@@ -24,7 +24,9 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
-      - run: npm ci --ignore-scripts --no-audit --no-fund
+      # The pnpm the package names (`packageManager` in package.json).
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile --ignore-scripts
 
       # The tag names the version, so it has to be the one the package says. The image is tagged X.Y.Z, without the v.
       - id: version
@@ -38,10 +40,10 @@ jobs:
           echo "version=$expected" >> "$GITHUB_OUTPUT"
 
       # Fails the build on a manifest an instance would refuse.
-      - run: npx sovereign-manifest check
+      - run: pnpm exec sovereign-manifest check
 
       - id: manifest
-        run: npx sovereign-manifest docker-args --format github >> "$GITHUB_OUTPUT"
+        run: pnpm exec sovereign-manifest docker-args --format github >> "$GITHUB_OUTPUT"
 
       - id: image
         run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"

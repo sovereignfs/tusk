@@ -23,8 +23,8 @@ The image's label (which is how an instance reads the manifest without pulling t
 `sovereign.manifest.json` by [`@sovereignfs/manifest`](https://www.npmjs.com/package/@sovereignfs/manifest), so build with what it prints:
 
 ```bash
-npm install
-eval "docker build $(npx sovereign-manifest docker-args) -t ghcr.io/you/tasks:0.1.0 ."
+pnpm install
+eval "docker build $(pnpm exec sovereign-manifest docker-args) -t ghcr.io/you/tasks:0.1.0 ."
 docker push ghcr.io/you/tasks:0.1.0
 ```
 
@@ -42,7 +42,7 @@ then, in your instance repository:
 ```
 
 `sv` reads the manifest from the image's label, shows you the scopes it asks for, gives it its address, its port (as `PORT`), its database and
-its secrets, and registers it with core. Change `sovereign.manifest.json` and build again; `npm run manifest:check` says whether it is
+its secrets, and registers it with core. Change `sovereign.manifest.json` and build again; `pnpm manifest:check` says whether it is
 valid.
 
 Two things to know. A person is identified by `session.sub` and by nothing else. And when you add data about people, delete it in
@@ -52,7 +52,7 @@ Two things to know. A person is identified by `session.sub` and by nothing else.
 
 ```bash
 cp .env.example .env     # point it at a core you can reach and a PostgreSQL database
-npm run dev
+pnpm dev
 ```
 
 See [Using the SDK](https://github.com/sovereignfs/sovereign/blob/main/docs/using-the-sdk.md) for what `sv.as(person)` can call, and
