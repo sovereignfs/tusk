@@ -32,7 +32,8 @@ ENV NODE_ENV=production \
 WORKDIR /app
 COPY --from=build --chown=node:node /app/.next/standalone ./
 COPY --from=build --chown=node:node /app/.next/static ./.next/static
-# The migrations, read from disk when the server starts and not traced by Next, are copied here by task 1.5.
+# The migrations are read from disk when the server starts, and Next does not trace them.
+COPY --from=build --chown=node:node /app/migrations ./migrations
 USER node
 EXPOSE ${PORT}
 CMD ["node", "server.js"]

@@ -9,9 +9,32 @@ function problems(result: LoadResult): readonly string[] {
 }
 
 describe('loadConfig', () => {
-  it('accepts no settings at all, so that a placeholder can be served with nothing set', () => {
+  it('accepts no settings at all, and the database is then an sqld service at its default address', () => {
     const result = loadConfig({});
-    expect(result).toEqual({ ok: true, config: { url: undefined, worker: true } });
+    expect(result).toMatchObject({
+      ok: true,
+      config: { url: undefined, worker: true, database: { database: { form: 'sqld' } } },
+    });
+  });
+
+  it('reports a wrong database setting with the others, naming it', () => {
+    const [problem] = problems(loadConfig({ TASKS_DB_DIALECT: 'mysql' }));
+    expect(problem).toContain('TASKS_DB_DIALECT');
+  });
+
+  it('reads the PostgreSQL address from a file, and keeps it out of what it reports', () => {
+    const result = loadConfig(
+      { TASKS_DB_DIALECT: 'postgres', TASKS_POSTGRES_URL_FILE: '/run/db' },
+      () => 'postgres://u:hunter2@db:5432/tasks\n',
+    );
+    expect(result).toMatchObject({ ok: true });
+    const bad = problems(
+      loadConfig(
+        { TASKS_DB_DIALECT: 'postgres', TASKS_POSTGRES_URL_FILE: '/run/db' },
+        () => 'hunter2 is not a url',
+      ),
+    );
+    expect(bad.join(' ')).not.toContain('hunter2');
   });
 
   describe('TASKS_URL', () => {

@@ -14,6 +14,8 @@ Each release's section is also its GitHub release notes: the release workflow re
 - Formatting with Prettier, linting with ESLint, and tests with Vitest.
 - Continuous integration, which runs only what a change can affect.
 - Settings are read in one place and checked at start-up: the server stops, naming the setting and never its value, on a wrong address, a partial set of related settings, or an SMTP host with no sender. `.env.example` lists every setting.
+- The database, in three forms: an sqld service (the default), a SQLite file and PostgreSQL, chosen by `TASKS_DB_DIALECT`. The server provisions and migrates it when it starts, waits for one that is still starting, and does not start if it cannot. `/api/health` answers only when the database does.
+- Migrations generated from a schema per dialect with `pnpm db:generate`, and checked in CI.
 
 ### Removed
 

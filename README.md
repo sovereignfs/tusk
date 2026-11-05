@@ -14,8 +14,14 @@ You need Node 24.15 or newer and [pnpm](https://pnpm.io).
 ```bash
 pnpm install --frozen-lockfile
 cp .env.example .env     # every setting is described in it
+# A database file needs no service. Put these in .env, or export them:
+#   TASKS_DB_DIALECT=sqlite
+#   TASKS_SQLITE_URL=file:./data/tasks.db
 pnpm dev
 ```
+
+The default database is an sqld service, and PostgreSQL is the third form. `pnpm db:dev sqld` or `pnpm db:dev postgres` starts either one in Docker and
+says which variables to set.
 
 `pnpm format:check`, `pnpm lint`, `pnpm typecheck` and `pnpm test` are what a change has to pass. [`CONTRIBUTING.md`](CONTRIBUTING.md) and
 [`AGENTS.md`](AGENTS.md) say how work is done here.

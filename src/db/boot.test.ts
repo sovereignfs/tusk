@@ -1,0 +1,83 @@
+import { sql } from 'drizzle-orm';
+import { afterEach, describe, expect, it } from 'vitest';
+import { getDatabase, getStores } from './boot';
+import type { Database } from './client';
+import { dbAll, dbGet } from './exec';
+import { resolveDatabaseConfig } from './config';
+import { resetStores, settingsFor, testTarget } from './test-support';
+
+const { leg, config } = testTarget();
+const KEY = Symbol.for('tasks.database');
+const holder = globalThis as { [KEY]?: Promise<{ close(): Promise<void> }> | undefined };
+
+afterEach(async () => {
+  const booted = holder[KEY];
+  holder[KEY] = undefined;
+  await (await booted?.catch(() => undefined))?.close();
+});
+
+/** The names of the tables a store holds, for any dialect. */
+async function tablesOf(database: Database): Promise<string[]> {
+  const rows =
+    database.dialect === 'postgres'
+      ? await dbAll<{ name: string }>(
+          database,
+          sql`SELECT table_name AS name FROM information_schema.tables WHERE table_schema = ${database.store === 'auth' ? 'tasks_auth' : 'tasks'}`,
+        )
+      : await dbAll<{ name: string }>(
+          database,
+          sql`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE '\\_\\_%' ESCAPE '\\' AND name NOT LIKE 'sqlite\\_%' ESCAPE '\\'`,
+        );
+  return rows.map((r) => r.name).sort();
+}
+
+describe(`booting an instance (${leg})`, () => {
+  it('from an empty database: provisions, migrates both stores, and is ready to use', async () => {
+    await resetStores(config);
+    const { app, auth } = await getStores(settingsFor(config));
+    expect(await dbGet(app, sql`SELECT 1 AS ok`)).toMatchObject({ ok: 1 });
+    expect(await dbGet(auth, sql`SELECT 1 AS ok`)).toMatchObject({ ok: 1 });
+  });
+
+  // The two must be separate databases: better-auth owns its tables and the app owns its
+  // own, and neither may see or collide with the other's. For sqld this is the
+  // `x-namespace` header, which sqld releases before 0.24.33 silently ignore, leaving every
+  // namespace the one default database; for a file, two files; for PostgreSQL, two schemas.
+  it("keeps the app's tables and better-auth's in separate stores", async () => {
+    await resetStores(config);
+    const { app, auth } = await getStores(settingsFor(config));
+    expect(await tablesOf(app)).toEqual(['account_settings']);
+    // Nothing of the app's is in the auth store: they are separate databases. (It holds better-auth's tables once sign-in is built, task 2.1.)
+    expect(await tablesOf(auth)).toEqual([]);
+  });
+
+  it('is booted once: later callers get the same database', async () => {
+    await resetStores(config);
+    const first = await getDatabase(settingsFor(config));
+    expect(await getDatabase(settingsFor(config))).toBe(first);
+  });
+
+  it('starts from an already-migrated database without changing it', async () => {
+    await resetStores(config);
+    const first = await getStores(settingsFor(config));
+    await first.close();
+    holder[KEY] = undefined;
+    const again = await getStores(settingsFor(config));
+    expect(await dbGet(again.app, sql`SELECT 1 AS ok`)).toMatchObject({ ok: 1 });
+    expect(await tablesOf(again.app)).toEqual(['account_settings']);
+  });
+
+  it('fails when the database cannot be reached, says why, and tries again on the next call', async () => {
+    const down = {
+      database: resolveDatabaseConfig({
+        TASKS_SQLD_URL: 'http://127.0.0.1:1',
+        TASKS_SQLD_ADMIN_URL: 'http://127.0.0.1:1',
+      }),
+      connectTimeoutMs: 100,
+      migrationsDir: undefined,
+    };
+    await expect(getStores(down)).rejects.toThrow(/TASKS_SQLD_ADMIN_URL/);
+    await resetStores(config);
+    await expect(getStores(settingsFor(config))).resolves.toBeDefined();
+  });
+});

@@ -1,3 +1,4 @@
+import { DatabaseConfigError, resolveDatabaseSettings, type DatabaseSettings } from '../db/config';
 import { readSetting, SettingFileError, type Env, type ReadFile } from './env';
 
 /** What the app was told, once it has been checked. It grows as the tasks that read a setting are built. */
@@ -6,6 +7,8 @@ export interface Config {
   readonly url: string | undefined;
   /** Whether this process runs the background jobs (DESIGN.md §5): off for all but one process when several share a database. */
   readonly worker: boolean;
+  /** Which database, and how to wait for it and migrate it (DESIGN.md §22.1). */
+  readonly database: DatabaseSettings;
 }
 
 /** One thing that is wrong, in words that name the setting and never its value. */
@@ -122,6 +125,19 @@ export function loadConfig(env: Env, readFile?: ReadFile): LoadResult {
     problems.push('TASKS_SMTP_HOST is set, and mail needs TASKS_SMTP_FROM as well.');
   }
 
-  if (problems.length > 0) return { ok: false, problems };
-  return { ok: true, config: { url, worker: rawWorker !== 'off' } };
+  // The database: which of the three forms, and the address it needs. A secret address may arrive as a file.
+  let database: DatabaseSettings | undefined;
+  try {
+    database = resolveDatabaseSettings({
+      ...env,
+      TASKS_POSTGRES_URL: read('TASKS_POSTGRES_URL'),
+      TASKS_POSTGRES_URL_FILE: undefined,
+    });
+  } catch (error) {
+    if (error instanceof DatabaseConfigError) problems.push(error.message);
+    else throw error;
+  }
+
+  if (problems.length > 0 || database === undefined) return { ok: false, problems };
+  return { ok: true, config: { url, worker: rawWorker !== 'off', database } };
 }

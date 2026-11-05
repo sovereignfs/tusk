@@ -142,29 +142,34 @@ pnpm dev                         # next dev
 pnpm format / format:check       # Prettier
 pnpm lint / lint:fix             # ESLint
 pnpm typecheck                   # next typegen && tsc --noEmit
+pnpm db:generate <name>          # migrations for both dialects, from the schemas
+pnpm db:dev sqld | postgres      # a local database in Docker (not needed: a file: URL works)
+pnpm boot-check                  # after pnpm build: a fresh instance boots on the database in the environment
 pnpm test                        # Vitest
 pnpm manifest:check              # sovereign.manifest.json is a valid manifest
 pnpm build                       # next build (standalone)
 eval "docker build $(pnpm exec sovereign-manifest docker-args) -t tasks:ci ."   # the image, with its port and label from the manifest
 ```
 
-Database and browser-test commands are added with their tooling (below); once they exist, this list is where they are written, and `verify` means all of it.
+Browser-test commands are added with their tooling (below); once they exist, this list is where they are written, and `verify` means all of it.
 
 ## Layout
 
 `DESIGN.md` §5.1 is where things go as the app is built; this is what is here now.
 
-| Path                                            | What                                                                                                                                                |
-| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `app/`                                          | Routes and layouts (App Router): a placeholder page and `/api/health`                                                                               |
-| `src/config/`                                   | Settings: `env.ts` is the only place `process.env` is read, `index.ts` checks them, `current.ts` keeps them                                         |
-| `instrumentation.ts`, `instrumentation-node.ts` | Run once at start-up: check the settings and stop on a wrong one. The first only hands over to the second, which Next must not compile for the Edge |
-| `scripts/`                                      | The CI classifier and its tests                                                                                                                     |
-| `sovereign.manifest.json`                       | What an instance reads to host the app. It still names the scaffold's sign-in paths, which task 2.10 replaces                                       |
-| `Dockerfile`, `.github/workflows/`              | One image, not root, on the manifest's port, published to `ghcr.io` on a `vX.Y.Z` tag; and CI                                                       |
+| Path                                            | What                                                                                                                                                                                                                                                                                                                      |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `app/`                                          | Routes and layouts (App Router): a placeholder page and `/api/health`, which asks the database                                                                                                                                                                                                                            |
+| `src/db/`                                       | The database layer (`DESIGN.md` §22): `config.ts` (which form), `client.ts`, `provision.ts`, `migrate.ts`, `boot.ts` (brings it up at start), `exec.ts` (`dbGet`, `dbAll`, `dbRun`, `transaction`), `schema/{sqlite,postgres}/` with the column vocabulary in `columns.ts`, `test-support.ts` (reads `TASKS_TEST_*` only) |
+| `src/config/`                                   | Settings: `env.ts` is the only place `process.env` is read, `index.ts` checks them, `current.ts` keeps them                                                                                                                                                                                                               |
+| `instrumentation.ts`, `instrumentation-node.ts` | Run once at start-up: check the settings, bring the database up, and stop on either being wrong. The first only hands over to the second, which Next must not compile for the Edge                                                                                                                                        |
+| `migrations/`                                   | The generated SQL, `sqlite/` and `postgres/`, committed and reviewed. Never written by hand                                                                                                                                                                                                                               |
+| `scripts/`                                      | The CI classifier and its tests, `db-generate.mjs`, `dev-db.mjs` and `boot-check.mjs                                                                                                                                                                                                                                      |
+| `sovereign.manifest.json`                       | What an instance reads to host the app. It still names the scaffold's sign-in paths, which task 2.10 replaces                                                                                                                                                                                                             |
+| `Dockerfile`, `.github/workflows/`              | One image, not root, on the manifest's port, published to `ghcr.io` on a `vX.Y.Z` tag; and CI                                                                                                                                                                                                                             |
 
 ## Not in place yet
 
-Each is a task in `ROADMAP.md`, not a thing to assume exists: everything in `src/` beyond the settings, the tests of the design (sign-in is tested
-against a fake Sovereign, never a real instance, as Fjord Web does), the `deploy/` setups, and the CI jobs for the databases, browser tests and the image. Add them in
+Each is a task in `ROADMAP.md`, not a thing to assume exists: everything in `src/` beyond the settings and the database, the tests of the design (sign-in is tested
+against a fake Sovereign, never a real instance, as Fjord Web does), the `deploy/` setups, and the CI jobs for browser tests and the image. Add them in
 their own `chore/` or `feat/` branches, and move the line out of this section as each lands. Nothing of the design is built.
