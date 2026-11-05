@@ -63,7 +63,9 @@ export default defineConfig({
       ...BLANK,
       ...database,
       TASKS_URL: `http://localhost:${PORT}`,
+      TASKS_AUTH_LOCAL: '1',
       TASKS_AUTH_SECRET: SECRET,
+      TASKS_AUTH_SIGNUP: 'closed',
     } as Record<string, string>,
   },
 });

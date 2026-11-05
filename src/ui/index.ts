@@ -10,12 +10,20 @@
  * package's types (`IconName`; an `Icon` needs `aria-hidden` or `aria-label`), not its README.
  */
 export {
+  AuthButton,
+  AuthCard,
+  AuthError,
+  AuthField,
+  AuthFooter,
+  AuthForm,
+  AuthLink,
   Avatar,
   BrandBadge,
   Button,
   ButtonLink,
   EmptyState,
   Icon,
+  Input,
   Spinner,
   ToastProvider,
   useToast,
