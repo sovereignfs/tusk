@@ -112,7 +112,7 @@ jobs:
           fi
 
   tests:
-    name: tests (${{ matrix.database }})
+    name: tests and browser tests (${{ matrix.database }})
     needs: changes
     if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-24.04
@@ -218,6 +218,21 @@ jobs:
       # TASKS_TEST_* names instead, because they drop whole schemas and namespaces and must never be pointed at a real database by the variables
       # a developer might have exported (src/db/test-support.ts).
       - run: pnpm test
+
+      # What only a browser can show (task 1.9): the built app, in Chromium and in WebKit, on this leg's database. The server is the one built
+      # above, started from the same variables.
+      - name: Install the browsers
+        run: pnpm exec playwright install --with-deps chromium webkit
+      - run: pnpm e2e
+      - name: Keep the report of a failure
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-report-${{ matrix.database }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
 
   scripts:
     name: shell scripts

@@ -7,8 +7,7 @@
 //
 // Exits 0 if /api/health answers ok on the expected dialect, 1 otherwise.
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { migrationsDir, prepareStandalone } from './lib/standalone.mjs';
 
 const port = process.env.BOOT_CHECK_PORT ?? '3999';
 // Health says `sqlite` for both of SQLite's forms, an sqld service and a file.
@@ -16,23 +15,18 @@ const configured = (process.env.TASKS_DB_DIALECT || 'sqld').trim().toLowerCase()
 const expectedDialect = configured === 'postgres' ? 'postgres' : 'sqlite';
 const deadline = Date.now() + Number(process.env.BOOT_CHECK_TIMEOUT_MS ?? 90_000);
 
-const entry = '.next/standalone/server.js';
-if (!existsSync(entry)) {
-  console.log(`${entry} is not there: run pnpm build first`);
+let entry;
+try {
+  entry = prepareStandalone();
+} catch (error) {
+  console.log(error.message);
   process.exit(1);
 }
 
 // The standalone server takes its port and address from the environment.
 const server = spawn('node', [entry], {
   stdio: ['ignore', 'pipe', 'pipe'],
-  // The standalone server runs from its own folder, which has no migrations: the image copies them beside it (task 1.10), and here they are
-  // named, as an operator may name them.
-  env: {
-    ...process.env,
-    PORT: port,
-    HOSTNAME: '127.0.0.1',
-    TASKS_MIGRATIONS_DIR: process.env.TASKS_MIGRATIONS_DIR || resolve('migrations'),
-  },
+  env: { ...process.env, PORT: port, HOSTNAME: '127.0.0.1', TASKS_MIGRATIONS_DIR: migrationsDir },
 });
 let log = '';
 server.stdout.on('data', (chunk) => (log += chunk));

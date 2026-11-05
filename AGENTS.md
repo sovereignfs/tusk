@@ -145,13 +145,14 @@ pnpm typecheck                   # next typegen && tsc --noEmit
 pnpm db:generate <name>          # migrations for both dialects, from the schemas
 pnpm db:dev sqld | postgres      # a local database in Docker (not needed: a file: URL works)
 pnpm boot-check                  # after pnpm build: a fresh instance boots on the database in the environment
+pnpm e2e                         # after pnpm build: browser tests (pnpm exec playwright install chromium webkit once)
 pnpm test                        # Vitest
 pnpm manifest:check              # sovereign.manifest.json is a valid manifest
 pnpm build                       # next build (standalone)
 eval "docker build $(pnpm exec sovereign-manifest docker-args) -t tasks:ci ."   # the image, with its port and label from the manifest
 ```
 
-Browser-test commands are added with their tooling (below); once they exist, this list is where they are written, and `verify` means all of it.
+once they exist, this list is where they are written, and `verify` means all of it.
 
 ## Layout
 
@@ -166,6 +167,7 @@ Browser-test commands are added with their tooling (below); once they exist, thi
 | `src/ui/`                                       | The design system's client boundary (`index.ts`), `AppShell` (the header row and the main area), the app's own CSS check (`design-tokens.ts`); `src/theme/` sets `data-theme` before first paint; `src/site.ts` is the app's name                                                                                         |
 | `src/config/`                                   | Settings: `env.ts` is the only place `process.env` is read, `index.ts` checks them, `current.ts` keeps them                                                                                                                                                                                                               |
 | `instrumentation.ts`, `instrumentation-node.ts` | Run once at start-up: check the settings, bring the database up, and stop on either being wrong. The first only hands over to the second, which Next must not compile for the Edge                                                                                                                                        |
+| `e2e/`, `playwright.config.ts`                  | Browser tests: the built app in Chromium and WebKit, on the database form the environment names (`pnpm build && pnpm e2e`). Touch is checked by hand in the iOS Simulator                                                                                                                                                 |
 | `migrations/`                                   | The generated SQL, `sqlite/` and `postgres/`, committed and reviewed. Never written by hand                                                                                                                                                                                                                               |
 | `scripts/`                                      | The CI classifier and its tests, `db-generate.mjs`, `dev-db.mjs` and `boot-check.mjs                                                                                                                                                                                                                                      |
 | `sovereign.manifest.json`                       | What an instance reads to host the app. It still names the scaffold's sign-in paths, which task 2.10 replaces                                                                                                                                                                                                             |
@@ -174,5 +176,5 @@ Browser-test commands are added with their tooling (below); once they exist, thi
 ## Not in place yet
 
 Each is a task in `ROADMAP.md`, not a thing to assume exists: everything in `src/` beyond the settings and the database, the tests of the design (sign-in is tested
-against a fake Sovereign, never a real instance, as Fjord Web does), the `deploy/` setups, and the CI jobs for browser tests and the image. Add them in
+against a fake Sovereign, never a real instance, as Fjord Web does), the `deploy/` setups, and the CI job for the image. Add them in
 their own `chore/` or `feat/` branches, and move the line out of this section as each lands. Nothing of the design is built.

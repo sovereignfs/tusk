@@ -19,6 +19,7 @@ Each release's section is also its GitHub release notes: the release workflow re
 - The frame of every page: a header with the app's mark and name, in light and dark and at a phone's width, with pages for a missing or failed route. Typeface and colours come from the design system, and a test refuses a literal colour, an undefined token or a typeface of the app's own.
 - Every page is sent with a Content-Security-Policy that has a nonce of its own, with no inline script, handler or `eval` allowed and nothing third-party; every response has the hardening headers, and HSTS over https.
 - A runner for background work inside the web process, safe when several processes share a database, switched off in all but one with `TASKS_WORKER=off`, and stopped on SIGTERM.
+- Browser tests with Playwright, in Chromium and WebKit, on each database form.
 
 ### Removed
 
