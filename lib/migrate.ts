@@ -33,6 +33,7 @@ export async function migrate(): Promise<void> {
         await client.query('ROLLBACK');
         throw new Error(
           `The migration ${file} failed: ${error instanceof Error ? error.message : String(error)}`,
+          { cause: error },
         );
       }
     }

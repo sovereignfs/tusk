@@ -139,13 +139,16 @@ pnpm is the package manager (the version is `packageManager` in `package.json`; 
 ```bash
 pnpm install --frozen-lockfile   # routine install
 pnpm dev                         # next dev
-pnpm typecheck                   # tsc --noEmit
+pnpm format / format:check       # Prettier
+pnpm lint / lint:fix             # ESLint
+pnpm typecheck                   # next typegen && tsc --noEmit
+pnpm test                        # Vitest
 pnpm manifest:check              # sovereign.manifest.json is a valid manifest
 pnpm build                       # next build (standalone)
 eval "docker build $(pnpm exec sovereign-manifest docker-args) -t tasks:ci ."   # the image, with its port and label from the manifest
 ```
 
-Format, lint, test and database commands are added with their tooling (below); once they exist, this list is where they are written, and `verify` means all of it.
+Database and browser-test commands are added with their tooling (below); once they exist, this list is where they are written, and `verify` means all of it.
 
 ## Layout
 
@@ -160,8 +163,6 @@ The repository today is the scaffold's. `DESIGN.md` §5.1 is where things go as 
 
 ## Not in place yet
 
-Each is a task in `ROADMAP.md`, not a thing to assume exists: everything in `src/`, `CHANGELOG.md`, `CONTRIBUTING.md`, a
-`LICENSE` (AGPL-3.0-or-later, as Fjord Web's), formatting and lint (Sovereign's Prettier and ESLint configuration), a test runner and
-tests (Vitest; sign-in is tested against a fake Sovereign, never a real instance, as Fjord Web does), the `deploy/` setups, a CI workflow with a
-changes-classifier job, a pull request template, and Dependabot. Add them in their own `chore/` PRs, and move the line out of this
-section as each lands. Nothing of the design is built.
+Each is a task in `ROADMAP.md`, not a thing to assume exists: everything in `src/` beyond a smoke test, the tests of the design (sign-in is tested
+against a fake Sovereign, never a real instance, as Fjord Web does), the `deploy/` setups, and a CI workflow with a changes-classifier job. Add them in
+their own `chore/` or `feat/` branches, and move the line out of this section as each lands. Nothing of the design is built.

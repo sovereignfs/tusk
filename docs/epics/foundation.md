@@ -32,7 +32,7 @@ Turns the scaffold into a repository that can hold Tasks as `DESIGN.md` designs 
 
 **Done as:** licence (copied from Fjord Web's AGPL text), contributing guide, pull request template, Dependabot, `.editorconfig` and `.node-version` (24.18.0); `package.json` gains `license`, `type` and `engines` of `>=24.15 <25`; `@sovereignfs/ui` is pinned at 0.91.0 and `@sovereignfs/sdk` at 2.1.0, both in `minimumReleaseAgeExclude`; `noUncheckedIndexedAccess` is on, and the scaffold already passed it. Dependabot holds TypeScript to 6.0.x and `@types/node` to the runtime's major. Left out: Prettier and ESLint, which are 1.2's.
 
-#### 📋 1.2 — Format, lint and test tooling
+#### ✅ 1.2 — Format, lint and test tooling
 
 **Goal:** the checks every later task runs.
 
@@ -47,6 +47,8 @@ Turns the scaffold into a repository that can hold Tasks as `DESIGN.md` designs 
 - `AGENTS.md` Commands gains them.
 
 **Accepts when:** `pnpm format:check`, `pnpm lint`, `pnpm typecheck` and `pnpm test` pass, and each is seen to fail on a planted fault.
+
+**Done as:** Prettier and ESLint with Sovereign's configuration (strict TypeScript rules and jsx-a11y; `eslint-plugin-jsx-a11y` is allowed on ESLint 10 by one named peer rule); Vitest, with the design system inlined for its CSS Modules and files run one after another; a smoke test that reads the manifest, so a runner that finds nothing cannot pass; `typecheck` runs `next typegen` first. The repository was reformatted in a commit of its own. Each of format, lint, typecheck and test was seen to fail on a planted fault. The scaffold's one lint error (an error thrown without its cause) is fixed. Left out: git hooks (`simple-git-hooks`, `lint-staged`), which can follow if wanted.
 
 #### 📋 1.3 — Continuous integration
 
