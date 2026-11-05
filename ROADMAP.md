@@ -2,7 +2,7 @@
 
 The order of work. **This file tracks progress; it does not define behaviour.** [`DESIGN.md`](DESIGN.md) says what Tusk does, and where it disagrees with this file, this file is stale and should be corrected. The detail of every task, with its technical notes and what makes it done, is in [`docs/epics/`](docs/epics/). How a task is run is in [`AGENTS.md`](AGENTS.md).
 
-State as of 2026-11-06: **Milestones A and B are done,** built as Tasks. On 2026-11-06 Tasks became **Tusk**, one app for a person's Desk and shared kanban boards (`DESIGN.md` §1, §5.2, §27), and this roadmap was replanned from row 30. **Milestone C makes the turn in the code: the name (15.1) and the Desk's tables (15.2) are done, and the Tusk shell (7.8) is next.** The developer assigns each task; the first row not done, with its dependencies met, is what the order recommends.
+State as of 2026-11-06: **Milestones A and B are done,** built as Tasks. On 2026-11-06 Tasks became **Tusk**, one app for a person's Desk and shared kanban boards (`DESIGN.md` §1, §5.2, §27), and this roadmap was replanned from row 30. **Milestone C makes the turn in the code: the name (15.1) and the Desk's tables (15.2) are done, the Tusk shell (7.8) is done, and the Desk in it (3.12) is next.** The developer assigns each task; the first row not done, with its dependencies met, is what the order recommends.
 
 _Status key: ✅ Done · ⏳ In progress · 📋 Planned · 🚧 Waits on a decision · ➖ Superseded_
 
@@ -73,7 +73,7 @@ What was built as Tasks becomes the Desk of Tusk. **Done when** the app is Tusk 
 | --- | ------------------------------ | ------------------------- | -------- | ---------- | ------ |
 | 30  | [15.1](docs/epics/tusk.md)     | The name                  | P0       | —          | ✅     |
 | 31  | [15.2](docs/epics/tusk.md)     | The Desk's tables         | P0       | 15.1       | ✅     |
-| 32  | [7.8](docs/epics/interface.md) | The Tusk shell            | P0       | 7.1, 15.1  | 📋     |
+| 32  | [7.8](docs/epics/interface.md) | The Tusk shell            | P0       | 7.1, 15.1  | ✅     |
 | 33  | [3.12](docs/epics/desk.md)     | The Desk in the new shell | P1       | 7.8, 15.2  | 📋     |
 | 34  | [3.13](docs/epics/desk.md)     | In progress               | P1       | 3.12       | 📋     |
 | 35  | [2.7](docs/epics/accounts.md)  | Settings                  | P1       | 7.8        | 📋     |

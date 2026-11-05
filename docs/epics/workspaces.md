@@ -83,7 +83,7 @@ gone and their comments stay; the last owner cannot leave; an added person sees 
 **Technical:** `GET /api/boards`: for each workspace the person is in, its name, people's avatars, and the boards they can see (by `canSeeBoard`), with
 name, colour and whether archived; light, one query per kind. The Desk tile from the local store (open count, due today). _My workspaces_ sorted by
 name, created or recently updated (`account_settings.workspace_sort`, a setting saved with the account through a small `PATCH /api/settings`);
-_Shared with me_ by name. Each section's gear opens the settings of 16.3; each ends with "Create board". A skeleton until loaded.
+_Shared with me_ by name. The Desk's entry in the app's sidebar (7.8) is removed here, since the Desk now has its tile. Each section's gear opens the settings of 16.3; each ends with "Create board". A skeleton until loaded.
 
 **Accepts when:** a private board appears only for its members and the workspace's owners; the sort survives a reload and holds on a second device;
 archived boards are behind _Archived_; the Desk tile works offline while the rest says it needs a connection.

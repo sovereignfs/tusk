@@ -27,6 +27,39 @@
   background-color: var(--sv-color-surface);
 }
 
+.lead {
+  display: flex;
+  align-items: center;
+  gap: var(--sv-space-2);
+  min-width: 0;
+}
+
+/* The sidebar's button: a plain icon button with the design system's focus ring and the size of a touch target. */
+.toggle {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  color: var(--sv-color-text-muted);
+  background: transparent;
+  border: 0;
+  border-radius: var(--sv-radius-md);
+  cursor: pointer;
+}
+
+.toggle:hover {
+  color: var(--sv-color-text-primary);
+  background: var(--sv-color-surface-sunken);
+}
+
+.toggle:focus-visible {
+  outline: 2px solid var(--sv-color-focus-ring);
+  outline-offset: 2px;
+}
+
 .brand {
   display: flex;
   align-items: center;

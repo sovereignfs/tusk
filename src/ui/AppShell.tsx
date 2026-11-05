@@ -4,7 +4,7 @@ import { markOf } from './brand';
 import styles from './AppShell.module.css';
 
 /**
- * The frame of a signed-in page (DESIGN.md §15.2): a header row and the main area. In the header, the logo and the app's name on the left, and on
+ * The frame of a signed-in page (DESIGN.md §17.2): a header row and the main area. In the header, the logo and the app's name on the left, and on
  * the right the notification bell and the person's avatar menu. The main area is given its columns by the page (`ThreeColumnLayout`, task 7.1).
  *
  * It is made here because the design system's `Header` requires an app launcher, which an app has no use for, and its `MobileHeader` never
@@ -15,12 +15,15 @@ import styles from './AppShell.module.css';
  */
 export function AppShell({
   name,
+  toolbar,
   bell,
   account,
   children,
 }: {
   /** The app's name, whose first two letters are the mark. */
   name: string;
+  /** What goes before the logo: the sidebar's button (task 7.8). */
+  toolbar?: ReactNode;
   /** The notification bell, at the right of the header (task 8.1). */
   bell?: ReactNode;
   /** The person's avatar menu, at the right of the header (task 2.7). */
@@ -30,10 +33,13 @@ export function AppShell({
   return (
     <div className={styles.shell}>
       <header className={styles.header}>
-        <a href="/" className={styles.brand} aria-label={name}>
-          <BrandBadge name={name} mark={markOf(name)} />
-          <span className={styles.name}>{name}</span>
-        </a>
+        <div className={styles.lead}>
+          {toolbar}
+          <a href="/" className={styles.brand} aria-label={name}>
+            <BrandBadge name={name} mark={markOf(name)} />
+            <span className={styles.name}>{name}</span>
+          </a>
+        </div>
         <div className={styles.actions}>
           {bell}
           {account}

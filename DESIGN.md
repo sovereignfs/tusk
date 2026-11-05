@@ -883,7 +883,7 @@ Two rows: the header, and the main area of two columns, the sidebar and the cont
 - **Header:** the logo and "Tusk" on the left, linking home; the avatar on the right. The avatar opens `UserMenu`: a header of the person's name and
   email, then Settings, and Sign out; and when a core is set, a way back to it.
 - **Sidebar, first block:** Boards, Planner and Inbox, each with its icon; the Inbox with its unread count. The Planner entry appears when the Planner
-  is built (phase 2), not before: there is no entry that leads nowhere.
+  is built (phase 2), not before: there is no entry that leads nowhere. **An entry is there only when its page is,** so the sidebar holds the Desk alone until Boards (16.4) holds its tile, and the Inbox until 8.1.
 - **Sidebar, second block:** the workspaces. The person's own (those they own) under _My workspaces_, with a + to create one; those they are a member
   of, under _Shared with me_, at the bottom. A workspace opens to its boards (`/w/<id>`), and expands in place to list them.
 - **Three states:** full, a rail of icons, and hidden, toggled from the header (`panel-left`) and remembered on the device. **By default it is full on
