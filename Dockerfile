@@ -5,35 +5,64 @@
 # arguments @sovereignfs/manifest prints from it:
 #
 #   eval "docker build $(pnpm exec sovereign-manifest docker-args) -t tasks ."
+#
+# The base is Debian ("glibc"), not Alpine: libSQL's native client, which the `file:` form of the database loads, has no build for musl
+# (DESIGN.md §22.1). The sqld and PostgreSQL forms would run on either, but one image has to run all three.
 
 ARG NODE_VERSION=24
 ARG PNPM_VERSION=11.28.9
 
-FROM node:${NODE_VERSION}-alpine AS build
+# --- Build ---------------------------------------------------------------------------------------------------
+FROM node:${NODE_VERSION}-bookworm-slim AS build
 ARG PNPM_VERSION
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0 NEXT_TELEMETRY_DISABLED=1
 RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
 WORKDIR /app
-# pnpm-workspace.yaml carries pnpm's settings (the platforms the lockfile covers), so the install needs it.
+# Dependencies first, from the lockfile alone, so they are not fetched again for a change to the source. pnpm-workspace.yaml carries pnpm's
+# settings (the platforms the lockfile covers, which include glibc's), so the install needs it.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN pnpm install --frozen-lockfile --ignore-scripts
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store pnpm install --frozen-lockfile --ignore-scripts
 COPY . .
-ENV NEXT_TELEMETRY_DISABLED=1
-RUN pnpm run build
+RUN pnpm build
 
-FROM node:${NODE_VERSION}-alpine AS run
+# --- What runs -----------------------------------------------------------------------------------------------
+FROM node:${NODE_VERSION}-bookworm-slim AS runtime
+
 # The port comes from the manifest, as the build argument sovereign-manifest docker-args gives. A build without it would listen where the
 # instance does not look, so it stops here.
 ARG PORT
 RUN test -n "${PORT}" || { echo 'Build with: eval "docker build $(pnpm exec sovereign-manifest docker-args) ."' >&2; exit 1; }
+
+LABEL org.opencontainers.image.title="Tasks" \
+      org.opencontainers.image.description="A private task manager that runs on its own or on a Sovereign instance" \
+      org.opencontainers.image.source="https://github.com/sovereignfs/tasks" \
+      org.opencontainers.image.licenses="AGPL-3.0-or-later"
+
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=${PORT} \
     HOSTNAME=0.0.0.0
+
 WORKDIR /app
 COPY --from=build --chown=node:node /app/.next/standalone ./
 COPY --from=build --chown=node:node /app/.next/static ./.next/static
 # The migrations are read from disk when the server starts, and Next does not trace them.
 COPY --from=build --chown=node:node /app/migrations ./migrations
+
+# Licences travel with the image: ours, and the design system's NOTICE, which carries Lucide's ISC licence and asks that it accompany copies (a
+# standalone build prunes it).
+COPY --from=build /app/LICENSE /usr/share/licenses/tasks/LICENSE
+COPY --from=build /app/node_modules/@sovereignfs/ui/LICENSE /usr/share/licenses/sovereignfs-ui/LICENSE
+COPY --from=build /app/node_modules/@sovereignfs/ui/NOTICE /usr/share/licenses/sovereignfs-ui/NOTICE
+
+# The database file, when the instance keeps one (TASKS_SQLITE_URL=file:/data/tasks.db), and nothing else, is written. The directory is the
+# app's user's, so that a volume made from it is too.
+RUN mkdir /data && chown node:node /data
+VOLUME /data
 USER node
 EXPOSE ${PORT}
+
+HEALTHCHECK --interval=15s --timeout=5s --start-period=40s --retries=3 \
+  CMD ["node", "-e", "fetch('http://127.0.0.1:'+process.env.PORT+'/api/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+
 CMD ["node", "server.js"]

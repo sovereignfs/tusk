@@ -146,6 +146,7 @@ pnpm db:generate <name>          # migrations for both dialects, from the schema
 pnpm db:dev sqld | postgres      # a local database in Docker (not needed: a file: URL works)
 pnpm boot-check                  # after pnpm build: a fresh instance boots on the database in the environment
 pnpm e2e                         # after pnpm build: browser tests (pnpm exec playwright install chromium webkit once)
+scripts/deploy-check.sh          # every setup of deploy/, from nothing (needs the image: see deploy/README.md)
 pnpm test                        # Vitest
 pnpm manifest:check              # sovereign.manifest.json is a valid manifest
 pnpm build                       # next build (standalone)
@@ -169,12 +170,13 @@ once they exist, this list is where they are written, and `verify` means all of 
 | `instrumentation.ts`, `instrumentation-node.ts` | Run once at start-up: check the settings, bring the database up, and stop on either being wrong. The first only hands over to the second, which Next must not compile for the Edge                                                                                                                                        |
 | `e2e/`, `playwright.config.ts`                  | Browser tests: the built app in Chromium and WebKit, on the database form the environment names (`pnpm build && pnpm e2e`). Touch is checked by hand in the iOS Simulator                                                                                                                                                 |
 | `migrations/`                                   | The generated SQL, `sqlite/` and `postgres/`, committed and reviewed. Never written by hand                                                                                                                                                                                                                               |
-| `scripts/`                                      | The CI classifier and its tests, `db-generate.mjs`, `dev-db.mjs` and `boot-check.mjs                                                                                                                                                                                                                                      |
+| `scripts/`                                      | The CI classifier and its tests, `db-generate.mjs`, `dev-db.mjs`, `boot-check.mjs`, `serve-standalone.mjs` (the built server as the image runs it), and `deploy-check.sh` (every setup, from nothing)                                                                                                                     |
 | `sovereign.manifest.json`                       | What an instance reads to host the app. It still names the scaffold's sign-in paths, which task 2.10 replaces                                                                                                                                                                                                             |
-| `Dockerfile`, `.github/workflows/`              | One image, not root, on the manifest's port, published to `ghcr.io` on a `vX.Y.Z` tag; and CI                                                                                                                                                                                                                             |
+| `Dockerfile`, `deploy/`                         | One image on Debian (libSQL has no musl build), not root, on the manifest's port; the Compose setups for sqld, a file and PostgreSQL, their README and `.env.example`                                                                                                                                                     |
+| `.github/workflows/`                            | `ci.yml` and `publish.yml` (a `vX.Y.Z` tag publishes the image to `ghcr.io`, with provenance)                                                                                                                                                                                                                             |
 
 ## Not in place yet
 
-Each is a task in `ROADMAP.md`, not a thing to assume exists: everything in `src/` beyond the settings and the database, the tests of the design (sign-in is tested
-against a fake Sovereign, never a real instance, as Fjord Web does), the `deploy/` setups, and the CI job for the image. Add them in
-their own `chore/` or `feat/` branches, and move the line out of this section as each lands. Nothing of the design is built.
+Each is a task in `ROADMAP.md`, not a thing to assume exists: everything in `src/` beyond the settings, the database, the jobs, the shell and the
+security headers, and the tests of the design (sign-in is tested against a fake Sovereign, never a real instance, as Fjord Web does). Add them in their
+own `chore/` or `feat/` branches, and move the line out of this section as each lands. Nothing of the product is built.

@@ -20,6 +20,7 @@ Each release's section is also its GitHub release notes: the release workflow re
 - Every page is sent with a Content-Security-Policy that has a nonce of its own, with no inline script, handler or `eval` allowed and nothing third-party; every response has the hardening headers, and HSTS over https.
 - A runner for background work inside the web process, safe when several processes share a database, switched off in all but one with `TASKS_WORKER=off`, and stopped on SIGTERM.
 - Browser tests with Playwright, in Chromium and WebKit, on each database form.
+- One image on Debian, not root, with the three ways to run it (an sqld service, a file, PostgreSQL) and a README, and a check that brings each up from nothing, restarts it, and stops it on SIGTERM. Published images carry provenance.
 
 ### Removed
 

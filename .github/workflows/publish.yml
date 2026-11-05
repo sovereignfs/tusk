@@ -62,4 +62,7 @@ jobs:
           push: true
           tags: ${{ steps.image.outputs.name }}:${{ steps.version.outputs.version }}
           labels: ${{ steps.manifest.outputs.labels }}
+          # Where the image came from, signed into it, and what it is made of: a registry can show both.
+          provenance: mode=max
+          sbom: true
           build-args: ${{ steps.manifest.outputs.build-args }}
