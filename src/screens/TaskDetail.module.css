@@ -27,3 +27,54 @@
   margin: 0;
   color: var(--sv-color-text-muted);
 }
+
+.subtasks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sv-space-2);
+}
+
+.heading {
+  margin: 0;
+  color: var(--sv-color-text-muted);
+  font-size: var(--sv-font-size-sm);
+  font-weight: var(--sv-font-weight-semibold);
+}
+
+.checklist {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.subtask {
+  display: flex;
+  align-items: center;
+  gap: var(--sv-space-2);
+  min-height: 40px;
+  border-bottom: var(--sv-border-width-hairline) solid var(--sv-color-border);
+}
+
+.subtaskTitle {
+  flex: 1;
+  min-width: 0;
+  padding: var(--sv-space-1) var(--sv-space-2);
+  border: var(--sv-border-width-hairline) solid transparent;
+  border-radius: var(--sv-radius-md);
+  background: transparent;
+  color: var(--sv-color-text-primary);
+  font: inherit;
+}
+
+.subtaskTitle:focus-visible {
+  border-color: var(--sv-color-border-strong);
+  outline: 2px solid var(--sv-color-focus-ring);
+  outline-offset: -2px;
+}
+
+.subtaskDone .subtaskTitle {
+  color: var(--sv-color-text-muted);
+  text-decoration: line-through;
+}

@@ -239,6 +239,18 @@ export function parseStructure(value: unknown, options: ChangeOptions = {}): Par
   if (kind === 'task' && out.parentId === out.id)
     return no('parentId: a task is not its own parent');
 
+  // A subtask has no date, star or repeat (§11.2): a change that makes one with any of them is refused here, where it can be seen, and an edit of one
+  // that already is a subtask is refused by the server, which knows the row (`apply.ts`).
+  if (kind === 'task' && typeof out.parentId === 'string') {
+    const set = (name: string) => {
+      const field = fields[name];
+      return field !== undefined && 'v' in field && field.v !== null && field.v !== false;
+    };
+    if (set('dueDate') || set('dueTime') || set('seriesId') || set('starred')) {
+      return no('a subtask has no date, star or repeat');
+    }
+  }
+
   if (creating) {
     for (const key of REQUIRED_ON_CREATE[kind])
       if (!Object.hasOwn(out, key)) return no(`${key}: a new row needs it`);

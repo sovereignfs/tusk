@@ -305,3 +305,29 @@ export async function allLists(db: LocalDatabase): Promise<LocalRow[]> {
 export async function taskCount(db: LocalDatabase): Promise<number> {
   return db.count('task');
 }
+
+/**
+ * For each top-level task with subtasks, how many it has and how many are done, for the ring on its row (DESIGN.md §11.2). Deleted subtasks are not
+ * counted. A completion time that is ciphertext cannot be read here, and counts as not done until the keys are in place (task 14.3).
+ */
+export async function subtaskCounts(
+  db: LocalDatabase,
+): Promise<Map<string, { done: number; total: number }>> {
+  const counts = new Map<string, { done: number; total: number }>();
+  let cursor = await db.transaction('task').store.openCursor();
+  while (cursor) {
+    const row = cursor.value;
+    if (row.table === 'task' && row.deletedAt === null && row.parentId !== null) {
+      const have = counts.get(row.parentId) ?? { done: 0, total: 0 };
+      const completed = row.fields.completedAt;
+      counts.set(row.parentId, {
+        total: have.total + 1,
+        done:
+          have.done +
+          (completed !== undefined && 'v' in completed && typeof completed.v === 'number' ? 1 : 0),
+      });
+    }
+    cursor = await cursor.continue();
+  }
+  return counts;
+}

@@ -188,8 +188,11 @@ async function applyChange(
   );
 
   if (existing === undefined) {
-    // It can only be new if it says what a new row needs. If not, it is an edit of a row that is not there for this account.
-    if (!parseStructure(change, { creating: true, plain }).ok) throw new Refused('unavailable');
+    // It can only be new if it says what a new row needs. If not, it is an edit of a row that is not there for this account, unless what is wrong
+    // with it is not what a new row needs but what no change may be (a subtask with a date): that is its shape, and is said so.
+    if (!parseStructure(change, { creating: true, plain }).ok) {
+      throw new Refused(parseStructure(change, { plain }).ok ? 'unavailable' : 'structure');
+    }
     await insertRow(tx, accountId, change, seq, options.now);
     touched.created[table] += 1;
   } else {
@@ -347,6 +350,20 @@ async function updateRow(
   if (updated.length === 0) throw new Refused('unavailable');
 }
 
+/** Whether fields hold what only a top-level task may have: a due date or time, a star, or a repeat. A field that is empty, false or unreadable does not. */
+function hasTopLevelOnlyField(fields: StoredFields): boolean {
+  const plain = (name: string) => {
+    const field = fields[name];
+    return field !== undefined && 'v' in field ? field.v : null;
+  };
+  return (
+    (plain('dueDate') ?? null) !== null ||
+    (plain('dueTime') ?? null) !== null ||
+    (plain('seriesId') ?? null) !== null ||
+    plain('starred') === true
+  );
+}
+
 interface TaskRow {
   id: string;
   listId: string;
@@ -397,6 +414,10 @@ async function checkStructure(
         sql`SELECT 1 AS one FROM ${task} WHERE parent_id = ${row.id} AND owner_id = ${accountId} LIMIT 1`,
       );
       if (children) throw new Refused('structure');
+      // A subtask has a title, notes and a tick, and no date, star or repeat (DESIGN.md §11.2), which keeps Today and the reminders about top-level
+      // tasks. Where the fields can be read, one that has any of them is refused; ciphertext cannot be checked, and the browser holds to it.
+      const own = decodeFields(row.fields);
+      if (own.ok && hasTopLevelOnlyField(own.value)) throw new Refused('structure');
       // A subtask that is edited brings its deleted parent back with it, as an edited task brings back its list.
       if (live && parent.deletedAt !== null && !touched.deletedTasks.has(row.parentId)) {
         await dbRun(

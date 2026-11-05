@@ -250,6 +250,46 @@ describe('a change', () => {
     expect(({} as Record<string, unknown>).ownerId).toBeUndefined();
   });
 
+  it('is refused when a subtask is made with a date, a time, a star or a repeat, and not when they are empty', () => {
+    const parent = ID();
+    const sub = (fields: Record<string, unknown>) => ({
+      table: 'task',
+      id: ID(),
+      listId: ID(),
+      parentId: parent,
+      position: 'a0',
+      fields: { title: { v: 'x' }, ...fields },
+    });
+    for (const fields of [
+      { dueDate: { v: '2026-11-05' } },
+      { dueTime: { v: '09:00' } },
+      { starred: { v: true } },
+      { seriesId: { v: ID() } },
+    ]) {
+      expect(parseStructure(sub(fields)).ok, JSON.stringify(fields)).toBe(false);
+    }
+    for (const fields of [
+      {},
+      { dueDate: { v: null } },
+      { starred: { v: false } },
+      { notes: { v: 'n' } },
+      { dueDate: { c: CIPHER } },
+    ]) {
+      expect(parseStructure(sub(fields)).ok, JSON.stringify(fields)).toBe(true);
+    }
+    // A top-level task may have all of them.
+    expect(
+      parseStructure({
+        table: 'task',
+        id: ID(),
+        listId: ID(),
+        parentId: null,
+        position: 'a0',
+        fields: { title: { v: 'x' }, dueDate: { v: '2026-11-05' }, starred: { v: true } },
+      }).ok,
+    ).toBe(true);
+  });
+
   it('is refused when a task is its own parent', () => {
     const id = ID();
     expect(parseStructure({ table: 'task', id, parentId: id }).ok).toBe(false);

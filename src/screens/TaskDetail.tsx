@@ -11,11 +11,12 @@ import {
   updateTask,
 } from '../actions/tasks';
 import type { LocalRow } from '../local/rows';
-import { getRow } from '../local/store';
+import { getRow, subtasksOf } from '../local/store';
 import { useLocal, useSync } from '../sync/react';
 import { Button, Checkbox, FormField, Input, Textarea } from '../ui';
 import { text } from './fields';
 import styles from './TaskDetail.module.css';
+import { Subtasks } from './Subtasks';
 import { useUndo } from './Undo';
 
 const ids = { newId: () => crypto.randomUUID() };
@@ -73,8 +74,10 @@ function Fields({ task, onDeleted }: { task: LocalRow; onDeleted: () => void }) 
     else if (result.reason === 'title') setDraftTitle(title);
   }
 
-  function tick(next: boolean) {
-    const result = next ? completeTask(task, Date.now(), ids) : reopenTask(task, ids);
+  async function tick(next: boolean) {
+    // A parent ticked off takes its open subtasks with it, in one mutation; reopening reopens nothing else.
+    const subtasks = next ? await client.read((db) => subtasksOf(db, task.id)) : [];
+    const result = next ? completeTask(task, Date.now(), ids, subtasks) : reopenTask(task, ids);
     if (result.ok) void client.commit(result.mutation);
   }
 
@@ -91,7 +94,12 @@ function Fields({ task, onDeleted }: { task: LocalRow; onDeleted: () => void }) 
 
   return (
     <>
-      <Checkbox id={`detail-tick-${task.id}`} label="Done" checked={done} onChange={tick} />
+      <Checkbox
+        id={`detail-tick-${task.id}`}
+        label="Done"
+        checked={done}
+        onChange={(next) => void tick(next)}
+      />
       <FormField label="Title">
         {(field) => (
           <Input
@@ -126,6 +134,7 @@ function Fields({ task, onDeleted }: { task: LocalRow; onDeleted: () => void }) 
           />
         )}
       </FormField>
+      {task.table === 'task' && task.parentId === null ? <Subtasks parent={task} /> : null}
       <div>
         <Button variant="secondary" onClick={remove}>
           Delete

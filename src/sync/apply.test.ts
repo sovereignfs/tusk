@@ -517,6 +517,105 @@ describe(`applying a mutation (${leg})`, () => {
     });
   });
 
+  describe('a subtask has no date, star or repeat', () => {
+    async function parentAndList() {
+      const ada = account();
+      const l = list();
+      const parent = task(l.id);
+      applied(await apply(ada, mutation(l, parent)));
+      return { ada, l, parent };
+    }
+    const refused = { status: 'refused', code: 'structure' };
+
+    it('is refused when it is made with one, wherever it can be read', async () => {
+      const { ada, l, parent } = await parentAndList();
+      const sub = (fields: Record<string, unknown>) =>
+        task(l.id, { parentId: parent.id, fields: { title: { v: 'x' }, ...fields } });
+      for (const fields of [
+        { dueDate: { v: '2026-11-05' } },
+        { dueTime: { v: '09:30' } },
+        { starred: { v: true } },
+        { seriesId: { v: id() } },
+      ]) {
+        expect(await apply(ada, mutation(sub(fields))), JSON.stringify(fields)).toEqual(refused);
+      }
+      expect((await snapshot(database, ada)).task).toHaveLength(1);
+    });
+
+    it('is refused when an edit gives an existing one a date, a star or a repeat', async () => {
+      const { ada, l, parent } = await parentAndList();
+      const sub = task(l.id, { parentId: parent.id });
+      applied(await apply(ada, mutation(sub)));
+      const edits: Record<string, { v: string | boolean }>[] = [
+        { dueDate: { v: '2026-11-05' } },
+        { starred: { v: true } },
+        { dueTime: { v: '10:00' } },
+      ];
+      for (const fields of edits) {
+        expect(
+          await apply(ada, mutation({ table: 'task', id: sub.id, fields })),
+          JSON.stringify(fields),
+        ).toEqual(refused);
+      }
+      expect(
+        await apply(ada, mutation({ table: 'task', id: sub.id, fields: { notes: { v: 'fine' } } })),
+      ).toMatchObject({ status: 'applied' });
+    });
+
+    it('is refused when a task that has a date is made a subtask, and let through when it is cleared in the same mutation', async () => {
+      const { ada, l, parent } = await parentAndList();
+      const dated = task(l.id, {
+        fields: { title: { v: 'dated' }, dueDate: { v: '2026-11-05' }, starred: { v: true } },
+      });
+      applied(await apply(ada, mutation(dated)));
+      expect(
+        await apply(ada, mutation({ table: 'task', id: dated.id, parentId: parent.id })),
+      ).toEqual(refused);
+      applied(
+        await apply(
+          ada,
+          mutation({
+            table: 'task',
+            id: dated.id,
+            parentId: parent.id,
+            fields: { dueDate: { v: null }, starred: { v: false } },
+          }),
+        ),
+      );
+    });
+
+    it('may have them empty, false or unreadable: nothing is held against what the server cannot see', async () => {
+      const { ada, l, parent } = await parentAndList();
+      applied(
+        await apply(
+          ada,
+          mutation(
+            task(l.id, {
+              parentId: parent.id,
+              fields: {
+                title: { v: 'a' },
+                dueDate: { v: null },
+                starred: { v: false },
+                seriesId: { v: null },
+              },
+            }),
+          ),
+        ),
+      );
+      applied(
+        await apply(
+          ada,
+          mutation(
+            task(l.id, {
+              parentId: parent.id,
+              fields: { title: { c: CIPHER }, dueDate: { c: CIPHER } },
+            }),
+          ),
+        ),
+      );
+    });
+  });
+
   describe('what an account may have', () => {
     it('is 200 lists and 50,000 tasks', () => {
       expect(LIMITS.listsPerAccount).toBe(200);

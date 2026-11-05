@@ -130,6 +130,23 @@ describe('what the seed makes', () => {
     const tasks = changes.filter((c) => c.table === 'task');
     const emptyLists = lists.filter((l) => !tasks.some((t) => 'listId' in t && t.listId === l.id));
     expect(emptyLists.length).toBeGreaterThanOrEqual(1);
+    // Subtasks at nothing done, part of them, and all of them, each under a parent that is open.
+    const subs = tasks.filter((t) => 'parentId' in t && typeof t.parentId === 'string');
+    const byParent = new Map<string, boolean[]>();
+    for (const sub of subs) {
+      if (!('parentId' in sub) || typeof sub.parentId !== 'string') continue;
+      byParent.set(sub.parentId, [
+        ...(byParent.get(sub.parentId) ?? []),
+        sub.fields?.completedAt !== undefined,
+      ]);
+    }
+    const shares = [...byParent.values()].map((done) => done.filter(Boolean).length / done.length);
+    expect(shares).toContain(0);
+    expect(shares).toContain(1);
+    expect(shares.some((share) => share > 0 && share < 1)).toBe(true);
+    for (const parentId of byParent.keys()) {
+      expect(tasks.find((t) => t.id === parentId)?.fields?.completedAt).toBeUndefined();
+    }
     const biggest = Math.max(
       ...lists.map((l) => tasks.filter((t) => 'listId' in t && t.listId === l.id).length),
     );
@@ -143,6 +160,7 @@ describe(`running it (${leg})`, () => {
     expect(result.created).toBe(true);
     expect(result.lists).toBe(6);
     expect(result.tasks).toBe(planSeed(result.accountId).ids.task.length);
+    expect(result.tasks).toBe(58);
     expect((await userRows()).length).toBe(1);
   });
 

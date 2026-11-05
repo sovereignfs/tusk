@@ -9,6 +9,7 @@ import { parseMutation } from '../sync/validate';
 import type { ActionResult, Ids } from './lists';
 import {
   completeTask,
+  createSubtask,
   createTask,
   deleteTask,
   isCompleted,
@@ -194,6 +195,140 @@ describe('ticking off', () => {
     expect(reopenTask(task(T1, 'a0'), counting())).toEqual({ ok: false, reason: 'nothing' });
     expect(completeTask(undefined, 1, counting())).toEqual({ ok: false, reason: 'missing' });
     expect(reopenTask(undefined, counting())).toEqual({ ok: false, reason: 'missing' });
+  });
+});
+
+const sub = (
+  id: string,
+  position: string,
+  parentId: string,
+  fields: Record<string, { v: unknown; s: number }> = {},
+): LocalRow =>
+  ({
+    table: 'task',
+    id,
+    listId: LIST,
+    parentId,
+    position,
+    deletedAt: null,
+    seq: 1,
+    createdAt: 1,
+    fields: { title: { v: id, s: 1 }, ...fields },
+  }) as LocalRow;
+const S1 = '40000000-0000-4000-8000-000000000001';
+const S2 = '40000000-0000-4000-8000-000000000002';
+const S3 = '40000000-0000-4000-8000-000000000003';
+
+describe('a subtask', () => {
+  const parent = task(T1, 'a0');
+
+  it('goes at the bottom of its parent’s subtasks, in the parent’s list, and is a mutation the server takes', () => {
+    const subs = [sub(S1, 'a0', T1), sub(S2, 'a1', T1)];
+    const result = createSubtask(parent, subs, { title: ' Book the flights ' }, counting());
+    accepted(result);
+    const change = mutationOf(result).changes[0] as {
+      listId: string;
+      parentId: string;
+      position: string;
+      fields: unknown;
+    };
+    expect(change).toMatchObject({
+      table: 'task',
+      listId: LIST,
+      parentId: T1,
+      fields: { title: { v: 'Book the flights' } },
+    });
+    expect(change.position > 'a1').toBe(true);
+    expect(
+      (
+        mutationOf(createSubtask(parent, [], { title: 'First' }, counting())).changes[0] as {
+          position: string;
+        }
+      ).position,
+    ).toBe('a0');
+  });
+
+  it('is refused unless the parent is a top-level task that is there', () => {
+    expect(createSubtask(sub(S1, 'a0', T1), [], { title: 'x' }, counting())).toEqual({
+      ok: false,
+      reason: 'nothing',
+    });
+    expect(createSubtask(undefined, [], { title: 'x' }, counting())).toEqual({
+      ok: false,
+      reason: 'missing',
+    });
+    expect(
+      createSubtask({ ...parent, deletedAt: 5 } as LocalRow, [], { title: 'x' }, counting()),
+    ).toEqual({ ok: false, reason: 'missing' });
+    expect(
+      createSubtask(
+        { ...parent, table: 'list' } as unknown as LocalRow,
+        [],
+        { title: 'x' },
+        counting(),
+      ),
+    ).toEqual({ ok: false, reason: 'missing' });
+  });
+
+  it('refuses a bad title and a full account, and each goes below the one made before it', () => {
+    expect(createSubtask(parent, [], { title: '  ' }, counting())).toEqual({
+      ok: false,
+      reason: 'title',
+    });
+    expect(createSubtask(parent, [], { title: 'x' }, counting(), LIMITS.tasksPerAccount)).toEqual({
+      ok: false,
+      reason: 'limit',
+    });
+    let below: string | undefined;
+    const made: string[] = [];
+    for (let i = 0; i < 5; i++) {
+      const change = mutationOf(createSubtask(parent, [], { title: `s${i}` }, counting(), 0, below))
+        .changes[0] as { position: string };
+      made.push(change.position);
+      below = change.position;
+    }
+    expect(made).toEqual([...made].sort());
+    expect(new Set(made).size).toBe(5);
+  });
+
+  it('completing the parent completes its open subtasks in the same mutation, and leaves the time of those already done alone', () => {
+    const subs = [
+      sub(S1, 'a0', T1),
+      sub(S2, 'a1', T1, { completedAt: { v: 1_700_000_000_000, s: 2 } }),
+      sub(S3, 'a2', T1),
+    ];
+    const result = completeTask(parent, 1_800_000_000_000, counting(), subs);
+    accepted(result);
+    const changes = mutationOf(result).changes;
+    expect(changes.map((c) => c.id)).toEqual([T1, S1, S3]);
+    for (const change of changes)
+      expect(change.fields).toEqual({ completedAt: { v: 1_800_000_000_000 } });
+    // The one that was done is not in it: its completion time is not touched.
+    expect(changes.some((c) => c.id === S2)).toBe(false);
+  });
+
+  it('ticking a subtask completes nothing else, the last one included, and reopening a parent reopens nothing', () => {
+    const subs = [sub(S1, 'a0', T1, { completedAt: { v: 5, s: 2 } }), sub(S2, 'a1', T1)];
+    // The last open subtask ticked: only itself.
+    const last = completeTask(subs[1], 9, counting(), []);
+    expect(mutationOf(last).changes).toEqual([
+      { table: 'task', id: S2, fields: { completedAt: { v: 9 } } },
+    ]);
+    // Even given subtasks, a subtask has none to complete.
+    expect(
+      mutationOf(completeTask(subs[1], 9, counting(), [sub(S3, 'a0', S2)])).changes,
+    ).toHaveLength(1);
+    // Reopening a parent: itself only.
+    const done = task(T1, 'a0', { completedAt: { v: 5, s: 2 } });
+    expect(mutationOf(reopenTask(done, counting())).changes).toHaveLength(1);
+  });
+
+  it('is still one thing when the parent is ticked twice', () => {
+    const done = task(T1, 'a0', { completedAt: { v: 5, s: 2 } });
+    expect(completeTask(done, 9, counting(), [sub(S1, 'a0', T1)])).toEqual({
+      ok: false,
+      reason: 'nothing',
+    });
   });
 });
 

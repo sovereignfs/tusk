@@ -1,6 +1,6 @@
 import { text as textParser } from '../access/parse';
 import type { LocalRow } from '../local/rows';
-import { before, first } from '../position';
+import { after, before, first } from '../position';
 import { LIMITS, type Mutation } from '../sync/format';
 import type { ActionResult, Ids } from './lists';
 
@@ -86,14 +86,33 @@ export function updateTask(
 /**
  * Ticks a task off at `now`. **Ticking one that is done already does nothing**, so that a double tap does one thing and not two: the second finds the
  * first's completion time and leaves it (DESIGN.md §13.1).
+ *
+ * Completing a parent is **one mutation** that also completes its **open** subtasks (`subtasks` is the parent's, as rendered): one that is done
+ * already keeps the time it was done at, which the plugin overwrote (§11.2). Ticking a subtask, the last one included, completes nothing else:
+ * finishing the parts is often not finishing the thing.
  */
-export function completeTask(task: LocalRow | undefined, now: number, ids: Ids): ActionResult {
+export function completeTask(
+  task: LocalRow | undefined,
+  now: number,
+  ids: Ids,
+  subtasks: readonly LocalRow[] = [],
+): ActionResult {
   if (!task) return { ok: false, reason: 'missing' };
   if (isCompleted(task)) return { ok: false, reason: 'nothing' };
-  return mutationOf(ids, [{ table: 'task', id: task.id, fields: { completedAt: { v: now } } }]);
+  const changes: Mutation['changes'][number][] = [
+    { table: 'task', id: task.id, fields: { completedAt: { v: now } } },
+  ];
+  const isParent = task.table === 'task' && task.parentId === null;
+  if (isParent) {
+    for (const sub of subtasks) {
+      if (!isCompleted(sub))
+        changes.push({ table: 'task', id: sub.id, fields: { completedAt: { v: now } } });
+    }
+  }
+  return mutationOf(ids, changes);
 }
 
-/** Un-ticks a task. One that is not done is left alone. */
+/** Un-ticks a task. One that is not done is left alone. **Reopening a parent reopens nothing else** (DESIGN.md §11.2). */
 export function reopenTask(task: LocalRow | undefined, ids: Ids): ActionResult {
   if (!task) return { ok: false, reason: 'missing' };
   if (!isCompleted(task)) return { ok: false, reason: 'nothing' };
@@ -109,4 +128,39 @@ export function deleteTask(task: LocalRow | undefined, ids: Ids): ActionResult {
 export function restoreTask(task: LocalRow | undefined, ids: Ids): ActionResult {
   if (!task) return { ok: false, reason: 'missing' };
   return mutationOf(ids, [{ table: 'task', id: task.id, deleted: false }]);
+}
+
+/**
+ * A subtask of `parent`, at the bottom of its subtasks (a checklist grows downward; it is a new *task* that goes to the top). **Refused unless the
+ * parent is a top-level task** that is still there: one level deep, here and at the server (DESIGN.md §11.2). It takes the parent's list.
+ */
+export function createSubtask(
+  parent: LocalRow | undefined,
+  subtasks: readonly LocalRow[],
+  input: { title: string },
+  ids: Ids,
+  allCount = 0,
+  /** The position of the subtask made last, for the next to go below while the screen is still catching up with it. */
+  below?: string,
+): ActionResult {
+  if (!parent || parent.table !== 'task' || parent.deletedAt !== null)
+    return { ok: false, reason: 'missing' };
+  if (parent.parentId !== null) return { ok: false, reason: 'nothing' };
+  const title = input.title.trim();
+  if (!TITLE(title).ok) return { ok: false, reason: 'title' };
+  if (allCount >= LIMITS.tasksPerAccount) return { ok: false, reason: 'limit' };
+  const last = subtasks.at(-1);
+  const shown = last && 'position' in last ? last.position : undefined;
+  const bottom =
+    shown !== undefined && below !== undefined ? (shown > below ? shown : below) : (shown ?? below);
+  return mutationOf(ids, [
+    {
+      table: 'task',
+      id: ids.newId(),
+      listId: parent.listId,
+      parentId: parent.id,
+      position: bottom !== undefined ? after(bottom) : first(),
+      fields: { title: { v: title } },
+    },
+  ]);
 }

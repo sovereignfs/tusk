@@ -202,3 +202,133 @@ test('with the network off, adding and ticking show at once, and are sent when i
     )
     .toBe(true);
 });
+
+test.describe('subtasks', () => {
+  /** A list with one task, opened in the right column. */
+  async function taskOpen(page: Page) {
+    await openNewList(page);
+    const title = unique('Plan the trip');
+    await add(page, title);
+    await page.getByRole('link', { name: title }).click();
+    const detail = page.getByRole('region', { name: 'Task', exact: true });
+    await expect(detail).toBeVisible();
+    return { title, detail };
+  }
+  const addSub = async (detail: ReturnType<Page['getByRole']>, title: string) => {
+    await detail.getByLabel('Add a subtask').fill(title);
+    await detail.getByLabel('Add a subtask').press('Enter');
+  };
+
+  test('are added from the keyboard, in order, with the cursor staying, and the row shows how far through it is', async ({
+    page,
+  }) => {
+    const { title, detail } = await taskOpen(page);
+    for (const sub of ['Flights', 'Hotel', 'Insurance']) {
+      await addSub(detail, sub);
+      await expect(detail.getByLabel('Add a subtask')).toBeFocused();
+    }
+    const subs = detail.getByRole('region', { name: 'Subtasks' });
+    await expect
+      .poll(
+        async () =>
+          await subs
+            .getByRole('listitem')
+            .getByRole('textbox')
+            .evaluateAll((els) => els.map((el) => (el as HTMLInputElement).value)),
+      )
+      .toEqual(['Flights', 'Hotel', 'Insurance']);
+
+    const ring = page.getByRole('listitem').filter({ hasText: title }).getByRole('img');
+    await expect(ring).toHaveAccessibleName('0 of 3 subtasks done');
+    await subs.getByRole('checkbox', { name: 'Done: Hotel' }).click();
+    await expect(ring).toHaveAccessibleName('1 of 3 subtasks done');
+    // They are not on the list's rows: a subtask is not a task of the list.
+    await expect(page.getByRole('link', { name: 'Hotel' })).toHaveCount(0);
+  });
+
+  test('ticking the parent ticks the open ones and leaves the time of the one that was done, and reopening it reopens nothing', async ({
+    page,
+    baseURL,
+  }) => {
+    const { title, detail } = await taskOpen(page);
+    const origin = new URL(baseURL ?? 'http://localhost').origin;
+    for (const sub of ['One', 'Two', 'Three']) await addSub(detail, sub);
+    const subs = detail.getByRole('region', { name: 'Subtasks' });
+    await subs.getByRole('checkbox', { name: 'Done: Two' }).click();
+    await expect(
+      page.getByRole('listitem').filter({ hasText: title }).getByRole('img'),
+    ).toHaveAccessibleName('1 of 3 subtasks done');
+
+    const completedAt = async () => {
+      const reply = await page.request.post('/api/sync', {
+        headers: { origin },
+        data: { protocol: 1, cursor: 0, mutations: [], limit: 2000 },
+      });
+      const rows = (await reply.json()).pull.rows as {
+        table: string;
+        fields: { title?: { v: string }; completedAt?: { v: number | null } };
+      }[];
+      return Object.fromEntries(
+        rows
+          .filter(
+            (r) =>
+              r.table === 'task' &&
+              ['One', 'Two', 'Three', title].includes(r.fields.title?.v ?? ''),
+          )
+          .map((r) => [r.fields.title?.v, r.fields.completedAt?.v ?? null]),
+      );
+    };
+    await expect.poll(async () => (await completedAt()).Two).not.toBeNull();
+    const twoDoneAt = (await completedAt()).Two;
+
+    await detail.getByRole('checkbox', { name: 'Done' }).first().click();
+    await expect.poll(async () => (await completedAt())[title]).not.toBeNull();
+    await expect.poll(async () => (await completedAt()).One).not.toBeNull();
+    const after = await completedAt();
+    expect(after.Three).not.toBeNull();
+    // Two was done already, and keeps the time it was done at.
+    expect(after.Two).toBe(twoDoneAt);
+
+    // Reopening the parent reopens none of them.
+    await detail.getByRole('checkbox', { name: 'Done' }).first().click();
+    await expect.poll(async () => (await completedAt())[title]).toBeNull();
+    const reopened = await completedAt();
+    expect(reopened.One).not.toBeNull();
+    expect(reopened.Three).not.toBeNull();
+  });
+
+  test('ticking the last one does not tick the parent, and a subtask deleted can be undone', async ({
+    page,
+  }) => {
+    const { detail } = await taskOpen(page);
+    await addSub(detail, 'Only');
+    const subs = detail.getByRole('region', { name: 'Subtasks' });
+    await subs.getByRole('checkbox', { name: 'Done: Only' }).click();
+    await expect(detail.getByRole('checkbox', { name: 'Done' }).first()).not.toBeChecked();
+
+    await subs.getByRole('button', { name: 'Delete subtask: Only' }).click();
+    await expect(subs.getByRole('textbox', { name: 'Subtask: Only' })).toHaveCount(0);
+    const bar = page.getByRole('status').filter({ hasText: 'Subtask deleted.' });
+    await bar.getByRole('button', { name: 'Undo' }).click();
+    await expect(subs.getByRole('textbox', { name: 'Subtask: Only' })).toBeVisible();
+  });
+
+  test('a title is edited in place and saved as it is left, and an emptied one goes back', async ({
+    page,
+  }) => {
+    const { detail } = await taskOpen(page);
+    await addSub(detail, 'Flights');
+    const field = detail.getByRole('textbox', { name: 'Subtask: Flights' });
+    await field.fill('Flights and trains');
+    await field.press('Enter');
+    await expect(
+      detail.getByRole('textbox', { name: 'Subtask: Flights and trains' }),
+    ).toBeVisible();
+    await page.reload();
+    await expect(page.getByRole('textbox', { name: 'Subtask: Flights and trains' })).toBeVisible();
+    const again = page.getByRole('textbox', { name: 'Subtask: Flights and trains' });
+    await again.fill('   ');
+    await again.blur();
+    await expect(again).toHaveValue('Flights and trains');
+  });
+});

@@ -24,6 +24,7 @@ import { firstListId } from '../src/actions/lists';
  * - **Local only.** It refuses a database that is not on this machine: it makes an account with a password that is written in this file.
  * - **Removes only its own.** `--reset` deletes the rows whose ids it would make, and the account it made, and makes them again.
  * - It grows with the features: a feature that has a shape worth looking at adds it here, in the task that builds it.
+ *   Subtasks are here (none done, some, and all while the parent is open); overdue, due today, upcoming, repeating and starred are not yet.
  */
 export const SEED_EMAIL = 'seed@example.test';
 /** A password for a development database on this machine, and for nothing else. */
@@ -94,6 +95,18 @@ export function planSeed(accountId: string): Plan {
     })),
   ];
 
+  // Subtasks at nothing done, part of them, and all of them while the parent is still open (finishing the parts is not finishing the thing).
+  const subtasks: { parent: string; key: string; title: string; done?: number }[] = [
+    { parent: 'plants', key: 'plants-1', title: 'The fern' },
+    { parent: 'plants', key: 'plants-2', title: 'The ivy' },
+    { parent: 'plants', key: 'plants-3', title: 'The cactus, barely' },
+    { parent: 'report', key: 'report-1', title: 'Get the numbers', done: 1_793_300_000_000 },
+    { parent: 'report', key: 'report-2', title: 'Write the summary' },
+    { parent: 'report', key: 'report-3', title: 'Check the charts' },
+    { parent: 'review', key: 'review-1', title: 'Read the description', done: 1_793_400_000_000 },
+    { parent: 'review', key: 'review-2', title: 'Run it', done: 1_793_410_000_000 },
+  ];
+
   const changes: Change[] = lists.map((list, i) => ({
     table: 'list',
     id: list.id,
@@ -120,6 +133,30 @@ export function planSeed(accountId: string): Plan {
           title: { v: task.title },
           ...(task.notes !== undefined ? { notes: { v: task.notes } } : {}),
           ...(task.done !== undefined ? { completedAt: { v: task.done } } : {}),
+        },
+      });
+    });
+  }
+
+  const parentOf = (key: string) => tasks.find((t) => t.key === key);
+  for (const parentKey of new Set(subtasks.map((sub) => sub.parent))) {
+    const parent = parentOf(parentKey);
+    const list = lists.find((l) => l.key === parent?.list);
+    if (!parent || !list) continue;
+    const mine = subtasks.filter((sub) => sub.parent === parentKey);
+    const positions = many(null, null, mine.length);
+    mine.forEach((sub, i) => {
+      const subId = id(`task:${sub.key}`);
+      taskIds.push(subId);
+      changes.push({
+        table: 'task',
+        id: subId,
+        listId: list.id,
+        parentId: id(`task:${parentKey}`),
+        position: positions[i] as string,
+        fields: {
+          title: { v: sub.title },
+          ...(sub.done !== undefined ? { completedAt: { v: sub.done } } : {}),
         },
       });
     });
