@@ -70,6 +70,11 @@ export async function openLocal(
         db.createObjectStore('meta');
       }
     },
+    // Another tab is deleting this account's database (it signed out, or the account was deleted): this connection is in the way, so it lets go.
+    // Without it the deletion waits for every tab to be closed, and a person who signed out would still have their tasks on the device.
+    blocking(_currentVersion, _blockedVersion, event) {
+      (event.target as IDBDatabase).close();
+    },
   });
 }
 

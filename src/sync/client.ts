@@ -3,6 +3,7 @@ import {
   type Refusal,
   type Settled,
   commitMutation,
+  lastSyncedAt,
   outboxSize,
   readCursor,
   readOutbox,
@@ -20,6 +21,9 @@ import { parseMutation } from './validate';
  * Nothing here is awaited by a screen: a screen calls `commit`, which finishes when the working copy has the change, and reads the working copy. It
  * never waits for `sync`, and nothing in the UI depends on one having happened (AGENTS.md).
  */
+/** The first page of a snapshot (DESIGN.md §8.5): small, so that the first list can be drawn while the rest arrives. */
+export const FIRST_PAGE = 100;
+
 export class InvalidMutation extends Error {
   constructor(readonly reason: string) {
     super(`not a mutation: ${reason}`);
@@ -32,6 +36,7 @@ export type SyncOutcome =
   | { status: 'offline' }
   | { status: 'signed-out' }
   | { status: 'update-required' }
+  | { status: 'account-deleted' }
   | { status: 'rate-limited'; retryAfterMs: number }
   | { status: 'error' };
 
@@ -103,6 +108,14 @@ export class SyncClient {
     return query(this.options.db);
   }
 
+  /**
+   * Whether this device has ever heard from the server. Until it has, a new device has nothing to show, and the app can say it is loading; after it,
+   * never: a device that has synced once paints from its own copy at once, on any network (DESIGN.md §8.5).
+   */
+  async hasSynced(): Promise<boolean> {
+    return (await lastSyncedAt(this.options.db)) !== undefined;
+  }
+
   /** The number of changes waiting to be sent. */
   pending(): Promise<number> {
     return outboxSize(this.options.db);
@@ -113,7 +126,7 @@ export class SyncClient {
    * what went wrong is the outcome, and the outbox is left as it was, so that the next try sends the same.
    */
   async sync(): Promise<SyncOutcome> {
-    const rounds = this.options.maxRounds ?? 20;
+    const rounds = this.options.maxRounds ?? 200;
     for (let round = 0; round < rounds; round++) {
       const sent = await readOutbox(this.options.db, LIMITS.mutationsPerRequest);
       const cursor = await readCursor(this.options.db);
@@ -121,11 +134,14 @@ export class SyncClient {
         protocol: PROTOCOL_VERSION,
         cursor,
         mutations: sent.map((entry) => entry.mutation),
+        // A device with nothing asks for a small first page, so that something is on the screen at once; the pages after it are the usual size.
+        ...(cursor === 0 ? { limit: FIRST_PAGE } : {}),
       });
 
       if (result.kind === 'offline') return { status: 'offline' };
       if (result.kind === 'signed-out') return { status: 'signed-out' };
       if (result.kind === 'update-required') return { status: 'update-required' };
+      if (result.kind === 'account-deleted') return { status: 'account-deleted' };
       if (result.kind === 'rate-limited')
         return { status: 'rate-limited', retryAfterMs: result.retryAfterMs };
       if (result.kind === 'error') return { status: 'error' };

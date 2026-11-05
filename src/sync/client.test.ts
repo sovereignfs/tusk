@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto';
 import { afterEach, describe, expect, it } from 'vitest';
 import { type LocalDatabase, deleteLocal, openLocal } from '../local/db';
 import { listsOf, outboxSize, readCursor } from '../local/store';
-import { InvalidMutation, SyncClient } from './client';
+import { FIRST_PAGE, InvalidMutation, SyncClient } from './client';
 import { LIMITS, PROTOCOL_VERSION, type SyncRequest, type SyncResponse } from './format';
 import type { Transport, TransportResult } from './transport';
 
@@ -133,6 +133,66 @@ describe('committing', () => {
   });
 });
 
+describe('a new device', () => {
+  it('asks for a small first page, so that something is drawn at once, and the usual size after it', async () => {
+    const t = transport((request, call) => ({
+      kind: 'ok',
+      response: {
+        protocol: PROTOCOL_VERSION,
+        results: [],
+        pull: { cursor: call * 5, more: call < 3, rows: [], tombstones: [] },
+      },
+    }));
+    const client = new SyncClient({ db: await database(), transport: t.send });
+    await client.sync();
+    expect(t.calls.map((c) => c.limit)).toEqual([FIRST_PAGE, undefined, undefined]);
+  });
+
+  it('has not synced until the server has answered once, and has for ever after', async () => {
+    let up = false;
+    const t = transport((request) => (up ? okFor(request) : { kind: 'offline' }));
+    const client = new SyncClient({ db: await database(), transport: t.send });
+    expect(await client.hasSynced()).toBe(false);
+    await client.sync();
+    expect(await client.hasSynced()).toBe(false);
+    up = true;
+    await client.sync();
+    expect(await client.hasSynced()).toBe(true);
+  });
+
+  it('shows what arrives as it arrives: each page is in the copy, and announced, before the next is asked for', async () => {
+    const seenAtAsk: number[] = [];
+    const holder: { client?: SyncClient } = {};
+    const t = transport((request, call) => {
+      void holder.client?.read(listsOf).then((rows) => seenAtAsk.push(rows.length));
+      const row = {
+        table: 'list' as const,
+        id: ID(),
+        position: 'a0',
+        deletedAt: null,
+        seq: call,
+        createdAt: 1,
+        fields: { title: { v: `l${call}`, s: call } },
+      };
+      return {
+        kind: 'ok',
+        response: {
+          protocol: PROTOCOL_VERSION,
+          results: [],
+          pull: { cursor: call, more: call < 3, rows: [row], tombstones: [] },
+        },
+      };
+    });
+    const client = new SyncClient({ db: await database(), transport: t.send });
+    holder.client = client;
+    let announced = 0;
+    client.subscribe(() => announced++);
+    await client.sync();
+    expect(announced).toBe(3);
+    expect((await client.read(listsOf)).length).toBe(3);
+  });
+});
+
 describe('syncing', () => {
   it('sends the outbox in order with the cursor and the protocol, and clears what was answered', async () => {
     const t = transport((request) => okFor(request));
@@ -197,6 +257,7 @@ describe('syncing', () => {
   it.each([
     [{ kind: 'signed-out' }, { status: 'signed-out' }],
     [{ kind: 'update-required' }, { status: 'update-required' }],
+    [{ kind: 'account-deleted' }, { status: 'account-deleted' }],
     [
       { kind: 'rate-limited', retryAfterMs: 7000 },
       { status: 'rate-limited', retryAfterMs: 7000 },

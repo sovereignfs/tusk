@@ -50,7 +50,7 @@ One person, running it alone, keeps real lists in it, and it works with the netw
 | 13  | [13.1](docs/epics/sync.md)            | The change format and validators        | P0       | 3.1            | ✅     |
 | 14  | [13.2](docs/epics/sync.md)            | The sync endpoint                       | P0       | 13.1           | ✅     |
 | 15  | [13.3](docs/epics/sync.md)            | The local store and outbox              | P0       | 13.1           | ✅     |
-| 16  | [13.4](docs/epics/sync.md)            | First load, sign-out and ended sessions | P0       | 13.2, 13.3     | 📋     |
+| 16  | [13.4](docs/epics/sync.md)            | First load, sign-out and ended sessions | P0       | 13.2, 13.3     | ✅     |
 | 17  | [3.2](docs/epics/lists-and-tasks.md)  | Positions                               | P0       | 1.5            | 📋     |
 | 18  | [7.1](docs/epics/interface.md)        | Desktop layout, over the local store    | P0       | 1.8, 13.3      | 📋     |
 | 19  | [3.3](docs/epics/lists-and-tasks.md)  | Lists                                   | P1       | 3.2, 7.1, 13.4 | 📋     |

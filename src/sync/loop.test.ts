@@ -297,6 +297,26 @@ describe('the sync loop', () => {
     loop.stop();
   });
 
+  it('stops for good when the account was deleted, telling the app once', async () => {
+    const env = new FakeEnvironment();
+    let told = 0;
+    let calls = 0;
+    const c = await client(async () => (calls++, { kind: 'account-deleted' }));
+    const loop = startSyncLoop({
+      client: c,
+      lockName: 'l',
+      environment: env,
+      onAccountDeleted: () => told++,
+    });
+    await settleMicrotasks();
+    await env.advance(600_000);
+    env.fire('online');
+    await settleMicrotasks();
+    expect(told).toBe(1);
+    expect(calls).toBe(1);
+    loop.stop();
+  });
+
   it('leaves nothing running when it is stopped', async () => {
     const env = new FakeEnvironment();
     const c = await client(async () => ok());

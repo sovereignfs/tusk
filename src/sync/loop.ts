@@ -40,6 +40,8 @@ export interface LoopOptions {
   onSignedOut?: () => void;
   /** This device is too old to talk to the server: update, keeping the outbox (task 13.4). */
   onUpdateRequired?: () => void;
+  /** The account this device holds the tasks of was deleted: the app deletes the working copy (task 13.4). */
+  onAccountDeleted?: () => void;
   /** Told of each finished attempt, for Settings' "last synced" and for tests. */
   onOutcome?: (outcome: SyncOutcome) => void;
 }
@@ -84,6 +86,9 @@ export function startSyncLoop(options: LoopOptions): Loop {
     } else if (outcome.status === 'signed-out') {
       stopped = true;
       options.onSignedOut?.();
+    } else if (outcome.status === 'account-deleted') {
+      stopped = true;
+      options.onAccountDeleted?.();
     } else if (outcome.status === 'update-required') {
       stopped = true;
       options.onUpdateRequired?.();

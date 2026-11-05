@@ -21,6 +21,7 @@ export {
   BrandBadge,
   Button,
   ButtonLink,
+  ConfirmDialog,
   EmptyState,
   Icon,
   Input,
