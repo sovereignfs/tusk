@@ -83,3 +83,28 @@ function daysIn(month: number, year: number): number {
   if (month === 2) return isLeap(year) ? 29 : 28;
   return [4, 6, 9, 11].includes(month) ? 30 : 31;
 }
+
+/** `true` or `false`, and nothing that merely behaves like one. */
+export const bool: Parser<boolean> = (value) =>
+  typeof value === 'boolean' ? ok(value) : no('not true or false');
+
+/** A whole number from `min` to `max`, both included. A string that looks like one is not one. */
+export function integer(min: number, max: number): Parser<number> {
+  return (value) =>
+    typeof value === 'number' && Number.isSafeInteger(value) && value >= min && value <= max
+      ? ok(value)
+      : no('not a whole number in range');
+}
+
+/** One of a fixed list of words. */
+export function oneOf<T extends string>(...words: readonly T[]): Parser<T> {
+  return (value) =>
+    typeof value === 'string' && (words as readonly string[]).includes(value)
+      ? ok(value as T)
+      : no('not one of the allowed words');
+}
+
+/** What `parser` takes, or null. */
+export function nullable<T>(parser: Parser<T>): Parser<T | null> {
+  return (value) => (value === null ? ok(null) : parser(value));
+}

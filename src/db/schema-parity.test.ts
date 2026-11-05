@@ -19,6 +19,15 @@ interface TableShape {
 }
 type Shape = Record<string, TableShape>;
 
+/**
+ * What a column holds, as the app sees it. A custom type is what the `position` word is on PostgreSQL (text compared by bytes, `COLLATE "C"`),
+ * and it is text there as it is on SQLite; any other custom type keeps its SQL type, so that it is compared with what it really is.
+ */
+function typeClass(column: { dataType: string; getSQLType(): string }): string {
+  if (column.dataType !== 'custom') return column.dataType;
+  return /^text\b/.test(column.getSQLType()) ? 'string' : `custom ${column.getSQLType()}`;
+}
+
 /** `name -> portable description`. A column's type class is Drizzle's `dataType` (number, string, boolean, json, bigint…), which is what the app sees. */
 function shapeOf(
   tables: Table[],
@@ -36,11 +45,12 @@ function shapeOf(
             notNull: boolean;
             primary: boolean;
             hasDefault: boolean;
+            getSQLType(): string;
           }[]
         )
           .map((c) => [
             c.name,
-            `${c.dataType}${c.notNull ? ' not null' : ''}${c.primary ? ' primary' : ''}${c.hasDefault ? ' default' : ''}`,
+            `${typeClass(c)}${c.notNull ? ' not null' : ''}${c.primary ? ' primary' : ''}${c.hasDefault ? ' default' : ''}`,
           ])
           .sort(),
       ),
@@ -106,6 +116,21 @@ describe('schema parity', () => {
   it('declares at least one table on each, so the comparison compares something', () => {
     expect(Object.keys(sqliteShape()).length).toBeGreaterThan(0);
     expect(Object.keys(pgShape())).toEqual(Object.keys(sqliteShape()));
+  });
+
+  it('covers the tables that sync, and better-auth’s', () => {
+    for (const table of [
+      'list',
+      'task',
+      'series',
+      'account_settings',
+      'user',
+      'session',
+      'rate_limit',
+    ]) {
+      expect(Object.keys(sqliteShape()), table).toContain(table);
+      expect(Object.keys(pgShape()), table).toContain(table);
+    }
   });
 
   it('offers the same column vocabulary on both', () => {

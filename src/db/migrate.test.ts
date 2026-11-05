@@ -11,7 +11,7 @@ import { freshDatabase, testTarget } from './test-support';
 const { leg } = testTarget();
 
 /** What the app's migrations make. It grows with every task that adds a table. */
-const APP_TABLES = ['account_settings'];
+const APP_TABLES = ['account_settings', 'list', 'series', 'task'];
 
 /** What the auth store's make: better-auth's tables for email and password, sessions and rate limits. Two-factor and passkeys add theirs (task 2.4). */
 const AUTH_TABLES = ['account', 'rate_limit', 'session', 'user', 'verification'];
