@@ -1,8 +1,9 @@
-# Tasks — design
+# Tusk — design
 
-**Status:** draft, written from a review of the legacy plugin and of Fjord Web, and from the owner's user flows (2026-11-05). Nothing here is
-implemented; the repository is still the scaffold (§5.2). Where this file and a contract Sovereign publishes disagree, the contract wins (`AGENTS.md`,
-Source of truth). §24 holds anything still waiting on a decision, and §25 what has been decided and why.
+**Status:** draft, rewritten on 2026-11-06 when Tasks became Tusk. It is drawn from the legacy tasks and kanban plugins, Fjord Web and the owner's
+direction. Phase 1's foundation, sign-in and the first form of the Desk are built (as lists and tasks, under the name Tasks); everything else is
+designed and not built. Where this file and a contract Sovereign publishes disagree, the contract wins (`AGENTS.md`, Source of truth). §26 holds what is
+still waiting on a decision, and §27 what has been decided and why.
 
 [`ROADMAP.md`](ROADMAP.md) puts the work in order, and [`docs/epics/`](docs/epics/) holds each task's detail.
 
@@ -10,224 +11,364 @@ Source of truth). §24 holds anything still waiting on a decision, and §25 what
 
 ## 1. Purpose
 
-Tasks is a private task manager for the people of a Sovereign instance or as a fully self-hosted app: a cleaner Google Tasks that you
-run yourself, not a Todoist and not a project management tool. It is an app of the Sovereign suite exactly as Fjord is: a program of its own, which an
-instance can host, and which needs no instance to run. It is a rewrite, from scratch, of `sovereign-plugin-tasks`. The plugin is the
-starting point for what Tasks does; none of its code is carried over.
+Tusk is one app for the work a person does alone and the work they do with others. **The Desk** is theirs: a private, offline-first list of things to
+do, as plain as Google Tasks. **Workspaces** hold boards that people share: Trello-like kanban, with lists of cards that are assigned, labelled,
+discussed and moved along. It is an app of the Sovereign suite exactly as Fjord is: a program of its own, which an instance can host, and which needs no
+instance to run.
+
+Tusk replaces two legacy plugins, `sovereign-plugin-tasks` and `sovereign-plugin-kanban`. They are the starting point for what Tusk does; none of their
+code is carried over.
 
 What it must not give up, whatever the convenience:
 
-- **Simplicity is the feature.** Each addition has to reduce friction without adding something to think about. Features stay out of the
-  way until someone reaches for them.
-- **It never makes you wait.** The app works from what is on the device, online or not. Syncing and resolving conflicts happen in the
-  background, and a person should not feel them (§8).
-- **Private by default.** A person's lists are visible to that person alone. Anyone can choose to hold their own key, so that the operator
-  cannot read their tasks (§9). Sharing is something they choose, one list at a time, and comes after the MVP.
-- **The data stays where its owner puts it.** On their server, on their devices, and in a repository of theirs if they connect one (§19). No
+- **Simplicity is the feature.** Each addition has to reduce friction without adding something to think about. Only a title is ever required; every
+  other field stays out of the way until someone reaches for it.
+- **The Desk never makes you wait.** It works from what is on the device, online or not. Syncing and resolving conflicts happen in the background, and
+  a person should not feel them (§8). Boards are online in phase 1, and still answer at once: the screen changes before the server replies (§14.7).
+- **Private by default.** The Desk is visible to its owner alone, and anyone can hold their own key so that the operator cannot read it (§9). A board
+  is seen by the people of its workspace, or only by its own members, and by the world only when someone publishes it (§14).
+- **The data stays where its owner puts it.** On their server, on their devices, and in a repository of theirs if they connect one (§21). No
   telemetry, no third-party service, nothing loaded from another site.
-- **A person can leave.** They can take everything with them in one file (§18), and deleting their account deletes what is held of them (§20).
+- **A person can leave.** They can take their data with them in one file (§20), and deleting their account deletes what is held of them, without
+  taking a shared board from the people still using it (§22).
 
-What it is not: a project management tool, a team inbox, a Kanban board, or a place for assistants to write without being asked.
+What it is not: a project management suite with Gantt charts and time tracking, a team chat, or a place for assistants to write without being asked.
 
 ## 2. Phases
 
-| Phase          | What it delivers                                                                                                                                                                                                                                                                                                                                          |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **1, the MVP** | Everything one person needs: accounts and settings, lists, tasks and subtasks, due dates, recurrence, Today, Starred, Review, search, bulk actions, keyboard, reminders by bell, Push and email, one-file export and import, backup to a git repository, working offline, an installable PWA, and opt-in encryption. Runs alone or hosted on an instance. |
-| **2**          | Sharing a list with other accounts, and assigning tasks. The plugin specified this and never built it.                                                                                                                                                                                                                                                    |
-| **3**          | Candidates, none committed: Google Tasks import, "the last Friday of the month", a shared key held through core.                                                                                                                                                                                                                                          |
+| Phase          | What it delivers                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **1, the MVP** | On the web, with the foundations for a phone laid: accounts and settings; the Desk (lists, cards with status, checklist, due dates, recurrence, star, search, working offline); workspaces with members; boards with lists, cards, labels, assignees, checklists, comments and activity; private and public boards and publishing; the Inbox; export and import; backup to a git repository; opt-in encryption of the Desk; an installable PWA. Runs alone or hosted on an instance. |
+| **2**          | The phone's own screens (the Desk and board carousels, the action button, Today and Review as swipe views), the Planner, reminders by Push and email, boards that work offline and update live, invitations by email, replies to comments, attachments, a board view of the Desk, and cards from boards and other services on the Desk. §25 outlines each.                                                                                                                           |
+| **3**          | Candidates, none committed: Google Tasks and Trello import, "the last Friday of the month", a shared key held through core, board templates.                                                                                                                                                                                                                                                                                                                                         |
 
-### What is carried over from the plugin
+### 2.1 What is carried over
 
-The plugin's requirement IDs are not used here: tasks get IDs of their own in the roadmap. This table is how to check nothing was lost.
+The plugins' requirement IDs are not used here: tasks get IDs of their own in the roadmap. These tables are how to check nothing was lost.
 
-| Plugin                                                                 | What                                                             | Here                                                                                          |
-| ---------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| TSK-01–05                                                              | Lists and tasks, colour, cascade, title and notes                | §10, §11. Colour stays a fixed set of swatches                                                |
-| TSK-06, 07                                                             | Subtasks one level deep; completing a parent completes them      | §11.2                                                                                         |
-| TSK-08                                                                 | Manual order by dragging                                         | §11.3, with a different way of storing order                                                  |
-| TSK-09                                                                 | Show or hide completed, per list                                 | §11.4                                                                                         |
-| TSK-10–14                                                              | Sharing, roles, ownership, assignment                            | §21 (phase 2)                                                                                 |
-| TSK-15, 16                                                             | Due date and time, overdue                                       | §12                                                                                           |
-| TSK-17, 18                                                             | Filters, search                                                  | §11.4, §14.5                                                                                  |
-| TSK-19–21                                                              | Keyboard shortcuts, bulk delete and move                         | §15.5, §15.6                                                                                  |
-| TSK-22, 23, 25                                                         | Recurrence, the next occurrence on completion, the pattern shown | §13                                                                                           |
-| TSK-24                                                                 | "This / this and following / all" when editing a recurring task  | **Dropped:** an edit applies to this occurrence and every later one, with no question (§13.4) |
-| TSK-26–28                                                              | Star, move to a list, the Starred view                           | §11, §14.3                                                                                    |
-| TSK-29                                                                 | Account-level export, import and deletion                        | Deletion: §20. The rest is §18's one file                                                     |
-| TSK-30                                                                 | Today's Agenda                                                   | §14.2, with different swipes                                                                  |
-| TSK-31                                                                 | One-file export and import in Settings                           | §18                                                                                           |
-| —                                                                      | Reminders and the morning digest                                 | §17                                                                                           |
-| —                                                                      | The mobile carousel, sheets and reorder                          | §15                                                                                           |
-| `tasks_views`, Kanban, Visualizer                                      | Reserved, never built                                            | **Dropped.** `fs.sovereign.kanban` is a product of its own                                    |
-| Tenants, `sdk.db`, the plugin manifest, the scheduler, the Apps drawer | The legacy runtime's                                             | Gone with it (§5)                                                                             |
+From the tasks plugin, into the Desk:
+
+| Plugin                            | What                                                             | Here                                                                                          |
+| --------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| TSK-01–05                         | Lists and tasks, colour, cascade, title and notes                | §10. Notes are now a card's description; colour is any colour (§17.7)                         |
+| TSK-06, 07                        | Subtasks one level deep; completing a parent completes them      | §10.3, as a card's checklist                                                                  |
+| TSK-08                            | Manual order by dragging                                         | §10.4, with a different way of storing order                                                  |
+| TSK-09                            | Show or hide completed, per list                                 | §10.5                                                                                         |
+| TSK-10–14                         | Sharing, roles, ownership, assignment                            | Replaced by workspaces and boards (§13–§15)                                                   |
+| TSK-15, 16                        | Due date and time, overdue                                       | §11                                                                                           |
+| TSK-17, 18                        | Filters, search                                                  | §10.5, §10.7                                                                                  |
+| TSK-19–21                         | Keyboard shortcuts, bulk delete and move                         | §17.8, §10.6                                                                                  |
+| TSK-22, 23, 25                    | Recurrence, the next occurrence on completion, the pattern shown | §12                                                                                           |
+| TSK-24                            | "This / this and following / all" when editing a recurring task  | **Dropped:** an edit applies to this occurrence and every later one, with no question (§12.4) |
+| TSK-26–28                         | Star, move to a list, the Starred view                           | §10.2, §10.5 (Starred is a filter of the Desk)                                                |
+| TSK-29, 31                        | Export, import and deletion                                      | §20, §22                                                                                      |
+| TSK-30                            | Today's Agenda                                                   | Phase 2, on the phone (§25.3)                                                                 |
+| `tasks_views`, Kanban, Visualizer | Reserved, never built                                            | Kanban is now the boards (§14)                                                                |
+
+From the kanban plugin, into workspaces and boards:
+
+| Plugin                                                         | Here                                                           |
+| -------------------------------------------------------------- | -------------------------------------------------------------- |
+| Projects, boards, lists, cards                                 | Workspaces, boards, lists, cards (§13–§15)                     |
+| Project owners (several) and members; board owners, members    | The same (§7.2)                                                |
+| Board members drawn only from project members                  | The same: from the workspace's members (§13.2)                 |
+| Project and board visibility                                   | Board visibility only; a workspace has none of its own (§27)   |
+| Read-only viewing; owners administer without editing content   | The same (§7.2)                                                |
+| Archive as the reversible half of delete, for cards and boards | The same (§14.4, §15.8)                                        |
+| Labels, assignees, due date, checklist, comments with replies  | The same, with replies in phase 2 (§15, §25.6)                 |
+| Activity that outlives the card it is about                    | The same (§15.6)                                               |
+| Inbox: assignments and replies, one "last seen" per person     | The same idea, with its own kinds (§16)                        |
+| Whole-card drag on the web; on a phone, cross-list by menu     | The same (§17.8, §18)                                          |
+| Loading states gate every surface                              | The same (§17.1)                                               |
+| Markdown descriptions                                          | **Dropped:** text is shown as text, with its line breaks (§24) |
+| Tenants, `sdk.db`, the plugin manifest, the plugin footer      | Gone with the legacy runtime (§5)                              |
+
+From Tasks, as it was built before the turn (`ROADMAP.md` Milestones A and B): the foundation, local sign-in, the access rules, the sync protocol and the
+local store, positions, the frame of the signed-in area, lists and tasks with subtasks, order, undo, purge, sort and filter, moving and starring. All of
+it carries into the Desk; §5.2 says what changes.
 
 ## 3. User journeys
 
-1. **First visit, alone.** Someone runs the image with the short setup of §23. They register, are offered encryption (§9), and find one list, _My
-   tasks_, with the cursor in "Add a task". Sign-up is then closed unless the operator opened it (§6).
-2. **First visit, on an instance.** A person opens Tasks from the launcher, signs in through core, is offered encryption, and finds the same.
+1. **First visit, alone.** Someone runs the image with the short setup of §24. They register, are offered encryption for their Desk (§9), and land on
+   the Desk: one list, _Backlog_, with the cursor in "Add a card". Sign-up is then closed unless the operator opened it (§6).
+2. **First visit, on an instance.** A person opens Tusk from the launcher, signs in through core, and finds the same.
 3. **Capture.** They type a title and press Enter. It appears at the top straight away, online or not. They add another without touching the mouse.
-4. **Work a list.** They tick things off, drag them into order, and open one to add notes, a date or subtasks, which opens in the right sidebar.
-5. **Open on a phone.** Today's modal opens: what is starred, due or overdue. They go through it as a list or as cards. They close it and see the
-   carousel of lists. The footer switches list, adds a task to the list on screen, and brings Today back.
-6. **Start the day.** They are told "3 tasks due today · 2 overdue" (§17). It opens Today.
-7. **Prioritise.** From the list switcher they choose "Review all tasks" and swipe through everything, starring what matters and cancelling what
-   no longer does. They can stop at any point and carry on later (§14.4).
-8. **Something that repeats.** "Water the plants" repeats every Saturday. Ticking it off makes next Saturday's. Renaming it renames this one and
-   every later one, and makes nothing new.
-9. **On a train.** They add and tick tasks with no signal. Nothing is different. It syncs when it can.
-10. **Keep a copy.** In Settings they connect a private git repository, perhaps their Fjord repository, and choose daily. Each day something changed, a
-    new file appears under `sovereign-tasks/` (§19).
-11. **Leave or move.** They download one file holding everything and import it elsewhere, or delete their account and Tasks deletes what it holds.
+4. **Work the Desk.** They mark a card in progress, tick another off, drag them into order, and open one to write a description, set a date or a
+   repeat, or add a checklist, in the right-hand column. Done cards gather at the end of the list, and can be cleared together.
+5. **Start working with others.** From Boards they create a workspace, add two colleagues by their email, and create a board. It starts with a
+   _Backlog_ list; they add _Doing_ and _Done_, and cards.
+6. **Run a board.** They drag cards between lists, assign one to a colleague, who sees it in their Inbox, label it, set a due date, and talk about it in
+   its comments. The board's Activity shows who did what.
+7. **Keep something private.** A board for the hiring plan is made private: only the people added to it, and the workspace's owners, see it.
+8. **Show the world.** A public roadmap board is published: anyone with its link sees it, read-only, with no names or comments on it.
+9. **On a train.** They add and tick cards on the Desk with no signal. Nothing is different. It syncs when it can. Boards say they need a connection.
+10. **Keep a copy.** In Settings they connect a private git repository and choose daily. Each day something changed, a new file appears under `tusk/`
+    (§21).
+11. **Leave or move.** They download one file holding their Desk and the workspaces they own and import it elsewhere, or delete their account: Tusk
+    deletes what it holds of them, and a board they shared carries on for the others.
 
 ## 4. Terminology
 
-| Term                   | Meaning                                                                                                                    |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| **Account**            | Someone who can sign in to this Tasks. Known by its id, whichever way they sign in (§6). "Person" means the same, in prose |
-| **List**               | A named, coloured group of tasks. Belongs to one account in phase 1                                                        |
-| **Task**               | A row in a list. A top-level task can have subtasks                                                                        |
-| **Subtask**            | A task with a parent: a title, notes and a tick, and nothing else (§11.2)                                                  |
-| **Due date, due time** | When a task is due, as written on a calendar, in no time zone (§12)                                                        |
-| **Today**              | The account's own calendar day (§12) and also the view of what needs attention (§14.2); the context says which             |
-| **Review**             | A pass over all a person's tasks, or one list's, to prioritise them (§14.4)                                                |
-| **Series**             | A repeating rule, and the occurrences made from it (§13)                                                                   |
-| **Occurrence**         | One task in a series. At most one is open at a time                                                                        |
-| **Change**             | One write to one row, as a device sends it to the server (§8.2)                                                            |
-| **Personal key**       | An age key a person holds, which makes their tasks unreadable to the server (§9)                                           |
-| **Backup**             | One file committed to the connected repository (§19)                                                                       |
+| Term                   | Meaning                                                                                                                                     |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Account**            | Someone who can sign in to this Tusk. Known by its id, whichever way they sign in (§6). "Person" means the same, in prose                   |
+| **Desk**               | A person's own board, private and offline-first. Every account has exactly one, and no one else can see it (§10)                            |
+| **Workspace**          | A group of people and the boards they share. Has owners and members (§13)                                                                   |
+| **Board**              | A set of lists in a workspace, shown as columns. Public to its workspace or private to its members (§14). The Desk is a board too, in prose |
+| **List**               | A named column of cards, on a board or on the Desk. On the Desk, a list is a category                                                       |
+| **Card**               | One thing to do, in a list. A Desk card and a board card have different fields (§10.2, §15.1)                                               |
+| **Checklist**          | The small steps of a card: items with a title and a tick                                                                                    |
+| **Status**             | On the Desk, Open, In progress or Done. On a board, Open or Archived; where a card is in its work is the list it is in                      |
+| **Label**              | A named colour of a board, put on its cards                                                                                                 |
+| **Assignee**           | A member of the board a card is assigned to                                                                                                 |
+| **Activity**           | The record of what was done on a board, by whom and when (§15.6)                                                                            |
+| **Inbox**              | What a person is told about: assignments, comments, being added (§16)                                                                       |
+| **Publishing**         | Giving a board a public, read-only address (§14.6)                                                                                          |
+| **Due date, due time** | When a card is due, as written on a calendar, in no time zone (§11)                                                                         |
+| **Series**             | A repeating rule on the Desk, and the occurrences made from it (§12)                                                                        |
+| **Change, mutation**   | One write to one row of the Desk, and a set of them made by one action (§8.2)                                                               |
+| **Operation**          | One write to a workspace, as the browser sends it to the server (§7.3)                                                                      |
+| **Personal key**       | An age key a person holds, which makes their Desk unreadable to the server (§9)                                                             |
+| **Backup**             | One file committed to the connected repository (§21)                                                                                        |
 
-User-facing text says "list" and "task", never "item"; "app", never "client" or "plugin".
+User-facing text says "card", "list", "board" and "workspace", never "item" or "task" for a card; "app", never "client" or "plugin". The checklist's
+entries are "items" only inside the checklist.
 
 ## 5. Architecture
 
 ```
-       browser (a PWA)                                server (one image, one process)
- ┌──────────────────────────────┐              ┌──────────────────────────────────────────┐
- │ UI (React 19, @sovereignfs/ui)│              │ Next.js: the shell, routes                │
- │   reads and writes ▼         │  /api/sync   │ better-auth (§6)                          │
- │ Local store (IndexedDB)      │ ◀──────────▶ │ sync: checks and stamps changes (§8)      │
- │ Outbox, sync in background   │   changes    │ jobs: reminders, backups, purge           │
- │ Keys, if encrypted (§9)      │              └───┬──────────┬───────────────┬───────────┘
- │ Service worker: shell, Push  │                  │          │               │
- └──────────────────────────────┘   SQLite (sqld or file)  GitHub REST   a Sovereign core,
-                                    or PostgreSQL (§22)    API (§19)     if one is set
+       browser (a PWA)                                    server (one image, one process)
+ ┌──────────────────────────────────┐              ┌────────────────────────────────────────────┐
+ │ UI (React 19, @sovereignfs/ui)   │              │ Next.js: the shell, routes                  │
+ │ ┌ the Desk ───────────────────┐  │  /api/sync   │ better-auth (§6)                            │
+ │ │ reads and writes ▼          │  │ ◀──────────▶ │ sync: checks and stamps the Desk's changes  │
+ │ │ local store (IndexedDB)     │  │   changes    │ ops: checks and applies workspace writes    │
+ │ │ outbox, sync in background  │  │              │   in one statement each, writes activity    │
+ │ │ keys, if encrypted (§9)     │  │  /api/ops    │ jobs: purge, backups, notifications          │
+ │ └─────────────────────────────┘  │ ◀──────────▶ └───┬──────────┬────────────────┬────────────┘
+ │ boards: in memory, optimistic    │  /api/boards     │          │                │
+ │ service worker: the shell only   │              SQLite (sqld   GitHub REST    a Sovereign core,
+ └──────────────────────────────────┘              or a file) or  API (§21)      if one is set
+                                                   PostgreSQL (§23)
 ```
 
-The stack, sign-in and database are Fjord Web's, on purpose, so that operating either is operating both. The data flow is new to the suite, because
-offline-first asks for it:
+The stack, sign-in and database are Fjord Web's, on purpose, so that operating one is operating the other. **Tusk has two halves, with two data flows,
+because they have different needs:**
 
-- **The browser holds a working copy, and the UI reads only that.** The server is the authority that every device converges on, not something a
-  screen waits for (§8).
-- **Next.js with React 19**, a long-running server and not serverless, because the jobs are background work. Signed-in screens are client components
-  over the local store. The server renders the shell and the landing page.
-- **SQLite by default, in production too, and PostgreSQL if the operator prefers** (§22).
-- **Jobs run in the web process**, on a timer started from `instrumentation.ts`, with `TASKS_WORKER=off` for all but one process if several share a database. Fjord decided against a separate worker (2026-10-31), for the same reason: a single container wants it, and a second entry point is a second bundle for no behaviour. Every job claims its work in the database (§17.3), so a second process running it is safe anyway.
+- **The Desk is offline-first.** The browser holds a working copy and the UI reads only that. The server is the authority every device converges on,
+  not something a screen waits for (§8). This is what Tasks built, and it carries over whole.
+- **Workspaces are online, and the server decides.** Shared data is read from the server and written through one door, `POST /api/ops` (§7.3), in a
+  statement that carries the permission. The screen applies a change before the server answers, and undoes it if the server refuses (§14.7). Their ids
+  are made by the browser and their order is fractional, as the Desk's are, so that bringing them under sync later (§25.4) is not a rewrite.
+- **Next.js with React 19**, a long-running server and not serverless, because the jobs are background work. Signed-in screens are client components.
+  The server renders the shell, the landing page and a published board.
+- **SQLite by default, in production too, and PostgreSQL if the operator prefers** (§23).
+- **Jobs run in the web process**, on a timer started from `instrumentation.ts`, with `TUSK_WORKER=off` for all but one process if several share a
+  database. Fjord decided against a separate worker (2026-10-31), for the same reason: a single container wants it. Every job claims its work in the
+  database, so a second process running it is safe anyway.
 - **The server talks to GitHub and to core.** The browser never does, and no credential reaches it.
-- **What can be pure is pure:** the next occurrence, what Today shows, a position between two others, what "today" is, and what a user action changes. They take the time as an argument, so they are tested with no clock and no database, and run the same in the browser and on the server.
+- **What can be pure is pure:** the next occurrence, a position between two others, what "today" is, what a user action on the Desk changes, and
+  what an operation on a board may do. They take the time as an argument, so they are tested with no clock and no database.
 
 ### 5.1 Where things go
 
 As Fjord Web's. `app/` for routes, and `src/` for everything else, with tests beside the code.
 
-| Path                                                                                   | What                                                                                                                |
-| -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `app/`                                                                                 | Routes: the shell, the landing page, sign-in, and `/api/*`                                                          |
-| `src/db/`                                                                              | Configuration, the clients, the schemas per dialect, migrations at start-up (§22)                                   |
-| `src/auth/`                                                                            | better-auth, its settings, the screens, the fake Sovereign for tests (§6)                                           |
-| `src/access/`                                                                          | The list of every page and route with who may use it, and the parsers (§7)                                          |
-| `src/sync/`                                                                            | The change format and validators (shared), the server's apply and pull, and the browser's outbox and sync loop (§8) |
-| `src/local/`                                                                           | The browser's store over IndexedDB, and its queries (§8)                                                            |
-| `src/actions/`                                                                         | What each user action changes: pure, run in the browser, producing changes                                          |
-| `src/crypto/`                                                                          | Credentials at rest (§19.2) and the operator-key mode (§9.5), on the server                                         |
-| `src/keys/`                                                                            | Personal keys, list keys and the field cipher, in the browser (§9)                                                  |
-| `src/recurrence.ts`, `src/time.ts`, `src/position.ts`, `src/today.ts`, `src/review.ts` | The pure rules                                                                                                      |
-| `src/notifications/`                                                                   | The notification list, the channels and the jobs (§17)                                                              |
-| `src/portability/`                                                                     | The file format, and reading the plugin's (§18)                                                                     |
-| `src/backup/`                                                                          | The connection and the job (§19)                                                                                    |
-| `src/providers/`                                                                       | The git host interface, GitHub's implementation, an in-memory one (§19.2)                                           |
-| `src/sovereign/`                                                                       | What an instance tells the app, and `People` (§20)                                                                  |
-| `src/mail/`                                                                            | The SMTP mailer (§6, §17)                                                                                           |
-| `src/pwa/`, `src/sw/`                                                                  | The manifest's details, and the service worker's source (§15.7)                                                     |
-| `src/ui/`                                                                              | The design system's client boundary, and `AppShell`                                                                 |
-| `migrations/`                                                                          | The generated SQL: `sqlite/`, `postgres/`, `auth/`                                                                  |
-| `deploy/`                                                                              | The Compose setups for sqld, a file and PostgreSQL, their README and `.env.example`                                 |
-| `sovereign.manifest.json`                                                              | What an instance reads to host the app (§23)                                                                        |
+| Path                                                  | What                                                                                                              |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `app/`                                                | Routes: the shell, the landing page, sign-in, a published board, and `/api/*`                                     |
+| `src/db/`                                             | Configuration, the clients, the schemas per dialect, migrations at start-up (§23)                                 |
+| `src/auth/`                                           | better-auth, its settings, the screens, the fake Sovereign for tests (§6)                                         |
+| `src/access/`                                         | The list of every page and route with who may use it, the parsers, and the workspace roles (§7)                   |
+| `src/sync/`                                           | The Desk's change format and validators (shared), the server's apply and pull, the browser's outbox and loop (§8) |
+| `src/local/`                                          | The browser's store of the Desk over IndexedDB, and its queries (§8)                                              |
+| `src/actions/`                                        | What each action on the Desk changes: pure, run in the browser, producing changes                                 |
+| `src/workspaces/`                                     | The operations (shared format and validators), the server's apply and reads, activity and the Inbox's notices     |
+| `src/boards/`                                         | The browser's board state: loading, optimistic operations, freshness (§14.7)                                      |
+| `src/publish/`                                        | Published boards (§14.6)                                                                                          |
+| `src/crypto/`                                         | Credentials at rest (§21.2) and the operator-key mode (§9.5), on the server                                       |
+| `src/keys/`                                           | Personal keys, list keys and the field cipher, in the browser (§9)                                                |
+| `src/recurrence.ts`, `src/time.ts`, `src/position.ts` | The pure rules                                                                                                    |
+| `src/portability/`                                    | The file format, and reading the tasks plugin's (§20)                                                             |
+| `src/backup/`, `src/providers/`                       | The connection and the job (§21); the git host interface, GitHub's implementation, an in-memory one               |
+| `src/sovereign/`                                      | What an instance tells the app, and `People` (§22)                                                                |
+| `src/mail/`                                           | The SMTP mailer (§6)                                                                                              |
+| `src/screens/`                                        | The signed-in screens: the shell's sidebar, the Desk, the boards index, a board, the card modal, the Inbox        |
+| `src/pwa/`, `src/sw/`                                 | The manifest's details, and the service worker's source (§17.9)                                                   |
+| `src/ui/`                                             | The design system's client boundary, `AppShell`, and what every drag shares                                       |
+| `migrations/`                                         | The generated SQL: `sqlite/`, `postgres/`, `auth/`                                                                |
+| `deploy/`                                             | The Compose setups for sqld, a file and PostgreSQL, their README and `.env.example`                               |
+| `sovereign.manifest.json`                             | What an instance reads to host the app (§24)                                                                      |
 
-### 5.2 What happens to the scaffold
+### 5.2 The turn from Tasks
 
-`npm create @sovereignfs app` made an app that is hosted or nothing: sign-in through the SDK, PostgreSQL through `pg`, `lib/`. Its `lib/auth.ts`, `lib/stores.ts`, `lib/sovereign.ts`, `lib/db.ts`, `lib/migrate.ts`, `lib/crypto.ts`, `lib/config.ts`, `app/auth/`, its notes example and `migrations/001_init.sql` are replaced. Its manifest, Dockerfile and publish workflow are kept and changed as §23 says. This is the first task of the roadmap.
+What was built as Tasks becomes the Desk, and the app is renamed. The roadmap's Milestone C does this before anything new is built on it:
+
+- **The name is Tusk everywhere** (§27): the package `@sovereignfs/tusk`, the `TUSK_` prefix of every setting, the databases `tusk` and `tusk_auth`
+  (namespaces, files and schemas), the cookie prefix `tusk`, the IndexedDB database `tusk-desk-<account id>`, the manifest's `prefix` and `name`, the
+  image `ghcr.io/sovereignfs/tusk`, the repository, and every document. Nothing is released, so nothing is migrated: the old names are simply gone.
+- **The migrations are squashed** into one first migration per dialect and store, since no version has been tagged and no database outside a
+  developer's machine holds data. A developer's database is recreated (`pnpm seed --reset` makes a new one worth looking at).
+- **The Desk's tables replace `list`, `task` and `series`** (§23.3): `desk_list`, `desk_card`, `desk_check` and `desk_series`. Subtasks become
+  checklist items, in a table of their own. A card gains a description (the notes, renamed) and a start time for In progress.
+- **The first list is _Backlog_**, not _My tasks_, with the same derived id.
+- **The routes move:** `/home` and `/lists/<id>` become `/desk` and `/desk/<listId>`.
+- **The shell is the new one** (§17.2), with the Desk inside it.
 
 ## 6. Authentication
 
-**Identical to Fjord Web's §6, and read that for the detail.** The flows, the rules and the tests are the same; this section records what it means here, with `TASKS_` for `FJORD_`.
+**Identical to Fjord Web's §6, and read that for the detail.** The flows, the rules and the tests are the same; this section records what it means here,
+with `TUSK_` for `FJORD_`.
 
-Built on **better-auth 1.7**, in a store of its own (§22), with its own migrations. Which methods are offered is set by the environment, so an instance can run either or both:
+Built on **better-auth 1.7**, in a store of its own (§23), with its own migrations. Which methods are offered is set by the environment, so an instance
+can run either or both:
 
-| Method        | Enabled by                                                                        | What                                                                                                                                                                                                                                  |
-| ------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Local**     | `TASKS_AUTH_LOCAL=1`                                                              | Email and password, passkeys, and an authenticator app with ten backup codes. Off means off: `/sign-in`, `/sign-up` and `/api/auth` answer 404                                                                                        |
-| **Sovereign** | `TASKS_CORE_URL`, `TASKS_CORE_CLIENT_ID`, `TASKS_CORE_CLIENT_SECRET`, all or none | OIDC against a core, through `genericOAuth`: authorization code with PKCE S256, the ID token verified against the keys discovery points to. Redirect address `<TASKS_URL>/api/auth/callback/sovereign`; scopes `openid profile email` |
+| Method        | Enabled by                                                                     | What                                                                                                                                                                                                                                 |
+| ------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Local**     | `TUSK_AUTH_LOCAL=1`                                                            | Email and password, passkeys, and an authenticator app with ten backup codes. Off means off: `/sign-in`, `/sign-up` and `/api/auth` answer 404                                                                                       |
+| **Sovereign** | `TUSK_CORE_URL`, `TUSK_CORE_CLIENT_ID`, `TUSK_CORE_CLIENT_SECRET`, all or none | OIDC against a core, through `genericOAuth`: authorization code with PKCE S256, the ID token verified against the keys discovery points to. Redirect address `<TUSK_URL>/api/auth/callback/sovereign`; scopes `openid profile email` |
 
-- **The server refuses to start on a setting that is wrong:** a short `TASKS_AUTH_SECRET`, a non-https `TASKS_URL` (localhost aside), a partial set of `TASKS_CORE_*`, an SMTP host with no sender.
-- **Who may sign up** is `TASKS_AUTH_SIGNUP`: `closed` by default, where the first account is made and then sign-up is refused, by the server; or `open`. One policy for both methods, in the user-creation hook. A self-hoster who forgets is not an open registration; an instance sets `open`, since there the instance decides who may sign in.
-- **Email is optional.** With `TASKS_SMTP_*`, an address must be verified before first sign-in and a forgotten password is reset by a single-use link. Without it, sign-up is immediate and no screen offers a reset.
-- **A Sovereign account is identity, not authorization.** Identity is its `sub`, stored as the better-auth account id. `email` and `name` are copied when the account is made and not overwritten after.
-- **No implicit linking.** A Sovereign login whose email is a local account's is refused, until the person links the two from a signed-in session, and only when the addresses match. Unlinking can never remove an account's last way to sign in.
-- **Signing out is local.** Ending a Tasks session does not end the Sovereign one.
-- **Two-factor is the password's.** A person with Tasks two-factor who links Sovereign is not asked for the Tasks code when signing in through it.
-- **Tested the same way:** auth flows over real requests through `auth.handler` on all three databases, a strict fake Sovereign, a recording of a real instance's discovery document, and every security behaviour seen to fail with it switched off.
+- **The server refuses to start on a setting that is wrong:** a short `TUSK_AUTH_SECRET`, a non-https `TUSK_URL` (localhost aside), a partial set of
+  `TUSK_CORE_*`, an SMTP host with no sender.
+- **Who may sign up** is `TUSK_AUTH_SIGNUP`: `closed` by default, where the first account is made and then sign-up is refused, by the server; or `open`.
+  One policy for both methods, in the user-creation hook. An instance sets `open`, since there the instance decides who may sign in. With sign-up
+  closed, the people a self-hoster wants in their workspaces are made by opening it for a while; invitations are phase 2 (§25.5).
+- **Email is optional.** With `TUSK_SMTP_*`, an address must be verified before first sign-in and a forgotten password is reset by a single-use link.
+  Without it, sign-up is immediate and no screen offers a reset.
+- **A Sovereign account is identity, not authorization.** Identity is its `sub`, stored as the better-auth account id. `email` and `name` are copied
+  when the account is made and not overwritten after.
+- **No implicit linking.** A Sovereign login whose email is a local account's is refused, until the person links the two from a signed-in session, and
+  only when the addresses match. Unlinking can never remove an account's last way to sign in.
+- **Signing out is local.** Ending a Tusk session does not end the Sovereign one.
+- **Two-factor is the password's.** A person with Tusk two-factor who links Sovereign is not asked for the Tusk code when signing in through it.
+- **Tested the same way:** auth flows over real requests through `auth.handler` on all three databases, a strict fake Sovereign, a recording of a real
+  instance's discovery document, and every security behaviour seen to fail with it switched off.
 
-**The owner of everything is the better-auth user id** (`account_id`), not `sub`. It is in the other store, so it is not a foreign key, as in Fjord. The `sub` is looked up only for what needs it: a notification through core (§17.2) and a notice from core (§20).
+**The owner of everything is the better-auth user id** (`account_id`), not `sub`. It is in the other store, so it is not a foreign key, as in Fjord.
+The `sub` is looked up only for what needs it: a notice from core (§22). **A workspace member is an account id too,** and the name, email and avatar
+shown beside it are read from the auth store when a board is loaded, never copied into the app's tables (§23.3).
 
-Signing in needs a network. Once signed in on a device, the session cookie is not re-checked to read what is on that device: the app opens offline, and the next sync finds out if the session ended (§8.5).
+Signing in needs a network. Once signed in on a device, the Desk opens offline, and the next sync finds out if the session ended (§8.5).
 
 ## 7. Access
 
-**The rule: every write names the account in the statement that makes it.** Not a check first and a write after.
+### 7.1 The rule
+
+**Every write carries its permission in the statement that makes it.** Not a check first and a write after.
+
+On the Desk, that is the owner:
 
 ```ts
-db.update(task)
+db.update(deskCard)
   .set({ fields, seq })
-  .where(and(eq(task.id, id), eq(task.ownerId, accountId)));
+  .where(and(eq(deskCard.id, id), eq(deskCard.ownerId, accountId)));
 ```
 
-No row affected means the row is not there for this account, and the answer is the same whether it does not exist or belongs to someone else.
+On a board, it is membership, as a condition of the same statement:
 
-This closes the plugin's most serious flaw. There, an action took `(taskId, listId)`, checked the caller owned `listId`, and then updated by `taskId` alone. Anyone who knew another person's task id could change or delete it by passing a list of their own. The same shape was in `updateTask`, `toggleComplete`, `toggleFavorite`, `setDueDate`, `setRecurrenceRule`, `deleteTask`, `moveTask`, `bulkDeleteTasks`, `bulkMoveTasks`, `reorderTasks` and `getSubtasks`.
+```sql
+UPDATE card SET title = ?, updated_at = ?
+ WHERE id = ?
+   AND board_id IN (SELECT board_id FROM board_member WHERE account_id = ?)
+   AND board_id IN (SELECT id FROM board WHERE archived_at IS NULL)
+```
 
-With offline-first, nearly every write comes through one door, `POST /api/sync` (§8.3), so this is checked in one place and tested hard:
+No row affected means the row is not there for this account, and the answer is the same whether it does not exist, belongs to someone else, or is on an
+archived board: **a refusal reads as "not found"** (`404`), since whether a board exists is itself something only its members may know.
 
-- **The server trusts nothing a device says about ownership.** A change to a row of another account is refused, and so is a `list_id` or `parent_id` that points at one. Row ids being made by the client means a device could try to claim an id another account uses: inserting one is refused, not merged.
-- **Who may call what is written down once:** `src/access/routes.ts` lists every page and route with who may use it, and `routes.test.ts` holds it to the files, as in Fjord Web. A test seeds two accounts and sends each kind of change as the wrong one, and asserts nothing changed.
-- **A route that changes something checks `Origin`** against `TASKS_URL`.
-- **Input is parsed at the edge.** Shared validators (§8.2) run on a device before a change is queued, and on the server for what it can read: a title is 1 to 500 characters, notes up to 20,000, ids are UUIDs, a date is a real date, a time is `HH:MM`, a rule passes §13.2. On an encrypted account the server can check only structure and size, and the browser's checks are a convenience (§9.4).
-- **Limits exist so one account cannot fill the server:** 200 lists and 50,000 tasks an account, a size per field, and a rate on `/api/sync`.
+This closes the tasks plugin's most serious flaw. There, an action took `(taskId, listId)`, checked the caller owned `listId`, and then updated by
+`taskId` alone, so anyone who knew another person's task id could change it. The same shape was in eleven of its actions.
 
-## 8. Sync and offline
+- **Who may call what is written down once:** `src/access/routes.ts` lists every page and route with who may use it, and `routes.test.ts` holds it to the
+  files. Tests seed two accounts, and for the workspaces, a member, a viewer and an outsider, and send each kind of change and operation as each,
+  asserting that only the allowed ones changed anything.
+- **A route that changes something checks `Origin`** against `TUSK_URL`.
+- **Input is parsed at the edge.** Shared validators run in the browser before a change is queued or an operation sent, and on the server for what it
+  can read: a title is 1 to 500 characters, a description up to 20,000, a comment up to 10,000, a name up to 100, ids are UUIDs, a date is a real date,
+  a time is `HH:MM`, a colour is `#rrggbb`, a rule passes §12.2. On a Desk with a personal key the server can check only structure and size (§9.4).
+- **Anything an operation points at must be the board's or the workspace's too:** a list a card moves to, a label put on a card, an assignee (a member
+  of the board), a board a card moves to.
 
-The design goal is that **a person does not feel any of this.** The app never waits for the network to show or change a task, shows no conflict dialogs, and needs no "saving" indicator. Settings shows when it last synced, for anyone who wants to know.
+### 7.2 Roles in a workspace
+
+A workspace has **owners** (one or more) and **members**. A board has **owners** and **members**, drawn from the workspace's people. A person who can
+see a board without being its member is a **viewer**: everything is shown, and nothing can be changed.
+
+| What                                                        | Workspace owner | Workspace member | Board owner | Board member |
+| ----------------------------------------------------------- | :-------------: | :--------------: | :---------: | :----------: |
+| See the workspace, and its public boards                    |        ✓        |        ✓         |      —      |      —       |
+| See a private board                                         |        ✓        |                  |      ✓      |      ✓       |
+| Join a public board, as a member                            |        ✓        |        ✓         |      —      |      —       |
+| Create a board (and become its owner)                       |        ✓        |        ✓         |      —      |      —       |
+| Change a board's content: lists, cards, labels, comments    |                 |                  |      ✓      |      ✓       |
+| A board's settings, members, publishing, archive, delete    |        ✓        |                  |      ✓      |              |
+| Rename or delete the workspace; its members and their roles |        ✓        |                  |      —      |      —       |
+| Leave                                                       |  ✓ (not last)   |        ✓         |      ✓      |      ✓       |
+
+- **Only board membership grants editing.** A workspace owner who is not a member of a board can see and administer it, and not touch its cards; they
+  can add themselves, which is recorded in its activity. This keeps "who is working on this" honest, and still means no board is ever left that nobody
+  can manage when its owners leave (the lesson the kanban plugin paid for).
+- **An archived board is read-only for everyone,** its owners included, until one restores it (§14.4).
+- **A comment is edited or deleted by its author,** and deleted by a board owner.
+- **A workspace keeps at least one owner.** The last owner cannot leave or step down; they make someone else owner first, or delete the workspace.
+- **Removing someone from a workspace** removes them from each of its boards and unassigns them there, in one transaction. Their comments and activity
+  stay, under their name.
+
+### 7.3 The door for workspaces
+
+Every write to a workspace is an **operation**, sent to `POST /api/ops`:
+
+```json
+{ "opId": "…", "op": "card.move", "cardId": "…", "listId": "…", "position": "a1" }
+```
+
+- **One door,** as the Desk has `/api/sync`, so that the permission rule is in one module and the wrong-account tests are a loop over the kinds of
+  operation. The kinds are a closed set, each with a validator shared with the browser and a function on the server that applies it.
+- **One short transaction each:** the change, the permission in its statement, the activity it writes (§15.6), any notices it raises (§16), the
+  board's `version` and the workspace's `updated_at` moved on. Nothing in it calls out of the database.
+- **An `opId` makes a retry harmless,** recorded as the Desk's mutations are (`applied_mutation`).
+- **The answer** is the changed rows as the server now holds them, or a refusal: `not_found` (which covers "not yours"), `invalid`, `limit`, `stale`
+  (it points at something that is gone). The browser keeps the first, and undoes its optimistic change on the second, with a toast for anything but
+  `not_found`.
+- **Reads are routes of their own,** each in `routes.ts`: the boards index, a board, a card, a board's or card's activity by page, the Inbox, a
+  workspace's members, and a published board.
+
+### 7.4 Limits
+
+So that one account cannot fill the server: 200 Desk lists and 50,000 Desk cards an account; 50 workspaces created by an account; 100 members in a
+workspace; 500 boards in a workspace; 100 lists and 5,000 cards on a board; 50 labels on a board; 200 checklist items on a card; 1,000 comments on a
+card. A size per field, and a rate per account on `/api/sync`, `/api/ops`, adding a member by email, and the published pages.
+
+## 8. Sync and offline (the Desk)
+
+The design goal is that **a person does not feel any of this.** The Desk never waits for the network to show or change a card, shows no conflict
+dialogs, and needs no "saving" indicator. Settings shows when it last synced, for anyone who wants to know.
+
+This section is what Tasks built, carried over with its tables renamed. **It covers the Desk only;** boards are online (§14.7) and come under sync in
+phase 2 (§25.4).
 
 ### 8.1 The model
 
-- **The UI reads and writes the local store,** IndexedDB through `idb`, one database per account, named for it. A write is applied there at once, and the screen updates from that.
+- **The UI reads and writes the local store,** IndexedDB through `idb`, one database per account (`tusk-desk-<account id>`). A write is applied there at
+  once, and the screen updates from that.
 - **Each write also goes in an outbox,** in the same IndexedDB transaction. The sync loop sends it.
-- **The server is a referee:** it checks a change is allowed, stamps it with an order, stores it and hands it to the other devices. It does not need to understand a task beyond its structure, which is what lets it work on encrypted data (§9).
+- **The server is a referee:** it checks a change is allowed, stamps it with an order, stores it and hands it to the other devices. It does not need to
+  understand a card beyond its structure, which is what lets it work on encrypted data (§9).
 
 ### 8.2 Changes
 
-A user action is a pure function in `src/actions/`, run in the browser, that turns "complete this task" into changes to rows. Completing a parent with two open subtasks that repeats is one **mutation** holding several changes: the task, the subtasks, and the next occurrence and its copied subtasks.
+An action on the Desk is a pure function in `src/actions/`, run in the browser, that turns "complete this card" into changes to rows. Completing a card
+with two open checklist items that repeats is one **mutation** holding several changes: the card, its items, and the next occurrence and its copied
+checklist.
 
 ```json
 {
   "mutationId": "…",
   "changes": [
     {
-      "table": "task",
+      "table": "desk_card",
       "id": "…",
       "listId": "…",
-      "parentId": null,
       "position": "a1",
       "fields": { "title": { "v": "Water the plants" }, "completedAt": { "v": 1793000000000 } }
     }
@@ -235,19 +376,24 @@ A user action is a pure function in `src/actions/`, run in the browser, that tur
 }
 ```
 
-- **Ids are made by the client,** so a new task exists at once and everything can refer to it offline. A mutation's id makes replaying it harmless: the server records what it has applied.
+- **Ids are made by the client,** so a new card exists at once and everything can refer to it offline. A mutation's id makes replaying it harmless: the
+  server records what it has applied.
 - **Only what changed is sent:** a field, not a row. That is what makes conflicts mostly vanish (§8.4).
 - **A field's value is plain or ciphertext** (`{ "v": … }` or `{ "c": "…" }`), and everything above that is the same either way.
 - **Validators are one module,** used by the browser before it queues and by the server when it can read.
-- **The structural part is checked by the server whatever the mode:** the list is the account's; a subtask's parent is the account's, top-level, and in the same list.
+- **The structural part is checked by the server whatever the mode:** the list is the account's; a checklist item's card is the account's.
 
 ### 8.3 The endpoint
 
-`POST /api/sync`, with the session cookie and `Origin` checked. A request carries the outbox and a cursor; an answer carries what was applied, what was refused, and the changes since the cursor.
+`POST /api/sync`, with the session cookie and `Origin` checked. A request carries the outbox and a cursor; an answer carries what was applied, what was
+refused, and the changes since the cursor.
 
-- **Order is a per-account counter.** Applying a mutation is one short transaction: increment `account_settings.seq`, stamp each changed field and row with it, record the mutation. It works alike on all three databases, and the increment serialises one account's writes without holding anyone else up.
-- **Pull** returns rows whose `seq` is past the cursor, paged. A new device starts at zero, which is the snapshot (§8.5).
-- **A device syncs** after a write (debounced), on load, when the tab regains focus, when it comes back online, every few minutes while open, and through the Background Sync API where there is one. One tab syncs at a time (Web Locks); others see the store change (BroadcastChannel).
+- **Order is a per-account counter.** Applying a mutation is one short transaction: increment `account_settings.seq`, stamp each changed field and row
+  with it, record the mutation. It works alike on all three databases, and the increment serialises one account's writes without holding anyone else up.
+- **Pull** returns rows whose `seq` is past the cursor, paged, each page ending at a `seq` boundary. A new device starts at zero, which is the snapshot
+  (§8.5).
+- **A device syncs** after a write (debounced), on load, when the tab regains focus, when it comes back online, every few minutes while open, and through
+  the Background Sync API where there is one. One tab syncs at a time (Web Locks); others see the store change (BroadcastChannel).
 - **Retrying is safe,** since a mutation applies once, and a lost answer is just a retry.
 - **A protocol version** travels with each request. A device too old is told to update, and the service worker does so; its outbox is kept.
 
@@ -257,600 +403,887 @@ Resolved by rule, in the background, with nothing asked:
 
 | What happened                                                   | What results                                                                                                     |
 | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| Two devices change different fields of a task                   | Both changes stand                                                                                               |
+| Two devices change different fields of a card                   | Both changes stand                                                                                               |
 | Two devices change the same field                               | The one that reached the server later wins                                                                       |
-| One device edits a task another deleted                         | The edit restores it: losing someone's words is worse than a deleted task coming back                            |
+| One device edits a card another deleted                         | The edit restores it: losing someone's words is worse than a deleted card coming back                            |
 | Both delete                                                     | Deleted                                                                                                          |
-| Two devices move a task to one position                         | Both keep the key; ties break by id, so every device shows one order                                             |
-| Two devices complete a repeating task                           | They make the same next occurrence, since its id derives from the series and the date, and it arrives once       |
+| Two devices move a card to one position                         | Both keep the key; ties break by id, so every device shows one order                                             |
+| One device marks a card in progress, another marks it done      | Done: a completion time wins over a start time, whichever arrived later (§10.2)                                  |
+| Two devices complete a repeating card                           | They make the same next occurrence, since its id derives from the series and the date, and it arrives once       |
 | Two devices complete it on different days, so next dates differ | Two open occurrences arrive. The device that sees it deletes the later one, by a rule every device applies alike |
-| A task is added to a list another device deleted                | The list is restored                                                                                             |
+| A card is added to a list another device deleted                | The list is restored                                                                                             |
 
-A refusal the server gives (a limit, a change it cannot accept) is the only thing that reaches the person: the change is undone locally with a toast saying why. The later-arrival rule can silently overwrite an edit made on another device; that is the accepted cost of having no conflict dialogs, and fields are small enough for it to be rare.
+A refusal the server gives (a limit, a change it cannot accept) is the only thing that reaches the person: the change is undone locally with a toast
+saying why.
 
 ### 8.5 First load, sign-out, and an ended session
 
 - **First load on a device** needs a network. It pulls the snapshot in pages, and shows what it has as it arrives, the first list first.
 - **Later loads** paint from IndexedDB at once. There is no spinner to see a list you have already seen, on any network.
 - **Signing out deletes the local database,** after trying to send the outbox, and warning if it cannot and there are unsent changes.
-- **A session that ended elsewhere** (a password reset, core's logout) is found at the next sync: the app shows sign-in and displays no data, and keeps the outbox for the same account to send once it signs back in.
+- **A session that ended elsewhere** (a password reset, core's logout) is found at the next sync: the app shows sign-in and displays no data, and keeps
+  the outbox for the same account to send once it signs back in.
 - **Persistent storage is requested** (`navigator.storage.persist()`), so that a browser is less likely to evict what is here.
 
 ### 8.6 What cannot be hidden
 
 Stated plainly here and in the user's documentation:
 
-- **Signing in, first load on a device, and Settings actions** (account, security, import, export, backup) need a network. They say so when offline; the rest of the app is unaffected.
+- **Signing in, first load on a device, boards, the Inbox, and Settings actions** need a network. They say so when offline; the Desk is unaffected.
 - **On iPhone, sync happens only while the app is open.** Safari has no Background Sync.
-- **Reminders are sent by the server,** which knows only what has synced. One can arrive for a task completed offline.
 - **A browser can evict storage.** Unsynced edits could be lost if it does, in spite of asking it not to.
-- **A shared computer** holds a signed-in person's tasks until they sign out.
+- **A shared computer** holds a signed-in person's Desk until they sign out.
 
 ### 8.7 Keeping the history small
 
-Deleted rows are hard-deleted after seven days (§11.5), and leave a tombstone of id and `seq` so that devices learn of it. Tombstones and applied-mutation records go after 90 days. A device whose cursor is older than that gets a fresh snapshot, sending its outbox first.
+Deleted rows are hard-deleted after seven days (§10.6), and leave a tombstone of id and `seq` so that devices learn of it. Tombstones and
+applied-mutation records go after 90 days. A device whose cursor is older than that gets a fresh snapshot, sending its outbox first.
 
 ## 9. Encryption
 
 Two modes, mutually exclusive. By default neither is on, and everything is stored as plain text.
 
-|                    | Personal key                                                       | Operator key                                |
-| ------------------ | ------------------------------------------------------------------ | ------------------------------------------- |
-| Chosen by          | Each person, opt-in                                                | The operator, by `.env`                     |
-| Who can read tasks | Only that person's devices                                         | The server, and so the operator             |
-| Protects against   | Reading the database, dumps and backups, including by the operator | A stolen database or dump, not the operator |
-| When it is on      | Other people on the server are unaffected                          | Personal keys are not offered to anyone     |
+|                  | Personal key                                                       | Operator key                                |
+| ---------------- | ------------------------------------------------------------------ | ------------------------------------------- |
+| Chosen by        | Each person, opt-in                                                | The operator, by `.env`                     |
+| Covers           | **That person's Desk only**                                        | Everything: the Desk and every workspace    |
+| Who can read it  | Only that person's devices                                         | The server, and so the operator             |
+| Protects against | Reading the database, dumps and backups, including by the operator | A stolen database or dump, not the operator |
+| When it is on    | Other people on the server are unaffected                          | Personal keys are not offered to anyone     |
+
+**Shared data cannot be under one person's key.** A board is read by everyone on it, its activity and notices are written by the server, and a
+published board is rendered by the server, so the server reads what is on boards. Settings and the sign-up offer say so in a sentence: "Your Desk can be
+yours alone. Boards are shared, and the server can read them." Keys for a board, wrapped for each member, are a phase 3 candidate at most.
 
 ### 9.1 Choosing a personal key
 
-After registering or first signing in, a person is offered it, and can skip. If they skip, their tasks are plain text, and Settings > Data can turn it on later (§9.3). It is one way: to go back, they export and start a new account.
+After registering or first signing in, a person is offered it, and can skip. If they skip, their Desk is plain text, and Settings > Data can turn it on
+later (§9.3). It is one way: to go back, they export and start a new account.
 
-- **Create** makes an age identity in the browser, and makes them save it first: download the key file, and confirm they did. **Nobody can recover it.** Losing the key and every device loses the tasks.
-- **Upload** takes an existing age identity, by file or by pasting. **The same key can be used across the suite:** a person's Fjord identity, for example, is the same format. Sharing one through core, for an instance connected by OAuth, waits on core, whose end-to-end encryption is listed as "later"; nothing here prevents it.
+- **Create** makes an age identity in the browser, and makes them save it first: download the key file, and confirm they did. **Nobody can recover it.**
+  Losing the key and every device loses the Desk.
+- **Upload** takes an existing age identity, by file or by pasting. **The same key can be used across the suite:** a person's Fjord identity, for
+  example, is the same format.
 
-On a new device they give the key once, and it is remembered until sign-out (below). A person with no key to hand can still sign in, and sees a page asking for it, with no data.
+On a new device they give the key once, and it is remembered until sign-out. A person with no key to hand can still sign in, and sees boards and the
+Inbox; the Desk asks for the key.
 
 ### 9.2 How it works
 
-- **The age key wraps a data key per list, and a list key encrypts fields** with AES-256-GCM, bound to the row and the field, so that the server cannot move a value to another row or field unnoticed. age itself is used only for wrapping, since its overhead is too much per field. `age-encryption` (BSD-3-Clause) does this in the browser; Fjord does the same in WebAssembly, which brings more than this needs. Per-list keys are what makes sharing possible later: a list key is wrapped for another member.
-- **Encrypted:** all content. Titles, notes, list names and colours, rules, dates, stars, completion, review and dismissal times, and sort settings.
-- **Readable by the server:** ids, a task's list and parent, positions, delete markers, sync counters, the size and timing of changes, and the account itself (email, sessions, time zone, settings). So an operator can see how many tasks someone has, how they nest, and when they change, and not what they say.
-- **Unlocking is once per device.** Keys are kept in IndexedDB as non-extractable browser keys where the platform supports that, until sign-out. There are no repeated prompts, offline works, and Push can show titles. An unlocked device can read the tasks, so anyone with that device can too.
+- **The age key wraps a data key per Desk list, and a list key encrypts fields** with AES-256-GCM, bound to the row and the field, so that the server
+  cannot move a value to another row or field unnoticed. age itself is used only for wrapping, since its overhead is too much per field.
+  `age-encryption` (BSD-3-Clause) does this in the browser.
+- **Encrypted:** all content. Titles, descriptions, checklist items, list names and colours, rules, dates, stars, start and completion times, and sort
+  settings.
+- **Readable by the server:** ids, a card's list, a checklist item's card, positions, delete markers, sync counters, the size and timing of changes, and
+  the account itself. So an operator can see how many cards someone has and when they change, and not what they say.
+- **Unlocking is once per device.** Keys are kept in IndexedDB as non-extractable browser keys where the platform supports that, until sign-out.
 
 ### 9.3 Turning it on later
 
-The browser re-encrypts everything it has, in resumable batches through the ordinary sync path, with the account marked as moving. Once done, the server refuses plain fields for that account. **What was already written elsewhere stays readable:** older database backups, and files committed to a backup repository before this. Settings says so at the time.
+The browser re-encrypts everything on the Desk, in resumable batches through the ordinary sync path, with the account marked as moving. Once done, the
+server refuses plain Desk fields for that account. **What was already written elsewhere stays readable:** older database backups, and files committed
+to a backup repository before this. Settings says so at the time.
 
-### 9.4 What changes for an encrypted account
+### 9.4 What changes for an encrypted Desk
 
-Because of §8, most of the app needs nothing from the server. What differs:
-
-| Thing                             | With a personal key                                                      |
-| --------------------------------- | ------------------------------------------------------------------------ |
-| Search, Today, counts, recurrence | Nothing: already in the browser                                          |
-| Server validation                 | Structure and size only                                                  |
-| Moving a task to another list     | The browser re-encrypts its fields under that list's key                 |
-| Export                            | Made in the browser, as plain JSON in the person's hands, with a warning |
-| Import                            | Read and encrypted in the browser                                        |
-| Auto backup                       | The file holds ciphertext and wrapped keys (§19.3)                       |
-| Reminders                         | By times only (§17.5)                                                    |
+| Thing                            | With a personal key                                                      |
+| -------------------------------- | ------------------------------------------------------------------------ |
+| Search, counts, recurrence       | Nothing: already in the browser                                          |
+| Server validation                | Structure and size only                                                  |
+| Moving a card to another list    | The browser re-encrypts its fields under that list's key                 |
+| Export                           | Made in the browser, as plain JSON in the person's hands, with a warning |
+| Import into the Desk             | Read and encrypted in the browser                                        |
+| Auto backup                      | The Desk's part of the file holds ciphertext and wrapped keys (§21.3)    |
+| The Planner, reminders (phase 2) | By times only (§25.2)                                                    |
 
 ### 9.5 The operator key
 
-`TASKS_DB_ENCRYPTION=on`, with `TASKS_ENCRYPTION_KEY`.
+`TUSK_DB_ENCRYPTION=on`, with `TUSK_ENCRYPTION_KEY`.
 
-- **It is server-side field encryption, not the database's own,** because PostgreSQL has no built-in equivalent and it must behave the same on all three forms. Each field is sealed with the same AES-GCM binding as §9.2, through `src/crypto/`, with rotation by `TASKS_ENCRYPTION_KEY_PREVIOUS`. Devices exchange plain fields with the server over TLS, and hold them in IndexedDB as in plain mode.
-- **The server can decrypt,** so reminders, backups and everything else work as in plain mode. A due date, due time and completion time stay readable in their own columns (§22.3), since the reminder job has to query them.
+- **It is server-side field encryption, not the database's own,** because PostgreSQL has no built-in equivalent and it must behave the same on all three
+  forms. Each content field is sealed with the same AES-GCM binding as §9.2, through `src/crypto/`, with rotation by `TUSK_ENCRYPTION_KEY_PREVIOUS`. On
+  the Desk that is each field of `fields`; on a workspace it is each content column: names, titles, descriptions, checklist items, comments, label names
+  and the details of activity and notices.
+- **What a query needs stays readable:** structure, positions, due dates (the Planner and reminders query them), archive and delete times, and colours.
 - **Personal keys are not offered,** and the sign-up page and docs say that the operator manages encryption and can read data.
-- **It never converts silently,** per Sovereign's rule. The server refuses to start if the setting conflicts with what is stored: on, with accounts holding personal keys or with plain fields; off, with sealed fields. Moving existing data takes an explicit command shipped in the image.
-- **Backup files are plain** (§19.3), since the server decrypts to make them.
+- **It never converts silently,** per Sovereign's rule. The server refuses to start if the setting conflicts with what is stored. Moving existing data
+  takes an explicit command shipped in the image.
+- **Backup files are plain** (§21.3), since the server decrypts to make them.
 
 ### 9.6 What this does not do
 
-A personal key protects what is stored. It does not protect against an operator who serves altered JavaScript that takes the key, since the browser runs what the server sends. This is true of every web app that encrypts in the browser, and the docs say so.
+A personal key protects what is stored. It does not protect against an operator who serves altered JavaScript that takes the key, since the browser runs
+what the server sends. This is true of every web app that encrypts in the browser, and the docs say so.
 
-## 10. Lists
+## 10. The Desk
 
-- Create with the + in the sidebar, and name it. A first visit makes _My tasks_, so there is always somewhere to type.
-- Rename, recolour, reorder and delete in Settings > Lists (§16). Dragging a row in the sidebar also reorders.
-- Colour is one of the six swatches (`black`, `grey`, `green`, `blue`, `amber`, `red`), mapped to `--sv-*` tokens. New lists are `black`. It is the one splash of colour in a monochrome interface, and appears only as the small dot.
-- Deleting a list asks first (`ConfirmDialog`), naming how many open tasks it holds, and takes its tasks with it. It can be undone (§11.5).
-- Deleting a list's completed tasks is one action, from the list's menu.
-- The sidebar shows the count of open top-level tasks at the right of each row, from the local store.
+The Desk is a person's own board: theirs alone, offline-first, and as plain as Google Tasks. It is virtual: there is no row for it, only its lists and
+cards, and its settings in `account_settings`. In phase 1 it is shown as a list view (§17.4); a board view of it comes in phase 2 (§25.7).
 
-## 11. Tasks
+### 10.1 Lists
 
-### 11.1 A task
+- On the Desk a list is a category. The first visit makes _Backlog_, so there is always somewhere to type; it is an ordinary list, renamed or deleted
+  like any other.
+- Create with the + at the top of the Desk's lists; rename, recolour and delete from a list's menu; drag to reorder, which writes one row.
+- Each list has a colour, any colour (§17.7), shown as its dot. A new list takes a neutral one.
+- Deleting a list asks first (`ConfirmDialog`), naming how many open cards it holds, takes its cards with it, and can be undone (§10.6).
+- The count of open cards is at the right of each list's row.
 
-The same as the plugin's: a title, optional notes (plain text; shown as written, with links not made live in phase 1), a star, a due date and optional due time, optionally a repeat, and subtasks. A new task goes at the top of its list.
+### 10.2 A card
 
-Moving a task to another list takes its subtasks with it, and the task goes to the top of the destination.
+| Field           | What                                                                                   |
+| --------------- | -------------------------------------------------------------------------------------- |
+| **Title**       | The one required field, 1 to 500 characters                                            |
+| **Status**      | Open, In progress or Done                                                              |
+| **Description** | Plain text, shown as written, with its line breaks; links are not made live in phase 1 |
+| **Due date**    | A date, and optionally a time (§11)                                                    |
+| **Recurring**   | A repeat (§12)                                                                         |
+| **Checklist**   | Items with a title and a tick (§10.3)                                                  |
+| **Starred**     | A star                                                                                 |
 
-### 11.2 Subtasks
+A new card goes at the top of its list, with only its title. Moving a card to another list takes its checklist with it, and it goes to the top there.
 
-One level deep. The plugin's spec said "at the app layer", and `createTask` did not actually check. Here both the action and the server check it: a parent must be top-level and in the same list. A subtask has a title, notes and a tick. It has no due date, star or repeat, which keeps Today and reminders about top-level tasks.
+**Status is two fields, so that it converges** (§8.4): `startedAt` and `completedAt`. A card is **Done** if `completedAt` is set, **In progress** if
+only `startedAt` is, and **Open** if neither. Marking it in progress sets `startedAt` and clears `completedAt`; done sets `completedAt`; reopening
+clears both. Two devices that disagree end at the same status on both, and Done is never lost to a later "in progress" written offline.
 
-Completing a parent completes its open subtasks, and leaves the completion time of those already done (the plugin overwrote them). Reopening a parent reopens nothing. Ticking the last subtask does not complete the parent: finishing the parts is often not finishing the thing. A row shows progress as a small ring.
+**In progress is optional and quiet.** A card shows it as a small spinning-circle icon beside its title (`loader-circle` in Lucide's naming), never a
+column or a colour. The checkbox ticks a card straight to Done from either state; In progress is set from the card's menu and its detail. The icon is
+not in `@sovereignfs/ui` yet: it is added there, in `sovereign`, and the star with it, with a text stand-in until a release with them is pinned
+(§17.1).
 
-### 11.3 Order
+### 10.3 Checklist
 
-Order is a **position**: a string that sorts between its neighbours (fractional indexing, compared byte by byte: §22.2). Moving a task writes one row. The plugin stored integers, and every drag rewrote every row in the list. One row per move is what makes order survive two offline devices at all.
+A card's checklist is its small steps: items with a title and a tick, in an order of their own, one level deep. An item has no date, star or repeat,
+which keeps dates about cards.
 
-Under "Custom" order, tasks that are overdue or due today float to the top of the list (a partition, not a change to their position), and are in position order among themselves. Dragging is computed against what is on the screen, then translated to a position between the visible neighbours; that is the bug the plugin carried for months (§15.8).
+Completing a card ticks its open items, and leaves the completion time of those already done. Reopening it reopens nothing. Ticking the last item does
+not complete the card: finishing the parts is often not finishing the thing. A card's row shows progress as a small ring.
 
-### 11.4 Seeing a list
+Items are rows of their own (`desk_check`), not cards with a parent, so a card has no self-reference and an item cannot be given a date by mistake;
+§27 says why.
 
-- **Filter:** All, Active, Overdue. Completed tasks are a collapsible section at the bottom, whose open or closed state is remembered per list.
-- **Sort:** Custom, Date created, Due date, Title. **Remembered per list,** unlike the plugin, which reset it on every navigation. Dragging is available only under Custom.
+### 10.4 Order
 
-### 11.5 Delete, and undo
+Order is a **position**: a string that sorts between its neighbours (fractional indexing, compared byte by byte: §23.2). Moving a card writes one row.
+One row per move is what makes order survive two offline devices at all.
 
-The plugin's deletes were final, including its swipe-down in Today, which deleted at once with no confirmation, because the card's animation had already committed. Here **every delete offers Undo** in a toast, for about ten seconds.
+Under "Custom" order, cards that are overdue or due today float to the top of the list (a partition, not a change to their position). Dragging is
+computed against what is on the screen, then translated to a position between the visible neighbours (§17.10).
 
-Deleting sets `deleted_at`, on a task or a list alike. Undo clears it. A job removes rows deleted more than seven days ago (§8.7). There is no trash to browse: this is the smallest thing that makes a mistake recoverable. Account deletion and that job are the only hard deletes.
+### 10.5 Seeing a list
 
-## 12. Dates and time
+- **Filter:** All, Active, Starred, Overdue.
+- **Done cards** gather at the end, in a collapsible _Completed_ section whose open or closed state is remembered for the list. _Delete completed_
+  clears them in one action, with Undo.
+- **Sort:** Custom, Date created, Due date, Title. **Remembered per list,** on every device. Dragging is available only under Custom.
 
-The plugin had three ideas of "today": the server's local date in some paths, the browser's in others, and a stored zone in the reminder job. Here there is one function, `todayFor(zone, now)` in `src/time.ts`, used everywhere:
+### 10.6 Delete, undo and bulk
 
-- **A due date and time are floating:** "Saturday at 09:00" as written on a calendar, stored as `YYYY-MM-DD` and `HH:MM` text, in no zone. They compare as strings, which sort chronologically. Someone who flies somewhere still has it due Saturday at 09:00 where they are. Google Tasks behaves this way, and so did the plugin.
+**Every delete offers Undo** in a toast, for about ten seconds. Deleting sets `deleted_at`, on a card or a list alike, and takes a card's checklist with
+it; Undo clears it, bringing back exactly what went. A job removes rows deleted more than seven days ago (§8.7). There is no trash to browse.
+
+Ctrl- or cmd-click starts selection, since a card's checkbox already means complete. A bar shows the count, with Complete, Move to list, Delete and
+Cancel. Each is one mutation, in chunks if it is large.
+
+### 10.7 Search
+
+Titles, descriptions and checklist items, across the Desk, newest change first. **It runs in the browser, on the local store,** on any encryption mode,
+offline as well. A board's search is its own (§14.5).
+
+## 11. Dates and time
+
+One function, `todayFor(zone, now)` in `src/time.ts`, is the idea of "today" everywhere, on the Desk and on boards:
+
+- **A due date and time are floating:** "Saturday at 09:00" as written on a calendar, stored as `YYYY-MM-DD` and `HH:MM` text, in no zone. They compare
+  as strings, which sort chronologically. Someone who flies somewhere still has it due Saturday at 09:00 where they are. On a board, every member sees the
+  same date.
 - **In the browser, the zone is the browser's,** so the screen always agrees with the person's own clock, online or not.
-- **On the server, the zone is `account_settings.time_zone`,** for jobs. The browser reports it on load, and it is updated when it differs. It is validated, and an invalid one falls back to UTC. (The plugin captured it only when notification settings were saved, so a person who moved kept getting their digest in the old zone.)
-- **Displayed in the browser's locale:** "Today", "Tomorrow", "Mar 5", and times in the locale's 12- or 24-hour form.
+- **On the server, the zone is `account_settings.time_zone`,** for jobs. The browser reports it on load, and it is updated when it differs. An invalid
+  one falls back to UTC.
+- **Displayed in the browser's locale:** "Today", "Tomorrow", "Mar 5", and times in the locale's 12- or 24-hour form. Overdue is shown in the danger
+  colour.
 
-The due date picker offers Today, Tomorrow and Next week, then `Calendar` from `@sovereignfs/ui` (the plugin's own month grid predates it), and a time once a date is set. Time zone is not something anyone is asked about.
+The due date picker offers Today, Tomorrow and Next week, then the design system's `DatePicker`, and a time once a date is set.
 
-## 13. Recurrence
+## 12. Recurrence (the Desk)
 
-### 13.1 The model
+A Desk card can repeat. A board card does not in phase 1: a card on a shared board is a piece of work, not a habit.
 
-A series is a rule and an anchor date. **One occurrence is open at a time**, as in the plugin and in Google Tasks: completing it makes the next. Occurrences are ordinary tasks, so they filter, sort and show up in Today with no special cases.
+### 12.1 The model
 
-Completing is one mutation (§8.2), made once: a double-tap finds the task already complete and does nothing. The plugin had no guard: complete, reopen and complete again made two next occurrences. **The next occurrence's id derives from the series and its date** (a UUIDv5), so that two devices arrive at the same row (§8.4).
+A series is a rule and an anchor date. **One occurrence is open at a time**, as in Google Tasks: completing it makes the next. Occurrences are ordinary
+cards, so they filter and sort with no special cases.
 
-The next occurrence copies the title, notes, star, due time and list, but not a dismissal or review time, takes the same position, and has **its subtasks copied, unticked**. If the rule has ended (`UNTIL` or `COUNT`), there is none.
+Completing is one mutation (§8.2), made once: a double-tap finds the card already complete and does nothing. **The next occurrence's id derives from the
+series and its date** (a UUIDv5), so that two devices arrive at the same row (§8.4).
 
-### 13.2 The rule
+The next occurrence copies the title, description, star, due time and list, takes the same position, and has **its checklist copied, unticked**. If the
+rule has ended (`UNTIL` or `COUNT`), there is none.
+
+### 12.2 The rule
 
 Stored as an RFC 5545 `RRULE` string with no `DTSTART`, computed with the `rrule` package, inside `src/recurrence.ts` alone, in the browser.
 
-The plugin passed whatever string the browser sent to the database, where a bad one failed only at the moment someone completed the task. Here a validator parses a rule against an allow-list: `FREQ` (daily to yearly), `INTERVAL` (1 to 999), `BYDAY` (plain weekdays, weekly only), and one of `UNTIL` or `COUNT`. Nothing else, 200 characters at most.
+A validator parses a rule against an allow-list: `FREQ` (daily to yearly), `INTERVAL` (1 to 999), `BYDAY` (plain weekdays, weekly only), and one of
+`UNTIL` or `COUNT`. Nothing else, 200 characters at most.
 
-The picker offers: Daily, Weekdays, Weekly, Monthly, Yearly, and Custom (every N units, on chosen weekdays, ending on a date or after N). The task row shows a short form ("Weekly", "Every 2 weeks") and the detail the full one ("every week on Monday, Wednesday").
+The picker offers: Daily, Weekdays, Weekly, Monthly, Yearly, and Custom (every N units, on chosen weekdays, ending on a date or after N). A card shows a
+short form ("Weekly", "Every 2 weeks") and the detail the full one ("every week on Monday, Wednesday").
 
-`rrule` works in UTC, so a date crossing into it must go through `Date.UTC` and come back through `getUTC*`. Doing otherwise moves `BYDAY` matches by a day east of Greenwich, as the plugin learned. Tests run under more than one `TZ`.
+`rrule` works in UTC, so a date crossing into it must go through `Date.UTC` and come back through `getUTC*`. Doing otherwise moves `BYDAY` matches by a
+day east of Greenwich, as the tasks plugin learned. Tests run under more than one `TZ`.
 
-### 13.3 What the next date is
+### 12.3 What the next date is
 
-**A task done late does not leave a trail.** The plugin's daily task, ticked a week late, made one due yesterday. Ticked again, the day before, and so on. The next occurrence is the first one, counted from the anchor, after whichever is later: its due date, or today.
+**A card done late does not leave a trail.** The next occurrence is the first one, counted from the anchor, after whichever is later: its due date, or
+today. Setting a repeat on a card with no due date gives it one: the first date the rule matches from today.
 
-Setting a repeat on a task with no due date gives it one: the first date the rule matches from today. The plugin silently never made a next occurrence for such a task, and its interface did not say so.
+### 12.4 Editing
 
-### 13.4 Editing
+**An edit to a recurring card updates it in place, applies to that occurrence and every later one, and duplicates nothing.** There is no prompt.
 
-**An edit to a recurring task updates it in place, applies to that occurrence and every later one from that moment, and duplicates nothing.** There is no prompt. No row is added by editing, and completed occurrences are history and are never changed.
+| Edit                                          | What happens                                                                                                                                   |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Title, description, star, due time, checklist | The open occurrence changes, and the next is copied from it                                                                                    |
+| The rule                                      | The series' rule is replaced, and the anchor set to this occurrence's date                                                                     |
+| The due date                                  | This occurrence moves and the series moves with it: the anchor becomes the new date, and a weekly rule on one weekday moves to the new weekday |
+| "Does not repeat", or clearing the due date   | The series ends, and this stays as a one-off                                                                                                   |
 
-| Edit                                        | What happens                                                                                                                                                                   |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Title, notes, star, due time, subtasks      | The open occurrence changes, and the next is copied from it                                                                                                                    |
-| The rule                                    | The series' rule is replaced, and the anchor set to this occurrence's date                                                                                                     |
-| The due date                                | This occurrence moves and the series moves with it: the anchor becomes the new date, and a weekly rule on one weekday moves to the new weekday. Every later occurrence follows |
-| "Does not repeat", or clearing the due date | The series ends, and this stays as a one-off                                                                                                                                   |
+### 12.5 Reopening, moving, deleting
 
-The plugin's prompt looked like a choice, but with one open occurrence there were no future rows to choose between. "This task only" was not true, since the next occurrence copied the edit anyway. "This and following" was in effect the same one row. "All" went back and rewrote completed rows' titles.
+- **Reopening** a completed occurrence when the next is untouched removes that next occurrence, so Undo after a tick leaves things as they were. If the
+  next has been changed, the reopened card leaves the series and becomes a one-off, and nothing is lost.
+- **Moving** an occurrence to another list moves the series with it.
+- **Deleting** ends the series, and Undo brings it back. A job removes a series with no occurrence left.
 
-### 13.5 Reopening, moving, cancelling, deleting
+## 13. Workspaces
 
-- **Reopening** a completed occurrence when the next is untouched removes that next occurrence, so Undo after a tick leaves things as they were. If the next has been changed, the reopened task leaves the series and becomes a one-off, and nothing is lost.
-- **Moving** an occurrence to another list moves the series with it, since the next is copied from it.
-- **Cancelling,** a swipe in Today or Review (§14.2), skips this occurrence: it is deleted, with Undo, and the next is made.
-- **Deleting,** in the detail, ends the series, because nothing is left to make the next from, and Undo brings it back. A job removes a series with no occurrence left.
+### 13.1 A workspace
 
-## 14. Views
+A workspace is a name, its people and its boards. Anyone can create one, from the + beside the sidebar's workspaces or from Boards, and becomes its
+first owner. A new account has none: Boards shows the Desk and a way to create the first.
 
-### 14.1 Addresses
+Its owners rename it and delete it, from its settings (§17.3). Deleting asks for its name to be typed, and deletes every board in it, with its lists,
+cards and everything on them, at once: a shared space is not deleted by accident, and is not half-deleted. There is no Undo; archiving its boards is the
+reversible route.
 
-| Address                       | What                                                                                                                 |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `/`                           | A landing page for someone not signed in, static, as in Fjord. Signed in, the first list, by a rewrite in `proxy.ts` |
-| `/sign-in`, `/sign-up`        | §6                                                                                                                   |
-| `/lists/<id>`                 | A list. `?task=<id>` opens a task's detail, so it can be linked to and reloaded                                      |
-| `/today`                      | §14.2                                                                                                                |
-| `/starred`                    | §14.3                                                                                                                |
-| `/review`, `/review/<listId>` | §14.4                                                                                                                |
-| `/search?q=`                  | §14.5                                                                                                                |
-| `/settings?section=`          | §16                                                                                                                  |
+### 13.2 Its people
 
-A list that is not there for this account says so, with a way back. No route depends on an id being unable to collide with a word, which the plugin's `/tasks/[listId]` relied on for `starred`.
+- **People are added by their exact email,** by an owner, from the workspace's settings. Only an account that already exists on this Tusk can be added:
+  "No account with that address here" otherwise. That tells an owner whether an address has an account, so it is limited per account and per hour.
+  There is no directory search: a self-hosted server has no directory to offer, and an instance's is for phase 2 with invitations (§25.5).
+- **Anyone added is a member,** and an owner can make them an owner too.
+- **The people of a board come only from its workspace,** and the people a card is assigned to only from its board.
+- **Being added** raises a notice in their Inbox (§16), and the workspace appears in their sidebar under _Shared with me_.
+- **Leaving and removing** are §7.2's.
 
-### 14.2 Today
+### 13.3 What a workspace shows
 
-A virtual list: every open top-level task that is overdue, due today, or starred, across the account's lists. Overdue first (oldest first), then due today (by time, no time last), then starred (by title). A task in more than one of those shows once. Computed in the browser, by `todayFor` and a pure function.
+Its boards, as tiles, the ones a person can see (§7.2): public boards to everyone in it, private boards to their members and its owners. Archived boards
+are behind an _Archived_ disclosure. The workspace's `updated_at` moves with every operation in it, for "recently updated" (§17.3).
 
-On a phone it is a full-screen modal. On a desktop it is the content column, reached from the sidebar. Either way, a **List | Cards** toggle (`SegmentedControl`) chooses how to go through it, and the choice is remembered on the device.
+## 14. Boards
 
-**Cards** are a `SwipeStack`, one at a time, with buttons always shown, since a gesture is never the only way (§15.5):
+### 14.1 A board
 
-| Gesture | Button  | What it does                                                                                                       |
-| ------- | ------- | ------------------------------------------------------------------------------------------------------------------ |
-| Up      | Done    | Completes it (a repeat makes its next)                                                                             |
-| Down    | Cancel  | Deletes it, with Undo. On a repeating task, skips this occurrence and makes the next (§13.5)                       |
-| Left    | Dismiss | Hides it from Today until tomorrow, with Undo. Its due date and status do not change, and it stays in its own list |
-| Right   | Star    | Sets the star, and leaves the due date alone. It leaves the stack for this pass                                    |
+A board has a name, a colour (any colour, §17.7), an optional description, a visibility, and lists. Creating one, from a workspace's "Create board"
+tile, asks for a name and offers a colour, and makes it with one list, _Backlog_, which can be renamed or deleted like any other. Its creator is its
+owner. Its settings (from the board's menu) change the name, colour, description and visibility.
 
-**Dismiss** is the snooze this view has: a `dismissedOn` date on the task, which Today compares with today, in the device's own local day. It reaches the person's other devices, and works offline and on an encrypted account like any field. The next day it is simply back, so nothing has to clear it. It affects only Today: the task still shows in its list, Starred, search and Review, and reminders and the daily brief still count it, since it is still due.
+### 14.2 Lists on a board
 
-**When it opens by itself, on a phone:** on launch and after 30 minutes or more away. It does not when opening from a notification or a link to a particular task, or when there is nothing in it, or on coming back from a brief switch to another app. It is an overlay on the carousel, not a navigation: closing it shows the list that was underneath. `/today` opens it directly. A desktop opens on a list as usual.
+A list has a name, a position and its cards. Its header shows the name, the count of its open cards, and a menu:
 
-### 14.3 Starred
+| Entry           | What                                                                                             |
+| --------------- | ------------------------------------------------------------------------------------------------ |
+| Configure       | A dialog to rename it                                                                            |
+| Add card        | A card at the top of the list                                                                    |
+| Change position | Move it left or right, or to a position by number, which also serves a keyboard                  |
+| Delete          | Asks first, naming how many cards go with it; the cards are deleted, and the activity records it |
 
-A virtual list of starred top-level tasks, by due date with undated last, each showing its list. It owns no row and takes no new tasks, drags or bulk actions; everything else about a row works as in a list. One component, not a fork. Reached from the sidebar, and on a phone from the list switcher.
+Lists are dragged by their header to reorder, which writes one row. A new list goes at the end.
 
-### 14.4 Review
+### 14.3 Visibility and membership
 
-A pass over every open top-level task to prioritise them, for when Today is not the question. **The cards and swipes are Today's** (§14.2): up done, down cancel, left dismiss, right star.
+- **Public** (the default): everyone in the workspace can see it, and join it from the board's header ("Join board"), becoming a member. Joining is
+  recorded in its activity.
+- **Private:** only its members and the workspace's owners see it. It is not listed, searched or counted for anyone else, and its address answers 404
+  for them.
+- **The Share dialog** lists the board's people and their roles. An owner adds people from the workspace's (a picker over its members, never a search of
+  the server), makes them owners, removes them, and publishes the board (§14.6). Anyone can leave it.
+- **The board's header shows its members' avatars,** a few and then "+N", which open the Share dialog.
 
-- **Reached** from "Review all tasks" at the top of the list switcher on a phone, a Review row under Today and Starred on a desktop, and "Review this list" in any list's menu.
-- **Any swipe marks a task reviewed** (`reviewed_at`). Dismiss here means only that: it moves on, and does not hide the task from Today. Cards come least-recently-reviewed first, with never-reviewed first of all, so a person can stop at any point and carry on later without seeing the same ones again.
-- **It shows the count left,** and says when they have been through everything, with a way to start again.
-- **A date is not changed from a card,** in Today or here. The card's title opens the detail for that.
+### 14.4 Archive and delete
 
-### 14.5 Search
+- **Archive** (from the board's menu) hides it from the workspace's tiles and the sidebar behind _Archived_, and makes it read-only for everyone. It
+  keeps everything; restoring clears it. A published archived board stays published until it is unpublished.
+- **Delete** asks for its name to be typed, and removes it with everything on it, at once. There is no Undo; archive is the reversible half.
 
-Titles and notes, across the account's lists, including subtasks shown under their parent's name, newest change first. **It runs in the browser, on the local store,** on any encryption mode, offline as well. So it needs no server query, full Unicode case folding is free, and none of the plugin's flaws can recur: there, `%` matched everything, and 50 rows of the whole tenant were taken before filtering to the person's own.
+### 14.5 Search on a board
 
-## 15. Interface
+A search field in the board's header filters the cards shown, as you type, by title, label name and assignee name, in the browser over the board it has
+loaded. A filter is not saved, and says how many cards it hides. Search across boards is phase 3.
 
-### 15.1 Principles
+### 14.6 Publishing
 
-Everything comes from `@sovereignfs/ui` and its `--sv-*` tokens: monochrome, with colour only on a list's dot. What is reusable and missing is added there, in `sovereign`, not built here (the plugin's `CalendarGrid` and its own overlays were this mistake). The design system comes through `src/ui`, as in Fjord Web.
+A board's owners publish it from the Share dialog: it gets an address, `/p/<token>`, that anyone can open without signing in.
 
-**One set of routes.** The plugin rendered two different component trees depending on `matchMedia`, each with its own data. Sovereign's rule is the fix: **never fork a navigation decision by viewport; fork only what is rendered.** Addresses and data are the same at every width. Today opening by itself on a phone (§14.2) is an overlay, not a navigation, which keeps this true.
+- **Read-only, and only the work:** its name and colour, its lists, and its cards with their titles, descriptions, labels, due dates and checklists.
+  **No people:** no members, assignees, emails, comments or activity. A card opens to a read-only detail.
+- **The token is 32 random bytes,** in base64url. Unpublishing deletes it, and that address is gone for good; publishing again makes a new one.
+- **The page is rendered on the server,** with no script beyond the shell's, a strict policy, `noindex` by default, and a rate per address. It is always
+  the board as it is now, archived or not; a deleted board's address answers 404.
+- **Published boards are listed** in the board's Share dialog and in Settings > Data, so a person can see what of theirs is public.
 
-### 15.2 Desktop
+### 14.7 Online, and still at once
 
-Above 768px, two rows:
+In phase 1, boards are read from the server and held in memory, not on the device.
+
+- **A board loads whole and light:** the board, its lists, its labels, its people (id, name, avatar), and every open card with what its tile shows
+  (title, position, labels, due date, assignees, checklist progress, comment count, whether it has a description). Its archived cards are fetched when
+  asked for. **A card's detail is fetched when it opens:** description, checklist, comments and activity, each paged where it can be long.
+- **Every change shows at once.** The browser applies an operation to what it holds, sends it, and keeps the server's answer, or undoes it with a toast
+  on a refusal (§7.3). Sending is in order, one at a time per board, so that a drag followed by an edit reach the server as they were made.
+- **Freshness without live updates:** each operation moves the board's `version` on. While a board is open and visible, the browser asks for its
+  version every 20 seconds and on focus, and reloads the board if it moved, keeping an open card and anything being typed. Live updates are phase 2
+  (§25.4).
+- **Offline, a board says it needs a connection,** and changes nothing. What it held stays on the screen, read-only, until the connection comes back.
+
+## 15. Cards on a board
+
+### 15.1 A card
+
+| Field           | What                                               |
+| --------------- | -------------------------------------------------- |
+| **Title**       | The one required field, 1 to 500 characters        |
+| **Description** | Plain text, shown as written, with its line breaks |
+| **Due date**    | A date, and optionally a time (§11)                |
+| **Checklist**   | Items with a title and a tick, in order (§15.4)    |
+| **Labels**      | The board's labels it carries (§15.2)              |
+| **Assignees**   | Members of the board (§15.3)                       |
+| **Status**      | Open or Archived (§15.8)                           |
+| **Comments**    | §15.5                                              |
+| **Activity**    | §15.6                                              |
+
+A card is added at the top of its list, from the list's menu or the "Add a card" at the top of its column, with only its title. Clicking a card opens
+its detail, as a dialog over the board, at its own address (`/b/<board>/c/<card>`), so it can be linked to and reloaded. The detail edits every field,
+saving as you leave a field, with no Save; a viewer sees the same, read-only.
+
+A card's tile on the board shows its labels as small bars of colour, its title, and badges for its due date, checklist progress, comment count and
+description, and its assignees' avatars.
+
+### 15.2 Labels
+
+Each board has its own labels: a colour (any colour, §17.7) and an optional name. A new board has none. They are created, renamed, recoloured and
+deleted from the card detail's label picker or the board's settings. Deleting a label takes it off every card. A label's text is shown in black or white,
+whichever reads against its colour.
+
+### 15.3 Assignees
+
+A card can be assigned to any of its board's members, from its detail. Assigning someone raises a notice in their Inbox (§16), unless they assigned
+themselves. Someone removed from the board, or the workspace, is unassigned from its cards. A person's assigned cards across every board are in their
+Inbox (§16).
+
+### 15.4 Checklist
+
+As the Desk's (§10.3), in a table of its own: items with a title, a tick and an order, added, renamed, ticked, dragged into order and deleted in the
+detail. A tile shows progress as "2/5". Archiving a card does nothing to its checklist.
+
+### 15.5 Comments
+
+At the foot of a card's detail, newest first, each with its author's avatar and name and when it was written ("edited" if it was). A member writes one;
+its author edits or deletes it; a board owner deletes it. Plain text, with its line breaks. Writing one raises a notice for the card's assignees and the
+person who created the card (§16), never for its author. Replies are phase 2 (§25.6).
+
+### 15.6 Activity
+
+What happened on a board, by whom and when, written by the server in the same transaction as the change (§7.3), never by the browser.
+
+- **Kinds:** a card created, renamed, moved between lists, archived, restored, deleted, its due date set or cleared, a label put on or taken off, a
+  person assigned or unassigned, a checklist item added or ticked, a comment written; a list created, renamed, moved or deleted; the board created,
+  renamed, its visibility changed, archived, restored, published or unpublished; a person joining, added, removed or made owner.
+- **Each row keeps the names it needs** (the card's title, the lists') as they were, so that it reads the same after the card is renamed or deleted.
+  It keeps the card's id, which may then point at nothing.
+- **Shown** in the card's detail (its own), and in the board's Activity dialog (all of it), newest first, in pages of 50. A person's own, across
+  boards, is in Settings > Activity (§19).
+- **Kept** for as long as the board is. It is not edited, and not deleted except with its board or its workspace.
+
+### 15.7 Moving and cloning
+
+Cards are dragged within a list and between lists (§17.8). A right-click on a card, or its detail's menu, offers:
+
+- **Move:** to another list of this board, or to a board of the same workspace that the person is a member of, at the top of a list they choose. On
+  another board, labels are matched by name and colour and created if missing, and assignees who are not members there are dropped, which the dialog
+  says before it moves. Its comments and activity go with it, and both boards' activity records the move.
+- **Clone:** a copy in the same list, below it, with its title, description, due date, checklist (unticked), labels and assignees; not its comments or
+  activity. The copy's activity says what it was cloned from.
+- **Archive**, and for an archived card, **Restore** and **Delete**.
+
+### 15.8 Archive, and delete
+
+A card's status is Open or Archived. **Archive** takes it off the board, keeping its list and position, so restoring puts it back where it was. The
+board's menu lists archived cards, with Restore and Delete. **Delete** is only for an archived card, asks first, and is final; its activity stays,
+under the title it had.
+
+## 16. Inbox
+
+Basic notifications for phase 1: what a person needs to know about the boards they are on, in the app. Push and email are phase 2 (§25.2).
+
+- **Notices are written when they happen,** in the operation's transaction (§7.3), one row per person told: being **assigned** a card; a **comment** on
+  a card one is assigned to or created; being **added** to a workspace or a board. Never for what a person did themselves.
+- **The Inbox** (`/inbox`) has two parts. **Notifications:** newest first, grouped by day ("Today", "Yesterday", a date), each saying who did what to
+  which card or board, and opening it. **Assigned to me:** every open card assigned to the person, across their boards, by due date, undated last.
+- **Unread is one time per person** (`account_settings.inbox_seen_at`), as the kanban plugin found enough: opening the Inbox moves it on, and the
+  sidebar's Inbox entry shows how many notices are newer, up to "99+".
+- **A notice the person can no longer see** (they left the board, it was deleted or made private to others) is not shown, and is removed with them or
+  it.
+- **Kept** 90 days, and at most the latest 500 a person.
+
+## 17. Interface (the web)
+
+### 17.1 Principles
+
+Everything comes from `@sovereignfs/ui` and its `--sv-*` tokens. What is reusable and missing is added there, in `sovereign`, not built here: in phase 1
+that is the `loader-circle` and star icons (§10.2), and whatever the card dialog needs that `Dialog` lacks. The design system comes through `src/ui`. The
+icons this design names are the package's own: `square-kanban` for Boards, `calendar` for the Planner, `inbox`, `settings` for a workspace's gear and
+`panel-left` for the sidebar's toggle.
+
+**One set of routes.** Sovereign's rule: **never fork a navigation decision by viewport; fork only what is rendered.** Addresses and data are the same at
+every width. So the home is one address for everyone: **`/desk`** (§17.11).
+
+**Loading states gate every surface,** as the kanban plugin decided: the Desk paints from the device, so it has none after the first load; a board, the
+boards index and the Inbox show a skeleton until what they need is there, and never half a board.
+
+### 17.2 The shell
+
+Two rows: the header, and the main area of two columns, the sidebar and the content.
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│ ▣ Tasks                                            🔔  (avatar)│  header
-├────────────┬───────────────────────────────┬─────────────────┤
-│ Today       │ Personal                 ⋯  │  (right sidebar)  │
-│ Starred     │ Add a task…                 │  a task's detail, │
-│ Review      │ ☐ Water the plants  Sat  ☆ │  hidden until one │
-│ MY LISTS  + │ ☐ Call the bank          ☆ │  is opened        │
-│ ● Personal 4│ ▾ Completed (1)             │                   │
-└────────────┴───────────────────────────────┴─────────────────┘
+┌──────────────────────────────────────────────────────────────────────────┐
+│ ▣ Tusk                                                          (avatar) │  header
+├───────────────────┬──────────────────────────────────────────────────────┤
+│ ▦ Boards          │                                                      │
+│ ▤ Planner         │                    content                           │
+│ ▢ Inbox        3  │                                                      │
+│                   │                                                      │
+│ MY WORKSPACES   + │                                                      │
+│  ● Acme           │                                                      │
+│  ● Side project   │                                                      │
+│ SHARED WITH ME    │                                                      │
+│  ● Club           │                                                      │
+│               ⇤   │                                                      │
+└───────────────────┴──────────────────────────────────────────────────────┘
 ```
 
-- **Header:** the logo and app name on the left, the notification bell and the avatar on the right. The avatar opens `UserMenu`: Settings, Sign out, and when a core is set, a way back to it. The design system's `Header` requires a launcher slot that an app has no use for, so the shell is our own `AppShell` unless `Header` gains an option; decided in its task.
-- **Main:** `ThreeColumnLayout`: sidebar, content, right sidebar. **It shows two columns at first.** Clicking a task renders its detail in the right sidebar, as in the plugin.
-- **Dimensions,** matched to the Shopper screenshot: a sidebar of about 280px, content filling the rest with about 24px of padding, a right sidebar of 360px. The layout's defaults are 280 and 360. These are measured from the screenshot against the legacy shell's 64px rail, and Shopper's source was not to hand to confirm them. The screenshot's icon rail is the legacy shell's, and is replaced by the header.
-- **Sidebar:** Today, Starred and Review pinned, then the lists, each with its colour dot on the left and task count at the right end. The + beside "My lists" adds one.
+- **Header:** the logo and "Tusk" on the left, linking home; the avatar on the right. The avatar opens `UserMenu`: a header of the person's name and
+  email, then Settings, and Sign out; and when a core is set, a way back to it.
+- **Sidebar, first block:** Boards, Planner and Inbox, each with its icon; the Inbox with its unread count. The Planner entry appears when the Planner
+  is built (phase 2), not before: there is no entry that leads nowhere.
+- **Sidebar, second block:** the workspaces. The person's own (those they own) under _My workspaces_, with a + to create one; those they are a member
+  of, under _Shared with me_, at the bottom. A workspace opens to its boards (`/w/<id>`), and expands in place to list them.
+- **Three states:** full, a rail of icons, and hidden, toggled from the header (`panel-left`) and remembered on the device. **By default it is full on
+  the index pages (Boards, a workspace, the Inbox) and a rail on the Desk and a board,** which need the width; a person's toggle changes the default
+  for that kind of page on that device.
 
-### 15.3 Mobile
+### 17.3 The boards index
 
-At 768px and under, three rows: header, carousel, footer.
+`/boards`. The Desk first, as a tile of its own (its open count, and today's due), then each workspace as a section: its name, its people's avatars,
+a gear for its settings, and its boards as tiles of their colour, ending with a "Create board" tile. _My workspaces_ come first and can be sorted by
+name, date created or recently updated; the choice is saved with the account (§19), so it is the same on every device. _Shared with me_ follow, sorted
+by name.
 
-- **Header:** `MobileHeader`, as in legacy Sovereign: logo and app name on the left; bell and avatar on the right. The avatar opens the same menu.
-- **Main:** `SwipableMobileCarousel`, with `useCarouselRouteSync` mapping a slide to an address: **one slide per list.** Swiping changes the address.
-- **Footer:** `MobileFooter`, three buttons. Its centre slot is the launcher's, given our own icon and action:
+**A workspace's settings** are a dialog from its gear: its name; its people, their roles, adding by email, removing, leaving; and Delete. A member sees
+the people and Leave.
 
-| Button | What it does                                                                                                                                             |
-| ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Left   | Opens a sheet for switching lists quickly: "Review all tasks", Starred, then the lists with dot and count                                                |
-| Middle | Adds a task, in a sheet, with the list on screen already chosen as the target. It can be changed. From a view with no list behind it, the list used last |
-| Right  | Opens Today's modal                                                                                                                                      |
+### 17.4 The Desk
 
-Task detail and list actions are `Sheet`s. Date and repeat pickers use the design system's adaptive surface (`Popover` above, `Drawer` under). Neighbouring slides are already in the local store, so a swipe never shows a spinner.
+`/desk`, and `/desk/<listId>` for a list. The look of the Sovereign Tasks screenshot: with the app's sidebar as a rail, three columns, the Desk's lists,
+the list, and a card's detail on the right while `?card=<id>` is set.
 
-### 15.4 A row
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│ ▣ Tusk                                                          (avatar) │
+├──┬──────────────┬───────────────────────────────┬────────────────────────┤
+│▦ │ DESK       + │ Backlog                    ⋯  │ (a card's detail,      │
+│▤ │ ● Backlog  4 │ Add a card…                   │  while ?card= is set)  │
+│▢ │ ● Errands  2 │ ☐ Water the plants   Sat  ☆  │                        │
+│  │ ● Home     1 │ ☐ ◌ Call the bank          ★  │                        │
+│  │              │ ▾ Completed (1)                │                        │
+└──┴──────────────┴───────────────────────────────┴────────────────────────┘
+```
 
-A checkbox, the title, the list dot where lists are mixed, the due date (in the danger colour when overdue), a repeat icon, subtask progress and a star. Clicking the row opens the detail; the controls in it keep their own click. The detail edits title and notes, saving as you leave the field, and shows the date, repeat, list, subtasks and Delete.
+- **The lists column:** the Desk's lists, each with its dot and open count, a + to add one, dragged into order.
+- **The list:** "Add a card" at the top, then its cards: checkbox, title, the in-progress icon, due date, repeat icon, checklist ring, star. The filter,
+  sort and _Delete completed_ in its menu. Done cards in _Completed_ at the end.
+- **A card's detail,** in the right column: status, title, description, due date and repeat, list, checklist, star, Delete. It saves as you leave a
+  field. Closing it replaces the address, so Back does not step through every card looked at.
 
-### 15.5 Gestures, keyboard, and access
+### 17.5 A board
 
-**A gesture is always a shortcut for something visible.** On a touch screen:
+`/b/<boardId>`. Three rows inside the content: the app's header, the board's header, and the columns.
 
-- Swiping horizontally moves between lists. It belongs to the carousel.
-- **Reordering starts from a visible handle** at the row's edge, with a long press. The plugin tried a long press anywhere on the row, which fought the carousel, then an invisible handle, then a toast explaining the invisible handle.
-- Long-pressing the row body enters selection.
-- Row swipe-to-reveal (Done, Delete) uses `useSwipeReveal`, from a zone that does not fight the star.
+- **The board's header:** its name (renamed in place by an editor), its search (§14.5), its members' avatars, Share, and a menu: Activity (a dialog of
+  §15.6), Settings, Archived cards, Archive or Restore, Delete, each shown only to whom it is for (§7.2). A viewer of a public board sees "Join board".
+- **The columns:** the lists side by side, scrolling sideways, each with its header (§14.2) and its cards, and "Add a list" at the end. The board's
+  colour is a thin band at the top, not a wash behind the cards, so that text stays readable in both themes.
 
-With a keyboard, attached to the page and ignored while typing or with a modifier held: `n` new task, `j` and `k` or arrows to move, `e` to complete, `Enter` to open, `[` and `]` for the previous and next list, `Esc` to clear a selection, `?` to list them.
+### 17.6 The card dialog
 
-Accessibility is a condition of each task's being done, not a later pass (the plugin left it to a v1.0 that never came): WCAG 2.2 AA, keyboard reordering through dnd-kit's `KeyboardSensor` plus Move up and Move down in a row's menu, labelled icon buttons, real focus handling in sheets and dialogs, and honouring reduced motion.
+A `Dialog` over the board, at `/b/<board>/c/<card>` (an intercepting route, as Fjord's `/account`), and a page of its own when that address is opened
+directly. Two columns at desktop widths: the title and the list it is in; labels, assignees and due date as a row of chips; the description; the
+checklist; then Comments and Activity as two tabs. A side column holds the actions: Move, Clone, Archive, and the pickers. On a narrow screen it is one
+column.
 
-### 15.6 Bulk
+### 17.7 Colours
 
-Ctrl- or cmd-click, or a long press, starts selection, since the row's checkbox already means complete. A bar shows the count, with Complete, Move to list, Delete and Cancel (Complete is new). Each is one mutation.
+Boards, Desk lists and labels each have a colour, and **any colour can be picked**: `ColorPicker` from the design system, offering a row of suggested
+colours and a free choice. Stored as `#rrggbb`. Everything drawn on a colour (a label's name, a tile's title) is black or white by contrast, and a board's
+colour is a band or a dot, never a background for the page, so that light and dark both work.
 
-### 15.7 PWA
+### 17.8 Drag, keyboard and access
 
-Fully installable, on desktop and phone. **Fjord has neither a manifest nor a service worker;** the model is Sovereign core (`apps/core/app/manifest.ts`, `src/sw/source.ts`).
+- **On a board, a whole card is dragged, with no handle** (the kanban plugin's decision): a press that moves a few pixels starts a drag, and one that
+  does not is a click that opens the card. Cards move within a list and between lists; lists move by their header. Dropping writes one row.
+- **On the Desk, the same:** a card is dragged by its row, and a click opens it. (Tasks used the title link as the handle; the row becomes the handle,
+  with the checkbox and star keeping their own clicks.)
+- **With a keyboard,** a focused card is lifted with Space, moved with the arrows (between lists with left and right), and put down with Space, through
+  dnd-kit's `KeyboardSensor`; "Change position" and Move are in every menu too. Attached to the page and ignored while typing: `n` a new card, `/`
+  search, `Esc` close, `?` to list them.
+- **Accessibility is a condition of each task's being done:** WCAG 2.2 AA, labelled icon buttons, real focus handling in dialogs and menus, a drag's
+  result announced, and reduced motion honoured.
 
-- **`app/manifest.ts`:** name, icons (with a maskable one), `display: standalone`, theme colours. On an instance, the instance's branding is not used: it is an app called Tasks.
-- **The service worker** (`src/sw/source.ts`, served at `/sw.js`) caches only **the app shell, by allow-list:** a versioned set of built files and icons, and the one shell page, which holds nothing of a person. Task data is never in a cache: it is in IndexedDB (§8), named per account and deleted at sign-out. Sovereign's rule that a worker never stores a per-user page holds. A test evaluates the worker and fails if anything else gets in.
-- **It also handles** Push (§17.2) and Background Sync (§8.3). A new version activates at the next load, keeping the outbox.
-- **Install:** the browser's own prompt where it has one, and a line in Settings saying how on iPhone, since Push there needs it.
+### 17.9 PWA
 
-### 15.8 What the plugin paid to learn
+Fully installable, on desktop and phone, modelled on Sovereign core (`apps/core/app/manifest.ts`, `src/sw/source.ts`).
+
+- **`app/manifest.ts`:** name Tusk, icons (with a maskable one), `display: standalone`, theme colours.
+- **The service worker** caches only **the app shell, by allow-list:** a versioned set of built files and icons, and the one shell page, which holds
+  nothing of a person. **No data is ever in a cache:** the Desk is in IndexedDB, named per account and deleted at sign-out, and boards are in memory.
+  A test evaluates the worker and fails if anything else gets in.
+- **It also handles** Background Sync for the Desk (§8.3), and Push in phase 2. A new version activates at the next load, keeping the outbox.
+
+### 17.10 What the plugins paid to learn
 
 Each of these cost a release there. They are written here so they are not paid for twice.
 
 - **Drag indices are against what is rendered,** never the full array: filters, sort and the pin to the top all make the two differ.
-- **dnd-kit's auto-scroll will scroll the carousel sideways** in the middle of a reorder unless told to scroll only vertical containers (`canScroll`). Each `DndContext` needs an explicit `id`, or SSR and hydration disagree.
-- **`transform` on an ancestor makes it the containing block for `position: fixed`,** so a `Drawer` inside it renders squashed. Use `backface-visibility` if a sticky element needs its own layer.
-- **`overscroll-behavior-y: none`, not `contain`,** on scrolling columns: in WebKit `contain` keeps the element's own bounce, and a sticky header rides down with it. Chromium does not show this; test on real WebKit.
-- **`<Link replace>` to the same path with another search param does nothing** on a mounted route. Closing the detail uses `router.replace`.
-- **Sticky headers need an opaque background and a `z-index` above the rows',** which set their own on mobile for swiping.
-- **A one-time hint needs its claim set synchronously** if several instances of a component can mount at once.
-- **A self-rendered mobile footer must publish its height,** or `Sheet` and `Drawer` slide beneath it. `MobileFooter` now does this itself; check it.
+- **dnd-kit's auto-scroll will scroll a container sideways** in the middle of a vertical reorder unless told to scroll only what it should
+  (`canScroll`); on a board, sideways is wanted between lists and not within one. Each `DndContext` needs an explicit `id`, or SSR and hydration
+  disagree.
+- **`transform` on an ancestor makes it the containing block for `position: fixed`,** so a `Drawer` inside it renders squashed.
+- **`overscroll-behavior: none`, not `contain`,** on scrolling columns: in WebKit `contain` keeps the element's own bounce.
+- **`<Link replace>` to the same path with another search param does nothing** on a mounted route; closing a detail uses `router.replace`.
+- **Sticky headers need an opaque background and a `z-index` above the rows'.**
+- **Text written in a field keeps its line breaks** (`white-space: pre-wrap`) wherever it is shown: the kanban plugin collapsed them in two places.
+- **A dialog's close button needs its clearance reserved,** or a long title runs under it.
+- **A bug can live on PostgreSQL only.** The kanban plugin shipped one; every data-layer test here runs on all three forms (§23.1).
 - **Touch behaviour is not testable in Chromium's tooling.** A change to gestures or scrolling is checked in the iOS Simulator, and says so in its PR.
 
-## 16. Settings
+### 17.11 Addresses
 
-One place, from the avatar menu, at `/settings?section=`: a dialog over the page on a desktop and a full page on a phone, as Fjord's `/account` is (`app/@modal`). It replaces separate account and settings pages.
+| Address                                   | What                                                                                        |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `/`                                       | A landing page for someone not signed in, static. Signed in, `proxy.ts` sends it to `/desk` |
+| `/sign-in`, `/sign-up`                    | §6                                                                                          |
+| `/desk`, `/desk/<listId>`                 | The Desk: its first list, or a list. `?card=<id>` opens a card's detail                     |
+| `/boards`                                 | The boards index (§17.3)                                                                    |
+| `/w/<workspaceId>`                        | One workspace's boards                                                                      |
+| `/b/<boardId>`, `/b/<boardId>/c/<cardId>` | A board, and a card on it                                                                   |
+| `/inbox`                                  | §16                                                                                         |
+| `/planner`                                | Phase 2 (§25.1)                                                                             |
+| `/account?section=`                       | Settings (§19), a dialog over the page as Fjord's is                                        |
+| `/p/<token>`                              | A published board (§14.6), for anyone                                                       |
 
-| Section           | What                                                                                                                                                               |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Profile**       | Name, email, avatar                                                                                                                                                |
-| **Preferences**   | Theme, first day of the week, and how Today opens on this device                                                                                                   |
-| **Security**      | Password, two-factor, passkeys, linking Sovereign, as Fjord's. An account that came through Sovereign has no password, two-factor or passkey sections, and says so |
-| **Lists**         | Each list's name and colour; change the order; delete                                                                                                              |
-| **Notifications** | Enable Push on this device; email reminders on or off; the daily brief's time; due-time reminders on or off (§17)                                                  |
-| **Data**          | Export and import (§18); backup (§19); encryption (§9); last synced; delete account (§20)                                                                          |
+Anything that is not there, or not there for this person, says so with a way back, and answers 404.
 
-Settings shows only what can work here: no Push without VAPID keys, no email without SMTP, no encryption choice in operator-key mode, each with a sentence saying why. All of it but Lists needs a network.
+## 18. Mobile
 
-## 17. Reminders and notifications
+The phone's own screens are phase 2. **Phase 1 lays their foundations:** every screen works at a phone's width as a single column, the routes are the
+ones the phone will use, and the shell can swap its sidebar for the footer below at 768px and under. What phase 2 builds, as the owner set it out:
 
-### 17.1 What is sent
+- **Three rows:** the header (logo and Tusk, avatar), the content, and a footer of five: **Desk | Boards | Action | Planner | Inbox**.
+- **The Desk is the default,** as a carousel of its lists, one per slide (`SwipableMobileCarousel`). The action button opens four: the list selector
+  (and a new list), a new card (a dialog, with the list on screen chosen), **Today's agenda** as a swipe view, and **Review** as a swipe view (§25.3).
+- **Boards** shows the boards grouped by workspace; a board opens as a carousel of its columns. The action button offers a new board and a new workspace;
+  inside a board, a new list and a new card.
+- **The action button changes with the view.** The Planner is a feed of dates with blocks; the Inbox holds the notifications and assigned cards.
+- **A card's detail is full-screen.** Cards are reordered in a list by a long press; **moving between lists is by a menu, never a drag** on a carousel
+  that also swipes (the kanban plugin's decision). Reordering on the Desk starts from a visible handle.
 
-Off until a person turns it on in Settings. Then:
+## 19. Settings
 
-- **A daily brief,** once per local day at or after their time: "3 tasks due today · 2 overdue", linking to `/today`. Nothing on a day with nothing to say.
-- **A reminder at a task's due time,** one per task, linking to the task.
+One dialog, from the avatar menu, at `/account?section=`: over the page on a desktop and a full page on a phone, as Fjord's `/account` is
+(`app/@modal`).
 
-A due time passed while the app was down is sent on the next tick of the same day. One missed by a whole day is not; it is in the next brief.
+| Section           | What                                                                                                                                                                  |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Profile**       | Name, email, avatar. The name and avatar are what workspaces see                                                                                                      |
+| **Security**      | Password, two-factor, passkeys, linking Sovereign, signed-in devices, as Fjord's. An account that came through Sovereign has no password, two-factor or passkey parts |
+| **Preferences**   | Theme, first day of the week, how My workspaces are sorted                                                                                                            |
+| **Notifications** | Phase 1: what the Inbox tells you about, each on or off. Push and email are added in phase 2                                                                          |
+| **Data**          | Export and import (§20); backup (§21); encryption of the Desk (§9); published boards (§14.6); last synced; delete account (§22)                                       |
+| **Activity**      | What the person did across their boards, newest first, from §15.6, and when they last signed in on each device                                                        |
 
-### 17.2 Channels
+Settings shows only what can work here: no encryption choice in operator-key mode, no backup without `TUSK_ENCRYPTION_KEY`, each with a sentence saying
+why. All of it needs a network.
 
-**The app's own notification list is always there.** A `notification` row per notice, read by the header's bell through `NotificationsPanel` from `@sovereignfs/ui`, and brought down by sync so that the bell works offline. This works on a server running alone, and needs no core. Each account keeps its latest 200, for 30 days.
+**Preferences are saved with the account when they are about the data,** so they follow the person: the sort of My workspaces, a Desk list's sort and
+whether its _Completed_ is open. **What is about the screen stays on the device:** the sidebar's state, the theme, which workspaces are expanded.
 
-Then, each by its own switch:
+## 20. Export and import
 
-| Channel         | Needs                                                                                                | What it does                                                                                                                                                                                                                          |
-| --------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Web Push**    | `TASKS_VAPID_PUBLIC_KEY`, `TASKS_VAPID_PRIVATE_KEY`, `TASKS_VAPID_SUBJECT`                           | Through `web-push` and the service worker, per device (`push_subscription`), turned on from that device. Dead subscriptions (410, 404) are removed. Legacy's `runtime/src/push.ts` is the model. On iPhone it needs the PWA installed |
-| **Email**       | `TASKS_SMTP_*`                                                                                       | The mailer of §6. Each message links to Settings to turn it off                                                                                                                                                                       |
-| **Core's bell** | A linked Sovereign identity, `TASKS_CORE_*`, and the app scope `notifications:send` from an operator | `sv.app.notifications.send` to the `sub`. Automatic when hosted. Without the scope it is logged once and tried rarely, and everything else still works                                                                                |
+One JSON file, from Settings > Data, or from a workspace's or board's menu, either way.
 
-- **`@sovereignfs/sdk` is used for this and for checking core's notices,** and for nothing else; sign-in is better-auth's. It is assumed an app token needs none of the SDK's session or token stores: the first task to use it confirms that.
-- **A task's title leaves the database by these routes.** A Push payload is encrypted to the device, but email goes through the mail provider, and core stores its notifications. Settings says so.
-- **One channel failing does not stop another** (`Promise.allSettled`, as legacy does).
+### 20.1 What can be exported
 
-### 17.3 Exactly once, as near as can be
-
-The job runs once a minute. Any process may run it, and **the database decides who sends:** each send is a conditional update, and only the process whose update returned a row sends. The brief sets `last_digest_on = today` where it is null or earlier. A reminder sets `reminder_sent_at` where it is null. No lock: nothing here needs one, and SQLite has none.
-
-The notification row and its fan-out follow. Core's `key` (`digest-2026-11-04`, `due-<id>-<date>`) means sending there again within a day is the same send. The plugin claimed, sent, and lost the notification if the send failed. Here the row is written in the claim's transaction, so the bell always gets it, and a channel that fails is retried on the next tick a few times, then given up, since Push and email have no such key and a doubled reminder is worse than a late one.
-
-### 17.4 The query
-
-Zones are not portable SQL, so the job reads the distinct zones of accounts with reminders on, works out the local date and time of each in JavaScript, and runs one statement per zone, using a partial index over open tasks with a time and no reminder sent. It reads `due_date`, `due_time` and `completed_at`, which the server mirrors from the fields of an account that is not personally encrypted (§22.3). Sends are made with a small concurrency. For core, its limits are respected: 600 a minute for the app and 60 an hour per person, with `429` and `Retry-After` honoured by leaving the rest to a later tick. One person's failure never stops the next person's.
-
-When the server applies a change to a due date or time, it clears `reminder_sent_at`, so it fires again.
-
-### 17.5 On an encrypted account
-
-The server cannot read a due date, so **the browser uploads times only:** `reminder_slot` rows of when to notify, in UTC, computed from the tasks and the zone, for the next 14 days, replaced whenever they change. A slot has no link to any task, and a daily brief is a slot too.
-
-- **Push wakes the device.** The service worker reads IndexedDB, decrypts, and shows the title, or the brief's counts. If nothing is due after all, it shows "Nothing due after all": browsers require a visible notification for a push.
-- **The bell, email and core's bell say only "You have tasks due"**, linking to `/today`.
-- **The operator can see those times,** and not what they are for. A device that has not synced for 14 days stops getting reminders, and Settings says so at the time it is turned on.
-
-## 18. Export and import
-
-One JSON file, from Settings, either way. That is the whole of portability: there is no bulk migration from the plugin, and core's account-level export is "later" (sdk §10).
+| Scope           | Holds                                                                  | Who may               |
+| --------------- | ---------------------------------------------------------------------- | --------------------- |
+| **Desk**        | Its lists, cards, checklists and series                                | Its owner             |
+| **A board**     | Its lists, cards, labels, checklists, assignees, comments and activity | Anyone who can see it |
+| **A workspace** | Its boards, as above, and its people                                   | Its owners            |
+| **Everything**  | The Desk, and every workspace the person owns                          | The person            |
 
 ```json
 {
-  "format": "sovereign-tasks",
+  "format": "tusk",
   "version": 1,
-  "exportedAt": "2026-11-04T09:00:00Z",
-  "lists": [
+  "exportedAt": "2026-11-06T09:00:00Z",
+  "scope": "everything",
+  "desk": {
+    "lists": [{ "id": "…", "title": "Backlog", "color": "#6b7280", "position": "a0", "cards": [] }],
+    "series": []
+  },
+  "workspaces": [
     {
       "id": "…",
-      "title": "…",
-      "color": "blue",
-      "position": "a0",
-      "sort": "custom",
-      "showCompleted": false,
-      "tasks": [
+      "name": "Acme",
+      "people": [{ "name": "Ana", "email": "ana@example.com", "role": "owner" }],
+      "boards": [
         {
           "id": "…",
-          "parentId": null,
-          "title": "…",
-          "notes": null,
-          "starred": false,
-          "dueDate": "2026-11-08",
-          "dueTime": null,
-          "seriesId": "…",
-          "position": "a1",
-          "completedAt": null,
-          "reviewedAt": null,
-          "createdAt": "…"
+          "name": "Roadmap",
+          "color": "#2563eb",
+          "visibility": "public",
+          "lists": [],
+          "labels": []
         }
       ]
     }
-  ],
-  "series": [{ "id": "…", "rule": "FREQ=WEEKLY;BYDAY=SA", "anchor": "2026-11-08" }],
-  "settings": { "morningTime": "08:00" }
+  ]
 }
 ```
 
-- **Made and read in the browser,** from the local store and into it, so that it works the same on any encryption mode. Plain JSON in the person's hands, with a warning if the account is encrypted.
-- **Everything of theirs,** completed tasks included; not what was deleted, nothing about reminders having been sent or today's dismissals, and no key, backup connection or credential.
-- **Written deterministically:** ordered by id, so that two exports of the same data differ only in `exportedAt`.
-- **Import is additive.** It never replaces anything, every id is made new, and a file that fails validation changes nothing. It says what it found ("3 lists, 214 tasks") and asks before writing: importing twice would otherwise silently double everything. Existing settings are not overwritten. It goes to `POST /api/import` as one request and one transaction, encrypted first on an encrypted account.
-- **Limits:** 50 MB, and the same limits on each field as anywhere else (§7). A file is untrusted input: rules go through §13.2.
-- **It reads the plugin's file too,** `{ pluginId: "fs.sovereign.tasks", schemaVersion: 1, data }`, so that people on the plugin have a way across without anything more. Epoch seconds become times, integers become positions, each series gets an anchor from its open occurrence, `views` and `reminderSentAt` are ignored, and `assigneeId` is dropped.
+- **People are named by name and email,** never by id, so that a file means something on another server.
+- **Everything of the scope,** done and archived included; not what was deleted, and no key, publication token, backup connection or credential.
+- **Written deterministically:** ordered by position and id, so that two exports of the same data differ only in `exportedAt`.
+- **The Desk is made and read in the browser,** from the local store and into it, so that it works the same on any encryption mode, with a warning if it
+  is encrypted. **Boards and workspaces are made on the server,** since that is where they are.
 
-## 19. Backup to git
+### 20.2 Import
 
-A person can opt in to connecting a git repository of theirs, and Tasks commits their data to it, as a new file each time.
+- **Import always creates.** It never replaces or merges: Desk lists are added to the Desk; a board is created in a workspace the person chooses (where
+  they may create boards); a workspace is created with the person as its owner. Every id is made new. Importing twice makes two copies, so it says what
+  it found ("1 workspace, 4 boards, 312 cards") and asks before writing.
+- **People are matched by email** to accounts on this server: someone who is a member of the destination workspace is assigned and kept on the board;
+  anyone else is dropped, and the summary says how many. Importing a workspace does not add people to it.
+- **Comments and activity are not imported:** the file keeps them as a record, and a new board's history starts with its import.
+- **A file that fails validation changes nothing.** 50 MB at most, and every field within its limits (§7.1). It goes to the server as one request and one
+  transaction, the Desk's part encrypted first on an encrypted Desk.
+- **It reads the tasks plugin's file too,** `{ pluginId: "fs.sovereign.tasks", schemaVersion: 1, data }`, into the Desk: lists become lists, tasks
+  cards, subtasks checklist items, notes descriptions, and each series gets an anchor from its open occurrence. The kanban plugin had no export, so there
+  is nothing of it to read.
 
-### 19.1 What a person does
+## 21. Backup to git
 
-In Settings > Data:
+A person can connect a git repository of theirs, and Tusk commits their data to it, as a new file each time.
 
-1. **Connect a repository** (§19.2).
-2. **Choose a mode:**
+### 21.1 What a person does
 
-| Mode     | What it does                                                                                                      |
-| -------- | ----------------------------------------------------------------------------------------------------------------- |
-| `manual` | Only when they press **Back up now**                                                                              |
-| `auto`   | On a frequency they choose: every hour, every 6 hours, daily (the default) or weekly. **Back up now** still works |
+In Settings > Data: connect a repository (§21.2); choose `manual` (only on **Back up now**) or `auto` (every hour, 6 hours, day (the default) or week);
+see the repository, the last backup with a link to the file, the next, and what went wrong if something did. Change the mode or disconnect at any time.
 
-3. See the state: the repository, the last backup with a link to the file, the next, and what went wrong if something did. Change the mode or disconnect at any time.
+**The repository can be a Fjord repository or anything else.** In a Fjord repository, `tusk/` is an ordinary folder outside every vault, so nothing is
+needed from Fjord. The first provider is GitHub; `Provider` leaves room for others.
 
-**The repository can be a Fjord repository or anything else.** In a Fjord repository, `sovereign-tasks/` is an ordinary folder outside every vault (Fjord's spec §2), so nothing is needed from Fjord and `fjord verify` is not disturbed. There is no deeper tie: reusing Fjord's stored connection would couple two apps that can run apart. The first provider is GitHub; `Provider` leaves room for others.
-
-### 19.2 Connecting, as Fjord does
+### 21.2 Connecting, as Fjord does
 
 The connection is Fjord Web's §7, for one repository per account:
 
-- **Two ways in.** **The GitHub App** (`TASKS_GITHUB_APP_*`, preferred where the operator has set it up): the person installs it and chooses the repository; _Contents: read and write_ and _Metadata: read_ only; short-lived installation tokens, with no token kept. **A repository address and a fine-grained personal access token**, limited to that repository with _Contents: read and write_.
-- **Checked before anything is kept,** in the order a person would fix things: GitHub accepts the token; it can see the repository; **the repository is private** (§19.5); the default branch has something in it; and the token can write, by `canWrite`, which tries something that changes nothing, since a repository's reported permissions are not to be trusted. Each refusal is a message of ours saying what to do, never GitHub's text, never the token. An empty repository is refused with "add a README first", as in Fjord.
-- **Credentials at rest** are `src/crypto/`, as Fjord's: envelope encryption under `TASKS_ENCRYPTION_KEY`, bound to the row and purpose, with rotation by restart through `TASKS_ENCRYPTION_KEY_PREVIOUS`, and a server that refuses to start rather than lose one quietly. Without a key, Settings says why a repository cannot be connected.
-- **A git host is reached only through `Provider`** (`src/providers/`), tested as Fjord's is: one contract, over a fake whose storage is a real git repository, an in-memory one the app is tested against, and GitHub's real answers recorded. Tasks needs a small part of it: `getRepository`, `canWrite`, `getHead` and `commit`. `TASKS_GITHUB_API_URL` covers an Enterprise Server. **Credentials never appear in an error, a log or a URL.**
+- **Two ways in.** **The GitHub App** (`TUSK_GITHUB_APP_*`, preferred where the operator has set it up), with _Contents: read and write_ and _Metadata:
+  read_ only and short-lived installation tokens. **A repository address and a fine-grained personal access token**, limited to that repository.
+- **Checked before anything is kept,** in the order a person would fix things: GitHub accepts the token; it can see the repository; **the repository is
+  private**; the default branch has something in it; the token can write (`canWrite`). Each refusal is a message of ours saying what to do, never
+  GitHub's text, never the token.
+- **Credentials at rest** are `src/crypto/`: envelope encryption under `TUSK_ENCRYPTION_KEY`, bound to the row and purpose, with rotation through
+  `TUSK_ENCRYPTION_KEY_PREVIOUS`.
+- **A git host is reached only through `Provider`** (`src/providers/`), tested over a fake whose storage is a real git repository, an in-memory one the app
+  is tested against, and GitHub's real answers recorded. `TUSK_GITHUB_API_URL` covers an Enterprise Server. **Credentials never appear in an error, a log
+  or a URL.**
 
-### 19.3 What is committed
+### 21.3 What is committed
 
 ```
-sovereign-tasks/2026-11-05_14-30-00.json
+tusk/2026-11-06_14-30-00.json
 ```
 
-- **On the default branch,** under a folder `sovereign-tasks` at the repository's root, made by the first commit if it is not there. Other files in the repository are never touched.
-- **The name is `YYYY-mm-dd_hh-mm-ss` in UTC,** when the backup was made, so that names sort in order whatever the account's time zone or daylight saving is doing. The extension is `json`.
-- **The file is made on the server,** so that auto backups need no device. For a plain or operator-key account, it is §18's export exactly: a person can read it, and imports it as any other file. **For a personal-key account, the same shape holds ciphertext for each field and the wrapped list keys** (`"encrypted": true`), so the backup is as private as the database, and importing it needs the key.
-- **To restore,** download it and import it in Settings. Import is additive, so restoring is for an empty account, or knowing it adds; it says what it found before writing.
-- **The commit** is one file, made the way Fjord makes one (blobs, a tree on the head's, a commit, a fast-forward), **never forced**, with the message `Tasks backup 2026-11-05 14:30:00 UTC`, authored by the identity of the token or App.
-- **Nothing is ever deleted or rewritten.** Each backup is a new file, and Tasks does not prune. A person who wants fewer removes them in git.
+- **The "everything" export of §20:** the Desk and every workspace the person owns. A board in someone else's workspace is theirs to back up.
+- **On the default branch,** under `tusk/` at the repository's root, made by the first commit if it is not there. Other files are never touched.
+- **The name is `YYYY-mm-dd_hh-mm-ss` in UTC,** so that names sort in order whatever the time zone is doing.
+- **Made on the server,** so that auto backups need no device. **On a personal-key Desk, the Desk's part holds ciphertext and the wrapped list keys**
+  (`"encrypted": true`), so the backup is as private as the database, and importing it needs the key.
+- **To restore,** download it and import it (§20.2).
+- **The commit** is one file (blobs, a tree on the head's, a commit, a fast-forward), **never forced**, with the message
+  `Tusk backup 2026-11-06 14:30:00 UTC`. **Nothing is ever deleted or rewritten,** and Tusk does not prune.
 
-### 19.4 Running it
+### 21.4 Running it
 
-- **Auto backups are a job,** in the same timer as §17. A connection has `next_backup_at`; a process claims it by a conditional update, moving it on, so that one process does it. The data is read in a short transaction and closed; GitHub is called outside it.
-- **Nothing changed, nothing committed.** An auto backup compares the account's `seq` with the one at the last backup, and if they match it only records that it looked. Daily backups of a quiet account do not make daily commits. **Back up now** always commits, since someone asked. It is limited to once a minute.
-- **A backup holds what has synced.** A device's unsent changes are in the next one.
-- **A branch that moved** (`head_moved`) is read again and tried once more in the same run: nothing conflicts, since the path is new.
-- **A write is never retried on a lost answer,** as in Fjord: the commit may have happened. The next backup is a new file, so the worst case is one file too many.
-- **Failures are kept and shown:** the kind of failure, when, and how many in a row. A network failure or rate limit tries again at the next due time. A token that stopped working, a repository gone, or one made public **stops auto backup**, says so in Settings, and adds a notification (§17.2). It never spins against GitHub.
-- **Size:** the 50 MB limit of §18 holds here too, so a backup is never a file that could not be imported. Over it, the backup is refused and says so.
+- **Auto backups are a job.** A connection has `next_backup_at`; a process claims it by a conditional update, so that one process does it. The data is
+  read in a short transaction and closed; GitHub is called outside it.
+- **Nothing changed, nothing committed.** An auto backup compares a fingerprint of what it would write (the Desk's `seq` and each owned workspace's
+  `updated_at`) with the last one's, and if they match it only records that it looked. **Back up now** always commits, at most once a minute.
+- **A branch that moved** is read again and tried once more in the same run. **A write is never retried on a lost answer:** the next backup is a new
+  file, so the worst case is one file too many.
+- **Failures are kept and shown.** A network failure or rate limit tries again at the next due time. A token that stopped working, a repository gone,
+  or one made public **stops auto backup**, says so in Settings, and adds a notice to the Inbox.
+- **Size:** the 50 MB limit of §20 holds here too.
 
-### 19.5 Privacy
+### 21.5 Privacy
 
-Unless the account has a personal key, the file is **plain text**, with everything the person wrote, on GitHub's servers. So:
+Unless the Desk has a personal key, the file is **plain text** on GitHub's servers, and boards always are. So **only a private repository can be
+connected,** each backup checks again, and Settings says plainly what is being sent and where. **It is each person's own choice and own repository.**
+Disconnecting and deleting the account delete the connection and its credential; neither touches the repository.
 
-- **Only a private repository can be connected,** and each backup checks again, stopping if it has become public. This is so even in a Fjord repository with encrypted vaults, where this folder is still plain text. Settings says plainly what is being sent and where.
-- **It is each person's own choice and own repository.** Nothing is backed up unless they connect one. An operator backing up the whole server is a different thing, and is their database's backup (§23).
-- **Disconnecting** deletes the connection and its credential. **Deleting an account** does the same (§20). Neither touches the repository: what was committed is theirs, and remains. The account deletion screen says so.
+## 22. Account deletion and signing out
 
-### 19.6 Not in phase 1
+**`People.deletePerson`** (`src/sovereign/people.ts`, as Fjord's) deletes everything of an account, and leaves shared work to the people still using it.
+It is one routine, safe to run again: the row linking a `sub` to the account goes last, so a run that stopped can find the account.
 
-A list of backups in the app with restore from there, GitLab or another host, and a choice of branch or folder.
+- **The Desk:** every list, card, checklist item and series, including what was soft-deleted; list keys; Desk settings.
+- **Workspaces:** they are removed from every workspace and board, and unassigned from every card, as removal does (§7.2). **A workspace where they were
+  the only owner passes to its longest-standing member,** who is told in their Inbox; **one with nobody left is deleted** with its boards.
+- **What stays:** their comments, and the activity and cards they made on boards that carry on, shown as by "Deleted account", since the account id no
+  longer resolves to a name. Nothing is copied to keep their name.
+- **The rest:** notices for them and about them, publications of boards that are deleted, the backup connection and its credential, rate counters,
+  passkeys, two-factor, sessions and sign-ins, and the account.
 
-## 20. Account deletion and signing out
-
-**`People.deletePerson`** (`src/sovereign/people.ts`, as Fjord's) deletes everything of an account: tasks, lists and series, including what was soft-deleted; list keys, reminder slots, notifications, push subscriptions; settings; the backup connection and its credential; rate counters; passkeys, two-factor, sessions and sign-ins; the account. It is one routine, safe to run again: the row linking a `sub` to the account goes last, so a run that stopped can find the account. A test seeds one row of every table and finds nothing of that account after. A new table that holds something of a person fails it until it is included.
+A test seeds one row of every table, for the person and for a second person sharing a workspace with them, and finds nothing of the first after, and
+the second's boards intact. A new table that holds something of a person fails it until it is included.
 
 It is reached two ways:
 
-- **From Settings > Data,** after the password or, for a Sovereign-only account, a fresh session. It says what will go, and that a backup repository will not. This device's local database goes too. Other devices find out at their next sync, and delete theirs.
-- **From core's account-deleted notice,** when a Sovereign identity is linked: a signed token in a form, `POST`ed to `/api/sovereign/account-deleted`, checked by the SDK (`verifyAccountDeletedToken`), and answered `200` only once done, as app manifest §4 requires. Core retries for 30 days. An account that Sovereign was linked to with a password or a passkey is deleted whole, as the notice asks.
+- **From Settings > Data,** after the password or, for a Sovereign-only account, a fresh session. It says what will go, what will pass to others, and
+  that a backup repository will not. This device's local database goes too; other devices find out at their next sync, and delete theirs.
+- **From core's account-deleted notice,** when a Sovereign identity is linked: a signed token, `POST`ed to `/api/sovereign/account-deleted`, checked by
+  the SDK (`verifyAccountDeletedToken`), and answered `200` only once done, as app manifest §4 requires.
 
-**Back-channel logout** is `/api/sovereign/backchannel-logout`, checked the same way, and ends all of the person's sessions. Both routes read a bounded form, count requests against one limit, refuse a replayed `jti`, and are 404 where Sovereign sign-in is not set up.
+**Back-channel logout** is `/api/sovereign/backchannel-logout`, checked the same way, and ends all of the person's sessions. Both routes read a bounded
+form, count requests against one limit, refuse a replayed `jti`, and are 404 where Sovereign sign-in is not set up.
 
-Removing the app's access in core leaves the data; the person can come back.
+## 23. Data model and database
 
-## 21. Sharing (phase 2)
+### 23.1 Database
 
-After the MVP. Outlined here so phase 1 does not preclude it. It gets its own RFC before it is built.
+**As Fjord Web's §14, and read that for the detail.** `TUSK_DB_DIALECT` is `sqld` (the default), `sqlite` or `postgres`, read in one place.
 
-- **A list can be shared with other accounts on this server,** as Fjord shares documents (its §12). No links and no guests. How an account is found is for the RFC: an instance can offer `directory.searchUsers` (the `directory` scope), and a server running alone cannot.
-- **Roles:** one owner, and members. A member reads and edits tasks. Only the owner renames, deletes or shares the list. A member can leave; an owner must transfer or delete first.
-- **Assignment:** a task may be assigned to a member. Removing a member unassigns theirs. Assigning sends a notification.
-- **What changes:** a `list_member` table; §7's check becomes "a member of the list"; sync's cursor covers lists shared with an account; and order, sort and show-completed move to per-account.
-- **With encryption:** the list key is wrapped for each member's public key (§9.2). A member with no key is the RFC's question.
-- **When an owner's account is deleted,** a shared list passes to its longest-standing member, and goes if it has none. A deleted member's assignments are cleared, and the tasks stay.
-- **A recurring task on a shared list** is also for that RFC.
+| Dialect              | Address                                                                     | For                                                                                                    |
+| -------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `sqld` (**default**) | `TUSK_SQLD_URL`, with `TUSK_SQLD_ADMIN_URL`                                 | Most installs. Namespaces `tusk` and `tusk_auth`. sqld 0.24.33 or later                                |
+| `sqlite`             | `TUSK_SQLITE_URL`, `file:/data/tusk.db`                                     | The smallest self-host: one container. Auth is `tusk_auth.db` beside it. Never on a network filesystem |
+| `postgres`           | `TUSK_POSTGRES_URL` (or `_FILE`), `PGSSLROOTCERT`, `TUSK_POSTGRES_POOL_MAX` | An operator who prefers it, and what an instance gives. Schemas `tusk` and `tusk_auth`                 |
 
-## 22. Data model and database
+- **Drizzle, a schema and a migration set per dialect,** generated with `pnpm db:generate` and never written by hand or `push`ed, applied at start-up.
+  CI fails if generating would write anything. A **parity test** checks that the two dialects declare the same tables, columns and indexes.
+- **Portable by rule:** standard SQL only, values bound. **No `LISTEN/NOTIFY`, no trigger, no extension.** A permission is a subquery in the statement
+  (§7.1), which all three run alike.
+- **No foreign keys and no cascades,** as in Fjord: `account_id` is in the other store, and SQLite's enforcement depends on a per-connection setting.
+  **Every deletion names what it deletes, in a transaction:** deleting a board deletes its lists, cards, labels, checklist items, comments, activity,
+  members, publication and notices, by `board_id`, which every one of those tables carries for this reason.
+- **At start-up,** in `instrumentation.ts`, before anything is served, and it does not start if it cannot.
+- **Tested on every form.** A data-layer test runs on sqld, a `file:` database and PostgreSQL, and one that passes on only one is not done. Tests read
+  `TUSK_TEST_*` and never the app's variables.
+- **A file database serialises its statements in the process,** since libSQL waits for a lock synchronously; a transaction holds nothing across a call
+  out of the database.
 
-### 22.1 Database
+### 23.2 Representations
 
-**As Fjord Web's §14, and read that for the detail.** `TASKS_DB_DIALECT` is `sqld` (the default), `sqlite` or `postgres`, read in one place; nothing infers it from a URL.
+One per type, through the column vocabulary (`src/db/schema/*/columns.ts`):
 
-| Dialect              | Address                                                                       | For                                                                                                                          |
-| -------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `sqld` (**default**) | `TASKS_SQLD_URL`, with `TASKS_SQLD_ADMIN_URL`                                 | Most installs. Namespaces `tasks` and `tasks_auth`. sqld 0.24.33 or later, since earlier ignore `x-namespace`                |
-| `sqlite`             | `TASKS_SQLITE_URL`, `file:/data/tasks.db`                                     | The smallest self-host: one container. Auth is `tasks_auth.db` beside it. Never on a network filesystem. Needs a glibc image |
-| `postgres`           | `TASKS_POSTGRES_URL` (or `_FILE`), `PGSSLROOTCERT`, `TASKS_POSTGRES_POOL_MAX` | An operator who prefers it, and what an instance gives. Schemas `tasks` and `tasks_auth`                                     |
+| Value             | Stored as                                                                                  |
+| ----------------- | ------------------------------------------------------------------------------------------ |
+| Id                | Text, a UUID made by the client                                                            |
+| Time              | `epochMs`: a 64-bit integer, a `number` in JavaScript                                      |
+| Boolean           | The vocabulary's word, `0/1` on SQLite and `boolean` on PostgreSQL                         |
+| Date, time of day | Text, `YYYY-MM-DD` and `HH:MM` (§11)                                                       |
+| Position          | Text compared byte by byte: `BINARY` on SQLite and `COLLATE "C"` on PostgreSQL             |
+| Colour            | Text, `#rrggbb`                                                                            |
+| Fields (the Desk) | JSON as text: a map of field name to `{ v }` or `{ c }`, plus the `seq` that last wrote it |
+| Details           | JSON as text, for an activity's or a notice's names                                        |
+| Sealed            | Under the operator key, a content column holds ciphertext as text (§9.5)                   |
 
-- **Drizzle, a schema and a migration set per dialect,** generated with `pnpm db:generate` and never written by hand or `push`ed, applied at start-up. CI fails if generating would write anything. A **parity test** checks that the two dialects declare the same tables, columns and indexes.
-- **Portable by rule:** standard SQL only, values bound, raw SQL through one small helper. **No `LISTEN/NOTIFY`, no trigger, no extension.** The dialect is chosen at install time; moving between them is §18's file, per account.
-- **No foreign keys and no cascades in the app store,** as in Fjord: `account_id` is in the other store, and SQLite's enforcement depends on a per-connection setting. Every deletion names what it deletes, in a transaction, which is what `People` (§20) tests.
-- **At start-up,** in `instrumentation.ts`, before anything is served, and it does not start if it cannot. Concurrent starts are safe: PostgreSQL takes an advisory lock on one pinned connection, and SQLite retries. So the manifest declares `database: true`, with no pooling, as Fjord's does.
-- **Tested on every form, from the first task.** A data-layer test runs on sqld, a `file:` database and PostgreSQL in CI, and one that passes on only one is not done. Tests read `TASKS_TEST_*` and never the app's variables, so that `pnpm test` can never wipe a developer's data.
+### 23.3 Tables
 
-### 22.2 Representations
+Beyond better-auth's (`user`, `session`, `account`, `verification`, `two_factor`, `passkey`, `rate_limit`, in the auth store).
 
-One per type, through the column vocabulary (`src/db/schema/*/columns.ts`), so that no table names a dialect's own type:
+**The Desk** is synced, so each row has structural columns the server uses and a `fields` column it mostly does not:
 
-| Value             | Stored as                                                                                                                               |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| Id                | Text, a UUID made by the client                                                                                                         |
-| Time              | `epochMs`: a 64-bit integer, a `number` in JavaScript                                                                                   |
-| Boolean           | The vocabulary's word, `0/1` on SQLite and `boolean` on PostgreSQL                                                                      |
-| Date, time of day | Text, `YYYY-MM-DD` and `HH:MM` (§12)                                                                                                    |
-| Position          | Text compared byte by byte: SQLite's default `BINARY`, and `COLLATE "C"` on PostgreSQL, which the vocabulary's `position` word declares |
-| Fields            | JSON as text: a map of field name to `{ v }` or `{ c }`, plus the `seq` that last wrote it                                              |
+| Table         | Structural columns                                                                                                             | Fields                                                                                          |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| `desk_list`   | `id`, `owner_id`, `position`, `deleted_at`, `seq`, `created_at`                                                                | `title`, `color`, `sort`, `showCompleted`                                                       |
+| `desk_card`   | `id`, `owner_id`, `list_id`, `position`, `deleted_at`, `seq`, `created_at`, and mirrors `due_date`, `due_time`, `completed_at` | `title`, `description`, `starred`, `dueDate`, `dueTime`, `seriesId`, `startedAt`, `completedAt` |
+| `desk_check`  | `id`, `owner_id`, `card_id`, `position`, `deleted_at`, `seq`, `created_at`                                                     | `title`, `completedAt`                                                                          |
+| `desk_series` | `id`, `owner_id`, `list_id`, `deleted_at`, `seq`, `created_at`                                                                 | `rule`, `anchor`                                                                                |
 
-### 22.3 Tables
+The mirrors exist for the Planner and reminders (phase 2): the server copies them from `fields` when it can read them, and they are null on a
+personal-key Desk.
 
-Beyond better-auth's (`user`, `session`, `account`, `verification`, `two_factor`, `passkey`, `rate_limit`, in the auth store). A synced row has **structural columns the server uses, and a `fields` column it mostly does not.**
+**Workspaces** are ordinary rows, written only through `/api/ops`. Every row below a board carries `board_id`, for the permission and for deletion.
 
-| Table    | Structural columns                                                                                                                                              | Fields                                                                                                    |
-| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `list`   | `id`, `owner_id`, `position`, `deleted_at`, `seq`, `created_at`                                                                                                 | `title`, `color`, `sort`, `showCompleted`                                                                 |
-| `task`   | `id`, `owner_id`, `list_id`, `parent_id`, `position`, `deleted_at`, `seq`, `created_at`, `reminder_sent_at`, and mirrors `due_date`, `due_time`, `completed_at` | `title`, `notes`, `starred`, `dueDate`, `dueTime`, `seriesId`, `completedAt`, `reviewedAt`, `dismissedOn` |
-| `series` | `id`, `owner_id`, `list_id`, `deleted_at`, `seq`, `created_at`                                                                                                  | `rule`, `anchor`                                                                                          |
+| Table              | Columns                                                                                                                                                      |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `workspace`        | `id`, `name`, `created_by`, `created_at`, `updated_at`                                                                                                       |
+| `workspace_member` | `workspace_id`, `account_id` (together the key), `role` (`owner`, `member`), `added_by`, `created_at`                                                        |
+| `board`            | `id`, `workspace_id`, `name`, `color`, `description`, `visibility` (`public`, `private`), `archived_at`, `version`, `created_by`, `created_at`, `updated_at` |
+| `board_member`     | `board_id`, `account_id` (the key), `workspace_id`, `role` (`owner`, `member`), `created_at`                                                                 |
+| `board_list`       | `id`, `board_id`, `name`, `position`, `created_at`, `updated_at`                                                                                             |
+| `card`             | `id`, `board_id`, `list_id`, `title`, `description`, `due_date`, `due_time`, `position`, `archived_at`, `created_by`, `created_at`, `updated_at`             |
+| `label`            | `id`, `board_id`, `name`, `color`, `created_at`                                                                                                              |
+| `card_label`       | `card_id`, `label_id` (the key), `board_id`                                                                                                                  |
+| `card_assignee`    | `card_id`, `account_id` (the key), `board_id`, `assigned_by`, `created_at`                                                                                   |
+| `checklist_item`   | `id`, `card_id`, `board_id`, `title`, `completed_at`, `position`, `created_at`                                                                               |
+| `comment`          | `id`, `card_id`, `board_id`, `author_id`, `body`, `created_at`, `edited_at`                                                                                  |
+| `activity`         | `id`, `board_id`, `card_id` (may point at nothing), `actor_id`, `kind`, `details`, `created_at`                                                              |
+| `publication`      | `board_id` (the key), `token` (unique), `created_by`, `created_at`                                                                                           |
+| `notice`           | `id`, `account_id`, `kind`, `actor_id`, `workspace_id`, `board_id`, `card_id`, `details`, `created_at`                                                       |
 
-- **The mirrors exist only for the reminder job.** The server copies them from `fields` when it can read them, and they are null on a personal-key account. They stay readable under the operator key (§9.5).
-- **`CHECK`s on content are gone,** since the server cannot always read it. Validators hold those rules (§8.2).
-- **The partial index for the reminder job:** open tasks with a time and no reminder sent. Others follow the queries: rows by account and `seq`, for pull.
+Indexes follow the queries: members by account (the sidebar, the index), cards by list and position, activity by board and time and by card and time,
+notices by account and time, assignees by account (Assigned to me).
 
-| Other table         | Holds                                                                                                                                                                                                                                           |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `account_settings`  | `account_id` (primary key), `seq`, `time_zone`, `first_day_of_week`, `theme`, `reminders`, `email_reminders`, `morning_time`, `last_digest_on`, `encryption` (`none`, `moving`, `personal`), `recipient` (the age public key)                   |
-| `list_key`          | `list_id`, `account_id`, `wrapped` (an age file), `seq`                                                                                                                                                                                         |
-| `applied_mutation`  | `id`, `account_id`, when (§8.7)                                                                                                                                                                                                                 |
-| `tombstone`         | `id`, `table`, `account_id`, `seq`, when (§8.7)                                                                                                                                                                                                 |
-| `notification`      | `id`, `account_id`, `kind`, `title`, `body`, `url`, `read_at`, `seq`, `created_at`, and channels still to try                                                                                                                                   |
-| `push_subscription` | `id`, `account_id`, `endpoint`, `p256dh`, `auth`, `created_at`                                                                                                                                                                                  |
-| `reminder_slot`     | `id`, `account_id`, `at`, `claimed_at` (§17.5)                                                                                                                                                                                                  |
-| `backup_connection` | `account_id` (primary key), `kind` (`token` or `app`), `repository`, `branch`, `credential_id`, `mode`, `frequency`, `next_backup_at`, `last_backup_at`, `last_backup_path`, `last_seq`, `failure_kind`, `failures`, `stopped_at`, `created_at` |
-| `credential`        | As Fjord's: `id`, `purpose`, `kek_id`, `wrapped_key`, `ciphertext`, `created_at`, `rewrapped_at`                                                                                                                                                |
-| `rate_bucket`       | As Fjord's: a key, when the window began, a count. Sync, Back up now, core's notices and their replay                                                                                                                                           |
+**The rest:**
 
-**The browser's store** holds the same three synced tables, with their fields decrypted in memory only when read, plus the outbox, the cursor, keys if encrypted, and what the app remembers on this device.
+| Table               | Holds                                                                                                                                                                                                                                             |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `account_settings`  | `account_id` (the key), `seq`, `pruned_through`, `time_zone`, `first_day_of_week`, `workspace_sort`, `inbox_seen_at`, `encryption` (`none`, `moving`, `personal`), `recipient` (the age public key)                                               |
+| `list_key`          | `list_id`, `account_id`, `wrapped` (an age file), `seq`                                                                                                                                                                                           |
+| `applied_mutation`  | `account_id`, `id`, when: the Desk's mutations and the workspaces' operations alike (§8.7)                                                                                                                                                        |
+| `tombstone`         | `table`, `id`, `account_id`, `seq`, when (§8.7)                                                                                                                                                                                                   |
+| `backup_connection` | `account_id` (the key), `kind` (`token`, `app`), `repository`, `branch`, `credential_id`, `mode`, `frequency`, `next_backup_at`, `last_backup_at`, `last_backup_path`, `last_fingerprint`, `failure_kind`, `failures`, `stopped_at`, `created_at` |
+| `credential`        | As Fjord's: `id`, `purpose`, `kek_id`, `wrapped_key`, `ciphertext`, `created_at`, `rewrapped_at`                                                                                                                                                  |
+| `rate_bucket`       | A key, when the window began, a count                                                                                                                                                                                                             |
 
-## 23. Security, deployment, testing
+**The browser's store** holds the Desk's four tables, with their fields decrypted in memory only when read, plus the outbox, the cursor, keys if
+encrypted, and what the app remembers on this device. It holds nothing of a workspace.
+
+## 24. Security, deployment, testing
 
 ### Security
 
-Beyond §7: a strict Content-Security-Policy with a per-request nonce and the usual hardening headers from `proxy.ts`, with `worker-src 'self'` and `connect-src 'self'`; no `'unsafe-inline'` in `script-src`. Nothing third-party loads, and fonts are self-hosted at build. Task text is rendered as text, never as HTML, which matters more with keys in the page. Logs hold no titles, notes, tokens or file contents: an id and a kind of failure. A security review of phase 1 is written up before its release, as Fjord's are.
+Beyond §7: a strict Content-Security-Policy with a per-request nonce and the usual hardening headers from `proxy.ts`, with `worker-src 'self'` and
+`connect-src 'self'`; no `'unsafe-inline'` in `script-src`. A published board's page has the same policy and no script of its own. Nothing third-party
+loads, and fonts are self-hosted at build. **Text people write is rendered as text, never as HTML,** everywhere, which matters more with keys in the
+page and other people's words on a board. Logs hold no titles, descriptions, comments, tokens or file contents: an id and a kind of failure. A security
+review of phase 1 is written up before its release, as Fjord's are, with the workspace roles of §7.2 as its centre.
 
 ### Licence
 
@@ -862,77 +1295,154 @@ One image, and three ways to run it, as Fjord:
 
 ```bash
 # The smallest: one container, a file, no other service
-docker run -v tasks:/data -e TASKS_DB_DIALECT=sqlite -e TASKS_SQLITE_URL=file:/data/tasks.db \
-  -e TASKS_URL=https://tasks.example.com -e TASKS_AUTH_LOCAL=1 -e TASKS_AUTH_SECRET=… -e TASKS_ENCRYPTION_KEY=… ghcr.io/sovereignfs/tasks
+docker run -v tusk:/data -e TUSK_DB_DIALECT=sqlite -e TUSK_SQLITE_URL=file:/data/tusk.db \
+  -e TUSK_URL=https://tusk.example.com -e TUSK_AUTH_LOCAL=1 -e TUSK_AUTH_SECRET=… -e TUSK_ENCRYPTION_KEY=… ghcr.io/sovereignfs/tusk
 ```
 
-- **`deploy/`** has Compose files for sqld (the default), a file and PostgreSQL, with a README and `.env.example`. `scripts/deploy-check.sh` brings each up from nothing in CI, and a fourth as an instance hosts it.
-- **Hosted on an instance:** `sv app add`, from the manifest. Tasks remains a program of its own, and its only ties are `@sovereignfs/ui`, its sign-in through core, and the two conventions the toolkit reads.
-- **The manifest,** changed from the scaffold's, as Fjord's is: `"database": true`; the redirect `/api/auth/callback/sovereign`; `backChannel` and `accountDeleted` as in §20; scopes `openid profile email`; an `icon` and a real `description`; `generate` of `TASKS_AUTH_SECRET` and `{ "name": "TASKS_ENCRYPTION_KEY", "bytes": 32 }`; and `core` of at least 0.62.0, for notifications. `src/sovereign-manifest.test.ts` holds it to the schema and the code.
-- **What an operator of an instance sets:** `TASKS_AUTH_SIGNUP=open`, the app scope `notifications:send`, VAPID keys, SMTP, and the GitHub App if they want it. The README says so.
-- **Releases:** a `vX.Y.Z` tag publishes the image for amd64 and arm64 to `ghcr.io`, as the scaffold's workflow does. A patch release carries no migration and no change to a setting. A change to the sync protocol raises its version, and devices update (§8.3).
-- **The operator's backups are the database's:** a snapshot of the sqld volume, Litestream or `.backup` for a file, `pg_dump` for PostgreSQL. A person's backup (§19) is not a substitute, nor the reverse. `TASKS_ENCRYPTION_KEY` is kept with secrets, apart from those backups.
+- **`deploy/`** has Compose files for sqld (the default), a file and PostgreSQL, with a README and `.env.example`. `scripts/deploy-check.sh` brings each
+  up from nothing in CI, and a fourth as an instance hosts it.
+- **Hosted on an instance:** `sv app add`, from the manifest. Tusk remains a program of its own.
+- **The manifest,** as Fjord's: `"database": true`; the redirect `/api/auth/callback/sovereign`; `backChannel` and `accountDeleted` as in §22; scopes
+  `openid profile email`; an icon and a real description; `generate` of `TUSK_AUTH_SECRET` and `TUSK_ENCRYPTION_KEY`. `src/sovereign-manifest.test.ts`
+  holds it to the schema and the code.
+- **What an operator of an instance sets:** `TUSK_AUTH_SIGNUP=open`, SMTP, and the GitHub App if they want it. The README says so.
+- **Releases:** a `vX.Y.Z` tag publishes the image for amd64 and arm64 to `ghcr.io`. A patch release carries no migration and no change to a setting. A
+  change to the sync protocol raises its version, and devices update (§8.3).
+- **The operator's backups are the database's:** a snapshot of the sqld volume, Litestream or `.backup` for a file, `pg_dump` for PostgreSQL. A person's
+  backup (§21) is not a substitute, nor the reverse.
 
 ### Testing
 
-- **Vitest,** with pure rules tested directly, the server's sync on all three databases (§22.1), and the browser's store against `fake-indexeddb`. A rule that was hard to get right is seen to fail with it switched off.
-- **Sync** with simulated devices: several local stores, one server, random orderings of offline edits, asserting that all converge on the same state. The most important test in the repository.
-- **Encryption:** the server is checked to never hold a plain field for a personal-key account, by reading its tables after a full journey. A value moved to another row or field is refused.
-- **Sign-in** against the fake Sovereign (§6). **Core's services** against `createFakeCore` from `@sovereignfs/sdk/testing`, including `core.fail(...)`, a lost answer included.
-- **Backups** against `MemoryProvider` for the app, and the provider contract as §19.2 says.
-- **Recurrence** with property tests, run under more than one `TZ`. **Time** by passing it in; no fake timers are needed.
-- **Playwright,** including with the network off, for what only a browser can show, and **the iOS Simulator** for gestures, Push and offline (§15.8).
-- A dev **seed** covering overdue, due today, repeating, starred, subtasks at each state, long titles and an empty list, as the plugin's `scripts/seed.ts` did.
+- **Vitest,** with pure rules tested directly, the server's sync and operations on all three databases (§23.1), and the browser's store against
+  `fake-indexeddb`. A rule that was hard to get right is seen to fail with it switched off.
+- **The Desk's sync** with simulated devices: several local stores, one server, random orderings of offline edits, asserting that all converge.
+- **The workspace roles** as a matrix: an owner, a member, a board member, a viewer and an outsider, each sending every kind of operation and read, with
+  the expected answer for each written once and checked against all of them.
+- **Encryption:** the server is checked to never hold a plain Desk field for a personal-key account, by reading its tables after a full journey.
+- **Sign-in** against the fake Sovereign (§6). **Core's notices** against `createFakeCore` from `@sovereignfs/sdk/testing`.
+- **Backups** against `MemoryProvider`. **Recurrence** with property tests under more than one `TZ`. **Time** by passing it in.
+- **Playwright,** in Chromium and WebKit, including with the network off for the Desk, and two signed-in people on one board. **The iOS Simulator** for
+  gestures and offline (§17.10).
+- A dev **seed** (`pnpm seed`): a Desk covering overdue, due today, in progress, repeating, starred, checklists at each state, long titles and an empty
+  list; and a workspace shared with a second seeded account, with public, private, archived and published boards.
 
-## 24. Open questions
+## 25. Phase 2, in outline
 
-None at present. New ones go here, each with a recommendation, until they are decided and moved to §25.
+After the MVP. Outlined here so phase 1 does not preclude any of it. Each gets its own design before it is built.
 
-## 25. Decision log
+### 25.1 The Planner
 
-| Decision                                                                                                                               | Why                                                                                                                                       | Rejected                                                                                                               |
-| -------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| An app of the suite exactly like Fjord: runs alone or hosted (2026-11-05)                                                              | The owner's direction                                                                                                                     | Hosted only, as the scaffold makes it                                                                                  |
-| Auth identical to Fjord: better-auth, local and Sovereign, linking by `sub` from a session                                             | The owner's direction; one set of rules across the suite                                                                                  | The SDK's `nextAuth`, which needs a core                                                                               |
-| sqld, a file or PostgreSQL, through Drizzle, as Fjord (2026-11-05)                                                                     | The owner's direction; running alone wants SQLite                                                                                         | PostgreSQL only, which this design first proposed                                                                      |
-| Offline-first from the first screen, in the MVP (2026-11-05)                                                                           | The owner's direction: sync and conflicts in the background with no effect on the experience. Retrofitting it would be close to a rewrite | Server actions and a client cache, which this design first proposed; offline as a later release                        |
-| Browser actions produce field-level changes; the server checks structure and stamps order, rather than running the same logic          | It is the only form that also works on ciphertext, and it unifies the modes                                                               | The same operations run on both sides, which an encrypted account cannot do                                            |
-| Later arrival wins per field, an edit restores a delete, and nothing asks                                                              | The owner's direction: no conflict UI. Fields are small, so overwrites are rare                                                           | CRDTs for text, far more than notes need; conflict dialogs                                                             |
-| Our own small sync, not a library                                                                                                      | It has to work over sqld, a file and PostgreSQL, on ciphertext, with AGPL-compatible parts, and it is small given §8.2                    | Replicache, PowerSync, ElectricSQL                                                                                     |
-| Opt-in personal key, wrapping per-list keys that encrypt fields (2026-11-05)                                                           | The owner's direction: the operator cannot read it. Per-list keys leave sharing possible                                                  | age per field (too large); one key for everything (no way to share)                                                    |
-| Personal key at sign-up or later, one way                                                                                              | Keeps the states simple; going back is export and a new account                                                                           | Sign-up only; on and off at will                                                                                       |
-| Unlocked once per device, until sign-out                                                                                               | The owner's direction: no felt difference. Offline and Push titles need it                                                                | Fjord's passphrase and idle lock                                                                                       |
-| Times only for reminders on an encrypted account                                                                                       | The closest to "everything encrypted" that still reminds                                                                                  | Readable due dates; no reminders                                                                                       |
-| An `.env` operator key, which disables personal keys (2026-11-05)                                                                      | The owner's direction. Built as field encryption, the only way alike on three forms                                                       | Dropping it, which was recommended, since the operator can read regardless; having both at once                        |
-| The app's own bell, Web Push and email, each switchable, and core's bell when hosted (2026-11-05)                                      | The owner's direction; works on a server running alone                                                                                    | Core's bell only                                                                                                       |
-| Mobile opens on Today on fresh opens, with exceptions (2026-11-05)                                                                     | The owner's direction, without interrupting a quick switch of apps or a link to a task                                                    | Every time the app comes to the foreground                                                                             |
-| Cards: up done, down cancel, left dismiss, right star, alike in Today and Review (2026-11-05)                                          | The owner's direction. One set of gestures to learn                                                                                       | Snooze by moving the date and "keep for today", which this design first took from the plugin; different swipes in each |
-| Cancel deletes with Undo, and on a repeating task skips this occurrence (2026-11-05)                                                   | The owner's direction. Nothing else needs a "cancelled" state                                                                             | A kept "cancelled" status                                                                                              |
-| Dismiss hides a task from Today until tomorrow, by a `dismissedOn` field, with its date and status untouched, and an Undo (2026-11-05) | The owner's direction. It needs no clearing and syncs like any field                                                                      | Until Today is next opened; moving the due date; a "dismissed until" time of day                                       |
-| Dismiss affects only Today: reminders and the brief still count the task, and it shows in its list, Starred and search (2026-11-05)    | It is still due, and a person should still be told                                                                                        | Keeping a dismissed task quiet for the day                                                                             |
-| In Review, a left swipe only marks a task reviewed, and does not hide it from Today (2026-11-05)                                       | Review goes through everything; hiding things from Today would be a surprising side effect                                                | The same effect as Today's Dismiss                                                                                     |
-| A next occurrence and an export carry no dismissal (2026-11-05)                                                                        | It belongs to one task on one day                                                                                                         | Copying it                                                                                                             |
-| Google Tasks import and the last Friday of the month wait for phase 3 (2026-11-05)                                                     | Neither is needed to replace the plugin; the rule format already allows the second                                                        | Doing them in the MVP                                                                                                  |
-| No snooze that moves a date, and so no `occurs_on`                                                                                     | A task's date is its schedule, since Dismiss leaves it alone. Date edits move the series                                                  | A separate scheduled date                                                                                              |
-| Review orders by `reviewed_at`, with entry from the switcher, the sidebar and a list's menu                                            | It can be stopped and resumed. Entry points are visible, not a hidden gesture                                                             | Long-pressing a footer button                                                                                          |
-| One Settings, from the avatar                                                                                                          | The owner's direction; one place to look                                                                                                  | Separate account and settings pages                                                                                    |
-| A desktop of two rows and three columns, at Shopper's dimensions                                                                       | The owner's direction                                                                                                                     | The plugin's full-height columns                                                                                       |
-| Recurring edits apply to that occurrence and later ones, with no prompt and no new row (2026-11-05)                                    | The owner's direction, and what the model can honestly do                                                                                 | The plugin's three-way prompt; real future rows                                                                        |
-| Subtasks are copied to the next occurrence, unticked (2026-11-05)                                                                      | A repeating checklist is the natural use                                                                                                  | Starting the next with none, as the plugin did                                                                         |
-| Kanban, Visualizer and `tasks_views` dropped (2026-11-05)                                                                              | Never built, and Kanban is its own product                                                                                                | Reserving a table for them                                                                                             |
-| One JSON file is the whole of portability (2026-11-05)                                                                                 | The owner's direction                                                                                                                     | An operator's bulk migration from the plugin                                                                           |
-| Backup is a person's own, opt-in, to their own private repository, as a new timestamped file (2026-11-05)                              | The owner's direction; the file is the export, so needs no tool to read                                                                   | Overwriting one file; a backup format of its own; allowing public repositories                                         |
-| A Fjord repository works as is, with no integration                                                                                    | The folder is valid in Fjord's format, and the apps stay independent                                                                      | Reusing Fjord's stored connection                                                                                      |
-| Backup names are in UTC                                                                                                                | They sort correctly through time zones and daylight saving                                                                                | The account's local time                                                                                               |
-| Auto backup commits only when something changed                                                                                        | A quiet account should not fill a repository with identical files                                                                         | A commit on every tick                                                                                                 |
-| Owner named in the statement, with `owner_id` on every row                                                                             | Closes the plugin's id-only writes for good, and can be tested                                                                            | A separate ownership check first; joining to the list                                                                  |
-| Fractional positions, through `fractional-indexing` (CC0)                                                                              | One row per move; survives offline devices                                                                                                | Integers with rewrite, as the plugin; integers with gaps and rebalancing                                               |
-| `series` table with `anchor`                                                                                                           | Lateness stops corrupting the schedule; the rule is in one place                                                                          | The rule copied to every row, anchored on the current due date                                                         |
-| One function for today, with the browser's zone in the browser and the stored one in jobs                                              | Removes the plugin's three                                                                                                                | Deciding by the server's clock                                                                                         |
-| Undo through `deleted_at`, on tasks and lists, purged in seven days                                                                    | A swipe must not be able to lose something; no trash to design                                                                            | Hard delete with confirmations (a swipe can't stop to ask); a real trash (more than this app is)                       |
-| One route tree, forking only what is rendered                                                                                          | Sovereign's rule; ends the double mount and two data paths                                                                                | Two trees by `matchMedia`                                                                                              |
-| Task data in IndexedDB, never in the service worker's cache, deleted at sign-out                                                       | Offline needs it on the device; keeping it out of the cache holds Sovereign's worker rule                                                 | The plugin's cache with no wipe of its own; nothing on the device, which this design first proposed                    |
-| PWA modelled on Sovereign core                                                                                                         | Fjord has no manifest or worker to follow                                                                                                 | —                                                                                                                      |
-| Claim and write the notification in one transaction, then fan out                                                                      | The bell never misses one; a failed channel can retry                                                                                     | Claim then send (loses it on failure); send then claim (doubles it)                                                    |
-| Jobs in the web process                                                                                                                | As Fjord decided: one image, one entry point; claims make replicas safe                                                                   | A separate worker image; an external cron                                                                              |
-| Own file format, reading the plugin's                                                                                                  | People on the plugin need a way across; the plugin's envelope names an id that no longer means anything                                   | Keeping the plugin's envelope                                                                                          |
+A feed of dates, from today on, each day a block of what is due: Desk cards and board cards assigned to the person, overdue first. On a phone, the
+screenshot's look: one day after another, scrolling. It reads due dates the server can see (§23.3's mirrors), so on a personal-key Desk the Desk's part
+is computed in the browser.
+
+### 25.2 Reminders, Push and email
+
+As Tasks designed them: a daily brief ("3 cards due today · 2 overdue") and a reminder at a due time, through Web Push (`TUSK_VAPID_*`, per device),
+email (`TUSK_SMTP_*`) and core's bell when hosted (`notifications:send`), each by its own switch, with the Inbox always there. **The database decides who
+sends,** by a conditional update, so any process may run the job; the notice is written in the claim's transaction, and channels fan out after it. Zones
+are worked out in JavaScript, one query per zone. **On a personal-key Desk the browser uploads times only** (`reminder_slot`), and Push wakes the device
+to show the title. Inbox notices are also sent by Push and email, by the same switches.
+
+### 25.3 Today and Review on the phone
+
+From the Desk's action button. **Today** is every open Desk card that is overdue, due today, or starred; **Review** is every open card, least recently
+reviewed first. Both go through cards one at a time as a `SwipeStack`, with buttons always shown, since a gesture is never the only way:
+
+| Gesture | Button  | What it does                                                                                   |
+| ------- | ------- | ---------------------------------------------------------------------------------------------- |
+| Up      | Done    | Completes it (a repeat makes its next)                                                         |
+| Down    | Cancel  | Deletes it, with Undo. On a repeating card, skips this occurrence and makes the next           |
+| Left    | Dismiss | In Today, hides it until tomorrow (a `dismissedOn` field), with Undo. In Review, only moves on |
+| Right   | Star    | Sets the star, and leaves the due date alone                                                   |
+
+Any swipe in Review marks a card reviewed (`reviewedAt`), so a person can stop and carry on later. A date is not changed from a card.
+
+### 25.4 Boards offline, and live
+
+Boards come under sync: a cursor per board the person can see, the same server-stamped order per board (its `version` becomes that counter), and the
+same operations queued in an outbox. Operations are already field-level with client ids and fractional positions (§5), which is what makes this a step
+and not a rewrite. Live updates replace the 20-second check (§14.7) with server-sent events. What a device holds of a board it can no longer see is
+removed at its next sync.
+
+### 25.5 Invitations
+
+Inviting by email someone who has no account yet, with a link that signs them up into the workspace, and on an instance, finding people through core's
+directory (`directory.searchUsers`).
+
+### 25.6 Replies to comments
+
+One level, as the kanban plugin had, with a notice for the person replied to.
+
+### 25.7 The Desk as a board, and cards from elsewhere
+
+A board view of the Desk, its lists as columns. Then the Desk can show cards from boards (those assigned to the person, by a rule they choose) and from
+other services, without moving them: a view, not a copy.
+
+### 25.8 Attachments
+
+Files on a card. Where they are stored (the database, a volume, an object store) is for its design.
+
+## 26. Open questions
+
+None at present. New ones go here, each with a recommendation, until they are decided and moved to §27.
+
+## 27. Decision log
+
+Decisions from the turn to Tusk (2026-11-06) come first; those carried over from Tasks follow.
+
+| Decision                                                                                                                                        | Why                                                                                                                              | Rejected                                                                                |
+| ----------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Tasks becomes **Tusk**, one app for the Desk and shared kanban boards, replacing the tasks and kanban plugins (2026-11-06)                      | The owner's direction. One place for personal and shared work                                                                    | Two apps; kanban as a later phase of Tasks                                              |
+| The name changes everywhere: package, `TUSK_` settings, databases, cookie, IndexedDB, manifest, image, repository (2026-11-06)                  | The owner's direction. Nothing is released, so nothing needs migrating                                                           | Keeping `tasks` inside and Tusk outside                                                 |
+| Migrations squashed into a new first migration (2026-11-06)                                                                                     | No version is tagged and no real data exists; a history of names that never shipped helps no one                                 | Renaming tables through migrations                                                      |
+| Workspaces → boards → lists → cards; the Desk a virtual board per account (2026-11-06)                                                          | The owner's direction                                                                                                            | Projects, as the kanban plugin named them                                               |
+| The Desk offline-first on the existing sync; boards online, server-authoritative, optimistic, with client ids and fractional order (2026-11-06) | The owner's direction: the Desk offline; other parts may wait. Shaping boards for sync now keeps phase 2 a step                  | Boards offline in phase 1; boards on server actions with no shape for sync              |
+| Separate tables for the Desk and for boards (2026-11-06)                                                                                        | Different fields, different owners, different flows; one table would carry two sets of nullable columns and two permission rules | One `card` table for both                                                               |
+| Desk status as `startedAt` and `completedAt`, derived; In progress optional, shown by a small icon (2026-11-06)                                 | The owner's direction for the icon. Two times converge field by field, and Done always wins over a stale "in progress"           | One `status` field (a stale write could undo Done); a column per status                 |
+| Only the title is required, on every card (2026-11-06)                                                                                          | The owner's direction                                                                                                            | —                                                                                       |
+| Desk checklist items in their own table (2026-11-06)                                                                                            | A card has no self-reference; an item cannot be given a date by mistake; the same shape as a board's checklist                   | Subtasks as cards with a parent, as Tasks built them                                    |
+| _Backlog_ is the first list of the Desk and of every new board, renamable (2026-11-06)                                                          | The owner's direction                                                                                                            | _My tasks_                                                                              |
+| Board cards are Open or Archived; archive is reversible and delete is only for an archived card (2026-11-06)                                    | The owner's direction, and the kanban plugin's lesson that archive is the safe half of delete                                    | Done on board cards; deleting straight away                                             |
+| Workspace owners (several) and members; board owners and members; viewers see a public board read-only (2026-11-06)                             | The kanban plugin's model, proven there                                                                                          | One owner per workspace; every workspace member able to edit every public board         |
+| A workspace member joins a public board with one click (2026-11-06)                                                                             | The owner's confirmation. Read-only until joined keeps "who works on this" honest, and joining costs nothing                     | Asking a board owner to be added                                                        |
+| Workspace owners administer every board without editing its content (2026-11-06)                                                                | No board is left unmanageable when its owners leave, as happened in the kanban plugin                                            | Owners editing everything; owners with no power over boards                             |
+| A private board is seen by its members and the workspace's owners; no workspace-level visibility (2026-11-06)                                   | The owner's direction. The kanban plugin's project visibility was a second flag that overrode the first; one is enough           | A visibility flag on the workspace too                                                  |
+| People are added by exact email of an existing account, and boards draw only from the workspace (2026-11-06)                                    | The owner's direction: only within the workspace. A server running alone has no directory                                        | Directory search; invitations to new people (phase 2)                                   |
+| Refusals read as "not found" (2026-11-06)                                                                                                       | Whether a board exists is itself membership-gated, as in the kanban plugin                                                       | `403` for a board one cannot see                                                        |
+| One door for workspace writes, `POST /api/ops`, the permission a subquery in the statement (2026-11-06)                                         | The same reason as `/api/sync`: one module to get right, a matrix of tests that is a loop                                        | A route or server action per change; a check before the write                           |
+| Activity written by the server in the operation's transaction, keeping names, outliving its card (2026-11-06)                                   | An audit trail cannot be skipped by a client and must read the same after a rename or delete                                     | Activity written by the browser; activity deleted with its card                         |
+| Comments flat in phase 1, replies in phase 2 (2026-11-06)                                                                                       | Keeps phase 1 smaller; the notice for a reply needs the Inbox first                                                              | Replies now                                                                             |
+| Publishing at `/p/<token>`, read-only, with no people on it, revocable (2026-11-06)                                                             | The owner's direction. A public page should not expose names, emails or discussion                                               | Showing assignees and comments; a permanent address                                     |
+| A basic Inbox: assignments, comments, being added; unread as one time per person (2026-11-06)                                                   | The owner's direction: basic notifications are enough. One time is what the kanban plugin found sufficient                       | Push and email in phase 1; read state per notice                                        |
+| The Planner in phase 2 (2026-11-06)                                                                                                             | The owner's direction                                                                                                            | —                                                                                       |
+| Personal keys cover the Desk only; the operator key covers everything (2026-11-06)                                                              | Shared data is read by many and by the server (activity, notices, publishing)                                                    | Per-board keys wrapped for each member, now                                             |
+| Export of the Desk, a board, a workspace or everything; import always creates, matching people by email (2026-11-06)                            | The owner's direction. Creating never destroys; ids in a file mean nothing on another server                                     | Import that merges or replaces; people by id                                            |
+| Comments and activity exported, not imported (2026-11-06)                                                                                       | They are a record of what people said and did, which an import cannot honestly re-create under other accounts                    | Importing them under the importer's name                                                |
+| Backup commits the Desk and the workspaces the person owns (2026-11-06)                                                                         | Each workspace is backed up by its owners; a member backing up someone else's board is the owner's call                          | Everything the person can see                                                           |
+| Deleting a person passes a workspace they solely owned to its longest-standing member, and deletes one with nobody left (2026-11-06)            | The owner's confirmation. Shared work carries on; nothing is kept for no one                                                     | Deleting every workspace the person owned; leaving it with no owner                     |
+| Any colour for boards, labels and Desk lists, through `ColorPicker`, text on it by contrast (2026-11-06)                                        | The owner's direction for boards and labels; Desk lists follow so there is one picker                                            | Tasks' six swatches                                                                     |
+| The sidebar full on index pages and a rail on the Desk and boards, toggled to rail or hidden, remembered per device (2026-11-06)                | The owner's direction for the toggle; the Desk and a board need the width                                                        | Always full                                                                             |
+| The Desk's list view (the Tasks look) in phase 1, its board view in phase 2 (2026-11-06)                                                        | The owner's direction                                                                                                            | Both now                                                                                |
+| The home is `/desk` for everyone (2026-11-06)                                                                                                   | The phone opens on the Desk, and navigation may not fork by viewport, so the web does too                                        | `/boards` on the web and `/desk` on a phone                                             |
+| The workspace sort is saved with the account; the sidebar's state with the device (2026-11-06)                                                  | What arranges the data follows the person to every device; what shapes the screen belongs to that screen                         | Everything per device                                                                   |
+| Whole-card drag with no handle on the web; between lists by menu on a phone (2026-11-06)                                                        | The kanban plugin's settled interaction model                                                                                    | A handle on every card; drag on a carousel                                              |
+| The web first, laying the phone's foundations; the phone's screens in phase 2 (2026-11-06)                                                      | The owner's direction                                                                                                            | Both together                                                                           |
+| An app of the suite exactly like Fjord: runs alone or hosted (2026-11-05)                                                                       | The owner's direction                                                                                                            | Hosted only, as the scaffold makes it                                                   |
+| Auth identical to Fjord: better-auth, local and Sovereign, linking by `sub` from a session                                                      | The owner's direction; one set of rules across the suite                                                                         | The SDK's `nextAuth`, which needs a core                                                |
+| sqld, a file or PostgreSQL, through Drizzle, as Fjord (2026-11-05)                                                                              | The owner's direction; running alone wants SQLite                                                                                | PostgreSQL only                                                                         |
+| The Desk offline-first from the first screen (2026-11-05)                                                                                       | The owner's direction: sync and conflicts in the background with no effect on the experience                                     | Server actions and a client cache; offline as a later release                           |
+| Browser actions produce field-level changes; the server checks structure and stamps order                                                       | It is the only form that also works on ciphertext, and it unifies the modes                                                      | The same operations run on both sides                                                   |
+| Later arrival wins per field, an edit restores a delete, and nothing asks                                                                       | The owner's direction: no conflict UI                                                                                            | CRDTs for text; conflict dialogs                                                        |
+| Our own small sync, not a library                                                                                                               | It has to work over sqld, a file and PostgreSQL, on ciphertext, with AGPL-compatible parts                                       | Replicache, PowerSync, ElectricSQL                                                      |
+| Opt-in personal key, wrapping per-list keys that encrypt fields, one way, unlocked once per device (2026-11-05)                                 | The owner's direction: the operator cannot read it, with no felt difference                                                      | age per field; one key for everything; Fjord's passphrase and idle lock                 |
+| An `.env` operator key, which disables personal keys (2026-11-05)                                                                               | The owner's direction. Built as field encryption, the only way alike on three forms                                              | Having both at once                                                                     |
+| Recurring edits apply to that occurrence and later ones, with no prompt and no new row; the checklist copied unticked (2026-11-05)              | The owner's direction, and what the model can honestly do                                                                        | The plugin's three-way prompt; real future rows                                         |
+| The cards of Today and Review, and Dismiss as a `dismissedOn` date (2026-11-05)                                                                 | The owner's direction, now for the phone in phase 2                                                                              | Snooze by moving the date                                                               |
+| Backup is a person's own, opt-in, to their own private repository, as a new timestamped file, only when something changed (2026-11-05)          | The owner's direction; the file is the export, so needs no tool to read                                                          | Overwriting one file; allowing public repositories; a commit on every tick              |
+| Fractional positions, through `fractional-indexing` (CC0)                                                                                       | One row per move; survives offline devices and concurrent editors                                                                | Integers with rewrite; the kanban plugin's `REAL` positions, which run out of precision |
+| `series` with an anchor; one function for today                                                                                                 | Lateness stops corrupting the schedule; removes the tasks plugin's three ideas of today                                          | The rule on every row; the server's clock                                               |
+| Undo through `deleted_at` on the Desk, purged in seven days                                                                                     | A mistake is recoverable with no trash to design                                                                                 | Hard delete with confirmations                                                          |
+| One route tree, forking only what is rendered                                                                                                   | Sovereign's rule; ends the double mount and two data paths                                                                       | Two trees by `matchMedia`                                                               |
+| Data in IndexedDB or memory, never in the service worker's cache                                                                                | Sovereign's worker rule                                                                                                          | Caching pages that hold data                                                            |
+| Jobs in the web process                                                                                                                         | As Fjord decided: one image, one entry point; claims make replicas safe                                                          | A separate worker image; an external cron                                               |
