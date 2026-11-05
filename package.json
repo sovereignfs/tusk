@@ -2,10 +2,12 @@
   "name": "tasks",
   "version": "0.1.0",
   "private": true,
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
   "packageManager": "pnpm@11.28.9",
-  "description": "Tasks, an app for a Sovereign instance",
+  "description": "Tasks: a private task manager that runs on its own or on a Sovereign instance.",
   "engines": {
-    "node": ">=24.15"
+    "node": ">=24.15 <25"
   },
   "scripts": {
     "dev": "next dev",
@@ -17,8 +19,8 @@
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
-    "@sovereignfs/sdk": "^2.0.0",
-    "@sovereignfs/ui": "^0.89.1",
+    "@sovereignfs/sdk": "2.1.0",
+    "@sovereignfs/ui": "0.91.0",
     "next": "^16.4.3",
     "pg": "^8.23.1",
     "react": "^19.3.1",

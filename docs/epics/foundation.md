@@ -14,7 +14,7 @@ Turns the scaffold into a repository that can hold Tasks as `DESIGN.md` designs 
 
 ## Tasks
 
-#### 📋 1.1 — Repository conventions
+#### ✅ 1.1 — Repository conventions
 
 **Goal:** the files a repository of the suite is expected to have, and dependencies on the terms `AGENTS.md` states.
 
@@ -28,6 +28,8 @@ Turns the scaffold into a repository that can hold Tasks as `DESIGN.md` designs 
 - `tsconfig.json`: `noUncheckedIndexedAccess`. TypeScript stays on 6.0.x until `typescript-eslint` supports 7, as `sovereign` does (Fjord's client is on 7 and has no ESLint).
 
 **Accepts when:** a clean checkout installs with `pnpm install --frozen-lockfile`, `pnpm typecheck` passes, and `git status` is clean after it.
+
+**Done as:** licence (copied from Fjord Web's AGPL text), contributing guide, pull request template, Dependabot, `.editorconfig` and `.node-version` (24.18.0); `package.json` gains `license`, `type` and `engines` of `>=24.15 <25`; `@sovereignfs/ui` is pinned at 0.91.0 and `@sovereignfs/sdk` at 2.1.0, both in `minimumReleaseAgeExclude`; `noUncheckedIndexedAccess` is on, and the scaffold already passed it. Dependabot holds TypeScript to 6.0.x and `@types/node` to the runtime's major. Left out: Prettier and ESLint, which are 1.2's.
 
 #### 📋 1.2 — Format, lint and test tooling
 

@@ -2,7 +2,7 @@
 
 The order of work. **This file tracks progress; it does not define behaviour.** [`DESIGN.md`](DESIGN.md) says what Tasks does, and where it disagrees with this file, this file is stale and should be corrected. The detail of every task, with its technical notes and what makes it done, is in [`docs/epics/`](docs/epics/). How a task is run is in [`AGENTS.md`](AGENTS.md).
 
-State as of 2026-11-05: **the design is a draft and nothing is built.** The repository holds the scaffold. The developer assigns each task; the first row not done, with its dependencies met, is what the order recommends.
+State as of 2026-11-05: **Milestone A is under way** (1.1 done). The repository still holds the scaffold, which 1.4 replaces. The developer assigns each task; the first row not done, with its dependencies met, is what the order recommends.
 
 _Status key: ✅ Done · ⏳ In progress · 📋 Planned · 🚧 Waits on a decision_
 
@@ -28,7 +28,7 @@ The repository can hold the app. Nothing a person would notice. **Done when** an
 
 | # | ID | Task | Priority | Depends on | Status |
 | --- | --- | --- | --- | --- | --- |
-| 1 | [1.1](docs/epics/foundation.md) | Repository conventions | P0 | — | 📋 |
+| 1 | [1.1](docs/epics/foundation.md) | Repository conventions | P0 | — | ✅ |
 | 2 | [1.2](docs/epics/foundation.md) | Format, lint and test tooling | P0 | 1.1 | 📋 |
 | 3 | [1.3](docs/epics/foundation.md) | Continuous integration | P0 | 1.2 | 📋 |
 | 4 | [1.4](docs/epics/foundation.md) | Configuration, start-up, and removing the scaffold | P0 | 1.2 | 📋 |
