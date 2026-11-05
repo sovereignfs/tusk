@@ -17,19 +17,19 @@ _Status key: ✅ Done · ⏳ In progress · 📋 Planned · 🚧 Waits on a deci
 
 ## Epics
 
-| # | Epic | What it holds | Tasks |
-| --- | --- | --- | --- |
-| 1 | [Foundation](foundation.md) | Tooling, CI, configuration, the database, jobs, the shell, the image, the PWA | 11 |
-| 2 | [Accounts and sign-in](accounts.md) | Local and Sovereign sign-in, Settings, deleting, notices, hosting | 10 |
-| 3 | [Lists and tasks](lists-and-tasks.md) | Access rules, lists, tasks, subtasks, order, undo, bulk | 11 |
-| 4 | [Dates](dates.md) | One idea of today, due dates and times, overdue | 3 |
-| 5 | [Recurrence](recurrence.md) | Rules, series, the next occurrence, editing | 5 |
-| 6 | [Views](views.md) | Starred, search, Today, cards, Review | 5 |
-| 7 | [Interface](interface.md) | Desktop layout, mobile shell and footer, sheets, gestures, keyboard, accessibility | 7 |
-| 8 | [Reminders and notifications](reminders.md) | The bell, settings, email and core, Web Push, the daily brief, due-time reminders | 6 |
-| 9 | [Portability](portability.md) | One-file export and import, and reading the plugin's file | 3 |
-| 10 | [Backup](backup.md) | Credentials at rest, the GitHub provider, connecting, manual and auto backups | 7 |
-| 11 | [Release](release.md) | Seed, documents, security review, releases, a real instance | 5 |
-| 12 | [Sharing](sharing.md) | Phase 2: an RFC, then shared lists and assignment | 4 |
-| 13 | [Sync and offline](sync.md) | The change format, the endpoint, the local store, convergence, working offline | 7 |
-| 14 | [Encryption](encryption.md) | Personal keys, encrypted sync, reminders by times, the operator-key mode | 7 |
+| #   | Epic                                        | What it holds                                                                      | Tasks |
+| --- | ------------------------------------------- | ---------------------------------------------------------------------------------- | ----- |
+| 1   | [Foundation](foundation.md)                 | Tooling, CI, configuration, the database, jobs, the shell, the image, the PWA      | 11    |
+| 2   | [Accounts and sign-in](accounts.md)         | Local and Sovereign sign-in, Settings, deleting, notices, hosting                  | 10    |
+| 3   | [Lists and tasks](lists-and-tasks.md)       | Access rules, lists, tasks, subtasks, order, undo, bulk                            | 11    |
+| 4   | [Dates](dates.md)                           | One idea of today, due dates and times, overdue                                    | 3     |
+| 5   | [Recurrence](recurrence.md)                 | Rules, series, the next occurrence, editing                                        | 5     |
+| 6   | [Views](views.md)                           | Starred, search, Today, cards, Review                                              | 5     |
+| 7   | [Interface](interface.md)                   | Desktop layout, mobile shell and footer, sheets, gestures, keyboard, accessibility | 7     |
+| 8   | [Reminders and notifications](reminders.md) | The bell, settings, email and core, Web Push, the daily brief, due-time reminders  | 6     |
+| 9   | [Portability](portability.md)               | One-file export and import, and reading the plugin's file                          | 3     |
+| 10  | [Backup](backup.md)                         | Credentials at rest, the GitHub provider, connecting, manual and auto backups      | 7     |
+| 11  | [Release](release.md)                       | Seed, documents, security review, releases, a real instance                        | 5     |
+| 12  | [Sharing](sharing.md)                       | Phase 2: an RFC, then shared lists and assignment                                  | 4     |
+| 13  | [Sync and offline](sync.md)                 | The change format, the endpoint, the local store, convergence, working offline     | 7     |
+| 14  | [Encryption](encryption.md)                 | Personal keys, encrypted sync, reminders by times, the operator-key mode           | 7     |

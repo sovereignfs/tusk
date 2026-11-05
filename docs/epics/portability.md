@@ -21,6 +21,7 @@ One JSON file, out and in, made and read in the browser. A backup (epic 10) uses
 **Design:** §18. **Depends on:** 2.7, 3.7, 3.10, 4.2.
 
 **Technical:**
+
 - `src/portability/format.ts`: the types of version 1, and `buildExport(rows, now)`, pure: everything not deleted, without today's dismissals, deterministic: lists, tasks and series ordered by id, `exportedAt` the only thing that varies. Grows with later tasks' fields, its version unchanged until a release.
 - In the browser, from the local store, after syncing if online; saved as `sovereign-tasks-<date>.json`.
 - A section in Settings > Data. A warning on an encrypted account.
@@ -34,6 +35,7 @@ One JSON file, out and in, made and read in the browser. A backup (epic 10) uses
 **Design:** §18. **Depends on:** 5.2, 9.1.
 
 **Technical:**
+
 - `src/portability/validate.ts`: a hand-written validator over the whole file, using §7's parsers, `parseRule`, and limits on counts, returning one precise error or a normalised value. Cross-references checked; a subtask's parent must be top-level, in the same list.
 - In the browser, read and validated, showing the counts and asking. Then every id new through a per-import map, including series; positions normalised if needed; settings not overwritten; lists after the account's own.
 - `POST /api/import`: one request, one transaction, `Origin` checked, a bounded stream of 50 MB, structure and limits checked again on the server, and stamped with `seq` so that other devices pull it.

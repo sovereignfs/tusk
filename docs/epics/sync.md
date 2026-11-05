@@ -21,6 +21,7 @@ The data path every screen stands on: the UI reads and writes a local store, and
 **Design:** §8.2, §22.3. **Depends on:** 3.1.
 
 **Technical:**
+
 - `src/sync/format.ts`: a mutation (`mutationId`, `changes`); a change (`table`, `id`, structural columns, `fields`); a field value, `{ v }` or `{ c }`. A protocol version.
 - `src/sync/validate.ts`: pure, in both places. `parseStructure` for what the server always checks; `parseField(table, name, value)` for content, used before queueing and by the server when it can read.
 - `list`, `task` and `series` tables with `fields` as JSON text; the vocabulary's `fields` word; `account_settings.seq`.
@@ -35,6 +36,7 @@ The data path every screen stands on: the UI reads and writes a local store, and
 **Design:** §7, §8.3, §8.4. **Depends on:** 13.1.
 
 **Technical:**
+
 - `src/sync/apply.ts`: one short transaction per mutation: increment `seq`, check each change, write only the fields sent, stamp each with `seq`, and record `applied_mutation`. A repeated `mutationId` answers as before and writes nothing.
 - Checked always: the row and anything it points at are the account's; a client-made id already used by another account is refused; a parent is top-level and in the same list; limits (200 lists, 50,000 tasks). Checked when readable: `parseField`.
 - A field write to a deleted row clears `deleted_at`, per §8.4. Mirrors `due_date`, `due_time`, `completed_at` copied from readable fields, and `reminder_sent_at` cleared when a due field changes.
@@ -50,6 +52,7 @@ The data path every screen stands on: the UI reads and writes a local store, and
 **Design:** §8.1, §8.3. **Depends on:** 13.1.
 
 **Technical:**
+
 - `src/local/`: `idb` (ISC) over one database per account, `tasks-<accountId>`, with `list`, `task`, `series`, `outbox`, `meta`. Versioned upgrades. Queries by list and position.
 - `src/sync/client.ts`: `commit(mutation)` writes rows and outbox in one IndexedDB transaction, then notifies subscribers. A React hook `useLocal(query)` reads and re-renders.
 - `src/sync/loop.ts`: triggers of §8.3: debounced after a write, on load, on focus, on `online`, on a timer. One tab at a time (Web Locks); `BroadcastChannel` tells the others. Backs off on failure, silently.

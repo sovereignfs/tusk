@@ -21,6 +21,7 @@ The product: one person's lists and tasks. A user action here is a pure function
 **Design:** §7. **Depends on:** 1.5, 2.1.
 
 **Technical:**
+
 - `src/access/routes.ts`: every page and route with who may use it. `routes.test.ts` walks `app/` and fails on anything unlisted.
 - `src/access/route.ts`: wraps a route: finds the session, checks `Origin` on a write, and calls the handler with the account id.
 - `src/access/parse.ts`: small parsers, no new dependency: `uuid`, `text(min, max)`, `isoDate`, `hhmm`, `idArray(max 500)`. Used in the browser too.
@@ -45,7 +46,8 @@ The product: one person's lists and tasks. A user action here is a pure function
 **Design:** §10. **Depends on:** 3.2, 7.1, 13.4.
 
 **Technical:**
-- `src/actions/lists.ts`: `createList`, `renameList`, `setColor`, `moveList`, `deleteList`; `ensureFirstList` for *My tasks*, whose id derives from the account, so that two devices arrive at one. Limit of 200.
+
+- `src/actions/lists.ts`: `createList`, `renameList`, `setColor`, `moveList`, `deleteList`; `ensureFirstList` for _My tasks_, whose id derives from the account, so that two devices arrive at one. Limit of 200.
 - `src/lists/colors.ts`: the six swatches to `--sv-*` tokens, and a validator.
 - The sidebar: rows with dot and count from local queries; the + beside "My lists"; drag through `@dnd-kit`, with an explicit `DndContext` `id`. `/lists/<id>`, with a message if it isn't there.
 - Rename, colour and delete are in Settings > Lists (2.7), using these actions.
@@ -59,6 +61,7 @@ The product: one person's lists and tasks. A user action here is a pure function
 **Design:** §11.1. **Depends on:** 3.3.
 
 **Technical:**
+
 - `src/actions/tasks.ts`: `createTask` (top of the list), `updateTask`, `completeTask`, `reopenTask`, `deleteTask`. Completing a task already complete does nothing, so a double-tap does one thing.
 - A row and the add input; `?task=<id>` opens the detail in the right sidebar, which saves as you leave a field; a stale id shows nothing rather than failing. Title and notes limits in `parseField`.
 

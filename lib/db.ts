@@ -33,8 +33,7 @@ export function db(): Pool {
  */
 export function directDb(): Pool {
   direct ??= new Pool({
-    connectionString:
-      setting('TASKS_POSTGRES_DIRECT_URL') ?? required('TASKS_POSTGRES_URL'),
+    connectionString: setting('TASKS_POSTGRES_DIRECT_URL') ?? required('TASKS_POSTGRES_URL'),
     max: DIRECT_MAX,
   });
   return direct;

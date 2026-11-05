@@ -21,6 +21,7 @@ Turns the scaffold into a repository that can hold Tasks as `DESIGN.md` designs 
 **Design:** §23, `AGENTS.md`. **Depends on:** nothing.
 
 **Technical:**
+
 - Add `LICENSE` (AGPL-3.0-or-later), `CHANGELOG.md` (Keep a Changelog, with `[Unreleased]`), `CONTRIBUTING.md` (the people's version of `AGENTS.md`, as Fjord's), `.github/PULL_REQUEST_TEMPLATE.md`, `.github/dependabot.yml`.
 - `package.json`: `"license"`, `"type": "module"`, engines `>=24.15 <25`.
 - Pin `@sovereignfs/ui` and `@sovereignfs/sdk` exactly (the scaffold has `^`), listed in `minimumReleaseAgeExclude` as needed.
@@ -38,6 +39,7 @@ Turns the scaffold into a repository that can hold Tasks as `DESIGN.md` designs 
 **Design:** §23 Testing, `AGENTS.md`. **Depends on:** 1.1.
 
 **Technical:**
+
 - Prettier and ESLint with `sovereign`'s configuration: single quotes, semicolons, trailing commas, width 100; flat config, `typescript-eslint` recommended and strict, `eslint-config-prettier`. Reformat the repository in one commit of its own.
 - Vitest, with `src/**/*.test.{ts,tsx}`, `server.deps.inline` for `@sovereignfs/ui` (it imports CSS Modules), `fileParallelism: false` (data-layer tests share a database).
 - Scripts: `format`, `format:check`, `lint`, `test`. `typecheck` becomes `next typegen && tsc --noEmit`.
@@ -53,6 +55,7 @@ Turns the scaffold into a repository that can hold Tasks as `DESIGN.md` designs 
 **Design:** §23; Fjord's `web-ci.yml`, `scripts/ci-changes.sh`. **Depends on:** 1.2; gains its test legs with 1.5.
 
 **Technical:**
+
 - `.github/workflows/ci.yml`, on pull requests and on pushes to `main` (a rebase-and-merge makes new SHAs). Skipped on a draft or with the `skip-ci` label.
 - A first `changes` job classifies the paths with `scripts/ci-changes.sh`, which has its own tests: Markdown and `docs/` run nothing more.
 - Jobs: `check` (format, lint, typecheck, build, and from 1.5 "committed migrations match the schemas"); `tests` as a matrix over `sqld`, `file` and `postgres`, with a service for each; from 1.9 `e2e`; from 1.10 `image`. Actions pinned by SHA.
@@ -66,6 +69,7 @@ Turns the scaffold into a repository that can hold Tasks as `DESIGN.md` designs 
 **Design:** §5.1, §5.2, §6. **Depends on:** 1.2.
 
 **Technical:**
+
 - Remove `lib/`, `app/auth/`, `app/actions.ts`, `app/page.tsx`'s notes, `app/ui.tsx`, `migrations/001_init.sql`, `instrumentation.ts`'s old body, and `pg` use as it stands. Move to `src/`.
 - `src/config/env.ts`: reads a setting, and a secret in either form (`NAME`, or `NAME_FILE`, per `contracts/env.md`). `process.env` is read nowhere else.
 - `.env.example` rewritten for every setting of §6, §19 and §22, with comments, as Fjord's `deploy/.env.example`.
@@ -82,6 +86,7 @@ Turns the scaffold into a repository that can hold Tasks as `DESIGN.md` designs 
 **Design:** §22. Fjord's §14 and `src/db/`. **Depends on:** 1.4.
 
 **Technical:**
+
 - Dependencies: `drizzle-orm`, `drizzle-kit`, `@libsql/client`, `pg`.
 - `src/db/config.ts` reads `TASKS_DB_DIALECT` (`sqld` default, `sqlite`, `postgres`), `TASKS_SQLD_URL`, `TASKS_SQLD_ADMIN_URL`, `TASKS_SQLITE_URL`, `TASKS_POSTGRES_URL`, `TASKS_POSTGRES_POOL_MAX`, `PGSSLROOTCERT`, `TASKS_DB_CONNECT_TIMEOUT_MS`, `TASKS_MIGRATIONS_DIR`. Nothing infers a dialect from a URL.
 - Two clients: `@libsql/client/web` for sqld, so no native addon loads on the common path, with an `x-namespace` header per store; the native client only for `file:`, in WAL mode with a busy timeout. `pg` with `int8` parsed to a number, past 2^53 an error.
@@ -101,6 +106,7 @@ Turns the scaffold into a repository that can hold Tasks as `DESIGN.md` designs 
 **Design:** §5, §17.3. **Depends on:** 1.5.
 
 **Technical:**
+
 - `src/jobs/runner.ts`: `register(name, intervalMs, fn)`; started from `instrumentation-node.ts` unless `TASKS_WORKER=off`; stopped on `SIGTERM`, waiting for what is in flight, within the stop grace period.
 - A run of a job never overlaps itself in one process, and a failure is logged by job name and kind and does not stop the timer.
 - The clock is passed into jobs, so that tests call them directly with a time.
@@ -126,6 +132,7 @@ Turns the scaffold into a repository that can hold Tasks as `DESIGN.md` designs 
 **Design:** §15.1, §15.2. Fjord's `src/ui`. **Depends on:** 1.2.
 
 **Technical:**
+
 - `src/ui/index.ts`: a `'use client'` re-export of `@sovereignfs/ui`; `@dnd-kit/*` installed, since it imports them unconditionally.
 - `app/layout.tsx`: `@sovereignfs/ui/tokens.css`, Hanken Grotesk through `next/font/google` (self-hosted at build), the theme script that sets `data-theme` before first paint, with the CSP nonce.
 - `src/ui/AppShell.tsx`: the header row: logo and app name on the left, the bell (8.1) and avatar on the right, with `UserMenu` (filled by 2.1). The design system's `Header` requires a launcher slot an app has no use for: use it if that can be made optional in `sovereign`, otherwise this; record the answer in the task's Done as.
@@ -150,6 +157,7 @@ Turns the scaffold into a repository that can hold Tasks as `DESIGN.md` designs 
 **Design:** §22, §23 Deployment. **Depends on:** 1.5, 1.6.
 
 **Technical:**
+
 - `Dockerfile`: pnpm by corepack, `pnpm-workspace.yaml` copied, standalone output, not root, `ARG PORT`, migrations copied beside the server. **A glibc base for the `file:` form** (libSQL's native client has no musl build), or a check for the binary: the scaffold's Alpine is settled here, against Fjord's answer.
 - `deploy/`: Compose files for sqld (the default), a file and PostgreSQL, a README and `.env.example`.
 - `scripts/deploy-check.sh`: brings each up from an empty volume, asks `/api/health`, restarts it to prove migrations are safe twice, and sends `SIGTERM`, expecting a stop in seconds.

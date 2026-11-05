@@ -21,6 +21,7 @@ The frame and how it behaves. One set of routes and one set of data, and what di
 **Design:** §15.2. **Depends on:** 1.8, 13.3.
 
 **Technical:**
+
 - `app/(app)/layout.tsx`: `AppShell` (from 1.8) above `ThreeColumnLayout`: sidebar 280px, content with about 24px of padding, and the right sidebar at 360px, present only when `?task=` is set, which gives the two columns at first.
 - Check the dimensions against the Shopper screenshot in a browser, and against Shopper's source if it can be had.
 - Signed-in screens are client components, using `useLocal` (13.3). Actions go through `commit`.

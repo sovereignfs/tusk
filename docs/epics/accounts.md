@@ -21,6 +21,7 @@ Sign-in identical to Fjord Web's: local accounts, a Sovereign core, or both, on 
 **Design:** §6. **Depends on:** 1.5, 1.8.
 
 **Technical:**
+
 - `better-auth` and `@better-auth/drizzle-adapter`, pinned to one `~1.7` version, in the auth store, with its own migrations in `migrations/auth/` and tables in `src/db/schema/*/auth.ts`.
 - `src/auth/config.ts`: `TASKS_AUTH_LOCAL`, `TASKS_AUTH_SECRET` (32 characters or more), `TASKS_URL`, `TASKS_AUTH_SIGNUP` (`closed` by default). A wrong setting stops the server.
 - `src/auth/server.ts`; `app/api/auth/[...all]/route.ts`. `src/auth/session.ts`: `requireAccount()`, returning the account id, which everything after this uses.
@@ -68,6 +69,7 @@ Sign-in identical to Fjord Web's: local accounts, a Sovereign core, or both, on 
 **Design:** §6. **Depends on:** 2.1.
 
 **Technical:**
+
 - `TASKS_CORE_URL`, `TASKS_CORE_CLIENT_ID`, `TASKS_CORE_CLIENT_SECRET`: all or none, a partial set stops the server.
 - better-auth's `genericOAuth` with discovery: PKCE S256, basic auth, a nonce, `requireIdTokenVerification`. Redirect `/api/auth/callback/sovereign`; scopes `openid profile email` in one constant the manifest test shares. `sub` is the account id; `email` and `name` are copied once. `encryptOAuthTokens`, `disableProviderLogout`.
 - Refused with a code and a message, never bare JSON: `account_not_linked`, `SIGNUP_CLOSED`.
@@ -102,6 +104,7 @@ Sign-in identical to Fjord Web's: local accounts, a Sovereign core, or both, on 
 **Design:** §20. **Depends on:** 2.7, 3.4.
 
 **Technical:**
+
 - `src/sovereign/people.ts`: `People.deletePerson(accountId)`: tasks, series, lists (soft-deleted included), list keys, reminder slots, notifications, push subscriptions, settings, backup connection and credential, rate counters, then passkeys, two-factor, sessions, sign-ins, and the account. The row linking a `sub` goes last, so a run that stopped can find the account. Each store's part in a transaction; the two stores cannot share one, so it is written to be run again.
 - Settings > Data → Delete account: asks for the password, or a fresh session for a Sovereign-only account; says what goes, and that a backup repository does not. This device's local database goes too, and other devices learn at their next sync (13.4).
 - `people.test.ts` seeds **one row of every table**, by asking the schema for the tables, so a table left out fails it.
@@ -114,7 +117,7 @@ Sign-in identical to Fjord Web's: local accounts, a Sovereign core, or both, on 
 
 **Design:** §20. **Depends on:** 2.5, 2.8.
 
-**Technical:** `@sovereignfs/sdk`'s `verifyLogoutToken` and `verifyAccountDeletedToken`, imported in `src/sovereign/verifiers.ts` alone. `POST /api/sovereign/backchannel-logout` and `/api/sovereign/account-deleted`, rules in `src/sovereign/http.ts`: a bounded form (16 KiB), one rate limit for both, `400` to refuse, `503` when core could not be asked, `500` for a failure of ours, `200` for a deletion only once done. A replayed `jti` refused through `rate_bucket`. 404 where Sovereign is not set up. Logs the kind of error, never the token or the person. 
+**Technical:** `@sovereignfs/sdk`'s `verifyLogoutToken` and `verifyAccountDeletedToken`, imported in `src/sovereign/verifiers.ts` alone. `POST /api/sovereign/backchannel-logout` and `/api/sovereign/account-deleted`, rules in `src/sovereign/http.ts`: a bounded form (16 KiB), one rate limit for both, `400` to refuse, `503` when core could not be asked, `500` for a failure of ours, `200` for a deletion only once done. A replayed `jti` refused through `rate_bucket`. 404 where Sovereign is not set up. Logs the kind of error, never the token or the person.
 
 **Accepts when:** tests over `createFakeCore`'s real tokens: a good notice works, a replay, a wrong audience and an expired one do not; a browser test with the fake Sovereign signs someone out from the core's side.
 

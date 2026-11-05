@@ -151,11 +151,11 @@ Format, lint, test and database commands are added with their tooling (below); o
 
 The repository today is the scaffold's. `DESIGN.md` §5.1 is where things go as it is replaced.
 
-| Path | What |
-| --- | --- |
-| `app/` | Routes and layouts (App Router) |
-| `lib/`, `migrations/` | The scaffold's sign-in and PostgreSQL code and its SQL, to be replaced (`DESIGN.md` §5.2) |
-| `sovereign.manifest.json` | What an instance reads to host the app |
+| Path                                          | What                                                                                            |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `app/`                                        | Routes and layouts (App Router)                                                                 |
+| `lib/`, `migrations/`                         | The scaffold's sign-in and PostgreSQL code and its SQL, to be replaced (`DESIGN.md` §5.2)       |
+| `sovereign.manifest.json`                     | What an instance reads to host the app                                                          |
 | `Dockerfile`, `.github/workflows/publish.yml` | One image, not root, on the manifest's port; built and published to `ghcr.io` on a `vX.Y.Z` tag |
 
 ## Not in place yet

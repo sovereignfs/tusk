@@ -31,41 +31,41 @@ What it is not: a project management tool, a team inbox, a Kanban board, or a pl
 
 ## 2. Phases
 
-| Phase | What it delivers |
-| --- | --- |
+| Phase          | What it delivers                                                                                                                                                                                                                                                                                                                                          |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **1, the MVP** | Everything one person needs: accounts and settings, lists, tasks and subtasks, due dates, recurrence, Today, Starred, Review, search, bulk actions, keyboard, reminders by bell, Push and email, one-file export and import, backup to a git repository, working offline, an installable PWA, and opt-in encryption. Runs alone or hosted on an instance. |
-| **2** | Sharing a list with other accounts, and assigning tasks. The plugin specified this and never built it. |
-| **3** | Candidates, none committed: Google Tasks import, "the last Friday of the month", a shared key held through core. |
+| **2**          | Sharing a list with other accounts, and assigning tasks. The plugin specified this and never built it.                                                                                                                                                                                                                                                    |
+| **3**          | Candidates, none committed: Google Tasks import, "the last Friday of the month", a shared key held through core.                                                                                                                                                                                                                                          |
 
 ### What is carried over from the plugin
 
 The plugin's requirement IDs are not used here: tasks get IDs of their own in the roadmap. This table is how to check nothing was lost.
 
-| Plugin | What | Here |
-| --- | --- | --- |
-| TSK-01–05 | Lists and tasks, colour, cascade, title and notes | §10, §11. Colour stays a fixed set of swatches |
-| TSK-06, 07 | Subtasks one level deep; completing a parent completes them | §11.2 |
-| TSK-08 | Manual order by dragging | §11.3, with a different way of storing order |
-| TSK-09 | Show or hide completed, per list | §11.4 |
-| TSK-10–14 | Sharing, roles, ownership, assignment | §21 (phase 2) |
-| TSK-15, 16 | Due date and time, overdue | §12 |
-| TSK-17, 18 | Filters, search | §11.4, §14.5 |
-| TSK-19–21 | Keyboard shortcuts, bulk delete and move | §15.5, §15.6 |
-| TSK-22, 23, 25 | Recurrence, the next occurrence on completion, the pattern shown | §13 |
-| TSK-24 | "This / this and following / all" when editing a recurring task | **Dropped:** an edit applies to this occurrence and every later one, with no question (§13.4) |
-| TSK-26–28 | Star, move to a list, the Starred view | §11, §14.3 |
-| TSK-29 | Account-level export, import and deletion | Deletion: §20. The rest is §18's one file |
-| TSK-30 | Today's Agenda | §14.2, with different swipes |
-| TSK-31 | One-file export and import in Settings | §18 |
-| — | Reminders and the morning digest | §17 |
-| — | The mobile carousel, sheets and reorder | §15 |
-| `tasks_views`, Kanban, Visualizer | Reserved, never built | **Dropped.** `fs.sovereign.kanban` is a product of its own |
-| Tenants, `sdk.db`, the plugin manifest, the scheduler, the Apps drawer | The legacy runtime's | Gone with it (§5) |
+| Plugin                                                                 | What                                                             | Here                                                                                          |
+| ---------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| TSK-01–05                                                              | Lists and tasks, colour, cascade, title and notes                | §10, §11. Colour stays a fixed set of swatches                                                |
+| TSK-06, 07                                                             | Subtasks one level deep; completing a parent completes them      | §11.2                                                                                         |
+| TSK-08                                                                 | Manual order by dragging                                         | §11.3, with a different way of storing order                                                  |
+| TSK-09                                                                 | Show or hide completed, per list                                 | §11.4                                                                                         |
+| TSK-10–14                                                              | Sharing, roles, ownership, assignment                            | §21 (phase 2)                                                                                 |
+| TSK-15, 16                                                             | Due date and time, overdue                                       | §12                                                                                           |
+| TSK-17, 18                                                             | Filters, search                                                  | §11.4, §14.5                                                                                  |
+| TSK-19–21                                                              | Keyboard shortcuts, bulk delete and move                         | §15.5, §15.6                                                                                  |
+| TSK-22, 23, 25                                                         | Recurrence, the next occurrence on completion, the pattern shown | §13                                                                                           |
+| TSK-24                                                                 | "This / this and following / all" when editing a recurring task  | **Dropped:** an edit applies to this occurrence and every later one, with no question (§13.4) |
+| TSK-26–28                                                              | Star, move to a list, the Starred view                           | §11, §14.3                                                                                    |
+| TSK-29                                                                 | Account-level export, import and deletion                        | Deletion: §20. The rest is §18's one file                                                     |
+| TSK-30                                                                 | Today's Agenda                                                   | §14.2, with different swipes                                                                  |
+| TSK-31                                                                 | One-file export and import in Settings                           | §18                                                                                           |
+| —                                                                      | Reminders and the morning digest                                 | §17                                                                                           |
+| —                                                                      | The mobile carousel, sheets and reorder                          | §15                                                                                           |
+| `tasks_views`, Kanban, Visualizer                                      | Reserved, never built                                            | **Dropped.** `fs.sovereign.kanban` is a product of its own                                    |
+| Tenants, `sdk.db`, the plugin manifest, the scheduler, the Apps drawer | The legacy runtime's                                             | Gone with it (§5)                                                                             |
 
 ## 3. User journeys
 
-1. **First visit, alone.** Someone runs the image with the short setup of §23. They register, are offered encryption (§9), and find one list, *My
-   tasks*, with the cursor in "Add a task". Sign-up is then closed unless the operator opened it (§6).
+1. **First visit, alone.** Someone runs the image with the short setup of §23. They register, are offered encryption (§9), and find one list, _My
+   tasks_, with the cursor in "Add a task". Sign-up is then closed unless the operator opened it (§6).
 2. **First visit, on an instance.** A person opens Tasks from the launcher, signs in through core, is offered encryption, and finds the same.
 3. **Capture.** They type a title and press Enter. It appears at the top straight away, online or not. They add another without touching the mouse.
 4. **Work a list.** They tick things off, drag them into order, and open one to add notes, a date or subtasks, which opens in the right sidebar.
@@ -83,20 +83,20 @@ The plugin's requirement IDs are not used here: tasks get IDs of their own in th
 
 ## 4. Terminology
 
-| Term | Meaning |
-| --- | --- |
-| **Account** | Someone who can sign in to this Tasks. Known by its id, whichever way they sign in (§6). "Person" means the same, in prose |
-| **List** | A named, coloured group of tasks. Belongs to one account in phase 1 |
-| **Task** | A row in a list. A top-level task can have subtasks |
-| **Subtask** | A task with a parent: a title, notes and a tick, and nothing else (§11.2) |
-| **Due date, due time** | When a task is due, as written on a calendar, in no time zone (§12) |
-| **Today** | The account's own calendar day (§12) and also the view of what needs attention (§14.2); the context says which |
-| **Review** | A pass over all a person's tasks, or one list's, to prioritise them (§14.4) |
-| **Series** | A repeating rule, and the occurrences made from it (§13) |
-| **Occurrence** | One task in a series. At most one is open at a time |
-| **Change** | One write to one row, as a device sends it to the server (§8.2) |
-| **Personal key** | An age key a person holds, which makes their tasks unreadable to the server (§9) |
-| **Backup** | One file committed to the connected repository (§19) |
+| Term                   | Meaning                                                                                                                    |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| **Account**            | Someone who can sign in to this Tasks. Known by its id, whichever way they sign in (§6). "Person" means the same, in prose |
+| **List**               | A named, coloured group of tasks. Belongs to one account in phase 1                                                        |
+| **Task**               | A row in a list. A top-level task can have subtasks                                                                        |
+| **Subtask**            | A task with a parent: a title, notes and a tick, and nothing else (§11.2)                                                  |
+| **Due date, due time** | When a task is due, as written on a calendar, in no time zone (§12)                                                        |
+| **Today**              | The account's own calendar day (§12) and also the view of what needs attention (§14.2); the context says which             |
+| **Review**             | A pass over all a person's tasks, or one list's, to prioritise them (§14.4)                                                |
+| **Series**             | A repeating rule, and the occurrences made from it (§13)                                                                   |
+| **Occurrence**         | One task in a series. At most one is open at a time                                                                        |
+| **Change**             | One write to one row, as a device sends it to the server (§8.2)                                                            |
+| **Personal key**       | An age key a person holds, which makes their tasks unreadable to the server (§9)                                           |
+| **Backup**             | One file committed to the connected repository (§19)                                                                       |
 
 User-facing text says "list" and "task", never "item"; "app", never "client" or "plugin".
 
@@ -131,29 +131,29 @@ offline-first asks for it:
 
 As Fjord Web's. `app/` for routes, and `src/` for everything else, with tests beside the code.
 
-| Path | What |
-| --- | --- |
-| `app/` | Routes: the shell, the landing page, sign-in, and `/api/*` |
-| `src/db/` | Configuration, the clients, the schemas per dialect, migrations at start-up (§22) |
-| `src/auth/` | better-auth, its settings, the screens, the fake Sovereign for tests (§6) |
-| `src/access/` | The list of every page and route with who may use it, and the parsers (§7) |
-| `src/sync/` | The change format and validators (shared), the server's apply and pull, and the browser's outbox and sync loop (§8) |
-| `src/local/` | The browser's store over IndexedDB, and its queries (§8) |
-| `src/actions/` | What each user action changes: pure, run in the browser, producing changes |
-| `src/crypto/` | Credentials at rest (§19.2) and the operator-key mode (§9.5), on the server |
-| `src/keys/` | Personal keys, list keys and the field cipher, in the browser (§9) |
-| `src/recurrence.ts`, `src/time.ts`, `src/position.ts`, `src/today.ts`, `src/review.ts` | The pure rules |
-| `src/notifications/` | The notification list, the channels and the jobs (§17) |
-| `src/portability/` | The file format, and reading the plugin's (§18) |
-| `src/backup/` | The connection and the job (§19) |
-| `src/providers/` | The git host interface, GitHub's implementation, an in-memory one (§19.2) |
-| `src/sovereign/` | What an instance tells the app, and `People` (§20) |
-| `src/mail/` | The SMTP mailer (§6, §17) |
-| `src/pwa/`, `src/sw/` | The manifest's details, and the service worker's source (§15.7) |
-| `src/ui/` | The design system's client boundary, and `AppShell` |
-| `migrations/` | The generated SQL: `sqlite/`, `postgres/`, `auth/` |
-| `deploy/` | The Compose setups for sqld, a file and PostgreSQL, their README and `.env.example` |
-| `sovereign.manifest.json` | What an instance reads to host the app (§23) |
+| Path                                                                                   | What                                                                                                                |
+| -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `app/`                                                                                 | Routes: the shell, the landing page, sign-in, and `/api/*`                                                          |
+| `src/db/`                                                                              | Configuration, the clients, the schemas per dialect, migrations at start-up (§22)                                   |
+| `src/auth/`                                                                            | better-auth, its settings, the screens, the fake Sovereign for tests (§6)                                           |
+| `src/access/`                                                                          | The list of every page and route with who may use it, and the parsers (§7)                                          |
+| `src/sync/`                                                                            | The change format and validators (shared), the server's apply and pull, and the browser's outbox and sync loop (§8) |
+| `src/local/`                                                                           | The browser's store over IndexedDB, and its queries (§8)                                                            |
+| `src/actions/`                                                                         | What each user action changes: pure, run in the browser, producing changes                                          |
+| `src/crypto/`                                                                          | Credentials at rest (§19.2) and the operator-key mode (§9.5), on the server                                         |
+| `src/keys/`                                                                            | Personal keys, list keys and the field cipher, in the browser (§9)                                                  |
+| `src/recurrence.ts`, `src/time.ts`, `src/position.ts`, `src/today.ts`, `src/review.ts` | The pure rules                                                                                                      |
+| `src/notifications/`                                                                   | The notification list, the channels and the jobs (§17)                                                              |
+| `src/portability/`                                                                     | The file format, and reading the plugin's (§18)                                                                     |
+| `src/backup/`                                                                          | The connection and the job (§19)                                                                                    |
+| `src/providers/`                                                                       | The git host interface, GitHub's implementation, an in-memory one (§19.2)                                           |
+| `src/sovereign/`                                                                       | What an instance tells the app, and `People` (§20)                                                                  |
+| `src/mail/`                                                                            | The SMTP mailer (§6, §17)                                                                                           |
+| `src/pwa/`, `src/sw/`                                                                  | The manifest's details, and the service worker's source (§15.7)                                                     |
+| `src/ui/`                                                                              | The design system's client boundary, and `AppShell`                                                                 |
+| `migrations/`                                                                          | The generated SQL: `sqlite/`, `postgres/`, `auth/`                                                                  |
+| `deploy/`                                                                              | The Compose setups for sqld, a file and PostgreSQL, their README and `.env.example`                                 |
+| `sovereign.manifest.json`                                                              | What an instance reads to host the app (§23)                                                                        |
 
 ### 5.2 What happens to the scaffold
 
@@ -165,9 +165,9 @@ As Fjord Web's. `app/` for routes, and `src/` for everything else, with tests be
 
 Built on **better-auth 1.7**, in a store of its own (§22), with its own migrations. Which methods are offered is set by the environment, so an instance can run either or both:
 
-| Method | Enabled by | What |
-| --- | --- | --- |
-| **Local** | `TASKS_AUTH_LOCAL=1` | Email and password, passkeys, and an authenticator app with ten backup codes. Off means off: `/sign-in`, `/sign-up` and `/api/auth` answer 404 |
+| Method        | Enabled by                                                                        | What                                                                                                                                                                                                                                  |
+| ------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Local**     | `TASKS_AUTH_LOCAL=1`                                                              | Email and password, passkeys, and an authenticator app with ten backup codes. Off means off: `/sign-in`, `/sign-up` and `/api/auth` answer 404                                                                                        |
 | **Sovereign** | `TASKS_CORE_URL`, `TASKS_CORE_CLIENT_ID`, `TASKS_CORE_CLIENT_SECRET`, all or none | OIDC against a core, through `genericOAuth`: authorization code with PKCE S256, the ID token verified against the keys discovery points to. Redirect address `<TASKS_URL>/api/auth/callback/sovereign`; scopes `openid profile email` |
 
 - **The server refuses to start on a setting that is wrong:** a short `TASKS_AUTH_SECRET`, a non-https `TASKS_URL` (localhost aside), a partial set of `TASKS_CORE_*`, an SMTP host with no sender.
@@ -188,7 +188,8 @@ Signing in needs a network. Once signed in on a device, the session cookie is no
 **The rule: every write names the account in the statement that makes it.** Not a check first and a write after.
 
 ```ts
-db.update(task).set({ fields, seq })
+db.update(task)
+  .set({ fields, seq })
   .where(and(eq(task.id, id), eq(task.ownerId, accountId)));
 ```
 
@@ -219,9 +220,19 @@ The design goal is that **a person does not feel any of this.** The app never wa
 A user action is a pure function in `src/actions/`, run in the browser, that turns "complete this task" into changes to rows. Completing a parent with two open subtasks that repeats is one **mutation** holding several changes: the task, the subtasks, and the next occurrence and its copied subtasks.
 
 ```json
-{ "mutationId": "…", "changes": [
-  { "table": "task", "id": "…", "listId": "…", "parentId": null, "position": "a1",
-    "fields": { "title": { "v": "Water the plants" }, "completedAt": { "v": 1793000000000 } } } ] }
+{
+  "mutationId": "…",
+  "changes": [
+    {
+      "table": "task",
+      "id": "…",
+      "listId": "…",
+      "parentId": null,
+      "position": "a1",
+      "fields": { "title": { "v": "Water the plants" }, "completedAt": { "v": 1793000000000 } }
+    }
+  ]
+}
 ```
 
 - **Ids are made by the client,** so a new task exists at once and everything can refer to it offline. A mutation's id makes replaying it harmless: the server records what it has applied.
@@ -244,16 +255,16 @@ A user action is a pure function in `src/actions/`, run in the browser, that tur
 
 Resolved by rule, in the background, with nothing asked:
 
-| What happened | What results |
-| --- | --- |
-| Two devices change different fields of a task | Both changes stand |
-| Two devices change the same field | The one that reached the server later wins |
-| One device edits a task another deleted | The edit restores it: losing someone's words is worse than a deleted task coming back |
-| Both delete | Deleted |
-| Two devices move a task to one position | Both keep the key; ties break by id, so every device shows one order |
-| Two devices complete a repeating task | They make the same next occurrence, since its id derives from the series and the date, and it arrives once |
+| What happened                                                   | What results                                                                                                     |
+| --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Two devices change different fields of a task                   | Both changes stand                                                                                               |
+| Two devices change the same field                               | The one that reached the server later wins                                                                       |
+| One device edits a task another deleted                         | The edit restores it: losing someone's words is worse than a deleted task coming back                            |
+| Both delete                                                     | Deleted                                                                                                          |
+| Two devices move a task to one position                         | Both keep the key; ties break by id, so every device shows one order                                             |
+| Two devices complete a repeating task                           | They make the same next occurrence, since its id derives from the series and the date, and it arrives once       |
 | Two devices complete it on different days, so next dates differ | Two open occurrences arrive. The device that sees it deletes the later one, by a rule every device applies alike |
-| A task is added to a list another device deleted | The list is restored |
+| A task is added to a list another device deleted                | The list is restored                                                                                             |
 
 A refusal the server gives (a limit, a change it cannot accept) is the only thing that reaches the person: the change is undone locally with a toast saying why. The later-arrival rule can silently overwrite an edit made on another device; that is the accepted cost of having no conflict dialogs, and fields are small enough for it to be rare.
 
@@ -283,12 +294,12 @@ Deleted rows are hard-deleted after seven days (§11.5), and leave a tombstone o
 
 Two modes, mutually exclusive. By default neither is on, and everything is stored as plain text.
 
-| | Personal key | Operator key |
-| --- | --- | --- |
-| Chosen by | Each person, opt-in | The operator, by `.env` |
-| Who can read tasks | Only that person's devices | The server, and so the operator |
-| Protects against | Reading the database, dumps and backups, including by the operator | A stolen database or dump, not the operator |
-| When it is on | Other people on the server are unaffected | Personal keys are not offered to anyone |
+|                    | Personal key                                                       | Operator key                                |
+| ------------------ | ------------------------------------------------------------------ | ------------------------------------------- |
+| Chosen by          | Each person, opt-in                                                | The operator, by `.env`                     |
+| Who can read tasks | Only that person's devices                                         | The server, and so the operator             |
+| Protects against   | Reading the database, dumps and backups, including by the operator | A stolen database or dump, not the operator |
+| When it is on      | Other people on the server are unaffected                          | Personal keys are not offered to anyone     |
 
 ### 9.1 Choosing a personal key
 
@@ -314,15 +325,15 @@ The browser re-encrypts everything it has, in resumable batches through the ordi
 
 Because of §8, most of the app needs nothing from the server. What differs:
 
-| Thing | With a personal key |
-| --- | --- |
-| Search, Today, counts, recurrence | Nothing: already in the browser |
-| Server validation | Structure and size only |
-| Moving a task to another list | The browser re-encrypts its fields under that list's key |
-| Export | Made in the browser, as plain JSON in the person's hands, with a warning |
-| Import | Read and encrypted in the browser |
-| Auto backup | The file holds ciphertext and wrapped keys (§19.3) |
-| Reminders | By times only (§17.5) |
+| Thing                             | With a personal key                                                      |
+| --------------------------------- | ------------------------------------------------------------------------ |
+| Search, Today, counts, recurrence | Nothing: already in the browser                                          |
+| Server validation                 | Structure and size only                                                  |
+| Moving a task to another list     | The browser re-encrypts its fields under that list's key                 |
+| Export                            | Made in the browser, as plain JSON in the person's hands, with a warning |
+| Import                            | Read and encrypted in the browser                                        |
+| Auto backup                       | The file holds ciphertext and wrapped keys (§19.3)                       |
+| Reminders                         | By times only (§17.5)                                                    |
 
 ### 9.5 The operator key
 
@@ -340,7 +351,7 @@ A personal key protects what is stored. It does not protect against an operator 
 
 ## 10. Lists
 
-- Create with the + in the sidebar, and name it. A first visit makes *My tasks*, so there is always somewhere to type.
+- Create with the + in the sidebar, and name it. A first visit makes _My tasks_, so there is always somewhere to type.
 - Rename, recolour, reorder and delete in Settings > Lists (§16). Dragging a row in the sidebar also reorders.
 - Colour is one of the six swatches (`black`, `grey`, `green`, `blue`, `amber`, `red`), mapped to `--sv-*` tokens. New lists are `black`. It is the one splash of colour in a monochrome interface, and appears only as the small dot.
 - Deleting a list asks first (`ConfirmDialog`), naming how many open tasks it holds, and takes its tasks with it. It can be undone (§11.5).
@@ -419,12 +430,12 @@ Setting a repeat on a task with no due date gives it one: the first date the rul
 
 **An edit to a recurring task updates it in place, applies to that occurrence and every later one from that moment, and duplicates nothing.** There is no prompt. No row is added by editing, and completed occurrences are history and are never changed.
 
-| Edit | What happens |
-| --- | --- |
-| Title, notes, star, due time, subtasks | The open occurrence changes, and the next is copied from it |
-| The rule | The series' rule is replaced, and the anchor set to this occurrence's date |
-| The due date | This occurrence moves and the series moves with it: the anchor becomes the new date, and a weekly rule on one weekday moves to the new weekday. Every later occurrence follows |
-| "Does not repeat", or clearing the due date | The series ends, and this stays as a one-off |
+| Edit                                        | What happens                                                                                                                                                                   |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Title, notes, star, due time, subtasks      | The open occurrence changes, and the next is copied from it                                                                                                                    |
+| The rule                                    | The series' rule is replaced, and the anchor set to this occurrence's date                                                                                                     |
+| The due date                                | This occurrence moves and the series moves with it: the anchor becomes the new date, and a weekly rule on one weekday moves to the new weekday. Every later occurrence follows |
+| "Does not repeat", or clearing the due date | The series ends, and this stays as a one-off                                                                                                                                   |
 
 The plugin's prompt looked like a choice, but with one open occurrence there were no future rows to choose between. "This task only" was not true, since the next occurrence copied the edit anyway. "This and following" was in effect the same one row. "All" went back and rewrote completed rows' titles.
 
@@ -439,16 +450,16 @@ The plugin's prompt looked like a choice, but with one open occurrence there wer
 
 ### 14.1 Addresses
 
-| Address | What |
-| --- | --- |
-| `/` | A landing page for someone not signed in, static, as in Fjord. Signed in, the first list, by a rewrite in `proxy.ts` |
-| `/sign-in`, `/sign-up` | §6 |
-| `/lists/<id>` | A list. `?task=<id>` opens a task's detail, so it can be linked to and reloaded |
-| `/today` | §14.2 |
-| `/starred` | §14.3 |
-| `/review`, `/review/<listId>` | §14.4 |
-| `/search?q=` | §14.5 |
-| `/settings?section=` | §16 |
+| Address                       | What                                                                                                                 |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `/`                           | A landing page for someone not signed in, static, as in Fjord. Signed in, the first list, by a rewrite in `proxy.ts` |
+| `/sign-in`, `/sign-up`        | §6                                                                                                                   |
+| `/lists/<id>`                 | A list. `?task=<id>` opens a task's detail, so it can be linked to and reloaded                                      |
+| `/today`                      | §14.2                                                                                                                |
+| `/starred`                    | §14.3                                                                                                                |
+| `/review`, `/review/<listId>` | §14.4                                                                                                                |
+| `/search?q=`                  | §14.5                                                                                                                |
+| `/settings?section=`          | §16                                                                                                                  |
 
 A list that is not there for this account says so, with a way back. No route depends on an id being unable to collide with a word, which the plugin's `/tasks/[listId]` relied on for `starred`.
 
@@ -460,12 +471,12 @@ On a phone it is a full-screen modal. On a desktop it is the content column, rea
 
 **Cards** are a `SwipeStack`, one at a time, with buttons always shown, since a gesture is never the only way (§15.5):
 
-| Gesture | Button | What it does |
-| --- | --- | --- |
-| Up | Done | Completes it (a repeat makes its next) |
-| Down | Cancel | Deletes it, with Undo. On a repeating task, skips this occurrence and makes the next (§13.5) |
-| Left | Dismiss | Hides it from Today until tomorrow, with Undo. Its due date and status do not change, and it stays in its own list |
-| Right | Star | Sets the star, and leaves the due date alone. It leaves the stack for this pass |
+| Gesture | Button  | What it does                                                                                                       |
+| ------- | ------- | ------------------------------------------------------------------------------------------------------------------ |
+| Up      | Done    | Completes it (a repeat makes its next)                                                                             |
+| Down    | Cancel  | Deletes it, with Undo. On a repeating task, skips this occurrence and makes the next (§13.5)                       |
+| Left    | Dismiss | Hides it from Today until tomorrow, with Undo. Its due date and status do not change, and it stays in its own list |
+| Right   | Star    | Sets the star, and leaves the due date alone. It leaves the stack for this pass                                    |
 
 **Dismiss** is the snooze this view has: a `dismissedOn` date on the task, which Today compares with today, in the device's own local day. It reaches the person's other devices, and works offline and on an encrypted account like any field. The next day it is simply back, so nothing has to clear it. It affects only Today: the task still shows in its list, Starred, search and Review, and reminders and the daily brief still count it, since it is still due.
 
@@ -525,11 +536,11 @@ At 768px and under, three rows: header, carousel, footer.
 - **Main:** `SwipableMobileCarousel`, with `useCarouselRouteSync` mapping a slide to an address: **one slide per list.** Swiping changes the address.
 - **Footer:** `MobileFooter`, three buttons. Its centre slot is the launcher's, given our own icon and action:
 
-| Button | What it does |
-| --- | --- |
-| Left | Opens a sheet for switching lists quickly: "Review all tasks", Starred, then the lists with dot and count |
+| Button | What it does                                                                                                                                             |
+| ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Left   | Opens a sheet for switching lists quickly: "Review all tasks", Starred, then the lists with dot and count                                                |
 | Middle | Adds a task, in a sheet, with the list on screen already chosen as the target. It can be changed. From a view with no list behind it, the list used last |
-| Right | Opens Today's modal |
+| Right  | Opens Today's modal                                                                                                                                      |
 
 Task detail and list actions are `Sheet`s. Date and repeat pickers use the design system's adaptive surface (`Popover` above, `Drawer` under). Neighbouring slides are already in the local store, so a swipe never shows a spinner.
 
@@ -581,14 +592,14 @@ Each of these cost a release there. They are written here so they are not paid f
 
 One place, from the avatar menu, at `/settings?section=`: a dialog over the page on a desktop and a full page on a phone, as Fjord's `/account` is (`app/@modal`). It replaces separate account and settings pages.
 
-| Section | What |
-| --- | --- |
-| **Profile** | Name, email, avatar |
-| **Preferences** | Theme, first day of the week, and how Today opens on this device |
-| **Security** | Password, two-factor, passkeys, linking Sovereign, as Fjord's. An account that came through Sovereign has no password, two-factor or passkey sections, and says so |
-| **Lists** | Each list's name and colour; change the order; delete |
-| **Notifications** | Enable Push on this device; email reminders on or off; the daily brief's time; due-time reminders on or off (§17) |
-| **Data** | Export and import (§18); backup (§19); encryption (§9); last synced; delete account (§20) |
+| Section           | What                                                                                                                                                               |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Profile**       | Name, email, avatar                                                                                                                                                |
+| **Preferences**   | Theme, first day of the week, and how Today opens on this device                                                                                                   |
+| **Security**      | Password, two-factor, passkeys, linking Sovereign, as Fjord's. An account that came through Sovereign has no password, two-factor or passkey sections, and says so |
+| **Lists**         | Each list's name and colour; change the order; delete                                                                                                              |
+| **Notifications** | Enable Push on this device; email reminders on or off; the daily brief's time; due-time reminders on or off (§17)                                                  |
+| **Data**          | Export and import (§18); backup (§19); encryption (§9); last synced; delete account (§20)                                                                          |
 
 Settings shows only what can work here: no Push without VAPID keys, no email without SMTP, no encryption choice in operator-key mode, each with a sentence saying why. All of it but Lists needs a network.
 
@@ -609,11 +620,11 @@ A due time passed while the app was down is sent on the next tick of the same da
 
 Then, each by its own switch:
 
-| Channel | Needs | What it does |
-| --- | --- | --- |
-| **Web Push** | `TASKS_VAPID_PUBLIC_KEY`, `TASKS_VAPID_PRIVATE_KEY`, `TASKS_VAPID_SUBJECT` | Through `web-push` and the service worker, per device (`push_subscription`), turned on from that device. Dead subscriptions (410, 404) are removed. Legacy's `runtime/src/push.ts` is the model. On iPhone it needs the PWA installed |
-| **Email** | `TASKS_SMTP_*` | The mailer of §6. Each message links to Settings to turn it off |
-| **Core's bell** | A linked Sovereign identity, `TASKS_CORE_*`, and the app scope `notifications:send` from an operator | `sv.app.notifications.send` to the `sub`. Automatic when hosted. Without the scope it is logged once and tried rarely, and everything else still works |
+| Channel         | Needs                                                                                                | What it does                                                                                                                                                                                                                          |
+| --------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Web Push**    | `TASKS_VAPID_PUBLIC_KEY`, `TASKS_VAPID_PRIVATE_KEY`, `TASKS_VAPID_SUBJECT`                           | Through `web-push` and the service worker, per device (`push_subscription`), turned on from that device. Dead subscriptions (410, 404) are removed. Legacy's `runtime/src/push.ts` is the model. On iPhone it needs the PWA installed |
+| **Email**       | `TASKS_SMTP_*`                                                                                       | The mailer of §6. Each message links to Settings to turn it off                                                                                                                                                                       |
+| **Core's bell** | A linked Sovereign identity, `TASKS_CORE_*`, and the app scope `notifications:send` from an operator | `sv.app.notifications.send` to the `sub`. Automatic when hosted. Without the scope it is logged once and tried rarely, and everything else still works                                                                                |
 
 - **`@sovereignfs/sdk` is used for this and for checking core's notices,** and for nothing else; sign-in is better-auth's. It is assumed an app token needs none of the SDK's session or token stores: the first task to use it confirms that.
 - **A task's title leaves the database by these routes.** A Push payload is encrypted to the device, but email goes through the mail provider, and core stores its notifications. Settings says so.
@@ -644,12 +655,39 @@ The server cannot read a due date, so **the browser uploads times only:** `remin
 One JSON file, from Settings, either way. That is the whole of portability: there is no bulk migration from the plugin, and core's account-level export is "later" (sdk §10).
 
 ```json
-{ "format": "sovereign-tasks", "version": 1, "exportedAt": "2026-11-04T09:00:00Z",
-  "lists": [ { "id": "…", "title": "…", "color": "blue", "position": "a0", "sort": "custom", "showCompleted": false,
-               "tasks": [ { "id": "…", "parentId": null, "title": "…", "notes": null, "starred": false, "dueDate": "2026-11-08",
-                            "dueTime": null, "seriesId": "…", "position": "a1", "completedAt": null, "reviewedAt": null, "createdAt": "…" } ] } ],
-  "series": [ { "id": "…", "rule": "FREQ=WEEKLY;BYDAY=SA", "anchor": "2026-11-08" } ],
-  "settings": { "morningTime": "08:00" } }
+{
+  "format": "sovereign-tasks",
+  "version": 1,
+  "exportedAt": "2026-11-04T09:00:00Z",
+  "lists": [
+    {
+      "id": "…",
+      "title": "…",
+      "color": "blue",
+      "position": "a0",
+      "sort": "custom",
+      "showCompleted": false,
+      "tasks": [
+        {
+          "id": "…",
+          "parentId": null,
+          "title": "…",
+          "notes": null,
+          "starred": false,
+          "dueDate": "2026-11-08",
+          "dueTime": null,
+          "seriesId": "…",
+          "position": "a1",
+          "completedAt": null,
+          "reviewedAt": null,
+          "createdAt": "…"
+        }
+      ]
+    }
+  ],
+  "series": [{ "id": "…", "rule": "FREQ=WEEKLY;BYDAY=SA", "anchor": "2026-11-08" }],
+  "settings": { "morningTime": "08:00" }
+}
 ```
 
 - **Made and read in the browser,** from the local store and into it, so that it works the same on any encryption mode. Plain JSON in the person's hands, with a warning if the account is encrypted.
@@ -670,10 +708,10 @@ In Settings > Data:
 1. **Connect a repository** (§19.2).
 2. **Choose a mode:**
 
-| Mode | What it does |
-| --- | --- |
-| `manual` | Only when they press **Back up now** |
-| `auto` | On a frequency they choose: every hour, every 6 hours, daily (the default) or weekly. **Back up now** still works |
+| Mode     | What it does                                                                                                      |
+| -------- | ----------------------------------------------------------------------------------------------------------------- |
+| `manual` | Only when they press **Back up now**                                                                              |
+| `auto`   | On a frequency they choose: every hour, every 6 hours, daily (the default) or weekly. **Back up now** still works |
 
 3. See the state: the repository, the last backup with a link to the file, the next, and what went wrong if something did. Change the mode or disconnect at any time.
 
@@ -683,7 +721,7 @@ In Settings > Data:
 
 The connection is Fjord Web's §7, for one repository per account:
 
-- **Two ways in.** **The GitHub App** (`TASKS_GITHUB_APP_*`, preferred where the operator has set it up): the person installs it and chooses the repository; *Contents: read and write* and *Metadata: read* only; short-lived installation tokens, with no token kept. **A repository address and a fine-grained personal access token**, limited to that repository with *Contents: read and write*.
+- **Two ways in.** **The GitHub App** (`TASKS_GITHUB_APP_*`, preferred where the operator has set it up): the person installs it and chooses the repository; _Contents: read and write_ and _Metadata: read_ only; short-lived installation tokens, with no token kept. **A repository address and a fine-grained personal access token**, limited to that repository with _Contents: read and write_.
 - **Checked before anything is kept,** in the order a person would fix things: GitHub accepts the token; it can see the repository; **the repository is private** (§19.5); the default branch has something in it; and the token can write, by `canWrite`, which tries something that changes nothing, since a repository's reported permissions are not to be trusted. Each refusal is a message of ours saying what to do, never GitHub's text, never the token. An empty repository is refused with "add a README first", as in Fjord.
 - **Credentials at rest** are `src/crypto/`, as Fjord's: envelope encryption under `TASKS_ENCRYPTION_KEY`, bound to the row and purpose, with rotation by restart through `TASKS_ENCRYPTION_KEY_PREVIOUS`, and a server that refuses to start rather than lose one quietly. Without a key, Settings says why a repository cannot be connected.
 - **A git host is reached only through `Provider`** (`src/providers/`), tested as Fjord's is: one contract, over a fake whose storage is a real git repository, an in-memory one the app is tested against, and GitHub's real answers recorded. Tasks needs a small part of it: `getRepository`, `canWrite`, `getHead` and `commit`. `TASKS_GITHUB_API_URL` covers an Enterprise Server. **Credentials never appear in an error, a log or a URL.**
@@ -754,11 +792,11 @@ After the MVP. Outlined here so phase 1 does not preclude it. It gets its own RF
 
 **As Fjord Web's §14, and read that for the detail.** `TASKS_DB_DIALECT` is `sqld` (the default), `sqlite` or `postgres`, read in one place; nothing infers it from a URL.
 
-| Dialect | Address | For |
-| --- | --- | --- |
-| `sqld` (**default**) | `TASKS_SQLD_URL`, with `TASKS_SQLD_ADMIN_URL` | Most installs. Namespaces `tasks` and `tasks_auth`. sqld 0.24.33 or later, since earlier ignore `x-namespace` |
-| `sqlite` | `TASKS_SQLITE_URL`, `file:/data/tasks.db` | The smallest self-host: one container. Auth is `tasks_auth.db` beside it. Never on a network filesystem. Needs a glibc image |
-| `postgres` | `TASKS_POSTGRES_URL` (or `_FILE`), `PGSSLROOTCERT`, `TASKS_POSTGRES_POOL_MAX` | An operator who prefers it, and what an instance gives. Schemas `tasks` and `tasks_auth` |
+| Dialect              | Address                                                                       | For                                                                                                                          |
+| -------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `sqld` (**default**) | `TASKS_SQLD_URL`, with `TASKS_SQLD_ADMIN_URL`                                 | Most installs. Namespaces `tasks` and `tasks_auth`. sqld 0.24.33 or later, since earlier ignore `x-namespace`                |
+| `sqlite`             | `TASKS_SQLITE_URL`, `file:/data/tasks.db`                                     | The smallest self-host: one container. Auth is `tasks_auth.db` beside it. Never on a network filesystem. Needs a glibc image |
+| `postgres`           | `TASKS_POSTGRES_URL` (or `_FILE`), `PGSSLROOTCERT`, `TASKS_POSTGRES_POOL_MAX` | An operator who prefers it, and what an instance gives. Schemas `tasks` and `tasks_auth`                                     |
 
 - **Drizzle, a schema and a migration set per dialect,** generated with `pnpm db:generate` and never written by hand or `push`ed, applied at start-up. CI fails if generating would write anything. A **parity test** checks that the two dialects declare the same tables, columns and indexes.
 - **Portable by rule:** standard SQL only, values bound, raw SQL through one small helper. **No `LISTEN/NOTIFY`, no trigger, no extension.** The dialect is chosen at install time; moving between them is §18's file, per account.
@@ -770,41 +808,41 @@ After the MVP. Outlined here so phase 1 does not preclude it. It gets its own RF
 
 One per type, through the column vocabulary (`src/db/schema/*/columns.ts`), so that no table names a dialect's own type:
 
-| Value | Stored as |
-| --- | --- |
-| Id | Text, a UUID made by the client |
-| Time | `epochMs`: a 64-bit integer, a `number` in JavaScript |
-| Boolean | The vocabulary's word, `0/1` on SQLite and `boolean` on PostgreSQL |
-| Date, time of day | Text, `YYYY-MM-DD` and `HH:MM` (§12) |
-| Position | Text compared byte by byte: SQLite's default `BINARY`, and `COLLATE "C"` on PostgreSQL, which the vocabulary's `position` word declares |
-| Fields | JSON as text: a map of field name to `{ v }` or `{ c }`, plus the `seq` that last wrote it |
+| Value             | Stored as                                                                                                                               |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Id                | Text, a UUID made by the client                                                                                                         |
+| Time              | `epochMs`: a 64-bit integer, a `number` in JavaScript                                                                                   |
+| Boolean           | The vocabulary's word, `0/1` on SQLite and `boolean` on PostgreSQL                                                                      |
+| Date, time of day | Text, `YYYY-MM-DD` and `HH:MM` (§12)                                                                                                    |
+| Position          | Text compared byte by byte: SQLite's default `BINARY`, and `COLLATE "C"` on PostgreSQL, which the vocabulary's `position` word declares |
+| Fields            | JSON as text: a map of field name to `{ v }` or `{ c }`, plus the `seq` that last wrote it                                              |
 
 ### 22.3 Tables
 
 Beyond better-auth's (`user`, `session`, `account`, `verification`, `two_factor`, `passkey`, `rate_limit`, in the auth store). A synced row has **structural columns the server uses, and a `fields` column it mostly does not.**
 
-| Table | Structural columns | Fields |
-| --- | --- | --- |
-| `list` | `id`, `owner_id`, `position`, `deleted_at`, `seq`, `created_at` | `title`, `color`, `sort`, `showCompleted` |
-| `task` | `id`, `owner_id`, `list_id`, `parent_id`, `position`, `deleted_at`, `seq`, `created_at`, `reminder_sent_at`, and mirrors `due_date`, `due_time`, `completed_at` | `title`, `notes`, `starred`, `dueDate`, `dueTime`, `seriesId`, `completedAt`, `reviewedAt`, `dismissedOn` |
-| `series` | `id`, `owner_id`, `list_id`, `deleted_at`, `seq`, `created_at` | `rule`, `anchor` |
+| Table    | Structural columns                                                                                                                                              | Fields                                                                                                    |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `list`   | `id`, `owner_id`, `position`, `deleted_at`, `seq`, `created_at`                                                                                                 | `title`, `color`, `sort`, `showCompleted`                                                                 |
+| `task`   | `id`, `owner_id`, `list_id`, `parent_id`, `position`, `deleted_at`, `seq`, `created_at`, `reminder_sent_at`, and mirrors `due_date`, `due_time`, `completed_at` | `title`, `notes`, `starred`, `dueDate`, `dueTime`, `seriesId`, `completedAt`, `reviewedAt`, `dismissedOn` |
+| `series` | `id`, `owner_id`, `list_id`, `deleted_at`, `seq`, `created_at`                                                                                                  | `rule`, `anchor`                                                                                          |
 
 - **The mirrors exist only for the reminder job.** The server copies them from `fields` when it can read them, and they are null on a personal-key account. They stay readable under the operator key (§9.5).
 - **`CHECK`s on content are gone,** since the server cannot always read it. Validators hold those rules (§8.2).
 - **The partial index for the reminder job:** open tasks with a time and no reminder sent. Others follow the queries: rows by account and `seq`, for pull.
 
-| Other table | Holds |
-| --- | --- |
-| `account_settings` | `account_id` (primary key), `seq`, `time_zone`, `first_day_of_week`, `theme`, `reminders`, `email_reminders`, `morning_time`, `last_digest_on`, `encryption` (`none`, `moving`, `personal`), `recipient` (the age public key) |
-| `list_key` | `list_id`, `account_id`, `wrapped` (an age file), `seq` |
-| `applied_mutation` | `id`, `account_id`, when (§8.7) |
-| `tombstone` | `id`, `table`, `account_id`, `seq`, when (§8.7) |
-| `notification` | `id`, `account_id`, `kind`, `title`, `body`, `url`, `read_at`, `seq`, `created_at`, and channels still to try |
-| `push_subscription` | `id`, `account_id`, `endpoint`, `p256dh`, `auth`, `created_at` |
-| `reminder_slot` | `id`, `account_id`, `at`, `claimed_at` (§17.5) |
+| Other table         | Holds                                                                                                                                                                                                                                           |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `account_settings`  | `account_id` (primary key), `seq`, `time_zone`, `first_day_of_week`, `theme`, `reminders`, `email_reminders`, `morning_time`, `last_digest_on`, `encryption` (`none`, `moving`, `personal`), `recipient` (the age public key)                   |
+| `list_key`          | `list_id`, `account_id`, `wrapped` (an age file), `seq`                                                                                                                                                                                         |
+| `applied_mutation`  | `id`, `account_id`, when (§8.7)                                                                                                                                                                                                                 |
+| `tombstone`         | `id`, `table`, `account_id`, `seq`, when (§8.7)                                                                                                                                                                                                 |
+| `notification`      | `id`, `account_id`, `kind`, `title`, `body`, `url`, `read_at`, `seq`, `created_at`, and channels still to try                                                                                                                                   |
+| `push_subscription` | `id`, `account_id`, `endpoint`, `p256dh`, `auth`, `created_at`                                                                                                                                                                                  |
+| `reminder_slot`     | `id`, `account_id`, `at`, `claimed_at` (§17.5)                                                                                                                                                                                                  |
 | `backup_connection` | `account_id` (primary key), `kind` (`token` or `app`), `repository`, `branch`, `credential_id`, `mode`, `frequency`, `next_backup_at`, `last_backup_at`, `last_backup_path`, `last_seq`, `failure_kind`, `failures`, `stopped_at`, `created_at` |
-| `credential` | As Fjord's: `id`, `purpose`, `kek_id`, `wrapped_key`, `ciphertext`, `created_at`, `rewrapped_at` |
-| `rate_bucket` | As Fjord's: a key, when the window began, a count. Sync, Back up now, core's notices and their replay |
+| `credential`        | As Fjord's: `id`, `purpose`, `kek_id`, `wrapped_key`, `ciphertext`, `created_at`, `rewrapped_at`                                                                                                                                                |
+| `rate_bucket`       | As Fjord's: a key, when the window began, a count. Sync, Back up now, core's notices and their replay                                                                                                                                           |
 
 **The browser's store** holds the same three synced tables, with their fields decrypted in memory only when read, plus the outbox, the cursor, keys if encrypted, and what the app remembers on this device.
 
@@ -852,49 +890,49 @@ None at present. New ones go here, each with a recommendation, until they are de
 
 ## 25. Decision log
 
-| Decision | Why | Rejected |
-| --- | --- | --- |
-| An app of the suite exactly like Fjord: runs alone or hosted (2026-11-05) | The owner's direction | Hosted only, as the scaffold makes it |
-| Auth identical to Fjord: better-auth, local and Sovereign, linking by `sub` from a session | The owner's direction; one set of rules across the suite | The SDK's `nextAuth`, which needs a core |
-| sqld, a file or PostgreSQL, through Drizzle, as Fjord (2026-11-05) | The owner's direction; running alone wants SQLite | PostgreSQL only, which this design first proposed |
-| Offline-first from the first screen, in the MVP (2026-11-05) | The owner's direction: sync and conflicts in the background with no effect on the experience. Retrofitting it would be close to a rewrite | Server actions and a client cache, which this design first proposed; offline as a later release |
-| Browser actions produce field-level changes; the server checks structure and stamps order, rather than running the same logic | It is the only form that also works on ciphertext, and it unifies the modes | The same operations run on both sides, which an encrypted account cannot do |
-| Later arrival wins per field, an edit restores a delete, and nothing asks | The owner's direction: no conflict UI. Fields are small, so overwrites are rare | CRDTs for text, far more than notes need; conflict dialogs |
-| Our own small sync, not a library | It has to work over sqld, a file and PostgreSQL, on ciphertext, with AGPL-compatible parts, and it is small given §8.2 | Replicache, PowerSync, ElectricSQL |
-| Opt-in personal key, wrapping per-list keys that encrypt fields (2026-11-05) | The owner's direction: the operator cannot read it. Per-list keys leave sharing possible | age per field (too large); one key for everything (no way to share) |
-| Personal key at sign-up or later, one way | Keeps the states simple; going back is export and a new account | Sign-up only; on and off at will |
-| Unlocked once per device, until sign-out | The owner's direction: no felt difference. Offline and Push titles need it | Fjord's passphrase and idle lock |
-| Times only for reminders on an encrypted account | The closest to "everything encrypted" that still reminds | Readable due dates; no reminders |
-| An `.env` operator key, which disables personal keys (2026-11-05) | The owner's direction. Built as field encryption, the only way alike on three forms | Dropping it, which was recommended, since the operator can read regardless; having both at once |
-| The app's own bell, Web Push and email, each switchable, and core's bell when hosted (2026-11-05) | The owner's direction; works on a server running alone | Core's bell only |
-| Mobile opens on Today on fresh opens, with exceptions (2026-11-05) | The owner's direction, without interrupting a quick switch of apps or a link to a task | Every time the app comes to the foreground |
-| Cards: up done, down cancel, left dismiss, right star, alike in Today and Review (2026-11-05) | The owner's direction. One set of gestures to learn | Snooze by moving the date and "keep for today", which this design first took from the plugin; different swipes in each |
-| Cancel deletes with Undo, and on a repeating task skips this occurrence (2026-11-05) | The owner's direction. Nothing else needs a "cancelled" state | A kept "cancelled" status |
-| Dismiss hides a task from Today until tomorrow, by a `dismissedOn` field, with its date and status untouched, and an Undo (2026-11-05) | The owner's direction. It needs no clearing and syncs like any field | Until Today is next opened; moving the due date; a "dismissed until" time of day |
-| Dismiss affects only Today: reminders and the brief still count the task, and it shows in its list, Starred and search (2026-11-05) | It is still due, and a person should still be told | Keeping a dismissed task quiet for the day |
-| In Review, a left swipe only marks a task reviewed, and does not hide it from Today (2026-11-05) | Review goes through everything; hiding things from Today would be a surprising side effect | The same effect as Today's Dismiss |
-| A next occurrence and an export carry no dismissal (2026-11-05) | It belongs to one task on one day | Copying it |
-| Google Tasks import and the last Friday of the month wait for phase 3 (2026-11-05) | Neither is needed to replace the plugin; the rule format already allows the second | Doing them in the MVP |
-| No snooze that moves a date, and so no `occurs_on` | A task's date is its schedule, since Dismiss leaves it alone. Date edits move the series | A separate scheduled date |
-| Review orders by `reviewed_at`, with entry from the switcher, the sidebar and a list's menu | It can be stopped and resumed. Entry points are visible, not a hidden gesture | Long-pressing a footer button |
-| One Settings, from the avatar | The owner's direction; one place to look | Separate account and settings pages |
-| A desktop of two rows and three columns, at Shopper's dimensions | The owner's direction | The plugin's full-height columns |
-| Recurring edits apply to that occurrence and later ones, with no prompt and no new row (2026-11-05) | The owner's direction, and what the model can honestly do | The plugin's three-way prompt; real future rows |
-| Subtasks are copied to the next occurrence, unticked (2026-11-05) | A repeating checklist is the natural use | Starting the next with none, as the plugin did |
-| Kanban, Visualizer and `tasks_views` dropped (2026-11-05) | Never built, and Kanban is its own product | Reserving a table for them |
-| One JSON file is the whole of portability (2026-11-05) | The owner's direction | An operator's bulk migration from the plugin |
-| Backup is a person's own, opt-in, to their own private repository, as a new timestamped file (2026-11-05) | The owner's direction; the file is the export, so needs no tool to read | Overwriting one file; a backup format of its own; allowing public repositories |
-| A Fjord repository works as is, with no integration | The folder is valid in Fjord's format, and the apps stay independent | Reusing Fjord's stored connection |
-| Backup names are in UTC | They sort correctly through time zones and daylight saving | The account's local time |
-| Auto backup commits only when something changed | A quiet account should not fill a repository with identical files | A commit on every tick |
-| Owner named in the statement, with `owner_id` on every row | Closes the plugin's id-only writes for good, and can be tested | A separate ownership check first; joining to the list |
-| Fractional positions, through `fractional-indexing` (CC0) | One row per move; survives offline devices | Integers with rewrite, as the plugin; integers with gaps and rebalancing |
-| `series` table with `anchor` | Lateness stops corrupting the schedule; the rule is in one place | The rule copied to every row, anchored on the current due date |
-| One function for today, with the browser's zone in the browser and the stored one in jobs | Removes the plugin's three | Deciding by the server's clock |
-| Undo through `deleted_at`, on tasks and lists, purged in seven days | A swipe must not be able to lose something; no trash to design | Hard delete with confirmations (a swipe can't stop to ask); a real trash (more than this app is) |
-| One route tree, forking only what is rendered | Sovereign's rule; ends the double mount and two data paths | Two trees by `matchMedia` |
-| Task data in IndexedDB, never in the service worker's cache, deleted at sign-out | Offline needs it on the device; keeping it out of the cache holds Sovereign's worker rule | The plugin's cache with no wipe of its own; nothing on the device, which this design first proposed |
-| PWA modelled on Sovereign core | Fjord has no manifest or worker to follow | — |
-| Claim and write the notification in one transaction, then fan out | The bell never misses one; a failed channel can retry | Claim then send (loses it on failure); send then claim (doubles it) |
-| Jobs in the web process | As Fjord decided: one image, one entry point; claims make replicas safe | A separate worker image; an external cron |
-| Own file format, reading the plugin's | People on the plugin need a way across; the plugin's envelope names an id that no longer means anything | Keeping the plugin's envelope |
+| Decision                                                                                                                               | Why                                                                                                                                       | Rejected                                                                                                               |
+| -------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| An app of the suite exactly like Fjord: runs alone or hosted (2026-11-05)                                                              | The owner's direction                                                                                                                     | Hosted only, as the scaffold makes it                                                                                  |
+| Auth identical to Fjord: better-auth, local and Sovereign, linking by `sub` from a session                                             | The owner's direction; one set of rules across the suite                                                                                  | The SDK's `nextAuth`, which needs a core                                                                               |
+| sqld, a file or PostgreSQL, through Drizzle, as Fjord (2026-11-05)                                                                     | The owner's direction; running alone wants SQLite                                                                                         | PostgreSQL only, which this design first proposed                                                                      |
+| Offline-first from the first screen, in the MVP (2026-11-05)                                                                           | The owner's direction: sync and conflicts in the background with no effect on the experience. Retrofitting it would be close to a rewrite | Server actions and a client cache, which this design first proposed; offline as a later release                        |
+| Browser actions produce field-level changes; the server checks structure and stamps order, rather than running the same logic          | It is the only form that also works on ciphertext, and it unifies the modes                                                               | The same operations run on both sides, which an encrypted account cannot do                                            |
+| Later arrival wins per field, an edit restores a delete, and nothing asks                                                              | The owner's direction: no conflict UI. Fields are small, so overwrites are rare                                                           | CRDTs for text, far more than notes need; conflict dialogs                                                             |
+| Our own small sync, not a library                                                                                                      | It has to work over sqld, a file and PostgreSQL, on ciphertext, with AGPL-compatible parts, and it is small given §8.2                    | Replicache, PowerSync, ElectricSQL                                                                                     |
+| Opt-in personal key, wrapping per-list keys that encrypt fields (2026-11-05)                                                           | The owner's direction: the operator cannot read it. Per-list keys leave sharing possible                                                  | age per field (too large); one key for everything (no way to share)                                                    |
+| Personal key at sign-up or later, one way                                                                                              | Keeps the states simple; going back is export and a new account                                                                           | Sign-up only; on and off at will                                                                                       |
+| Unlocked once per device, until sign-out                                                                                               | The owner's direction: no felt difference. Offline and Push titles need it                                                                | Fjord's passphrase and idle lock                                                                                       |
+| Times only for reminders on an encrypted account                                                                                       | The closest to "everything encrypted" that still reminds                                                                                  | Readable due dates; no reminders                                                                                       |
+| An `.env` operator key, which disables personal keys (2026-11-05)                                                                      | The owner's direction. Built as field encryption, the only way alike on three forms                                                       | Dropping it, which was recommended, since the operator can read regardless; having both at once                        |
+| The app's own bell, Web Push and email, each switchable, and core's bell when hosted (2026-11-05)                                      | The owner's direction; works on a server running alone                                                                                    | Core's bell only                                                                                                       |
+| Mobile opens on Today on fresh opens, with exceptions (2026-11-05)                                                                     | The owner's direction, without interrupting a quick switch of apps or a link to a task                                                    | Every time the app comes to the foreground                                                                             |
+| Cards: up done, down cancel, left dismiss, right star, alike in Today and Review (2026-11-05)                                          | The owner's direction. One set of gestures to learn                                                                                       | Snooze by moving the date and "keep for today", which this design first took from the plugin; different swipes in each |
+| Cancel deletes with Undo, and on a repeating task skips this occurrence (2026-11-05)                                                   | The owner's direction. Nothing else needs a "cancelled" state                                                                             | A kept "cancelled" status                                                                                              |
+| Dismiss hides a task from Today until tomorrow, by a `dismissedOn` field, with its date and status untouched, and an Undo (2026-11-05) | The owner's direction. It needs no clearing and syncs like any field                                                                      | Until Today is next opened; moving the due date; a "dismissed until" time of day                                       |
+| Dismiss affects only Today: reminders and the brief still count the task, and it shows in its list, Starred and search (2026-11-05)    | It is still due, and a person should still be told                                                                                        | Keeping a dismissed task quiet for the day                                                                             |
+| In Review, a left swipe only marks a task reviewed, and does not hide it from Today (2026-11-05)                                       | Review goes through everything; hiding things from Today would be a surprising side effect                                                | The same effect as Today's Dismiss                                                                                     |
+| A next occurrence and an export carry no dismissal (2026-11-05)                                                                        | It belongs to one task on one day                                                                                                         | Copying it                                                                                                             |
+| Google Tasks import and the last Friday of the month wait for phase 3 (2026-11-05)                                                     | Neither is needed to replace the plugin; the rule format already allows the second                                                        | Doing them in the MVP                                                                                                  |
+| No snooze that moves a date, and so no `occurs_on`                                                                                     | A task's date is its schedule, since Dismiss leaves it alone. Date edits move the series                                                  | A separate scheduled date                                                                                              |
+| Review orders by `reviewed_at`, with entry from the switcher, the sidebar and a list's menu                                            | It can be stopped and resumed. Entry points are visible, not a hidden gesture                                                             | Long-pressing a footer button                                                                                          |
+| One Settings, from the avatar                                                                                                          | The owner's direction; one place to look                                                                                                  | Separate account and settings pages                                                                                    |
+| A desktop of two rows and three columns, at Shopper's dimensions                                                                       | The owner's direction                                                                                                                     | The plugin's full-height columns                                                                                       |
+| Recurring edits apply to that occurrence and later ones, with no prompt and no new row (2026-11-05)                                    | The owner's direction, and what the model can honestly do                                                                                 | The plugin's three-way prompt; real future rows                                                                        |
+| Subtasks are copied to the next occurrence, unticked (2026-11-05)                                                                      | A repeating checklist is the natural use                                                                                                  | Starting the next with none, as the plugin did                                                                         |
+| Kanban, Visualizer and `tasks_views` dropped (2026-11-05)                                                                              | Never built, and Kanban is its own product                                                                                                | Reserving a table for them                                                                                             |
+| One JSON file is the whole of portability (2026-11-05)                                                                                 | The owner's direction                                                                                                                     | An operator's bulk migration from the plugin                                                                           |
+| Backup is a person's own, opt-in, to their own private repository, as a new timestamped file (2026-11-05)                              | The owner's direction; the file is the export, so needs no tool to read                                                                   | Overwriting one file; a backup format of its own; allowing public repositories                                         |
+| A Fjord repository works as is, with no integration                                                                                    | The folder is valid in Fjord's format, and the apps stay independent                                                                      | Reusing Fjord's stored connection                                                                                      |
+| Backup names are in UTC                                                                                                                | They sort correctly through time zones and daylight saving                                                                                | The account's local time                                                                                               |
+| Auto backup commits only when something changed                                                                                        | A quiet account should not fill a repository with identical files                                                                         | A commit on every tick                                                                                                 |
+| Owner named in the statement, with `owner_id` on every row                                                                             | Closes the plugin's id-only writes for good, and can be tested                                                                            | A separate ownership check first; joining to the list                                                                  |
+| Fractional positions, through `fractional-indexing` (CC0)                                                                              | One row per move; survives offline devices                                                                                                | Integers with rewrite, as the plugin; integers with gaps and rebalancing                                               |
+| `series` table with `anchor`                                                                                                           | Lateness stops corrupting the schedule; the rule is in one place                                                                          | The rule copied to every row, anchored on the current due date                                                         |
+| One function for today, with the browser's zone in the browser and the stored one in jobs                                              | Removes the plugin's three                                                                                                                | Deciding by the server's clock                                                                                         |
+| Undo through `deleted_at`, on tasks and lists, purged in seven days                                                                    | A swipe must not be able to lose something; no trash to design                                                                            | Hard delete with confirmations (a swipe can't stop to ask); a real trash (more than this app is)                       |
+| One route tree, forking only what is rendered                                                                                          | Sovereign's rule; ends the double mount and two data paths                                                                                | Two trees by `matchMedia`                                                                                              |
+| Task data in IndexedDB, never in the service worker's cache, deleted at sign-out                                                       | Offline needs it on the device; keeping it out of the cache holds Sovereign's worker rule                                                 | The plugin's cache with no wipe of its own; nothing on the device, which this design first proposed                    |
+| PWA modelled on Sovereign core                                                                                                         | Fjord has no manifest or worker to follow                                                                                                 | —                                                                                                                      |
+| Claim and write the notification in one transaction, then fan out                                                                      | The bell never misses one; a failed channel can retry                                                                                     | Claim then send (loses it on failure); send then claim (doubles it)                                                    |
+| Jobs in the web process                                                                                                                | As Fjord decided: one image, one entry point; claims make replicas safe                                                                   | A separate worker image; an external cron                                                                              |
+| Own file format, reading the plugin's                                                                                                  | People on the plugin need a way across; the plugin's envelope names an id that no longer means anything                                   | Keeping the plugin's envelope                                                                                          |
