@@ -133,7 +133,7 @@ Turns the scaffold into a repository that can hold Tasks as `DESIGN.md` designs 
 
 **Accepts when:** `proxy.test.ts` asserts the headers on each return path; a page loads in a browser with no CSP violation in its console; an inline script with no nonce is refused.
 
-#### 📋 1.8 — Design system boundary and shell
+#### ✅ 1.8 — Design system boundary and shell
 
 **Goal:** the header every signed-in page sits under, and the pages for what goes wrong.
 
@@ -147,6 +147,8 @@ Turns the scaffold into a repository that can hold Tasks as `DESIGN.md` designs 
 - `app/not-found.tsx`, `app/error.tsx`, `app/loading.tsx`, each with a way back.
 
 **Accepts when:** a placeholder page renders inside the shell on the server, in light and dark, and at 375px; a literal colour fails `sovereign`'s token check, adopted here as a test.
+
+**Done as:** `src/ui/index.ts` is the `'use client'` re-export of `@sovereignfs/ui` (only what is used, and `@dnd-kit/*` is installed); `AppShell` is the header row, with the `BrandBadge` mark and the name at the left and the bell and the account menu as slots at the right, over a main area that does not scroll itself. The design system's `Header` was not used: it requires an app launcher, which an app has no use for, and its `MobileHeader` never stretches past 768px; both are noted in `AppShell`'s comment as worth offering to `@sovereignfs/ui`. The typeface is not loaded through `next/font/google` as the epic said: `@sovereignfs/ui` 0.91 ships Hanken Grotesk and its tokens load it from the app's own origin, which the build bundled into `.next/static/media`. `src/theme` sets `data-theme` before first paint from `tasks.theme` or the system's scheme, and follows the system; its script is run in a test against a stand-in page. `not-found.tsx`, `error.tsx` and `loading.tsx` each give a way back, and `error.tsx` never shows the error. `src/ui/design-tokens.ts` is Sovereign's token check as a test over the app's own CSS (an undefined token, a literal colour, a typeface of its own), seen to fail on a planted `#fff`. Looked at in a browser, from the built server: the shell and the 404 page, light at desktop width and dark at 375px, no horizontal overflow, a 56px header, Hanken Grotesk. Not seen: `error.tsx` and `loading.tsx`, which have no test beyond compiling. The theme script is inline without a nonce until 1.7 gives it one.
 
 #### 📋 1.9 — Browser tests
 
