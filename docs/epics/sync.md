@@ -2,15 +2,17 @@
 
 ## Status
 
-📋 Planned
+⏳ In progress: 13.1 to 13.4 and 13.7 are done; convergence tests (13.5) and working offline (13.6) are left.
 
 ## Overview
 
-The data path every screen stands on: the UI reads and writes a local store, and changes sync in the background, with conflicts resolved by rule and nothing asked of the person. It comes before Lists, because retrofitting it would be close to a rewrite. The field envelope that encryption needs (epic 14) is part of it from the first task, so that the data model never needs migrating for it.
+The data path the Desk stands on: the UI reads and writes a local store, and changes sync in the background, with conflicts resolved by rule and nothing
+asked of the person. The field envelope that encryption needs (epic 14) is part of it from the first task. Boards are online in phase 1 and come under
+sync in phase 2 (`DESIGN.md` §25.4); nothing here covers them. 15.2 renames its tables to the Desk's.
 
 ## Related
 
-[`DESIGN.md`](../../DESIGN.md) §8, §22.3
+[`DESIGN.md`](../../DESIGN.md) §8, §23.3
 
 ## Tasks
 
@@ -18,7 +20,7 @@ The data path every screen stands on: the UI reads and writes a local store, and
 
 **Goal:** one definition of what a device may send, shared by browser and server.
 
-**Design:** §8.2, §22.3. **Depends on:** 3.1.
+**Design:** §8.2, §23.3. **Depends on:** 3.1.
 
 **Technical:**
 
@@ -35,7 +37,7 @@ The data path every screen stands on: the UI reads and writes a local store, and
 
 **Goal:** `POST /api/sync` applies changes safely, and returns what changed.
 
-**Design:** §7, §8.3, §8.4. **Depends on:** 13.1.
+**Design:** §7.1, §8.3, §8.4. **Depends on:** 13.1.
 
 **Technical:**
 
@@ -80,34 +82,39 @@ The data path every screen stands on: the UI reads and writes a local store, and
 
 **Done as:** a device with nothing asks for a first page of 100 (`FIRST_PAGE`) so that something can be drawn at once, then pages of the usual size, up to 200 rounds, and each page is in the copy and announced before the next is asked for; `useHasSynced` says whether this device has ever heard from the server, so a screen can say it is loading for a new device and never for one that has synced. `SyncProvider` asks the browser to keep the copy (`navigator.storage.persist()`, once, quietly if refused) and now mounts on the signed-in home page. **Signing out is `leaveDevice`** (`src/sync/signout.ts`, behind the menu's _Sign out_): it syncs, and if changes are still unsent it asks with how many (`Stay signed in` or `Sign out anyway`); it then ends the session on the server, announces to the other tabs, and deletes the account's database. The order differs from the epic's, which deleted the copy and then signed out: a sign-out that cannot reach the server now changes **nothing** and says so (`You are offline`, with _Try again_), because deleting first would leave a session open with no data on the screen of whoever sits down next, and a failed sign-out is better than that. The other tabs of the account are told to go to the front page, and `openLocal` closes its connection when another tab deletes the database (`blocking`), so deleting finishes at once and not when the last tab is closed; a test with a second connection open hangs without it. **A session that ended** (`401`) stops the loop, unmounts the app and shows _Your session ended_ with a sign-in link, so no data is shown; the copy and its outbox stay, and signing back in as the same account finds them (seen in a browser), while a different account has a database of its own. **A device that is too old** (`426`) keeps working and shows a bar to reload, its outbox kept. **An account that was deleted** (`410`) deletes the copy and goes to the front page; the client side is done and tested, but the server cannot say it until `People.deletePerson` exists (2.8), so for now such a device sees `401`, and 2.8 owns making `/api/sync` answer `410` for an account it has deleted. 18 more tests in `src/sync` and `src/local` (the order of leaving, asking, offline, only this account's database, a tab that has it open, the transport's every status, persistence, the new outcome), and two browser tests in Chromium and WebKit: after signing out `indexedDB.databases()` has nothing for the account, and after the cookie is gone the next sync replaces the page with sign-in and keeps the database. Seen to fail: the session ended after the copy was deleted, a tab that does not let go, and no question about unsent changes. Not as the epic said: "first list first" is a small first page and not an order, since pages come in `seq` order and a list is among the first rows an account made; and a page of a snapshot is shown as it arrives, but the two seconds a first load of a large account takes are not measured. Not done: the Background Sync API and the service worker's update (1.11), and the screens that show a loading state for a new device (7.1).
 
-#### 📋 13.5 — Convergence tests
-
-**Goal:** proof that devices end up the same, whatever happens.
-
-**Design:** §8.4, §23 Testing. **Depends on:** 13.3, 13.2, 3.5, 5.2.
-
-**Technical:** `src/sync/simulate.test.ts`: several simulated devices against one real server per database, each making random offline actions from `src/actions/`, syncing in random orders, with lost answers and duplicate sends. After everyone syncs, all states are identical. The table of §8.4 has one named case per row. Failing seeds are printed and pinned as fixtures. Run with more seeds nightly.
-
-**Accepts when:** thousands of random runs converge on all three databases; each row of §8.4's table has a test seen to fail with its rule removed.
-
-#### 📋 13.6 — Working offline
-
-**Goal:** the whole task experience with the network off.
-
-**Design:** §8.6. **Depends on:** 1.11, 13.4.
-
-**Technical:** Playwright with the context offline, Chromium and WebKit: load, read, add, edit, complete, reorder, go online, and find it on a second browser context. Settings actions say they need a network, and nothing else does. Background Sync registered where available. The iOS Simulator by hand, stated in the PR. User documentation of §8.6.
-
-**Accepts when:** a browser offline from the start of the page load does every task action; on reconnecting, a second device sees them; no action shows an error for being offline.
-
 #### ✅ 13.7 — Keeping the history small
 
 **Goal:** purges that don't strand a device.
 
-**Design:** §8.7, §11.5. **Depends on:** 1.6, 13.2.
+**Design:** §8.7, §10.6. **Depends on:** 1.6, 13.2.
 
 **Technical:** a `purge` job: rows deleted over seven days ago become `tombstone`s, with their subtasks and any series with no occurrence left; tombstones and `applied_mutation` over 90 days old go. A cursor older than the oldest tombstone gets `410`: the device sends its outbox and takes a fresh snapshot.
 
 **Accepts when:** a device offline for 8 days learns of a purge; one offline for 91 days recovers through a snapshot, sending its edits first; the job purges at seven days and not before.
 
 **Done as:** `src/sync/purge.ts`, run **hourly** by a job registered in `src/jobs/index.ts` (the first real job), removes rows deleted **more than seven days ago** and gives each a tombstone with one new `seq` for the whole run of that account, so a pull finds them. What goes with a row: a deleted **list** takes its tasks, their subtasks and its series (deleting a list marks only the list, 3.3); a deleted **task** takes its subtasks, and a subtask deleted on its own goes alone; a deleted **series** goes alone, since a recurring task's occurrences are tasks that are deleted or not on their own (the epic's "any series with no occurrence left" is therefore only what 5.5 will mark deleted when the last occurrence is). Each account's purge is one transaction that takes the account's counter first, as a mutation does, and decides what is due **after** that, so a row restored in between is not removed, a run in two places at once removes each row once and writes one tombstone for it (tested with three at once), and a second run finds nothing. A run does at most 2,000 rows of an account at a time. Tombstones and the record of applied mutations go **after ninety days** (counted from the purge, for a tombstone), and the highest `seq` of a tombstone removed for age is kept per account in the new `account_settings.pruned_through`. **A cursor behind it gets `410` `SNAPSHOT_REQUIRED`**, checked before anything of the request is applied; the epic said "older than the oldest tombstone", and a floor that is remembered is exact where the oldest surviving tombstone is not, since it cannot tell a tombstone that was never made from one that was removed. The device (`startSnapshot`) puts its cursor at zero and remembers a token, keeps showing what it has, and **sends its outbox with the snapshot's first request**, which from cursor zero is let through; each row the server sends is tagged, and **when the last page is in, a row that was not sent is removed** unless it has an edit waiting (the server refuses that edit if the row is truly gone, and it is undone), and the tag is stripped, so the rows are exactly the server's. A `410` is read by its body (`SNAPSHOT_REQUIRED`, or `ACCOUNT_DELETED`, which 13.4 had read from a bare 410): **a 410 that says neither is an error, never the answer that deletes the device's copy.** Tests: 8 for the purge (at six days, twenty-three hours and not before, and at seven days and a second; restored rows left; what goes with what; the new `seq` and the pull that finds it; twice and for another account; three at once; tombstones at eighty-nine and ninety-one days; the record of a mutation), 2 at the endpoint (410, nothing applied, from zero and past the floor), 2 at the store (a snapshot over pages, and a row with an edit waiting), 3 devices against the real server on each database: **offline eight days learns of a purge** and the row goes, and **offline ninety-one days sends its edits first, takes a snapshot, and ends identical to the other device**. **A fault found on the way, which the earlier tasks had:** on a file database a statement outside a transaction waited for SQLite's lock on the one thread while a transaction in the same process awaited something else, which stopped the transaction from finishing (`SQLITE_BUSY` after the timeout); every statement of a file that is not in a transaction now takes its turn behind the transactions, as they do behind each other, and the transaction's own statements, marked on its handle, do not. Not done: a test in a browser of a device that is ninety-one days old, which needs a clock the browser tests do not have.
+
+#### 📋 13.5 — Convergence tests
+
+**Goal:** proof that devices end up the same, whatever happens.
+
+**Design:** §8.4, §24 Testing. **Depends on:** 3.13, 5.2.
+
+**Technical:** `src/sync/simulate.test.ts`: several simulated devices against one real server per database, each making random offline actions from
+`src/actions/` (cards, checklist items, status, moves, repeats), syncing in random orders, with lost answers and duplicate sends. After everyone syncs,
+all states are identical. The table of §8.4 has one named case per row. Failing seeds are printed and pinned as fixtures. Run with more seeds nightly.
+
+**Accepts when:** thousands of random runs converge on all three databases; each row of §8.4's table has a test seen to fail with its rule removed.
+
+#### 📋 13.6 — Working offline
+
+**Goal:** the whole Desk with the network off, and everything else saying it needs one.
+
+**Design:** §8.6. **Depends on:** 1.11, 13.4.
+
+**Technical:** Playwright with the context offline, Chromium and WebKit: load, read, add, edit, complete, mark in progress, reorder, go online, and find it
+on a second browser context. Boards, the boards index, the Inbox and Settings actions say they need a network, and nothing on the Desk does. Background
+Sync registered where available. The iOS Simulator by hand, stated in the PR. User documentation of §8.6.
+
+**Accepts when:** a browser offline from the start of the page load does every Desk action; on reconnecting, a second device sees them; no Desk action
+shows an error for being offline; a board shows what it had, read-only, with a line saying why.

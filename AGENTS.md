@@ -11,14 +11,16 @@ which.
 
 ## What this is
 
-**Tasks**, an app of the Sovereign suite exactly as Fjord is: a private task manager that a Sovereign instance can host and that also runs fully
-self-hosted, needing no instance. It is a rewrite of the Sovereign tasks plugin (`sovereignfs/sovereign-plugin-tasks`, the legacy plugin
-system). It is an offline-first PWA on Next.js, with its own database (sqld, a SQLite file or PostgreSQL), signing people in locally, through a Sovereign core, or
-both, from one image. **`clients/web` in `sovereignfs/fjord` is the model:** its `DESIGN.md` §6 for authentication and §14 for the database, and its
-`CLAUDE.md` for how it is built. The repository still holds the scaffold of `npm create @sovereignfs app`, which `DESIGN.md` §5.2 says what happens to.
+**Tusk**, an app of the Sovereign suite exactly as Fjord is: one app for a person's own work and the work they share. **The Desk** is private and
+offline-first, as plain as Google Tasks; **workspaces** hold shared kanban boards of lists and cards. A Sovereign instance can host it, and it also runs
+fully self-hosted, needing no instance. It replaces two legacy plugins, `sovereignfs/sovereign-plugin-tasks` and `sovereignfs/sovereign-plugin-kanban`.
+It is a PWA on Next.js, with its own database (sqld, a SQLite file or PostgreSQL), signing people in locally, through a Sovereign core, or both, from one
+image. **`clients/web` in `sovereignfs/fjord` is the model:** its `DESIGN.md` §6 for authentication and §14 for the database, and its `CLAUDE.md` for
+how it is built.
 
-The plugin's behaviour is the starting point, not a specification, and none of its code is carried over. `DESIGN.md` says what is kept, what
-changes and why; it is a draft, and nothing in it is built yet.
+It was built first as **Tasks**, a task manager alone, and became Tusk on 2026-11-06 (`DESIGN.md` §5.2, §27). **The code still says Tasks** (the
+`TASKS_` settings, `tasks` databases, lists and tasks) until the turn's tasks rename it (15.1, 15.2); the rules below name what it becomes. The plugins'
+behaviour is the starting point, not a specification, and none of their code is carried over.
 
 ## Source of truth
 
@@ -28,7 +30,7 @@ Read the relevant document before a task. Where two disagree, the earlier one wi
    instance gives it), `contracts/env.md`, `docs/using-the-sdk.md` and `docs/specs/sdk.md` (`@sovereignfs/sdk`),
    `docs/specs/design-system.md` and `docs/design-system.md` (`@sovereignfs/ui`), `docs/connecting-an-app.md`. When hosted, or signing in through a
    core, this app conforms to them; it never works around one. A gap is raised in `sovereign`, not patched here.
-2. **`DESIGN.md`**: what Tasks is and how it is built, with numbered sections that tasks cite.
+2. **`DESIGN.md`**: what Tusk is and how it is built, with numbered sections that tasks cite.
 3. **`ROADMAP.md`**: the order of work, one row per task, canonical for status.
 4. **`docs/epics/`**: each task's detail (goal, "Accepts when", and once done, how it was done and what was left out).
 
@@ -88,35 +90,38 @@ The ones most likely to be broken by accident. Each comes from `sovereign`'s con
   matched to an account by email at sign-in: it is linked only from a signed-in session, and only when the address is the account's own.
 - **Everything of a person is deleted by `People.deletePerson`** (`src/sovereign/people.ts`), which must be safe to run twice. **A new table that holds
   something of a person is deleted there in the same change**, with a test that seeds one of each.
-- **The UI reads and writes only the local store** (`DESIGN.md` §8). No screen waits on the network or calls the server for task data, and no server action changes one. A user action is a pure
-  function in `src/actions/` producing changes, which `commit` writes to IndexedDB and the outbox together. Nothing in the UI may depend on a sync having happened, and no conflict is ever shown to a person.
-- **The server trusts nothing a device says about ownership.** `POST /api/sync` is the door nearly every write comes through. A row of a person is written with the owner in the same statement
-  (`eq(task.id, id), eq(task.ownerId, accountId)`), never checked beforehand and then touched, and anything a change points at must be the account's too. A route finds the session first, and one that
-  changes something checks `Origin`. A new route is listed in `src/access/routes.ts` and has a test of who may call it, or it is not done.
-- **The server cannot assume it can read a field.** On a personal-key account all content is ciphertext, so server logic uses structural columns only, or says what it does when it can't read (`DESIGN.md` §9). Content rules
-  are validators shared with the browser. **A plain field never reaches the server for such an account, and a title never reaches a log for any.** Personal keys and the operator key are mutually exclusive.
-- **Task data is never in the service worker's cache.** The worker caches only the shell, by allow-list. Data is in IndexedDB, per account, deleted at sign-out.
-- **A new kind of change passes the convergence suite** (`src/sync/simulate.test.ts`), with several offline devices ending in one state.
-- **The database has three forms and two dialects** (`DESIGN.md` §22): a schema and migrations per dialect, generated with `pnpm db:generate` and never written
+- **The Desk's UI reads and writes only the local store** (`DESIGN.md` §8). No Desk screen waits on the network or calls the server for its data, and no server action changes it. A user action is a
+  pure function in `src/actions/` producing changes, which `commit` writes to IndexedDB and the outbox together. Nothing in the UI may depend on a sync having happened, and no conflict is ever shown to a person.
+- **Every workspace write is an operation through `POST /api/ops`** (`DESIGN.md` §7.3), applied in one transaction with its activity and notices; no other route or server action writes a workspace
+  row. A board's screen applies an operation at once and undoes it on a refusal (§14.7).
+- **The permission is in the statement.** On the Desk, the owner (`eq(deskCard.id, id), eq(deskCard.ownerId, accountId)`); on a board, membership as a subquery (`DESIGN.md` §7.1). Never checked beforehand
+  and then touched, and anything a change points at must be the account's, or the board's, too. **A refusal reads as not found.** A route finds the session first, and one that changes something checks
+  `Origin`. A new route is listed in `src/access/routes.ts` and has a test of who may call it, and a new operation or read has its row in the role matrix (`DESIGN.md` §24 Testing), or it is not done.
+- **The server cannot assume it can read a Desk field.** On a personal-key Desk all content is ciphertext, so server logic uses structural columns only, or says what it does when it can't read
+  (`DESIGN.md` §9). Content rules are validators shared with the browser. **A plain field never reaches the server for such an account, and no title, description or comment reaches a log for any.**
+  Personal keys cover the Desk only; they and the operator key are mutually exclusive.
+- **No data is ever in the service worker's cache.** The worker caches only the shell, by allow-list. The Desk is in IndexedDB, per account, deleted at sign-out; boards are in memory.
+- **A new kind of Desk change passes the convergence suite** (`src/sync/simulate.test.ts`), with several offline devices ending in one state.
+- **The database has three forms and two dialects** (`DESIGN.md` §23): a schema and migrations per dialect, generated with `pnpm db:generate` and never written
   by hand or `push`ed; one representation per type, through the column vocabulary; standard SQL, values bound and never interpolated; no `LISTEN/NOTIFY`, trigger,
   extension or foreign key; short transactions, nothing held across a call to GitHub or core. A data-layer test runs on sqld, a `file:` database and PostgreSQL, so
-  one that passes on only one is not done. **Tests read `TASKS_TEST_*` and never the app's variables,** so `pnpm test` can never wipe a developer's data.
+  one that passes on only one is not done. **Tests read `TUSK_TEST_*` (`TASKS_TEST_*` until 15.1) and never the app's variables,** so `pnpm test` can never wipe a developer's data.
 - **A released migration is never edited:** a fix is a new migration, and a patch release has none.
-- **A credential is stored only through `src/crypto/`** (envelope encryption under `TASKS_ENCRYPTION_KEY`), never as text in a column. Tokens and secrets never appear
+- **A credential is stored only through `src/crypto/`** (envelope encryption under `TUSK_ENCRYPTION_KEY`), never as text in a column. Tokens and secrets never appear
   in an error, a log, a URL or the browser.
 - **A git host is reached only through `Provider`** (`src/providers/`), and the app is tested against `MemoryProvider`, not GitHub. A commit is never forced, and a write is
   never retried on a lost answer.
 - **The manifest is the one copy** (`sovereign.manifest.json`) of what an instance reads: the port, the scopes and the paths. `pnpm manifest:check` passes, and the image is built
   with the arguments `pnpm exec sovereign-manifest docker-args` prints from it.
-- **Environment variables carry the app's prefix, `TASKS_`,** named as `contracts/env.md` says. Every `process.env` read is declared in `.env.example`. The server refuses to start on a setting
+- **Environment variables carry the app's prefix, `TUSK_` (`TASKS_` until 15.1),** named as `contracts/env.md` says. Every `process.env` read is declared in `.env.example`. The server refuses to start on a setting
   that is wrong; no secret has a default. `NEXT_PUBLIC_*` is never used for a value that varies at run time (it is inlined at build time).
 - **The design system comes through `src/ui`.** `@sovereignfs/ui` is one bundle that uses React context, so a Server Component imports its parts from there (a `'use client'` re-export, which
-  still renders on the server). Style with the `--sv-*` tokens, never a literal colour, so dark mode and theming keep working. The typeface is Hanken Grotesk, never fetched from another site by the
+  still renders on the server). Style with the `--sv-*` tokens, never a literal colour, so dark mode and theming keep working; a colour a person picked (a board's, a label's) is data, drawn as a band or a dot with text on it by contrast, never a page's background. The typeface is Hanken Grotesk, never fetched from another site by the
   browser. Reusable UI belongs in `@sovereignfs/ui` in `sovereign`, not forked here. Take icon names and props from the package's types, not its README.
 - **Never fork a navigation decision by viewport;** fork only what is rendered.
 - **`@sovereignfs/ui` is pre-1.0 and is pinned exactly;** upgrade it on purpose. Dependencies are chosen, not accumulated. A dependency's licence must be compatible with AGPL-3.0-or-later,
   which is what bundling `@sovereignfs/ui` makes this app.
-- **No third-party loads and no third-party requests from the browser.** Task text is rendered as text, never as HTML.
+- **No third-party loads and no third-party requests from the browser.** What people write is rendered as text, never as HTML.
 - **Next.js tracks the latest stable release,** never a canary. Read the guide bundled with the installed version (`node_modules/next/dist/docs/`) before writing Next code: it is not the Next.js of
   anyone's memory. `next dev` writes its own block into this file; commit it with your work.
 - **TypeScript is strict.** No `any` without a comment saying why it cannot be avoided. Prefix an intentionally unused identifier with `_`; never disable a lint rule inline without a comment.
@@ -163,14 +168,14 @@ once they exist, this list is where they are written, and `verify` means all of 
 | Path                                                         | What                                                                                                                                                                                                                                                                                                                                                                                         |
 | ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `app/`                                                       | Routes and layouts (App Router): a placeholder page inside the shell, `/api/health`, and the pages for a missing or failed route                                                                                                                                                                                                                                                             |
-| `src/db/`                                                    | The database layer (`DESIGN.md` §22): `config.ts` (which form), `client.ts`, `provision.ts`, `migrate.ts`, `boot.ts` (brings it up at start), `exec.ts` (`dbGet`, `dbAll`, `dbRun`, `transaction`), `schema/{sqlite,postgres}/` with the column vocabulary in `columns.ts`, `test-support.ts` (reads `TASKS_TEST_*` only)                                                                    |
+| `src/db/`                                                    | The database layer (`DESIGN.md` §23): `config.ts` (which form), `client.ts`, `provision.ts`, `migrate.ts`, `boot.ts` (brings it up at start), `exec.ts` (`dbGet`, `dbAll`, `dbRun`, `transaction`), `schema/{sqlite,postgres}/` with the column vocabulary in `columns.ts`, `test-support.ts` (reads `TASKS_TEST_*` only)                                                                    |
 | `proxy.ts`, `src/security/`                                  | The Content-Security-Policy with a nonce per request, and the headers every response has. `next.config.ts` adds the static ones. The proxy keeps the Edge discipline: no Node built-ins, no database (`src/config/edge.ts` is what it reads of the settings)                                                                                                                                 |
 | `src/jobs/`                                                  | Background work in the web process: `runner.ts` (timers, no overlap, a failure logged by name and kind, stopped on SIGTERM), `claim.ts` (the one coordination between processes: a conditional update that says who won), `index.ts` (the list of jobs, which each task that has one adds to)                                                                                                |
 | `src/ui/`                                                    | The design system's client boundary (`index.ts`), `AppShell` (the header row and the main area), the app's own CSS check (`design-tokens.ts`), `dnd.ts` (what every drag-to-reorder shares); `src/theme/` sets `data-theme` before first paint; `src/site.ts` is the app's name                                                                                                              |
 | `src/landing/`                                               | The page at `/` for a visitor, from typed content, with no client code; `proxy.ts` sends `/` to `/home` for a request with a session cookie                                                                                                                                                                                                                                                  |
 | `app/(app)/`, `src/screens/`                                 | The signed-in area: the layout finds the session and mounts sync and the shell; `Frame` (three columns, the right one only while `?task=` is set), `Sidebar`, `TaskDetail`. Screens are client components over the working copy                                                                                                                                                              |
 | `src/actions/`, `src/lists/`                                 | What a person does, as pure functions that return a mutation (`lists.ts`), the list colours (`colors.ts`) and the sorts (`sort.ts`). A screen calls one and `commit`s the result                                                                                                                                                                                                             |
-| `src/position.ts`                                            | Order: a position that sorts between its neighbours (`fractional-indexing`), compared as bytes (`DESIGN.md` §11.3)                                                                                                                                                                                                                                                                           |
+| `src/position.ts`                                            | Order: a position that sorts between its neighbours (`fractional-indexing`), compared as bytes (`DESIGN.md` §10.4)                                                                                                                                                                                                                                                                           |
 | `src/access/`                                                | Who may call what (`DESIGN.md` §7): `routes.ts` (every page and route with who may use it, held to `app/` by `routes.test.ts`), `route.ts` (`accountRoute`: session, `Origin` on a write, the account id), `parse.ts` (the input parsers, shared with the browser), `two-accounts.ts` (two real accounts to call as the wrong one)                                                           |
 | `src/local/`                                                 | The browser's working copy over IndexedDB, one database per account (`DESIGN.md` §8.1): the schema (`db.ts`), the pure row rules (`rows.ts`) and the store (`store.ts`: commit, settle, queries). `src/sync/client.ts`, `loop.ts`, `transport.ts`, `signout.ts` and `react.tsx` are the client side of sync                                                                                  |
 | `src/limits/`                                                | Rate limits counted in the database, so that they hold across processes (`rate.ts`)                                                                                                                                                                                                                                                                                                          |
@@ -187,6 +192,18 @@ once they exist, this list is where they are written, and `verify` means all of 
 
 ## Not in place yet
 
-Each is a task in `ROADMAP.md`, not a thing to assume exists: everything in `src/` beyond the settings, the database, the jobs, the shell, the
-security headers, local sign-in and the access rules, and the tests of the design (sign-in is tested against a fake Sovereign, never a real instance, as Fjord Web does). Add them in their
-own `chore/` or `feat/` branches, and move the line out of this section as each lands. Nothing of the product is built.
+Each is a task in `ROADMAP.md`, not a thing to assume exists. What is built is Tasks' half: the settings, the database, the jobs, the shell, the security
+headers, local sign-in, the access rules, and the Desk as lists, tasks and subtasks over sync, under the old names. **Not built:** the rename to Tusk and
+the Desk's tables (Milestone C), workspaces, boards, cards, the Inbox and publishing (D and E), and everything after. Add them in their own `chore/` or
+`feat/` branches, and move the line out of this section as each lands. Sign-in is tested against a fake Sovereign, never a real instance, as Fjord Web
+does.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+## This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

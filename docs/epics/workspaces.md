@@ -1,0 +1,89 @@
+# Epic 16: Workspaces
+
+## Status
+
+📋 Planned
+
+## Overview
+
+The shared half of Tusk: workspaces, their people, and the door every write to them comes through. The permission is a condition of each statement and
+a refusal reads as "not found", as on the Desk. This epic builds the door and the roles first, with the test matrix that holds them, so that no board is
+written without them.
+
+## Related
+
+[`DESIGN.md`](../../DESIGN.md) §7, §13, §17.2, §17.3, §23.3 · the kanban plugin's `app/_lib/authz.ts`, `CONCEPT.md` (Phase 2)
+
+## Tasks
+
+#### 📋 16.1 — Operations, and who may do them
+
+**Goal:** one door for workspace writes, with the permission in the statement, activity and notices in the same transaction, and a matrix of roles that
+tests every kind.
+
+**Design:** §7.1–§7.4, §15.6. **Depends on:** 3.1, 15.2.
+
+**Technical:**
+
+- **Tables** of §23.3 for workspaces, boards and below, in one generated migration per dialect, with the indexes it names. `board_id` on every row
+  below a board.
+- `src/workspaces/format.ts`: the operations as a closed union (`{ opId, op, … }`), and `validate.ts`, shared with the browser, built on
+  `src/access/parse.ts` (adding `color` for `#rrggbb`).
+- `src/workspaces/apply.ts`: `applyOp(db, accountId, op, now)` in one transaction: replay answered from `applied_mutation`; the change with its
+  permission as a subquery (`src/workspaces/can.ts` holds the subqueries: `isWorkspaceOwner`, `isWorkspaceMember`, `canSeeBoard`, `canEditBoard`,
+  `canAdminBoard`, each a SQL fragment over bound values, never a read first); the board's `version` and the workspace's `updated_at` moved on; the
+  activity row (`src/workspaces/activity.ts`, its kinds and `details`); the notices (8.1 adds them). Returns the changed rows or a refusal: `not_found`,
+  `invalid`, `limit`, `stale`.
+- `POST /api/ops`: session, `Origin`, a bounded body, a rate, `applyOp`; listed in `routes.ts`.
+- `src/workspaces/testing/roles.ts`: seeds a workspace with an owner, a member, a board owner, a board member, a viewer of a public board and an
+  outsider (`two-accounts.ts` grown to six), and **a table of every operation and read with who may**. The test runs each as each, on all three
+  databases, and checks the answer and that nothing changed when refused. A new operation without a row fails it.
+- The operations themselves arrive with the tasks that need them; this task carries `workspace.create` and `workspace.rename`, to prove the path.
+
+**Accepts when:** the matrix runs on all three forms; a refusal of every kind writes nothing, not even activity; a replayed `opId` answers the same and
+applies once; each permission subquery's test is seen to fail with that condition removed; no route in `app/api/` writes a workspace row except
+`/api/ops`, by a test over the files.
+
+#### 📋 16.2 — Workspaces
+
+**Goal:** create, rename and delete a workspace, and see one's workspaces in the sidebar.
+
+**Design:** §13.1, §17.2, §17.11. **Depends on:** 7.8, 16.1.
+
+**Technical:** `workspace.create` (the creator its first owner, in the same transaction), `workspace.rename`, `workspace.delete` (owners only; deletes
+every row with its `workspace_id` or a `board_id` of its boards, in one transaction, by name; asks for the name to be typed). `GET /api/workspaces`: the
+person's, with role, for the sidebar's _My workspaces_ (owned) and _Shared with me_. The + in the sidebar and a dialog. `/w/<id>`: the workspace's
+boards (tiles arrive with 17.1), 404 for an outsider. `src/boards/` gains the in-memory store with optimistic operations and rollback (§14.7), used
+first here.
+
+**Accepts when:** a created workspace appears in the sidebar at once and survives a reload; a member sees it under _Shared with me_; deleting one
+leaves no row of it in any table, by a test that seeds one of each; an outsider's `/w/<id>` is a 404.
+
+#### 📋 16.3 — A workspace's people
+
+**Goal:** owners add people by email, set roles and remove them; anyone can leave; a workspace always has an owner.
+
+**Design:** §7.2, §13.2. **Depends on:** 16.2.
+
+**Technical:** operations `member.add` (by exact email, case aside, looked up in the auth store; "No account with that address here" otherwise; a
+rate per account and hour), `member.setRole`, `member.remove`, `member.leave`. Removing or leaving takes the person off every board of the workspace
+and unassigns them there, in the same transaction. The last owner cannot leave or step down (`invalid`, with a reason the dialog shows). The
+workspace's settings dialog (from its gear): name, people with avatars and roles, add, remove, leave, delete; a member sees the people and Leave. Names
+and avatars come from the auth store at read time, never copied.
+
+**Accepts when:** adding an unknown address says so and adds nothing; the limit holds; a removed member's assignments on the workspace's boards are
+gone and their comments stay; the last owner cannot leave; an added person sees the workspace on their next load.
+
+#### 📋 16.4 — The boards index
+
+**Goal:** `/boards`: the Desk, then every workspace with its boards, sorted as the person chose.
+
+**Design:** §17.3. **Depends on:** 16.3, 17.1.
+
+**Technical:** `GET /api/boards`: for each workspace the person is in, its name, people's avatars, and the boards they can see (by `canSeeBoard`), with
+name, colour and whether archived; light, one query per kind. The Desk tile from the local store (open count, due today). _My workspaces_ sorted by
+name, created or recently updated (`account_settings.workspace_sort`, a setting saved with the account through a small `PATCH /api/settings`);
+_Shared with me_ by name. Each section's gear opens the settings of 16.3; each ends with "Create board". A skeleton until loaded.
+
+**Accepts when:** a private board appears only for its members and the workspace's owners; the sort survives a reload and holds on a second device;
+archived boards are behind _Archived_; the Desk tile works offline while the rest says it needs a connection.

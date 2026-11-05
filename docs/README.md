@@ -3,7 +3,7 @@
 |                    |                                                                                                                         |
 | ------------------ | ----------------------------------------------------------------------------------------------------------------------- |
 | [`epics/`](epics/) | The detail of every task: what it is, how it is built, what makes it done, and once done, how it was done.              |
-| `rfcs/`            | Proposals reviewed before they are built. Created with the first one (sharing, task 12.1).                              |
+| `rfcs/`            | Proposals reviewed before they are built. Created with the first one.                                                   |
 | `research/`        | Open questions investigated before a design: what was read, found and recommended, dated. Created with the first one.   |
 | `workstreams/`     | Features that cross epics, as an ordered run of tasks in legs, with their decisions locked. Created with the first one. |
 

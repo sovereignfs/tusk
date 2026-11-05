@@ -1,16 +1,18 @@
-# Epic 3: Lists and tasks
+# Epic 3: The Desk
 
 ## Status
 
-📋 Planned
+⏳ In progress: 3.1 to 3.10 are done, built as Tasks' lists and tasks; 15.2 turns them into the Desk's lists and cards. 3.11 to 3.13 are left.
 
 ## Overview
 
-The product: one person's lists and tasks. A user action here is a pure function in `src/actions/` that produces changes, committed to the local store and synced (epic 13). The access rule that closes the plugin's worst flaw is built first, so that nothing is written without it.
+A person's own board: private, offline-first, and as plain as Google Tasks. An action here is a pure function in `src/actions/` that produces changes,
+committed to the local store and synced (epic 13). The access rule that closes the tasks plugin's worst flaw was built first, so that nothing is written
+without it. The done tasks below say "list", "task" and "subtask", as they were built; the Desk calls them lists, cards and checklist items.
 
 ## Related
 
-[`DESIGN.md`](../../DESIGN.md) §7, §10, §11, §15.6
+[`DESIGN.md`](../../DESIGN.md) §7.1, §10, §17.4, §17.8
 
 ## Tasks
 
@@ -18,7 +20,7 @@ The product: one person's lists and tasks. A user action here is a pure function
 
 **Goal:** the machinery that makes "the owner in every statement" hard to get wrong, before there is anything to get wrong.
 
-**Design:** §7. **Depends on:** 1.5, 2.1.
+**Design:** §7.1. **Depends on:** 1.5, 2.1.
 
 **Technical:**
 
@@ -35,7 +37,7 @@ The product: one person's lists and tasks. A user action here is a pure function
 
 **Goal:** order that writes one row per move.
 
-**Design:** §11.3, §22.2. **Depends on:** 1.5.
+**Design:** §10.4, §23.2. **Depends on:** 1.5.
 
 **Technical:** `src/position.ts` wraps `fractional-indexing` (CC0): `first()`, `before(a)`, `after(a)`, `between(a, b)`. Pure. Its alphabet is digits, upper case, lower case, which is byte order, and why §22.2 needs `COLLATE "C"`. In JavaScript, compare by bytes and never with `localeCompare`. Two devices can make equal keys, so order ties break by id, and `between` with equal keys does not throw.
 
@@ -47,7 +49,7 @@ The product: one person's lists and tasks. A user action here is a pure function
 
 **Goal:** add a list from the sidebar, see each with its dot and count, and reorder by dragging.
 
-**Design:** §10. **Depends on:** 3.2, 7.1, 13.4.
+**Design:** §10.1. **Depends on:** 3.2, 7.1, 13.4.
 
 **Technical:**
 
@@ -64,7 +66,7 @@ The product: one person's lists and tasks. A user action here is a pure function
 
 **Goal:** add, edit, complete, reopen and delete a task.
 
-**Design:** §11.1. **Depends on:** 3.3.
+**Design:** §10.2. **Depends on:** 3.3.
 
 **Technical:**
 
@@ -79,7 +81,7 @@ The product: one person's lists and tasks. A user action here is a pure function
 
 **Goal:** one level of subtasks.
 
-**Design:** §11.2. **Depends on:** 3.4.
+**Design:** §10.3. **Depends on:** 3.4.
 
 **Technical:** `createSubtask`, refused unless the parent is top-level; the server's structural check repeats it. A validator refuses a date, star or repeat on a subtask where it can read. Completing a parent is one mutation that sets `completedAt` on its open subtasks only. Reopening reopens nothing; ticking the last does not complete the parent. A progress ring on the row, and a list in the detail, ordered by position.
 
@@ -91,7 +93,7 @@ The product: one person's lists and tasks. A user action here is a pure function
 
 **Goal:** drag tasks into order, correctly, under filters.
 
-**Design:** §11.3, §15.8. **Depends on:** 3.2, 3.4.
+**Design:** §10.4, §17.10. **Depends on:** 3.2, 3.4.
 
 **Technical:** `moveTask(id, beforeId, afterId)` computes a position between the given neighbours **as rendered**, writing one row. Subtasks too, within their parent. Available only under Custom. `@dnd-kit` with the sensors of `src/ui/dnd.ts` and `autoScroll` restricted to vertical containers from the start (§15.8). Local-first means no snap back.
 
@@ -103,7 +105,7 @@ The product: one person's lists and tasks. A user action here is a pure function
 
 **Goal:** every delete can be undone.
 
-**Design:** §11.5. **Depends on:** 3.3, 3.4.
+**Design:** §10.6. **Depends on:** 3.3, 3.4.
 
 **Technical:** `deleted_at` on list and task; deleting a list marks it, and local queries hide its tasks; `restoreList`, `restoreTask`. Deleting a parent marks its subtasks with the same time, so restore brings back exactly those. A toast with Undo for about ten seconds. All local queries go through helpers that exclude deleted rows. The purge is 13.7.
 
@@ -115,7 +117,7 @@ The product: one person's lists and tasks. A user action here is a pure function
 
 **Goal:** a task and its subtasks move together.
 
-**Design:** §11.1. **Depends on:** 3.5.
+**Design:** §10.2. **Depends on:** 3.5.
 
 **Technical:** `moveToList(id, toListId)`: one mutation of the task and its subtasks; the task takes a position at the top of the destination, and subtasks keep theirs. A control in the detail.
 
@@ -127,7 +129,7 @@ The product: one person's lists and tasks. A user action here is a pure function
 
 **Goal:** seeing a list the way one wants, remembered.
 
-**Design:** §11.4. **Depends on:** 3.4.
+**Design:** §10.5. **Depends on:** 3.4.
 
 **Technical:** `sort` and `showCompleted` as list fields. Filters All, Active and Overdue (Overdue arrives with 4.3). A collapsible Completed section, newest first. Deleting a list's completed tasks from its menu, with Undo. `src/lists/sort.ts` is pure. Drag handles are hidden under any sort but Custom, and a drag no-ops there.
 
@@ -139,7 +141,7 @@ The product: one person's lists and tasks. A user action here is a pure function
 
 **Goal:** mark a task.
 
-**Design:** §11.1. **Depends on:** 3.4.
+**Design:** §10.2. **Depends on:** 3.4.
 
 **Technical:** `setStarred`; a star on the row and in the detail, its own click target. Refused on a subtask.
 
@@ -147,12 +149,49 @@ The product: one person's lists and tasks. A user action here is a pure function
 
 **Done as:** `setStarred` (and `isStarred`) set the task's `starred` field; a subtask is refused here and by the server's validator (tested both ways). The star is `StarButton`, **its own click target**: a button, pressed or not (`aria-pressed`, named _Star_ or _Remove the star_), which opens nothing and does not start a drag of its row. It is on every row and in the detail, and a subtask has none. The design system has no star icon, so the glyph is text (`☆` and `★`) and a star icon is for `@sovereignfs/ui` to offer; nothing was forked. Tests: 2 for the action, one for the validator, and in Chromium and WebKit a star that does not open the task, is on the server, survives a reload and shows in the detail, and a subtask with none. Not done: the Starred view across lists, which is 6.1.
 
+#### 📋 3.12 — The Desk in the new shell
+
+**Goal:** the Desk at `/desk`, in the Tusk shell, looking like the Sovereign Tasks screenshot, with lists of any colour and cards dragged by their row.
+
+**Design:** §10.1, §17.4, §17.7, §17.8, §17.11. **Depends on:** 7.8, 15.2.
+
+**Technical:**
+
+- **Routes:** `/desk` (the first list, as `/home` did) and `/desk/<listId>`, with `?card=` for the detail; `/home` and `/lists/<id>` removed, and
+  `routes.ts` with them. `proxy.ts` sends `/` to `/desk` for a request with a session cookie.
+- **Layout:** the app's sidebar as a rail (7.8), then the Desk's lists column, the list, and the detail on the right while `?card=` is set, inside the
+  shell's content area. The Description field and the Checklist named so.
+- **Colour:** a list's colour through `ColorPicker` (any `#rrggbb`), its dot in the column; the six swatches' names read as their colours for lists
+  made before, in `src/lists/colors.ts`. The parser takes `#rrggbb`.
+- **Drag by the row:** the row is the drag source, with the checkbox and star keeping their clicks, a click on the row opening the card, and the
+  keyboard on a focused row; the title is no longer the handle. `src/ui/dnd.ts` keeps what every drag shares.
+- Browser tests move to the new addresses.
+
+**Accepts when:** `/` signed in shows the Desk at `/desk`; every Desk test passes at the new addresses; a list's colour picked freely shows on its dot and
+survives a reload and a second device; a row drags from anywhere but its controls, and a click opens it.
+
+#### 📋 3.13 — In progress
+
+**Goal:** a Desk card can be marked in progress, shown by a small icon, and its status always converges.
+
+**Design:** §8.4, §10.2. **Depends on:** 3.12.
+
+**Technical:** `startedAt` as a field; `startCard` (sets it, clears `completedAt`), and `completeCard` and `reopenCard` as §10.2 says (reopening clears
+both). `statusOf(card)`, pure: Done if `completedAt`, In progress if only `startedAt`, else Open. The icon beside the title (`loader-circle`, from
+`@sovereignfs/ui` once it is there, raised in `sovereign` with the star; a text stand-in until a release with it is pinned), with an accessible name. A
+Status control in the detail (Open, In progress, Done) and "Mark in progress" in a card's menu. The checkbox ticks to Done from either state.
+
+**Accepts when:** two devices, one marking a card in progress and one done, offline, both end at Done, in the convergence suite; reopening a done card
+leaves it Open; the icon has a name for a screen reader; `statusOf` is tested alone.
+
 #### 📋 3.11 — Bulk select
 
-**Goal:** act on several tasks at once.
+**Goal:** act on several Desk cards at once.
 
-**Design:** §15.6. **Depends on:** 3.7, 3.8, 7.5.
+**Design:** §10.6. **Depends on:** 3.7, 3.8, 3.12.
 
-**Technical:** selection by ctrl- or cmd-click, or long press from 7.5. `BulkActionBar`: count, Complete, Move to list, Delete, Cancel; `Esc` clears. One mutation, capped at 500 tasks. A repeating task completed in bulk makes its next. Delete gives one Undo for the whole selection.
+**Technical:** selection by ctrl- or cmd-click (and by long press on the phone, in phase 2). `BulkActionBar`: count, Complete, Move to list, Delete,
+Cancel; `Esc` clears. One mutation, chunked as `deleteMany` is. A repeating card completed in bulk makes its next. Delete gives one Undo for the whole
+selection.
 
-**Accepts when:** a mutation naming another account's id is refused whole; Undo restores all.
+**Accepts when:** a mutation naming another account's id is refused whole; Undo restores all, and only those.

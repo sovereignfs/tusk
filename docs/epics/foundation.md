@@ -2,15 +2,17 @@
 
 ## Status
 
-📋 Planned
+⏳ In progress: 1.1 to 1.10 are done, under the name Tasks; the PWA (1.11) is left.
 
 ## Overview
 
-Turns the scaffold into a repository that can hold Tasks as `DESIGN.md` designs it: an offline-first PWA that runs alone or hosted, on three forms of database. Nothing a person would notice, and everything else stands on it. Fjord Web (`clients/web` in `sovereignfs/fjord`) is the model throughout, and its code may be adapted where the licence allows, both being AGPL-3.0-or-later.
+Turns the scaffold into a repository that can hold Tusk as `DESIGN.md` designs it: an offline-first PWA that runs alone or hosted, on three forms of
+database. Nothing a person would notice, and everything else stands on it. Fjord Web (`clients/web` in `sovereignfs/fjord`) is the model throughout, and
+its code may be adapted where the licence allows, both being AGPL-3.0-or-later. The renaming of all of it to Tusk is 15.1.
 
 ## Related
 
-[`DESIGN.md`](../../DESIGN.md) §5, §22, §23 · Fjord's `clients/web/DESIGN.md` §14, §17
+[`DESIGN.md`](../../DESIGN.md) §5, §17.9, §23, §24 · Fjord's `clients/web/DESIGN.md` §14, §17
 
 ## Tasks
 
@@ -18,7 +20,7 @@ Turns the scaffold into a repository that can hold Tasks as `DESIGN.md` designs 
 
 **Goal:** the files a repository of the suite is expected to have, and dependencies on the terms `AGENTS.md` states.
 
-**Design:** §23, `AGENTS.md`. **Depends on:** nothing.
+**Design:** §24, `AGENTS.md`. **Depends on:** nothing.
 
 **Technical:**
 
@@ -36,7 +38,7 @@ Turns the scaffold into a repository that can hold Tasks as `DESIGN.md` designs 
 
 **Goal:** the checks every later task runs.
 
-**Design:** §23 Testing, `AGENTS.md`. **Depends on:** 1.1.
+**Design:** §24 Testing, `AGENTS.md`. **Depends on:** 1.1.
 
 **Technical:**
 
@@ -54,7 +56,7 @@ Turns the scaffold into a repository that can hold Tasks as `DESIGN.md` designs 
 
 **Goal:** CI that runs what a change can affect, and vouches for the commit that lands.
 
-**Design:** §23; Fjord's `web-ci.yml`, `scripts/ci-changes.sh`. **Depends on:** 1.2; gains its test legs with 1.5.
+**Design:** §24; Fjord's `web-ci.yml`, `scripts/ci-changes.sh`. **Depends on:** 1.2; gains its test legs with 1.5.
 
 **Technical:**
 
@@ -89,7 +91,7 @@ Turns the scaffold into a repository that can hold Tasks as `DESIGN.md` designs 
 
 **Goal:** the three forms of §22, with two stores, migrations at start-up, and tests on each from here on.
 
-**Design:** §22. Fjord's §14 and `src/db/`. **Depends on:** 1.4.
+**Design:** §23. Fjord's §14 and `src/db/`. **Depends on:** 1.4.
 
 **Technical:**
 
@@ -111,7 +113,7 @@ Turns the scaffold into a repository that can hold Tasks as `DESIGN.md` designs 
 
 **Goal:** background work inside the web process, safe with several processes.
 
-**Design:** §5, §17.3. **Depends on:** 1.5.
+**Design:** §5. **Depends on:** 1.5.
 
 **Technical:**
 
@@ -129,7 +131,7 @@ Turns the scaffold into a repository that can hold Tasks as `DESIGN.md` designs 
 
 **Goal:** every response carries the hardening headers, and pages a strict Content-Security-Policy.
 
-**Design:** §23 Security. **Depends on:** 1.4.
+**Design:** §24 Security. **Depends on:** 1.4.
 
 **Technical:** `proxy.ts` (Edge discipline: no Node built-ins, no database). A per-request nonce; `script-src 'nonce-…' 'strict-dynamic'`, never `'unsafe-inline'`; `default-src 'self'`; `frame-ancestors 'none'`; `base-uri 'self'`; `form-action 'self'`; `connect-src 'self'`; `worker-src 'self'`. HSTS over https only; `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`. Applied on every return path. Pages that need the nonce are dynamic, and the cached shell (1.11) has to work with this: settle how here, since a cached page cannot carry a fresh nonce.
 
@@ -141,7 +143,7 @@ Turns the scaffold into a repository that can hold Tasks as `DESIGN.md` designs 
 
 **Goal:** the header every signed-in page sits under, and the pages for what goes wrong.
 
-**Design:** §15.1, §15.2. Fjord's `src/ui`. **Depends on:** 1.2.
+**Design:** §17.1, §17.2. Fjord's `src/ui`. **Depends on:** 1.2.
 
 **Technical:**
 
@@ -158,7 +160,7 @@ Turns the scaffold into a repository that can hold Tasks as `DESIGN.md` designs 
 
 **Goal:** a way to test what only a browser can show.
 
-**Design:** §23 Testing. **Depends on:** 1.5.
+**Design:** §24 Testing. **Depends on:** 1.5.
 
 **Technical:** Playwright, Chromium and WebKit; `playwright.config.ts` runs a built server per database form; `e2e/` with one smoke test; `pnpm e2e`. WebKit runs what it can; the iOS Simulator remains the check for touch (§15.8), by hand, and says so in the PR. A CI job.
 
@@ -170,7 +172,7 @@ Turns the scaffold into a repository that can hold Tasks as `DESIGN.md` designs 
 
 **Goal:** the three ways to run it, each brought up from nothing in CI.
 
-**Design:** §22, §23 Deployment. **Depends on:** 1.5, 1.6.
+**Design:** §23, §24 Deployment. **Depends on:** 1.5, 1.6.
 
 **Technical:**
 
@@ -185,10 +187,18 @@ Turns the scaffold into a repository that can hold Tasks as `DESIGN.md` designs 
 
 #### 📋 1.11 — The PWA
 
-**Goal:** installable on desktop and phone, and opening with no network.
+**Goal:** installable on desktop and phone, and opening with no network to the Desk.
 
-**Design:** §15.7. **Depends on:** 1.7, 1.8.
+**Design:** §17.9. **Depends on:** 1.7, 1.8, 3.12.
 
-**Technical:** **First, prove the hard part,** which task 1.7 left open: every page now has a fresh nonce, so an HTML document the worker had cached would carry a stale one and its scripts would be blocked. The way out being tried is Sovereign core's: the worker builds the page itself, with a policy of its own, and a client that boots from it and the local store (task 13.3) with no document from the server. Whether Next's client can start that way is not known; if it cannot, the design's §15.7 and §23 change before anything else is built on it. Sovereign core is the model, since Fjord has neither (`apps/core/app/manifest.ts`, `src/pwa`, `src/sw/source.ts`, and its test). `app/manifest.ts`: name, icons with a maskable one, `display: standalone`, theme colours. `src/sw/source.ts`, served at `/sw.js`: an allow-list of built files, icons and the one shell page, in one versioned cache, with nothing else stored. Handlers for `push` and `notificationclick` arrive with 8.4, and `sync` with 13.6. A new version activates at the next load. An install line in Settings for iPhone.
+**Technical:** **First, prove the hard part,** which task 1.7 left open: every page has a fresh nonce, so an HTML document the worker had cached would
+carry a stale one and its scripts would be blocked. The way out being tried is Sovereign core's: the worker builds the page itself, with a policy of
+its own, and a client that boots from it and the local store with no document from the server. Whether Next's client can start that way is not known; if
+it cannot, `DESIGN.md` §17.9 and §24 change before anything else is built on it. Sovereign core is the model (`apps/core/app/manifest.ts`, `src/pwa`,
+`src/sw/source.ts`, and its test). `app/manifest.ts`: name Tusk, icons with a maskable one, `display: standalone`, theme colours. `src/sw/source.ts`,
+served at `/sw.js`: an allow-list of built files, icons and the one shell page, in one versioned cache, with nothing else stored. A `sync` handler
+arrives with 13.6, and `push` with 8.4 in phase 2. A new version activates at the next load. An install line in Settings for iPhone.
 
-**Accepts when:** Lighthouse's installable checks pass; the app installs in Chromium and on the iOS Simulator; with the network off, it opens to its shell; a test evaluates the worker and fails if a page with a person's data, or any API answer, is cached; a browser test lists every cache after a signed-in tour.
+**Accepts when:** Lighthouse's installable checks pass; the app installs in Chromium and on the iOS Simulator; with the network off, it opens to the
+Desk, and a board says it needs a connection; a test evaluates the worker and fails if a page with a person's data, or any API answer, is cached; a
+browser test lists every cache after a signed-in tour of the Desk, a board and the Inbox.
