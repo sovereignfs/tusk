@@ -152,17 +152,19 @@ Database and browser-test commands are added with their tooling (below); once th
 
 ## Layout
 
-The repository today is the scaffold's. `DESIGN.md` §5.1 is where things go as it is replaced.
+`DESIGN.md` §5.1 is where things go as the app is built; this is what is here now.
 
-| Path                                          | What                                                                                            |
-| --------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `app/`                                        | Routes and layouts (App Router)                                                                 |
-| `lib/`, `migrations/`                         | The scaffold's sign-in and PostgreSQL code and its SQL, to be replaced (`DESIGN.md` §5.2)       |
-| `sovereign.manifest.json`                     | What an instance reads to host the app                                                          |
-| `Dockerfile`, `.github/workflows/publish.yml` | One image, not root, on the manifest's port; built and published to `ghcr.io` on a `vX.Y.Z` tag |
+| Path                                            | What                                                                                                                                                |
+| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `app/`                                          | Routes and layouts (App Router): a placeholder page and `/api/health`                                                                               |
+| `src/config/`                                   | Settings: `env.ts` is the only place `process.env` is read, `index.ts` checks them, `current.ts` keeps them                                         |
+| `instrumentation.ts`, `instrumentation-node.ts` | Run once at start-up: check the settings and stop on a wrong one. The first only hands over to the second, which Next must not compile for the Edge |
+| `scripts/`                                      | The CI classifier and its tests                                                                                                                     |
+| `sovereign.manifest.json`                       | What an instance reads to host the app. It still names the scaffold's sign-in paths, which task 2.10 replaces                                       |
+| `Dockerfile`, `.github/workflows/`              | One image, not root, on the manifest's port, published to `ghcr.io` on a `vX.Y.Z` tag; and CI                                                       |
 
 ## Not in place yet
 
-Each is a task in `ROADMAP.md`, not a thing to assume exists: everything in `src/` beyond a smoke test, the tests of the design (sign-in is tested
+Each is a task in `ROADMAP.md`, not a thing to assume exists: everything in `src/` beyond the settings, the tests of the design (sign-in is tested
 against a fake Sovereign, never a real instance, as Fjord Web does), the `deploy/` setups, and the CI jobs for the databases, browser tests and the image. Add them in
 their own `chore/` or `feat/` branches, and move the line out of this section as each lands. Nothing of the design is built.

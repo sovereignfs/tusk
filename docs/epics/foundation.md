@@ -66,7 +66,7 @@ Turns the scaffold into a repository that can hold Tasks as `DESIGN.md` designs 
 
 **Done as:** `.github/workflows/ci.yml` runs on pull requests and on pushes to `main`, and weekly; skipped on a draft or with `skip-ci`. A `changes` job runs `scripts/ci-changes.sh` (29 tests in `scripts/test-ci-changes.sh`, one of which was seen to fail when the documents rule was removed) and sets `code` and `scripts`, so a change to documents alone runs nothing more. `check` runs format, lint, type-check, test, build and the manifest check; `scripts` runs shellcheck and the classifier's tests. Actions are pinned by SHA, and `actionlint` and `shellcheck` pass. Not here: the `tests` matrix over the three databases (1.5), `e2e` (1.9) and `image` (1.10), and the check that migrations match the schemas (1.5). It has not run on GitHub: nothing is pushed.
 
-#### 📋 1.4 — Configuration, start-up, and removing the scaffold
+#### ✅ 1.4 — Configuration, start-up, and removing the scaffold
 
 **Goal:** the app reads its settings in one place, refuses to start on a wrong one, and no longer holds the scaffold's sign-in or database code.
 
@@ -82,6 +82,8 @@ Turns the scaffold into a repository that can hold Tasks as `DESIGN.md` designs 
 - Keep `sovereign.manifest.json` valid while it moves; `pnpm manifest:check` stays green.
 
 **Accepts when:** the app builds and serves a placeholder with no database; a wrong `TASKS_URL` stops it with a message naming the setting and not its value; `grep -r process.env src app` finds only `src/config/`.
+
+**Done as:** the scaffold's `lib/`, `app/auth/`, server actions, design-system re-export, SQL and `pg` are removed. `src/config/env.ts` is the one place `process.env` is read, and reads a secret as `NAME` or `NAME_FILE`, the file winning, never putting a path or value in an error; `loadConfig` checks `TASKS_URL` (https, except on localhost, no path), `TASKS_WORKER`, the settings that go together (Sovereign sign-in, Web Push, the GitHub App: all or none) and an SMTP host with no sender, reporting every problem at once and no value. `instrumentation-node.ts` stops the server on a wrong setting: a built server was seen to serve the placeholder and `/api/health` with nothing set, and to exit 1 on `http://tasks.example.com`. `.env.example` lists every setting of the design. Two tests hold the rules: nothing outside `src/config` touches `process.env`, and every `TASKS_` name in the code is declared in `.env.example`, each seen to fail on a planted fault. Not done: a required `TASKS_URL` or `TASKS_AUTH_SECRET`, which are 2.1's once sign-in uses them; the manifest still names the scaffold's sign-in paths, which 2.10 replaces; the Dockerfile no longer copies `migrations/`, which 1.5 puts back. README rewritten to say what is here.
 
 #### 📋 1.5 — The database layer
 

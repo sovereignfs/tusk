@@ -1,7 +1,10 @@
-/** Runs once when the server starts. The app applies its own migrations before it takes a request (contracts/app-manifest.md §4). */
+/**
+ * Runs once when the server starts. It only hands over to the Node file: Next compiles this one for the Edge runtime too, where the process
+ * and the database must not be seen.
+ */
 export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
-    const { migrate } = await import('./lib/migrate');
-    await migrate();
+    const { start } = await import('./instrumentation-node');
+    await start();
   }
 }
