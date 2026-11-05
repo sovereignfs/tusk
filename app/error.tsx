@@ -18,7 +18,7 @@ export default function ErrorPage({
         <>
           <Button onClick={reset}>Try again</Button>
           <ButtonLink href="/" variant="secondary">
-            Go back to Tasks
+            Go back to Tusk
           </ButtonLink>
         </>
       }

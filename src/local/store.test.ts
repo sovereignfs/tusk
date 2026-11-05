@@ -36,7 +36,7 @@ async function device(): Promise<{
   reopen(): Promise<LocalDatabase>;
 }> {
   const account = ID();
-  names.push(`tasks-${account}`);
+  names.push(`tusk-desk-${account}`);
   const db = await openLocal(account);
   open.push(db);
   return {

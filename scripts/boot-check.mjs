@@ -1,6 +1,6 @@
 // Start a built instance of the app against whatever database the environment names, and ask it whether it is up. This is the check that "a
 // fresh instance boots from the documented variables" (task 1.5): the server provisions and migrates the database itself at start-up, so all
-// it is given is TASKS_DB_DIALECT and TASKS_SQLD_URL / TASKS_SQLD_ADMIN_URL, TASKS_SQLITE_URL or TASKS_POSTGRES_URL, exactly as an operator
+// it is given is TUSK_DB_DIALECT and TUSK_SQLD_URL / TUSK_SQLD_ADMIN_URL, TUSK_SQLITE_URL or TUSK_POSTGRES_URL, exactly as an operator
 // would.
 //
 //   pnpm build && pnpm boot-check
@@ -11,7 +11,7 @@ import { migrationsDir, prepareStandalone } from './lib/standalone.mjs';
 
 const port = process.env.BOOT_CHECK_PORT ?? '3999';
 // Health says `sqlite` for both of SQLite's forms, an sqld service and a file.
-const configured = (process.env.TASKS_DB_DIALECT || 'sqld').trim().toLowerCase();
+const configured = (process.env.TUSK_DB_DIALECT || 'sqld').trim().toLowerCase();
 const expectedDialect = configured === 'postgres' ? 'postgres' : 'sqlite';
 const deadline = Date.now() + Number(process.env.BOOT_CHECK_TIMEOUT_MS ?? 90_000);
 
@@ -26,7 +26,7 @@ try {
 // The standalone server takes its port and address from the environment.
 const server = spawn('node', [entry], {
   stdio: ['ignore', 'pipe', 'pipe'],
-  env: { ...process.env, PORT: port, HOSTNAME: '127.0.0.1', TASKS_MIGRATIONS_DIR: migrationsDir },
+  env: { ...process.env, PORT: port, HOSTNAME: '127.0.0.1', TUSK_MIGRATIONS_DIR: migrationsDir },
 });
 let log = '';
 server.stdout.on('data', (chunk) => (log += chunk));
@@ -52,7 +52,7 @@ while (Date.now() < deadline) {
     const body = await response.json().catch(() => ({}));
     if (response.ok && body.status === 'ok') {
       if (body.database === expectedDialect) {
-        finish(0, `healthy on ${body.database} (TASKS_DB_DIALECT=${configured})`);
+        finish(0, `healthy on ${body.database} (TUSK_DB_DIALECT=${configured})`);
       } else {
         finish(1, `healthy, but on ${body.database} and not ${expectedDialect}`);
       }

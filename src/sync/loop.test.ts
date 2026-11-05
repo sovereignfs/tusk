@@ -80,7 +80,7 @@ afterEach(async () => {
 
 async function client(send: Transport) {
   const account = ID();
-  names.push(`tasks-${account}`);
+  names.push(`tusk-desk-${account}`);
   const db = await openLocal(account);
   open.push(db);
   return new SyncClient({ db, transport: send });

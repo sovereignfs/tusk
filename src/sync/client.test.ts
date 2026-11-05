@@ -15,7 +15,7 @@ afterEach(async () => {
 });
 
 async function database(account = ID()): Promise<LocalDatabase> {
-  names.push(`tasks-${account}`);
+  names.push(`tusk-desk-${account}`);
   const db = await openLocal(account);
   open.push(db);
   return db;

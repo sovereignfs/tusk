@@ -3,8 +3,8 @@ import { markOf } from './brand';
 
 describe('markOf', () => {
   it('is the first two letters, the first a capital', () => {
-    expect(markOf('Tasks')).toBe('Ta');
-    expect(markOf('  tasks  ')).toBe('Ta');
+    expect(markOf('Tusk')).toBe('Tu');
+    expect(markOf('  tusk  ')).toBe('Tu');
   });
 
   it('takes whole characters, not halves of a pair', () => {

@@ -12,7 +12,7 @@ export default function NotFound() {
         icon="search"
         heading="That is not here"
         description="It may have been deleted, or the address may be wrong."
-        action={<ButtonLink href="/">Go back to Tasks</ButtonLink>}
+        action={<ButtonLink href="/">Go back to Tusk</ButtonLink>}
       />
     </AppShell>
   );

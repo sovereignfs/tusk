@@ -4,7 +4,7 @@ import { processEnv } from './env';
 /** The settings were wrong. `problems` name them, never their values. */
 export class ConfigError extends Error {
   constructor(readonly problems: readonly Problem[]) {
-    super(`Tasks's settings are wrong: ${problems.join(' ')}`);
+    super(`Tusk's settings are wrong: ${problems.join(' ')}`);
     this.name = 'ConfigError';
   }
 }

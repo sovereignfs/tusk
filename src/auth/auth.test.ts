@@ -88,7 +88,7 @@ describe(`local sign-in, first account only (${leg})`, () => {
       });
       expect(reply.status).toBe(200);
       const cookie = found(
-        reply.setCookies.find((c) => c.startsWith('tasks.session_token=')),
+        reply.setCookies.find((c) => c.startsWith('tusk.session_token=')),
         'session cookie',
       );
       expect(cookie).toMatch(/HttpOnly/i);
@@ -140,7 +140,7 @@ describe(`local sign-in, first account only (${leg})`, () => {
         email: await firstEmail(t),
         password: PASSWORD,
       });
-      const token = found(client.jar.get('tasks.session_token'), 'session cookie');
+      const token = found(client.jar.get('tusk.session_token'), 'session cookie');
       expect((await client.get('/api/auth/get-session')).body.user).toBeTruthy();
 
       await client.post('/api/auth/sign-out', {});
@@ -148,7 +148,7 @@ describe(`local sign-in, first account only (${leg})`, () => {
 
       // Replaying the old cookie does not bring it back: the session is deleted, not just forgotten.
       const replay = visitor(t);
-      replay.jar.set('tasks.session_token', token);
+      replay.jar.set('tusk.session_token', token);
       expect((await replay.get('/api/auth/get-session')).body).toBeNull();
     });
   });

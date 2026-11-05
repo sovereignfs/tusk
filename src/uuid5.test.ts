@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { TASKS_NAMESPACE, uuid5 } from './uuid5';
+import { TUSK_NAMESPACE, uuid5 } from './uuid5';
 
 const DNS = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
 
@@ -25,24 +25,24 @@ describe('a name-based id', () => {
   it('agrees with Node’s SHA-1 on names of every length around a block boundary, and on text that is not ASCII', () => {
     for (let length = 0; length < 200; length++) {
       const name = 'x'.repeat(length);
-      expect(uuid5(name, TASKS_NAMESPACE), `${length}`).toBe(reference(name, TASKS_NAMESPACE));
+      expect(uuid5(name, TUSK_NAMESPACE), `${length}`).toBe(reference(name, TUSK_NAMESPACE));
     }
     for (const name of ['Wasserstraße', '日本語', '😀 emoji', 'a\u0000b']) {
-      expect(uuid5(name, TASKS_NAMESPACE)).toBe(reference(name, TASKS_NAMESPACE));
+      expect(uuid5(name, TUSK_NAMESPACE)).toBe(reference(name, TUSK_NAMESPACE));
     }
   });
 
   it('is version 5 with the RFC variant, and one id for one name, whichever device asks', () => {
-    const id = uuid5('account-1', TASKS_NAMESPACE);
+    const id = uuid5('account-1', TUSK_NAMESPACE);
     expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
-    expect(uuid5('account-1', TASKS_NAMESPACE)).toBe(id);
-    expect(uuid5('account-2', TASKS_NAMESPACE)).not.toBe(id);
+    expect(uuid5('account-1', TUSK_NAMESPACE)).toBe(id);
+    expect(uuid5('account-2', TUSK_NAMESPACE)).not.toBe(id);
     expect(uuid5('account-1', DNS)).not.toBe(id);
   });
 
   it('is an id the server takes', async () => {
     const { uuid } = await import('./access/parse');
-    expect(uuid(uuid5('a better-auth user id', TASKS_NAMESPACE)).ok).toBe(true);
+    expect(uuid(uuid5('a better-auth user id', TUSK_NAMESPACE)).ok).toBe(true);
   });
 
   it('refuses a namespace that is not an id', () => {

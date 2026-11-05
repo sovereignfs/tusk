@@ -133,7 +133,7 @@ describe('every route says who may use it', () => {
 });
 
 describe('the check can fail', () => {
-  const scratch = () => mkdtempSync(join(tmpdir(), 'tasks-routes-'));
+  const scratch = () => mkdtempSync(join(tmpdir(), 'tusk-routes-'));
   const file = (root: string, path: string, content: string) => {
     mkdirSync(join(root, path, '..'), { recursive: true });
     writeFileSync(join(root, path), content);

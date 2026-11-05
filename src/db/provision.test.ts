@@ -36,7 +36,7 @@ describe(`provisioning (${leg})`, () => {
 
   it.runIf(leg === 'file')("keeps the auth store's file beside the app's", () => {
     if (config.dialect !== 'sqlite' || config.form !== 'file') return;
-    expect(config.authPath).toMatch(/tasks_auth\.db$/);
+    expect(config.authPath).toMatch(/tusk_auth\.db$/);
   });
 });
 
@@ -45,7 +45,7 @@ describe(`creating a namespace (${leg})`, () => {
   // what a reset left behind. sqld only.
   it.runIf(leg === 'sqld')('makes it usable, and is idempotent', async () => {
     if (config.dialect !== 'sqlite' || config.form !== 'sqld') return;
-    const namespace = `tasks_test_${Math.random().toString(36).slice(2, 10)}`;
+    const namespace = `tusk_test_${Math.random().toString(36).slice(2, 10)}`;
     await provisionNamespace(config.adminUrl, namespace);
     await provisionNamespace(config.adminUrl, namespace);
     const client = await createSqldClient(config.url, namespace);
@@ -62,18 +62,18 @@ describe(`creating a namespace (${leg})`, () => {
 describe('provisioning a service that is not there', () => {
   it('says which setting to check for sqld', async () => {
     const down = resolveDatabaseConfig({
-      TASKS_SQLD_URL: 'http://127.0.0.1:1',
-      TASKS_SQLD_ADMIN_URL: 'http://127.0.0.1:1',
+      TUSK_SQLD_URL: 'http://127.0.0.1:1',
+      TUSK_SQLD_ADMIN_URL: 'http://127.0.0.1:1',
     });
-    await expect(provisionStores(down, 100)).rejects.toThrow(/TASKS_SQLD_ADMIN_URL/);
+    await expect(provisionStores(down, 100)).rejects.toThrow(/TUSK_SQLD_ADMIN_URL/);
   });
 
   it('says which setting to check for PostgreSQL', async () => {
     const down = resolveDatabaseConfig({
-      TASKS_DB_DIALECT: 'postgres',
-      TASKS_POSTGRES_URL: 'postgres://u:p@127.0.0.1:1/x',
+      TUSK_DB_DIALECT: 'postgres',
+      TUSK_POSTGRES_URL: 'postgres://u:p@127.0.0.1:1/x',
     });
-    await expect(provisionStores(down, 100)).rejects.toThrow(/TASKS_POSTGRES_URL/);
+    await expect(provisionStores(down, 100)).rejects.toThrow(/TUSK_POSTGRES_URL/);
   });
 });
 

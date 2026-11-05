@@ -61,7 +61,7 @@ describe(`accountRoute (${leg})`, () => {
     seen.mockClear();
     const handler = route();
     const forged = t.request(null, '/api/x', {
-      headers: { cookie: 'tasks.session_token=forged.value' },
+      headers: { cookie: 'tusk.session_token=forged.value' },
     });
     expect((await handler(forged)).status).toBe(401);
 

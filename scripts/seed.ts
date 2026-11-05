@@ -12,7 +12,7 @@ import * as sqliteSchema from '../src/db/schema/sqlite';
 import { many } from '../src/position';
 import { applyMutation } from '../src/sync/apply';
 import type { Change, Mutation } from '../src/sync/format';
-import { TASKS_NAMESPACE, uuid5 } from '../src/uuid5';
+import { TUSK_NAMESPACE, uuid5 } from '../src/uuid5';
 import { firstListId } from '../src/actions/lists';
 
 /**
@@ -28,7 +28,7 @@ import { firstListId } from '../src/actions/lists';
  */
 export const SEED_EMAIL = 'seed@example.test';
 /** A password for a development database on this machine, and for nothing else. */
-export const SEED_PASSWORD = 'tasks-development-only';
+export const SEED_PASSWORD = 'tusk-development-only';
 export const SEED_NAME = 'Seed';
 
 /** Whether a database is on this machine: a file always is, and a service is when its host is. */
@@ -61,7 +61,7 @@ const LONG_NOTES = Array.from(
 
 /** What the seed makes, for an account. Pure, so that a test can look at all of it and a reset can name it. */
 export function planSeed(accountId: string): Plan {
-  const id = (name: string) => uuid5(`seed:${accountId}:${name}`, TASKS_NAMESPACE);
+  const id = (name: string) => uuid5(`seed:${accountId}:${name}`, TUSK_NAMESPACE);
   const lists = [
     { key: 'first', id: firstListId(accountId), title: 'My tasks', color: 'black' },
     { key: 'work', id: id('list:work'), title: 'Work', color: 'blue' },
@@ -194,7 +194,7 @@ async function findUser(auth: Database): Promise<string | undefined> {
 async function makeUser(auth: Database, settings: AuthSettings): Promise<string> {
   const instance = createAuth({
     settings: { ...settings, signUp: 'open' },
-    name: 'Tasks',
+    name: 'Tusk',
     database: auth,
   });
   const made = await instance.api.signUpEmail({
@@ -278,7 +278,7 @@ export async function main(argv: string[]): Promise<number> {
   }
   if (!loaded.config.auth) {
     console.error(
-      'Sign-in is not set up (TASKS_AUTH_LOCAL, TASKS_AUTH_SECRET, TASKS_URL), and the seed needs an account.',
+      'Sign-in is not set up (TUSK_AUTH_LOCAL, TUSK_AUTH_SECRET, TUSK_URL), and the seed needs an account.',
     );
     return 1;
   }

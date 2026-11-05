@@ -4,9 +4,9 @@
   "version": "7",
   "dialect": "postgresql",
   "tables": {
-    "tasks.account_settings": {
+    "tusk.account_settings": {
       "name": "account_settings",
-      "schema": "tasks",
+      "schema": "tusk",
       "columns": {
         "account_id": {
           "name": "account_id",
@@ -46,7 +46,7 @@
   },
   "enums": {},
   "schemas": {
-    "tasks": "tasks"
+    "tusk": "tusk"
   },
   "sequences": {},
   "roles": {},

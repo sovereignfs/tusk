@@ -4,9 +4,9 @@
   "version": "7",
   "dialect": "postgresql",
   "tables": {
-    "tasks_auth.account": {
+    "tusk_auth.account": {
       "name": "account",
-      "schema": "tasks_auth",
+      "schema": "tusk_auth",
       "columns": {
         "id": {
           "name": "id",
@@ -109,7 +109,7 @@
           "name": "account_user_id_user_id_fk",
           "tableFrom": "account",
           "tableTo": "user",
-          "schemaTo": "tasks_auth",
+          "schemaTo": "tusk_auth",
           "columnsFrom": [
             "user_id"
           ],
@@ -126,9 +126,9 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "tasks_auth.rate_limit": {
+    "tusk_auth.rate_limit": {
       "name": "rate_limit",
-      "schema": "tasks_auth",
+      "schema": "tusk_auth",
       "columns": {
         "id": {
           "name": "id",
@@ -171,9 +171,9 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "tasks_auth.session": {
+    "tusk_auth.session": {
       "name": "session",
-      "schema": "tasks_auth",
+      "schema": "tusk_auth",
       "columns": {
         "id": {
           "name": "id",
@@ -246,7 +246,7 @@
           "name": "session_user_id_user_id_fk",
           "tableFrom": "session",
           "tableTo": "user",
-          "schemaTo": "tasks_auth",
+          "schemaTo": "tusk_auth",
           "columnsFrom": [
             "user_id"
           ],
@@ -271,9 +271,9 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "tasks_auth.user": {
+    "tusk_auth.user": {
       "name": "user",
-      "schema": "tasks_auth",
+      "schema": "tusk_auth",
       "columns": {
         "id": {
           "name": "id",
@@ -335,9 +335,9 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "tasks_auth.verification": {
+    "tusk_auth.verification": {
       "name": "verification",
-      "schema": "tasks_auth",
+      "schema": "tusk_auth",
       "columns": {
         "id": {
           "name": "id",
@@ -403,7 +403,7 @@
   },
   "enums": {},
   "schemas": {
-    "tasks_auth": "tasks_auth"
+    "tusk_auth": "tusk_auth"
   },
   "sequences": {},
   "roles": {},

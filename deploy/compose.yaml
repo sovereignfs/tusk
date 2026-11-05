@@ -1,11 +1,11 @@
-# Tasks with an sqld database: the default setup (DESIGN.md §23).
+# Tusk with an sqld database: the default setup (DESIGN.md §23).
 #
-#   cp .env.example .env     # then edit it: at least TASKS_URL, TASKS_AUTH_SECRET and TASKS_ENCRYPTION_KEY
+#   cp .env.example .env     # then edit it: at least TUSK_URL, TUSK_AUTH_SECRET and TUSK_ENCRYPTION_KEY
 #   docker compose up -d --build
 #
 # Other setups: `-f compose.file.yaml` is one container with a database file (the smallest), and
 # `-f compose.yaml -f compose.postgres.yaml` replaces sqld with PostgreSQL. README.md has the rest.
-name: tasks
+name: tusk
 
 services:
   web:
@@ -14,21 +14,21 @@ services:
       # The port is written in sovereign.manifest.json, which Compose cannot read; a test holds this to it.
       args:
         PORT: '3000'
-    image: ${TASKS_IMAGE:-tasks}
+    image: ${TUSK_IMAGE:-tusk}
     restart: unless-stopped
     env_file:
       - path: .env
         required: false
     environment:
-      TASKS_DB_DIALECT: sqld
-      TASKS_SQLD_URL: http://sqld:8080
-      TASKS_SQLD_ADMIN_URL: http://sqld:8081
+      TUSK_DB_DIALECT: sqld
+      TUSK_SQLD_URL: http://sqld:8080
+      TUSK_SQLD_ADMIN_URL: http://sqld:8081
     depends_on:
       sqld:
         condition: service_healthy
     # Only the machine itself can reach this port: a reverse proxy with TLS in front of it is how people do.
     ports:
-      - '127.0.0.1:${TASKS_PORT:-3000}:3000'
+      - '127.0.0.1:${TUSK_PORT:-3000}:3000'
 
   sqld:
     # Pinned, not `latest`. 0.24.33 or later: earlier releases cannot create a namespace the way the app does.

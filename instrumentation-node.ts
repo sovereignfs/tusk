@@ -7,9 +7,9 @@ import { processEnv } from './src/config/env';
  *
  * 1. The settings are checked, and a wrong one stops the server, naming it.
  * 2. The database is provisioned, opened and migrated (DESIGN.md §22.1), and the server does not start if it cannot. It waits for one that is
- *    still starting, up to TASKS_DB_CONNECT_TIMEOUT_MS, since in a compose file the app and its database come up together.
+ *    still starting, up to TUSK_DB_CONNECT_TIMEOUT_MS, since in a compose file the app and its database come up together.
  *
- * 3. The background jobs start, unless `TASKS_WORKER=off` (src/jobs), and stop when the process is told to (SIGTERM, which Docker sends).
+ * 3. The background jobs start, unless `TUSK_WORKER=off` (src/jobs), and stop when the process is told to (SIGTERM, which Docker sends).
  */
 export async function start(): Promise<void> {
   const result = loadConfig(processEnv());

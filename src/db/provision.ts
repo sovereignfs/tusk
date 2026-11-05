@@ -12,7 +12,7 @@ import { provisionNamespace } from './sqld';
  * `timeoutMs`, since the app and its database come up together.
  *
  * The tables are not made here: migrations make them (`migrate.ts`), and PostgreSQL's
- * schemas `tasks` and `tasks_auth` are made by the first migration of each, which is why
+ * schemas `tusk` and `tusk_auth` are made by the first migration of each, which is why
  * they are not made here too: it would find them already there and fail.
  */
 export async function provisionStores(config: DatabaseConfig, timeoutMs = 30_000): Promise<void> {
@@ -29,7 +29,7 @@ export async function provisionStores(config: DatabaseConfig, timeoutMs = 30_000
       }, timeoutMs);
     } catch (error) {
       throw new Error(
-        `could not reach the sqld admin API at ${config.adminUrl} (set TASKS_SQLD_ADMIN_URL): ${message(error)}`,
+        `could not reach the sqld admin API at ${config.adminUrl} (set TUSK_SQLD_ADMIN_URL): ${message(error)}`,
         { cause: error },
       );
     }
@@ -46,7 +46,7 @@ export async function provisionStores(config: DatabaseConfig, timeoutMs = 30_000
       await client.end();
     }
   }, timeoutMs).catch((error: unknown) => {
-    throw new Error(`could not reach PostgreSQL (check TASKS_POSTGRES_URL): ${message(error)}`);
+    throw new Error(`could not reach PostgreSQL (check TUSK_POSTGRES_URL): ${message(error)}`);
   });
 }
 

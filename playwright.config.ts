@@ -8,7 +8,7 @@ import { defineConfig, devices } from '@playwright/test';
  * a page as a visitor sees it, a policy a browser enforces, a service worker, a network that goes away, and a phone's width.
  *
  * One instance of the app runs, on the database form the environment names: a leg of CI sets the variables an operator would set
- * (`TASKS_DB_DIALECT` and its address) and this uses them as they are, and with none it is a SQLite file in a directory of its own. The three
+ * (`TUSK_DB_DIALECT` and its address) and this uses them as they are, and with none it is a SQLite file in a directory of its own. The three
  * forms are three runs of this, as the data-layer tests are.
  *
  * Two browsers: Chromium, and WebKit, which is Safari's engine and where iOS's scrolling and compositing differ most (DESIGN.md §15.8). WebKit here
@@ -18,30 +18,30 @@ import { defineConfig, devices } from '@playwright/test';
  */
 const PORT = 3999;
 const SECRET = 'e2e-only-secret-not-for-anything-real-0123456789';
-const directory = mkdtempSync(join(tmpdir(), 'tasks-e2e-'));
+const directory = mkdtempSync(join(tmpdir(), 'tusk-e2e-'));
 
 // Next reads `.env.local` and does not override what is already set, so a developer's own settings there would reach this instance. Setting a
 // name, even to nothing, keeps it out: an empty value is "not set" to the app.
 const BLANK = Object.fromEntries(
   [
-    'TASKS_URL',
-    'TASKS_AUTH_LOCAL',
-    'TASKS_AUTH_SECRET',
-    'TASKS_AUTH_SIGNUP',
-    'TASKS_CORE_URL',
-    'TASKS_CORE_CLIENT_ID',
-    'TASKS_CORE_CLIENT_SECRET',
-    'TASKS_SMTP_HOST',
-    'TASKS_WORKER',
-    'TASKS_ENCRYPTION_KEY',
+    'TUSK_URL',
+    'TUSK_AUTH_LOCAL',
+    'TUSK_AUTH_SECRET',
+    'TUSK_AUTH_SIGNUP',
+    'TUSK_CORE_URL',
+    'TUSK_CORE_CLIENT_ID',
+    'TUSK_CORE_CLIENT_SECRET',
+    'TUSK_SMTP_HOST',
+    'TUSK_WORKER',
+    'TUSK_ENCRYPTION_KEY',
   ].map((name) => [name, '']),
 );
 
-// With no database named, a file in a directory of its own: the auth database is `tasks_auth.db` beside the app's, and a developer's data is not
+// With no database named, a file in a directory of its own: the auth database is `tusk_auth.db` beside the app's, and a developer's data is not
 // touched.
-const database = process.env.TASKS_DB_DIALECT
+const database = process.env.TUSK_DB_DIALECT
   ? {}
-  : { TASKS_DB_DIALECT: 'sqlite', TASKS_SQLITE_URL: `file:${join(directory, 'tasks.db')}` };
+  : { TUSK_DB_DIALECT: 'sqlite', TUSK_SQLITE_URL: `file:${join(directory, 'tusk.db')}` };
 
 export default defineConfig({
   testDir: 'e2e',
@@ -62,10 +62,10 @@ export default defineConfig({
     env: {
       ...BLANK,
       ...database,
-      TASKS_URL: `http://localhost:${PORT}`,
-      TASKS_AUTH_LOCAL: '1',
-      TASKS_AUTH_SECRET: SECRET,
-      TASKS_AUTH_SIGNUP: 'closed',
+      TUSK_URL: `http://localhost:${PORT}`,
+      TUSK_AUTH_LOCAL: '1',
+      TUSK_AUTH_SECRET: SECRET,
+      TUSK_AUTH_SIGNUP: 'closed',
     } as Record<string, string>,
   },
 });

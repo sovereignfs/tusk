@@ -13,7 +13,7 @@ export default async function SignInPage() {
   if (!authSettings()) notFound();
   if (await getSession()) redirect('/');
   return (
-    <AuthShell title="Sign in to Tasks">
+    <AuthShell title="Sign in to Tusk">
       <SignInForm canSignUp={await signUpAvailable()} />
     </AuthShell>
   );

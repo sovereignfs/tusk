@@ -8,7 +8,7 @@ const localDatabases = (page: Page) =>
   page.evaluate(async () =>
     (await indexedDB.databases())
       .map((db) => db.name ?? '')
-      .filter((name) => name.startsWith('tasks-')),
+      .filter((name) => name.startsWith('tusk-desk-')),
   );
 
 async function signedIn(page: Page) {
@@ -23,7 +23,7 @@ test('the working copy is on the device while signed in, and signing out leaves 
   page,
 }) => {
   await signedIn(page);
-  expect((await localDatabases(page))[0]).toMatch(/^tasks-.{8,}$/);
+  expect((await localDatabases(page))[0]).toMatch(/^tusk-desk-.{8,}$/);
 
   await signOut(page);
   await expect.poll(() => localDatabases(page)).toEqual([]);

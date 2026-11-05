@@ -47,7 +47,7 @@ export type LocalDatabase = IDBPDatabase<LocalSchema>;
 export const LOCAL_VERSION = 1;
 
 /** The database for an account (DESIGN.md §8.1). */
-export const localName = (accountId: string): string => `tasks-${accountId}`;
+export const localName = (accountId: string): string => `tusk-desk-${accountId}`;
 
 export async function openLocal(
   accountId: string,

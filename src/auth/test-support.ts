@@ -30,7 +30,7 @@ export async function makeAuth(overrides: AuthOverrides = {}): Promise<TestAuth>
   const { database } = await freshDatabase('auth');
   await runMigrations(database);
   const settings: AuthSettings = { ...SETTINGS, ...overrides };
-  const auth = createAuth({ settings, name: 'Tasks', database });
+  const auth = createAuth({ settings, name: 'Tusk', database });
   return {
     auth,
     settings,

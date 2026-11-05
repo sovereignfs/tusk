@@ -7,7 +7,7 @@ import { resolveDatabaseConfig } from './config';
 import { APP_TABLES, AUTH_TABLES, resetStores, settingsFor, testTarget } from './test-support';
 
 const { leg, config } = testTarget();
-const KEY = Symbol.for('tasks.database');
+const KEY = Symbol.for('tusk.database');
 const holder = globalThis as { [KEY]?: Promise<{ close(): Promise<void> }> | undefined };
 
 afterEach(async () => {
@@ -22,7 +22,7 @@ async function tablesOf(database: Database): Promise<string[]> {
     database.dialect === 'postgres'
       ? await dbAll<{ name: string }>(
           database,
-          sql`SELECT table_name AS name FROM information_schema.tables WHERE table_schema = ${database.store === 'auth' ? 'tasks_auth' : 'tasks'}`,
+          sql`SELECT table_name AS name FROM information_schema.tables WHERE table_schema = ${database.store === 'auth' ? 'tusk_auth' : 'tusk'}`,
         )
       : await dbAll<{ name: string }>(
           database,
@@ -70,13 +70,13 @@ describe(`booting an instance (${leg})`, () => {
   it('fails when the database cannot be reached, says why, and tries again on the next call', async () => {
     const down = {
       database: resolveDatabaseConfig({
-        TASKS_SQLD_URL: 'http://127.0.0.1:1',
-        TASKS_SQLD_ADMIN_URL: 'http://127.0.0.1:1',
+        TUSK_SQLD_URL: 'http://127.0.0.1:1',
+        TUSK_SQLD_ADMIN_URL: 'http://127.0.0.1:1',
       }),
       connectTimeoutMs: 100,
       migrationsDir: undefined,
     };
-    await expect(getStores(down)).rejects.toThrow(/TASKS_SQLD_ADMIN_URL/);
+    await expect(getStores(down)).rejects.toThrow(/TUSK_SQLD_ADMIN_URL/);
     await resetStores(config);
     await expect(getStores(settingsFor(config))).resolves.toBeDefined();
   });

@@ -5,7 +5,7 @@ import type { LocalRow } from '../local/rows';
 import { after, first } from '../position';
 import { neighboursAfterMove, positionBetween } from './order';
 import { LIMITS, type Mutation } from '../sync/format';
-import { TASKS_NAMESPACE, uuid5 } from '../uuid5';
+import { TUSK_NAMESPACE, uuid5 } from '../uuid5';
 
 /**
  * What a person does to their lists (DESIGN.md §10), as **pure functions**: given what is on the screen and what the person asked, each says which
@@ -134,7 +134,7 @@ export const FIRST_LIST_TITLE = 'My tasks';
 
 /** The id of an account's first list: derived from the account, so that two devices that each make it make one row, which arrives once. */
 export function firstListId(accountId: string): string {
-  return uuid5(`first-list:${accountId}`, TASKS_NAMESPACE);
+  return uuid5(`first-list:${accountId}`, TUSK_NAMESPACE);
 }
 
 /**

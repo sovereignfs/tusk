@@ -2,7 +2,7 @@ import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { epochMs } from './columns';
 
 /**
- * better-auth's tables, in the auth store (`tasks_auth`, DESIGN.md §22.1). Their shape is
+ * better-auth's tables, in the auth store (`tusk_auth`, DESIGN.md §22.1). Their shape is
  * better-auth's, not ours: it reads and writes through its Drizzle adapter, which looks a
  * table up by the key it is exported under, so the keys are its model names, and its dates
  * are real `Date` values (`timestamp_ms` here, `timestamp` on PostgreSQL) and not the epoch

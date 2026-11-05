@@ -15,12 +15,12 @@ describe('the session cookie', () => {
   });
 
   it('is found when it is there with a value, either name, and only then', () => {
-    expect(hasSessionCookie(jar({ 'tasks.session_token': 'x' }))).toBe(true);
-    expect(hasSessionCookie(jar({ '__Secure-tasks.session_token': 'x' }))).toBe(true);
-    expect(hasSessionCookie(jar({ 'tasks.session_token': '' }))).toBe(false);
+    expect(hasSessionCookie(jar({ 'tusk.session_token': 'x' }))).toBe(true);
+    expect(hasSessionCookie(jar({ '__Secure-tusk.session_token': 'x' }))).toBe(true);
+    expect(hasSessionCookie(jar({ 'tusk.session_token': '' }))).toBe(false);
     expect(
       hasSessionCookie(
-        jar({ session_token: 'x', 'tasks.session_data': 'y', 'fjord.session_token': 'z' }),
+        jar({ session_token: 'x', 'tusk.session_data': 'y', 'fjord.session_token': 'z' }),
       ),
     ).toBe(false);
     expect(hasSessionCookie(jar({}))).toBe(false);

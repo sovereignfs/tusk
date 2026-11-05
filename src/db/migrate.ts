@@ -25,7 +25,7 @@ import { sleep } from './retry';
 
 /**
  * The folder holding `sqlite/` and `postgres/`: `migrations/` in the directory the
- * server runs from, or the directory TASKS_MIGRATIONS_DIR names. It is read at run time on purpose, and
+ * server runs from, or the directory TUSK_MIGRATIONS_DIR names. It is read at run time on purpose, and
  * the container image copies the folder next to the server (task 1.10), so the
  * bundler is told not to trace it: left to guess, it would pull the whole project
  * into the deployed output.

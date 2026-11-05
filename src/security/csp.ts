@@ -19,7 +19,7 @@
  */
 export interface PolicyOptions {
   nonce: string;
-  /** The app is served over https (`TASKS_URL`). */
+  /** The app is served over https (`TUSK_URL`). */
   secure: boolean;
   /** `next dev`, which needs `eval`. */
   development: boolean;

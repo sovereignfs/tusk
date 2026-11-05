@@ -41,7 +41,7 @@ async function tableNames(database: Database): Promise<string[]> {
     database.dialect === 'postgres'
       ? await dbAll<{ name: string }>(
           database,
-          sql`SELECT table_name AS name FROM information_schema.tables WHERE table_schema = ${database.store === 'auth' ? 'tasks_auth' : 'tasks'}`,
+          sql`SELECT table_name AS name FROM information_schema.tables WHERE table_schema = ${database.store === 'auth' ? 'tusk_auth' : 'tusk'}`,
         )
       : await dbAll<{ name: string }>(
           database,
@@ -78,7 +78,7 @@ describe(`migrations (${leg})`, () => {
   it('fail on a folder with no migrations, since an app with no tables is a mistake', async () => {
     const { database } = await freshDatabase('auth');
     open.push(database);
-    await expect(runMigrations(database, join(tmpdir(), 'tasks-no-migrations'))).rejects.toThrow();
+    await expect(runMigrations(database, join(tmpdir(), 'tusk-no-migrations'))).rejects.toThrow();
   });
 
   it('do nothing the second time', async () => {

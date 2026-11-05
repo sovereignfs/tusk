@@ -18,9 +18,9 @@ It is a PWA on Next.js, with its own database (sqld, a SQLite file or PostgreSQL
 image. **`clients/web` in `sovereignfs/fjord` is the model:** its `DESIGN.md` §6 for authentication and §14 for the database, and its `CLAUDE.md` for
 how it is built.
 
-It was built first as **Tasks**, a task manager alone, and became Tusk on 2026-11-06 (`DESIGN.md` §5.2, §27). **The code still says Tasks** (the
-`TASKS_` settings, `tasks` databases, lists and tasks) until the turn's tasks rename it (15.1, 15.2); the rules below name what it becomes. The plugins'
-behaviour is the starting point, not a specification, and none of their code is carried over.
+It was built first as **Tasks**, a task manager alone, and became Tusk on 2026-11-06 (`DESIGN.md` §5.2, §27). **The name is changed everywhere** (15.1); what
+is left of Tasks is its _words_: the Desk is still lists, tasks and subtasks in the tables and screens until 15.2 and 3.12 turn them into lists, cards and
+checklist items. The plugins' behaviour is the starting point, not a specification, and none of their code is carried over.
 
 ## Source of truth
 
@@ -105,7 +105,7 @@ The ones most likely to be broken by accident. Each comes from `sovereign`'s con
 - **The database has three forms and two dialects** (`DESIGN.md` §23): a schema and migrations per dialect, generated with `pnpm db:generate` and never written
   by hand or `push`ed; one representation per type, through the column vocabulary; standard SQL, values bound and never interpolated; no `LISTEN/NOTIFY`, trigger,
   extension or foreign key; short transactions, nothing held across a call to GitHub or core. A data-layer test runs on sqld, a `file:` database and PostgreSQL, so
-  one that passes on only one is not done. **Tests read `TUSK_TEST_*` (`TASKS_TEST_*` until 15.1) and never the app's variables,** so `pnpm test` can never wipe a developer's data.
+  one that passes on only one is not done. **Tests read `TUSK_TEST_*` and never the app's variables,** so `pnpm test` can never wipe a developer's data.
 - **A released migration is never edited:** a fix is a new migration, and a patch release has none.
 - **A credential is stored only through `src/crypto/`** (envelope encryption under `TUSK_ENCRYPTION_KEY`), never as text in a column. Tokens and secrets never appear
   in an error, a log, a URL or the browser.
@@ -113,7 +113,7 @@ The ones most likely to be broken by accident. Each comes from `sovereign`'s con
   never retried on a lost answer.
 - **The manifest is the one copy** (`sovereign.manifest.json`) of what an instance reads: the port, the scopes and the paths. `pnpm manifest:check` passes, and the image is built
   with the arguments `pnpm exec sovereign-manifest docker-args` prints from it.
-- **Environment variables carry the app's prefix, `TUSK_` (`TASKS_` until 15.1),** named as `contracts/env.md` says. Every `process.env` read is declared in `.env.example`. The server refuses to start on a setting
+- **Environment variables carry the app's prefix, `TUSK_`,** named as `contracts/env.md` says. Every `process.env` read is declared in `.env.example`. The server refuses to start on a setting
   that is wrong; no secret has a default. `NEXT_PUBLIC_*` is never used for a value that varies at run time (it is inlined at build time).
 - **The design system comes through `src/ui`.** `@sovereignfs/ui` is one bundle that uses React context, so a Server Component imports its parts from there (a `'use client'` re-export, which
   still renders on the server). Style with the `--sv-*` tokens, never a literal colour, so dark mode and theming keep working; a colour a person picked (a board's, a label's) is data, drawn as a band or a dot with text on it by contrast, never a page's background. The typeface is Hanken Grotesk, never fetched from another site by the
@@ -156,7 +156,7 @@ scripts/deploy-check.sh          # every setup of deploy/, from nothing (needs t
 pnpm test                        # Vitest
 pnpm manifest:check              # sovereign.manifest.json is a valid manifest
 pnpm build                       # next build (standalone)
-eval "docker build $(pnpm exec sovereign-manifest docker-args) -t tasks:ci ."   # the image, with its port and label from the manifest
+eval "docker build $(pnpm exec sovereign-manifest docker-args) -t tusk:ci ."   # the image, with its port and label from the manifest
 ```
 
 once they exist, this list is where they are written, and `verify` means all of it.
@@ -168,7 +168,7 @@ once they exist, this list is where they are written, and `verify` means all of 
 | Path                                                         | What                                                                                                                                                                                                                                                                                                                                                                                         |
 | ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `app/`                                                       | Routes and layouts (App Router): a placeholder page inside the shell, `/api/health`, and the pages for a missing or failed route                                                                                                                                                                                                                                                             |
-| `src/db/`                                                    | The database layer (`DESIGN.md` §23): `config.ts` (which form), `client.ts`, `provision.ts`, `migrate.ts`, `boot.ts` (brings it up at start), `exec.ts` (`dbGet`, `dbAll`, `dbRun`, `transaction`), `schema/{sqlite,postgres}/` with the column vocabulary in `columns.ts`, `test-support.ts` (reads `TASKS_TEST_*` only)                                                                    |
+| `src/db/`                                                    | The database layer (`DESIGN.md` §23): `config.ts` (which form), `client.ts`, `provision.ts`, `migrate.ts`, `boot.ts` (brings it up at start), `exec.ts` (`dbGet`, `dbAll`, `dbRun`, `transaction`), `schema/{sqlite,postgres}/` with the column vocabulary in `columns.ts`, `test-support.ts` (reads `TUSK_TEST_*` only)                                                                     |
 | `proxy.ts`, `src/security/`                                  | The Content-Security-Policy with a nonce per request, and the headers every response has. `next.config.ts` adds the static ones. The proxy keeps the Edge discipline: no Node built-ins, no database (`src/config/edge.ts` is what it reads of the settings)                                                                                                                                 |
 | `src/jobs/`                                                  | Background work in the web process: `runner.ts` (timers, no overlap, a failure logged by name and kind, stopped on SIGTERM), `claim.ts` (the one coordination between processes: a conditional update that says who won), `index.ts` (the list of jobs, which each task that has one adds to)                                                                                                |
 | `src/ui/`                                                    | The design system's client boundary (`index.ts`), `AppShell` (the header row and the main area), the app's own CSS check (`design-tokens.ts`), `dnd.ts` (what every drag-to-reorder shares); `src/theme/` sets `data-theme` before first paint; `src/site.ts` is the app's name                                                                                                              |
@@ -192,9 +192,8 @@ once they exist, this list is where they are written, and `verify` means all of 
 
 ## Not in place yet
 
-Each is a task in `ROADMAP.md`, not a thing to assume exists. What is built is Tasks' half: the settings, the database, the jobs, the shell, the security
-headers, local sign-in, the access rules, and the Desk as lists, tasks and subtasks over sync, under the old names. **Not built:** the rename to Tusk and
-the Desk's tables (Milestone C), workspaces, boards, cards, the Inbox and publishing (D and E), and everything after. Add them in their own `chore/` or
+Each is a task in `ROADMAP.md`, not a thing to assume exists. What is built is Tasks' half, now named Tusk: the settings, the database, the jobs, the shell, the security
+headers, local sign-in, the access rules, and the Desk as lists, tasks and subtasks over sync. **Not built:** the Desk's tables (15.2) and the rest of Milestone C, workspaces, boards, cards, the Inbox and publishing (D and E), and everything after. Add them in their own `chore/` or
 `feat/` branches, and move the line out of this section as each lands. Sign-in is tested against a fake Sovereign, never a real instance, as Fjord Web
 does.
 

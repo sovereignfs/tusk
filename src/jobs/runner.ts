@@ -126,7 +126,7 @@ export class JobRunner {
     this.deps.clearTimer(timer);
     if (result === 'late') {
       this.deps.log(
-        `[tasks] jobs: stopping, and ${running.length} had not ended after ${graceMs} ms`,
+        `[tusk] jobs: stopping, and ${running.length} had not ended after ${graceMs} ms`,
       );
     }
     return { graceful: result === 'done' };
@@ -147,7 +147,7 @@ export class JobRunner {
       try {
         await entry.job.run({ now: this.deps.now(), signal: this.abort.signal });
       } catch (error) {
-        this.deps.log(`[tasks] job ${entry.job.name} failed: ${kindOf(error)}`);
+        this.deps.log(`[tusk] job ${entry.job.name} failed: ${kindOf(error)}`);
       }
     })().finally(() => {
       entry.running = undefined;

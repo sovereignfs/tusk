@@ -1,4 +1,4 @@
-# Contributing to Tasks
+# Contributing to Tusk
 
 Thank you for wanting to help. This is everything you need to get a change merged. The agent-facing version of these rules is [`AGENTS.md`](AGENTS.md);
 the two are meant to say the same thing.
@@ -18,8 +18,8 @@ You need Node 24.15 or newer and [pnpm](https://pnpm.io) (the version is `packag
 runs against sqld and PostgreSQL as well as a SQLite file.
 
 ```bash
-git clone https://github.com/sovereignfs/tasks.git
-cd tasks
+git clone https://github.com/sovereignfs/tusk.git
+cd tusk
 pnpm install --frozen-lockfile
 pnpm format:check && pnpm lint && pnpm typecheck && pnpm test
 ```
@@ -65,7 +65,7 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>
 
 ## Planning: the design, the roadmap and the epics
 
-[`DESIGN.md`](DESIGN.md) says what Tasks does, [`ROADMAP.md`](ROADMAP.md) puts the work in order, and [`docs/epics/`](docs/epics/) holds each task's detail and what
+[`DESIGN.md`](DESIGN.md) says what Tusk does, [`ROADMAP.md`](ROADMAP.md) puts the work in order, and [`docs/epics/`](docs/epics/) holds each task's detail and what
 makes it done. A change that the design does not cover changes the design first, in the same PR. An open question with no design gets a research
 document in `docs/research/`; a design that needs review before it is built gets an RFC in `docs/rfcs/`.
 
@@ -75,5 +75,5 @@ A release is its own pull request, and the merged commit is tagged `vX.Y.Z`. Con
 
 ## Licence of contributions
 
-Tasks is licensed under the [AGPL-3.0-or-later](LICENSE), since it bundles `@sovereignfs/ui`. By contributing you agree that your contribution is licensed under
+Tusk is licensed under the [AGPL-3.0-or-later](LICENSE), since it bundles `@sovereignfs/ui`. By contributing you agree that your contribution is licensed under
 the same terms. There is no CLA.

@@ -1,8 +1,8 @@
 {
   "manifest": 2,
-  "prefix": "tasks",
-  "name": "Tasks",
-  "description": "Notes, as a starting point for an app on a Sovereign instance",
+  "prefix": "tusk",
+  "name": "Tusk",
+  "description": "Your own work, private by default, and the boards you share. Runs on its own or on a Sovereign instance.",
   "port": 3000,
   "health": "/api/health",
   "launch": "/",
@@ -14,6 +14,6 @@
     "scopes": ["openid", "profile", "email", "offline_access"]
   },
   "database": { "pooling": "transaction" },
-  "generate": ["TASKS_AUTH_SECRET"],
+  "generate": ["TUSK_AUTH_SECRET"],
   "core": ">=0.49.0 <1.0.0"
 }

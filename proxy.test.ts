@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { config, proxy } from './proxy';
 
-const request = (path: string, base = 'https://tasks.example.com') =>
+const request = (path: string, base = 'https://tusk.example.com') =>
   new NextRequest(`${base}${path}`);
 
 /** The `x-middleware-request-*` headers Next copies onto a response: what the page will see as its request's. */
@@ -13,7 +13,7 @@ afterEach(() => vi.unstubAllEnvs());
 
 describe('the proxy', () => {
   it('sends a page with a Content-Security-Policy that carries the nonce the page is given', () => {
-    vi.stubEnv('TASKS_URL', 'https://tasks.example.com');
+    vi.stubEnv('TUSK_URL', 'https://tusk.example.com');
     const response = proxy(request('/'));
     const policy = response.headers.get('content-security-policy') ?? '';
     const nonce = forwarded(response, 'x-nonce') ?? '';
@@ -40,34 +40,34 @@ describe('the proxy', () => {
 
   it('turns the sign-in pages into a page that is not found when local sign-in is off, and leaves them when it is on', () => {
     const rewrite = (response: Response) => response.headers.get('x-middleware-rewrite');
-    vi.stubEnv('TASKS_AUTH_LOCAL', '');
+    vi.stubEnv('TUSK_AUTH_LOCAL', '');
     for (const path of ['/sign-in', '/sign-up']) {
       expect(rewrite(proxy(request(path))), path).toMatch(/\/not-found$/);
       // Still a page with a policy: the page that is not found is sent like any other.
       expect(proxy(request(path)).headers.get('content-security-policy'), path).toContain('nonce-');
     }
     expect(rewrite(proxy(request('/')))).toBeNull();
-    vi.stubEnv('TASKS_AUTH_LOCAL', '1');
+    vi.stubEnv('TUSK_AUTH_LOCAL', '1');
     expect(rewrite(proxy(request('/sign-in')))).toBeNull();
     expect(rewrite(proxy(request('/sign-up')))).toBeNull();
   });
 
   it('sends the front address to the first list for a request with a session cookie, and keeps the address', () => {
     const rewrite = (response: Response) => response.headers.get('x-middleware-rewrite');
-    for (const name of ['tasks.session_token', '__Secure-tasks.session_token']) {
-      const signedIn = new NextRequest('https://tasks.example.com/', {
+    for (const name of ['tusk.session_token', '__Secure-tusk.session_token']) {
+      const signedIn = new NextRequest('https://tusk.example.com/', {
         headers: { cookie: `${name}=anything` },
       });
       expect(rewrite(proxy(signedIn)), name).toMatch(/\/home$/);
     }
-    vi.stubEnv('TASKS_AUTH_LOCAL', '1');
+    vi.stubEnv('TUSK_AUTH_LOCAL', '1');
     // Only for the front address, and only for a cookie that is there: not for another page, an empty value, or a cookie of another name.
     expect(rewrite(proxy(request('/')))).toBeNull();
     expect(
       rewrite(
         proxy(
-          new NextRequest('https://tasks.example.com/', {
-            headers: { cookie: 'tasks.session_token=' },
+          new NextRequest('https://tusk.example.com/', {
+            headers: { cookie: 'tusk.session_token=' },
           }),
         ),
       ),
@@ -75,7 +75,7 @@ describe('the proxy', () => {
     expect(
       rewrite(
         proxy(
-          new NextRequest('https://tasks.example.com/', {
+          new NextRequest('https://tusk.example.com/', {
             headers: { cookie: 'other=1; session_token=1' },
           }),
         ),
@@ -84,15 +84,15 @@ describe('the proxy', () => {
     expect(
       rewrite(
         proxy(
-          new NextRequest('https://tasks.example.com/sign-in', {
-            headers: { cookie: 'tasks.session_token=x' },
+          new NextRequest('https://tusk.example.com/sign-in', {
+            headers: { cookie: 'tusk.session_token=x' },
           }),
         ),
       ),
     ).toBeNull();
     // A policy and a nonce are on it all the same.
-    const signedIn = new NextRequest('https://tasks.example.com/', {
-      headers: { cookie: 'tasks.session_token=x' },
+    const signedIn = new NextRequest('https://tusk.example.com/', {
+      headers: { cookie: 'tusk.session_token=x' },
     });
     expect(proxy(signedIn).headers.get('content-security-policy')).toContain('nonce-');
   });
@@ -106,7 +106,7 @@ describe('the proxy', () => {
   });
 
   it('never trusts a nonce or a policy that the client sent', () => {
-    const hostile = new NextRequest('https://tasks.example.com/', {
+    const hostile = new NextRequest('https://tusk.example.com/', {
       headers: { 'x-nonce': 'attacker', 'content-security-policy': "script-src 'unsafe-inline'" },
     });
     const response = proxy(hostile);
@@ -117,22 +117,22 @@ describe('the proxy', () => {
   });
 
   it('sends HSTS over https only', () => {
-    vi.stubEnv('TASKS_URL', 'https://tasks.example.com');
+    vi.stubEnv('TUSK_URL', 'https://tusk.example.com');
     expect(proxy(request('/')).headers.get('strict-transport-security')).toBe(
       'max-age=31536000; includeSubDomains',
     );
-    vi.stubEnv('TASKS_URL', 'http://localhost:3000');
+    vi.stubEnv('TUSK_URL', 'http://localhost:3000');
     expect(
       proxy(request('/', 'http://localhost:3000')).headers.get('strict-transport-security'),
     ).toBeNull();
   });
 
   it('upgrades insecure requests only where the app is served over https', () => {
-    vi.stubEnv('TASKS_URL', 'http://localhost:3000');
+    vi.stubEnv('TUSK_URL', 'http://localhost:3000');
     expect(
       proxy(request('/', 'http://localhost:3000')).headers.get('content-security-policy'),
     ).not.toContain('upgrade-insecure-requests');
-    vi.stubEnv('TASKS_URL', 'https://tasks.example.com');
+    vi.stubEnv('TUSK_URL', 'https://tusk.example.com');
     expect(proxy(request('/')).headers.get('content-security-policy')).toContain(
       'upgrade-insecure-requests',
     );

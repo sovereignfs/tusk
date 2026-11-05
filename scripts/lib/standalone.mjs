@@ -21,4 +21,4 @@ export function prepareStandalone() {
  * The migrations are not beside the standalone server in a checkout, as they are in the image (task 1.10), so they are named, as an operator
  * may name them.
  */
-export const migrationsDir = process.env.TASKS_MIGRATIONS_DIR || resolve(root, 'migrations');
+export const migrationsDir = process.env.TUSK_MIGRATIONS_DIR || resolve(root, 'migrations');

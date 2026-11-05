@@ -34,10 +34,10 @@ test('the page is the shell: a header with the app’s mark and name, and the ma
   page.on('console', (message) => message.type() === 'error' && errors.push(message.text()));
   await page.goto('/');
 
-  await expect(page).toHaveTitle('Tasks');
+  await expect(page).toHaveTitle('Tusk');
   const header = page.getByRole('banner');
-  await expect(header.getByText('Tasks')).toBeVisible();
-  await expect(header.getByText('Ta', { exact: true })).toBeVisible();
+  await expect(header.getByText('Tusk')).toBeVisible();
+  await expect(header.getByText('Tu', { exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   expect(await violations()).toEqual([]);
   expect(errors.filter((text) => !/favicon|Failed to load resource/.test(text))).toEqual([]);
@@ -64,7 +64,7 @@ test('a page that is not there is a page, with a way back', async ({ page }) => 
   const response = await page.goto('/no-such-page');
   expect(response?.status()).toBe(404);
   await expect(page.getByRole('heading', { name: 'That is not here' })).toBeVisible();
-  await page.getByRole('link', { name: 'Go back to Tasks' }).click();
+  await page.getByRole('link', { name: 'Go back to Tusk' }).click();
   await expect(page).toHaveURL('/');
 });
 

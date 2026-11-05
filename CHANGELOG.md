@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to Tasks are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
+All notable changes to Tusk are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
 Each release's section is also its GitHub release notes: the release workflow reads this file when a release is cut. Write the notes under
@@ -26,7 +26,7 @@ Each release's section is also its GitHub release notes: the release workflow re
 - Signing out removes that person's tasks from the device, after sending what it can and asking before it throws away what it cannot; it needs a connection, so that no one else can use the session. A session that ends elsewhere shows sign-in and no data at the next sync, and keeps what was changed on the device for when the same person signs back in.
 - The app for someone signed in: a header, a sidebar of lists with their colour and count of open tasks, and a right-hand column that opens for a task and closes without adding a step to go back through. It reads from the device, so it shows at once with or without a network. On a phone the sidebar is left out until the mobile layout.
 - Lists: the first visit makes _My tasks_, a + in the sidebar adds a list (also with no network, and it is sent when the connection comes back), and lists are dragged into order, which changes one row. A list that is not there says so and leads back.
-- The front address is a page that says what Tasks is, with a way to sign in, for someone who is not signed in, and their first list for someone who is.
+- The front address is a page that says what Tusk is, with a way to sign in, for someone who is not signed in, and their first list for someone who is.
 - Tasks: add one by typing and pressing Enter (it goes to the top and the cursor stays), tick it off, open it in the right-hand column to change its title and notes (saved as you leave the field), and delete it with ten seconds to undo. All of it works with no network and is sent when the connection comes back.
 - Subtasks: a checklist in a task's detail, one level deep, with a ring on the task's row showing how far through it is. Ticking a task ticks its open subtasks, and leaves the time of those already done; ticking the last subtask does not tick the task.
 - Tasks and subtasks are dragged into order, which changes one row, and by keyboard: Space lifts a row, the arrows move it, Space puts it down.
@@ -34,6 +34,10 @@ Each release's section is also its GitHub release notes: the release workflow re
 - Deleted tasks and lists are removed for good after seven days, and a device that was away learns of it the next time it connects; one that was away for more than ninety days starts again from what the server holds, after sending what it had changed.
 - A list can be sorted by the order you made, date created, due date or title, and the choice is remembered for that list on every device; under any sort but your own order a task cannot be dragged. The Completed section opens and closes as you left it, can be hidden with _Active_, and has _Delete completed_, with Undo.
 - A task can be moved to another list, with its subtasks, from its detail, and starred with a star on its row or in the detail.
+
+### Changed
+
+- The app is called **Tusk**, not Tasks. Every setting is `TUSK_…` (it was `TASKS_…`), the databases are `tusk` and `tusk_auth` (files `tusk.db` and `tusk_auth.db`), the session cookie is `tusk.session_token`, the database kept in the browser is `tusk-desk-<account>`, and the image is `ghcr.io/sovereignfs/tusk`. Nothing was released under the old names, so there is no alias: set the new ones, and a database made under the old names starts again.
 
 ### Removed
 

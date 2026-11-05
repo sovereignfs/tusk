@@ -23,14 +23,14 @@ import { createSqldClient, provisionNamespace } from './sqld';
  * What the data-layer tests run against, and a way to start each from nothing.
  *
  * CI runs the whole suite three times (sqld, a `file:` database, PostgreSQL) by
- * setting the TASKS_TEST_* variables below. They are deliberately **not** the
+ * setting the TUSK_TEST_* variables below. They are deliberately **not** the
  * variables the app reads: these tests drop whole schemas and namespaces, and a
- * developer with a real instance's TASKS_DB_DIALECT and TASKS_POSTGRES_URL exported in a shell
+ * developer with a real instance's TUSK_DB_DIALECT and TUSK_POSTGRES_URL exported in a shell
  * must never find them wiped. With none of them set the tests use a throwaway SQLite
  * file, so `pnpm test` needs no database service.
  *
- *   TASKS_TEST_DB_DIALECT, TASKS_TEST_SQLITE_URL,
- *   TASKS_TEST_SQLD_ADMIN_URL, TASKS_TEST_POSTGRES_DB_URL
+ *   TUSK_TEST_DB_DIALECT, TUSK_TEST_SQLITE_URL,
+ *   TUSK_TEST_SQLD_ADMIN_URL, TUSK_TEST_POSTGRES_DB_URL
  *
  * They keep the shape the app's variables had before they took Sovereign's names: a dialect of
  * `sqlite` or `postgres`, and one SQLite URL that is an sqld service's address or a `file:`.
@@ -47,14 +47,14 @@ let target: TestTarget | undefined;
 export function testTarget(env: Env = processEnv()): TestTarget {
   if (target) return target;
   const configured = Boolean(
-    env.TASKS_TEST_DB_DIALECT || env.TASKS_TEST_SQLITE_URL || env.TASKS_TEST_POSTGRES_DB_URL,
+    env.TUSK_TEST_DB_DIALECT || env.TUSK_TEST_SQLITE_URL || env.TUSK_TEST_POSTGRES_DB_URL,
   );
   const config = resolveDatabaseConfig(
     configured
       ? fromTestVariables(env)
       : {
-          TASKS_DB_DIALECT: 'sqlite',
-          TASKS_SQLITE_URL: `file:${join(mkdtempSync(join(tmpdir(), 'tasks-test-')), 'tasks.db')}`,
+          TUSK_DB_DIALECT: 'sqlite',
+          TUSK_SQLITE_URL: `file:${join(mkdtempSync(join(tmpdir(), 'tusk-test-')), 'tusk.db')}`,
         },
   );
   target = { leg: config.dialect === 'postgres' ? 'postgres' : config.form, config };
@@ -114,30 +114,30 @@ export async function freshDatabase(
   return { database: await openDatabase(config, store), config, leg };
 }
 
-/** The app's variables for what the TASKS_TEST_* variables name. */
+/** The app's variables for what the TUSK_TEST_* variables name. */
 function fromTestVariables(env: Env): Env {
-  if ((env.TASKS_TEST_DB_DIALECT ?? '').trim().toLowerCase() === 'postgres') {
-    return { TASKS_DB_DIALECT: 'postgres', TASKS_POSTGRES_URL: env.TASKS_TEST_POSTGRES_DB_URL };
+  if ((env.TUSK_TEST_DB_DIALECT ?? '').trim().toLowerCase() === 'postgres') {
+    return { TUSK_DB_DIALECT: 'postgres', TUSK_POSTGRES_URL: env.TUSK_TEST_POSTGRES_DB_URL };
   }
-  const url = (env.TASKS_TEST_SQLITE_URL ?? '').trim();
-  if (url.startsWith('file:')) return { TASKS_DB_DIALECT: 'sqlite', TASKS_SQLITE_URL: url };
+  const url = (env.TUSK_TEST_SQLITE_URL ?? '').trim();
+  if (url.startsWith('file:')) return { TUSK_DB_DIALECT: 'sqlite', TUSK_SQLITE_URL: url };
   return {
-    TASKS_DB_DIALECT: 'sqld',
-    TASKS_SQLD_URL: url,
-    TASKS_SQLD_ADMIN_URL: env.TASKS_TEST_SQLD_ADMIN_URL,
+    TUSK_DB_DIALECT: 'sqld',
+    TUSK_SQLD_URL: url,
+    TUSK_SQLD_ADMIN_URL: env.TUSK_TEST_SQLD_ADMIN_URL,
   };
 }
 
 /** The environment that makes `resolveDatabaseConfig` return this target's configuration. */
 export function envFor(config: DatabaseConfig): Env {
   if (config.dialect === 'postgres')
-    return { TASKS_DB_DIALECT: 'postgres', TASKS_POSTGRES_URL: config.url };
+    return { TUSK_DB_DIALECT: 'postgres', TUSK_POSTGRES_URL: config.url };
   if (config.form === 'file')
-    return { TASKS_DB_DIALECT: 'sqlite', TASKS_SQLITE_URL: `file:${config.path}` };
+    return { TUSK_DB_DIALECT: 'sqlite', TUSK_SQLITE_URL: `file:${config.path}` };
   return {
-    TASKS_DB_DIALECT: 'sqld',
-    TASKS_SQLD_URL: config.url,
-    TASKS_SQLD_ADMIN_URL: config.adminUrl,
+    TUSK_DB_DIALECT: 'sqld',
+    TUSK_SQLD_URL: config.url,
+    TUSK_SQLD_ADMIN_URL: config.adminUrl,
   };
 }
 

@@ -67,7 +67,7 @@ describe('leaving a device', () => {
     expect(result).toEqual({ status: 'left' });
     // Everything was sent, so nobody had to be asked.
     expect(order).toEqual(['session ended', 'announced']);
-    expect(await databases()).not.toContain(`tasks-${account}`);
+    expect(await databases()).not.toContain(`tusk-desk-${account}`);
   });
 
   it('asks before it throws away changes it could not send, with how many, and stays if the person says so', async () => {
@@ -86,7 +86,7 @@ describe('leaving a device', () => {
     expect(asked).toBe(2);
     expect(ended).toBe(false);
     // Nothing was touched: the copy and its outbox are still there.
-    expect(await databases()).toContain(`tasks-${account}`);
+    expect(await databases()).toContain(`tusk-desk-${account}`);
     expect(await client.pending()).toBe(2);
     expect((await client.read(listsOf)).length).toBe(2);
     expect(db.objectStoreNames.length).toBeGreaterThan(0);
@@ -102,7 +102,7 @@ describe('leaving a device', () => {
       endSession: async () => undefined,
     });
     expect(result).toEqual({ status: 'left' });
-    expect(await databases()).not.toContain(`tasks-${account}`);
+    expect(await databases()).not.toContain(`tusk-desk-${account}`);
   });
 
   it('changes nothing if the session cannot be ended, so no one is left signed in with no data or signed out with data', async () => {
@@ -117,7 +117,7 @@ describe('leaving a device', () => {
       },
     });
     expect(result).toEqual({ status: 'offline' });
-    expect(await databases()).toContain(`tasks-${account}`);
+    expect(await databases()).toContain(`tusk-desk-${account}`);
   });
 
   it('deletes only this account’s database: another account on the device keeps its own', async () => {
@@ -129,7 +129,7 @@ describe('leaving a device', () => {
       confirmLosing: async () => true,
       endSession: async () => undefined,
     });
-    expect(await databases()).toContain(`tasks-${two.account}`);
+    expect(await databases()).toContain(`tusk-desk-${two.account}`);
     expect(await two.client.pending()).toBe(1);
   });
 
@@ -148,7 +148,7 @@ describe('leaving a device', () => {
       new Promise<'stuck'>((resolve) => setTimeout(() => resolve('stuck'), 3000)),
     ]);
     expect(result).toEqual({ status: 'left' });
-    expect(await databases()).not.toContain(`tasks-${account}`);
+    expect(await databases()).not.toContain(`tusk-desk-${account}`);
   });
 
   it('can leave with no copy open: there is nothing to send, and the database goes', async () => {
@@ -162,7 +162,7 @@ describe('leaving a device', () => {
       endSession: async () => undefined,
     });
     expect(result).toEqual({ status: 'left' });
-    expect(await databases()).not.toContain(`tasks-${account}`);
+    expect(await databases()).not.toContain(`tusk-desk-${account}`);
   });
 
   it('a second account on the device sees nothing of the first', async () => {

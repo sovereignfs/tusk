@@ -4,17 +4,17 @@
  * `process-env.test.ts`). Nothing in this file may import a Node built-in.
  */
 export function edgeSettings(env: Record<string, string | undefined> = process.env): {
-  /** The app is served over https (`TASKS_URL`). */
+  /** The app is served over https (`TUSK_URL`). */
   secure: boolean;
   /** `next dev`. */
   development: boolean;
-  /** Local sign-in is on (`TASKS_AUTH_LOCAL`): when it is not, the sign-in pages do not exist. */
+  /** Local sign-in is on (`TUSK_AUTH_LOCAL`): when it is not, the sign-in pages do not exist. */
   authLocal: boolean;
 } {
-  const local = (env.TASKS_AUTH_LOCAL ?? '').trim().toLowerCase();
+  const local = (env.TUSK_AUTH_LOCAL ?? '').trim().toLowerCase();
   return {
     authLocal: local === '1' || local === 'true',
-    secure: (env.TASKS_URL ?? '').startsWith('https://'),
+    secure: (env.TUSK_URL ?? '').startsWith('https://'),
     development: env.NODE_ENV === 'development',
   };
 }

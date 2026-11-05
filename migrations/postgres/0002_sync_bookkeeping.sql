@@ -1,4 +1,4 @@
-CREATE TABLE "tasks"."applied_mutation" (
+CREATE TABLE "tusk"."applied_mutation" (
 	"account_id" text NOT NULL,
 	"id" text NOT NULL,
 	"seq" bigint NOT NULL,
@@ -6,13 +6,13 @@ CREATE TABLE "tasks"."applied_mutation" (
 	CONSTRAINT "applied_mutation_account_id_id_pk" PRIMARY KEY("account_id","id")
 );
 --> statement-breakpoint
-CREATE TABLE "tasks"."rate_bucket" (
+CREATE TABLE "tusk"."rate_bucket" (
 	"key" text PRIMARY KEY NOT NULL,
 	"window_start" bigint NOT NULL,
 	"count" bigint NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "tasks"."tombstone" (
+CREATE TABLE "tusk"."tombstone" (
 	"table_name" text NOT NULL,
 	"id" text NOT NULL,
 	"account_id" text NOT NULL,
@@ -21,5 +21,5 @@ CREATE TABLE "tasks"."tombstone" (
 	CONSTRAINT "tombstone_table_name_id_pk" PRIMARY KEY("table_name","id")
 );
 --> statement-breakpoint
-CREATE INDEX "rate_bucket_window_idx" ON "tasks"."rate_bucket" USING btree ("window_start");--> statement-breakpoint
-CREATE INDEX "tombstone_account_seq_idx" ON "tasks"."tombstone" USING btree ("account_id","seq");
+CREATE INDEX "rate_bucket_window_idx" ON "tusk"."rate_bucket" USING btree ("window_start");--> statement-breakpoint
+CREATE INDEX "tombstone_account_seq_idx" ON "tusk"."tombstone" USING btree ("account_id","seq");

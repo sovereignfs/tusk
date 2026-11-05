@@ -9,11 +9,11 @@ export interface Feature {
 
 export const landing = {
   heading: 'Your tasks, kept to yourself',
-  lead: 'A private task manager that you run yourself, or that your Sovereign instance runs for you. A cleaner Google Tasks, not a project management tool.',
+  lead: 'Your own list of things to do, private to you, that you run yourself or that your Sovereign instance runs for you. A cleaner Google Tasks, not a project management tool.',
   features: [
     {
       title: 'It never makes you wait',
-      body: 'Tasks works from what is on your device, online or not. Adding, ticking and reordering show at once, and it syncs in the background.',
+      body: 'Tusk works from what is on your device, online or not. Adding, ticking and reordering show at once, and it syncs in the background.',
     },
     {
       title: 'Yours alone',

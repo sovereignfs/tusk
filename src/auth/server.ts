@@ -10,7 +10,7 @@ import { countUsers } from './users';
  * `createAuth`). With no way of signing in on, `getAuth()` is null and everything that needs it answers 404: there is no sign-in, not a disabled
  * one (DESIGN.md §6).
  */
-const KEY = Symbol.for('tasks.auth');
+const KEY = Symbol.for('tusk.auth');
 type Holder = { [KEY]?: Promise<Auth> | undefined };
 
 /** The sign-in settings, or undefined when no way of signing in is on. */

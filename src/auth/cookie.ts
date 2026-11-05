@@ -1,9 +1,9 @@
 /**
- * The name of the session cookie better-auth sets (`advanced.cookiePrefix` in `auth.ts`): `tasks.session_token`, and with `Secure` cookies, which is
- * when `TASKS_URL` is https, `__Secure-tasks.session_token`. Kept apart from `auth.ts` since the proxy reads it and **the proxy runs on the Edge**:
+ * The name of the session cookie better-auth sets (`advanced.cookiePrefix` in `auth.ts`): `tusk.session_token`, and with `Secure` cookies, which is
+ * when `TUSK_URL` is https, `__Secure-tusk.session_token`. Kept apart from `auth.ts` since the proxy reads it and **the proxy runs on the Edge**:
  * it may import no Node built-in and no database, and `auth.ts` imports both.
  */
-export const SESSION_COOKIES = ['tasks.session_token', '__Secure-tasks.session_token'] as const;
+export const SESSION_COOKIES = ['tusk.session_token', '__Secure-tusk.session_token'] as const;
 
 /**
  * Whether a request carries a session cookie. **Only that it is there**: the proxy cannot check it and does not try, and a forged one gets the app's

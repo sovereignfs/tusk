@@ -40,59 +40,59 @@ describe('which databases the seed will touch', () => {
   it('only those on this machine: a file always, a service when its host is', () => {
     const env = (vars: Record<string, string>) => resolveDatabaseConfig(vars);
     expect(
-      isLocalDatabase(env({ TASKS_DB_DIALECT: 'sqlite', TASKS_SQLITE_URL: 'file:/data/tasks.db' })),
+      isLocalDatabase(env({ TUSK_DB_DIALECT: 'sqlite', TUSK_SQLITE_URL: 'file:/data/tusk.db' })),
     ).toBe(true);
     expect(
       isLocalDatabase(
         env({
-          TASKS_SQLD_URL: 'http://localhost:28080',
-          TASKS_SQLD_ADMIN_URL: 'http://127.0.0.1:28081',
+          TUSK_SQLD_URL: 'http://localhost:28080',
+          TUSK_SQLD_ADMIN_URL: 'http://127.0.0.1:28081',
         }),
       ),
     ).toBe(true);
     expect(
       isLocalDatabase(
         env({
-          TASKS_DB_DIALECT: 'postgres',
-          TASKS_POSTGRES_URL: 'postgres://u:p@localhost:5432/tasks',
+          TUSK_DB_DIALECT: 'postgres',
+          TUSK_POSTGRES_URL: 'postgres://u:p@localhost:5432/tusk',
         }),
       ),
     ).toBe(true);
     expect(
       isLocalDatabase(
         env({
-          TASKS_DB_DIALECT: 'postgres',
-          TASKS_POSTGRES_URL: 'postgres://u:p@[::1]:5432/tasks',
+          TUSK_DB_DIALECT: 'postgres',
+          TUSK_POSTGRES_URL: 'postgres://u:p@[::1]:5432/tusk',
         }),
       ),
     ).toBe(true);
     expect(
       isLocalDatabase(
         env({
-          TASKS_DB_DIALECT: 'postgres',
-          TASKS_POSTGRES_URL: 'postgres://u:p@db.example.com:5432/tasks',
+          TUSK_DB_DIALECT: 'postgres',
+          TUSK_POSTGRES_URL: 'postgres://u:p@db.example.com:5432/tusk',
         }),
       ),
     ).toBe(false);
     expect(
       isLocalDatabase(
-        env({ TASKS_SQLD_URL: 'http://sqld:8080', TASKS_SQLD_ADMIN_URL: 'http://sqld:8081' }),
+        env({ TUSK_SQLD_URL: 'http://sqld:8080', TUSK_SQLD_ADMIN_URL: 'http://sqld:8081' }),
       ),
     ).toBe(false);
     // Both addresses of a service must be here: one that is local and one that is not is not local.
     expect(
       isLocalDatabase(
         env({
-          TASKS_SQLD_URL: 'http://localhost:8080',
-          TASKS_SQLD_ADMIN_URL: 'http://sqld.example.com:8081',
+          TUSK_SQLD_URL: 'http://localhost:8080',
+          TUSK_SQLD_ADMIN_URL: 'http://sqld.example.com:8081',
         }),
       ),
     ).toBe(false);
     expect(
       isLocalDatabase(
         env({
-          TASKS_DB_DIALECT: 'postgres',
-          TASKS_POSTGRES_URL: 'postgres://u:p@localhost.evil.example.com:5432/tasks',
+          TUSK_DB_DIALECT: 'postgres',
+          TUSK_POSTGRES_URL: 'postgres://u:p@localhost.evil.example.com:5432/tusk',
         }),
       ),
     ).toBe(false);

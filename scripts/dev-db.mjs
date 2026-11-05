@@ -6,7 +6,7 @@
 //
 // Neither is needed to develop: a `file:` URL works with no Docker at all,
 //
-//   TASKS_DB_DIALECT=sqlite TASKS_SQLITE_URL=file:./data/tasks.db pnpm dev
+//   TUSK_DB_DIALECT=sqlite TUSK_SQLITE_URL=file:./data/tusk.db pnpm dev
 //
 // The containers are named, persistent and bound to localhost on unusual ports, so they
 // neither collide with a database you already run nor lose data between sessions.
@@ -17,12 +17,12 @@ const SQLD_IMAGE = 'ghcr.io/tursodatabase/libsql-server:v0.24.33'; // not 0.24.3
 const POSTGRES_IMAGE = 'postgres:16-alpine';
 
 const SQLD = {
-  name: 'tasks-dev-sqld',
-  volume: 'tasks-dev-sqld-data',
+  name: 'tusk-dev-sqld',
+  volume: 'tusk-dev-sqld-data',
   port: 28080,
   adminPort: 28081,
 };
-const POSTGRES = { name: 'tasks-dev-postgres', volume: 'tasks-dev-postgres-data', port: 25432 };
+const POSTGRES = { name: 'tusk-dev-postgres', volume: 'tusk-dev-postgres-data', port: 25432 };
 
 const docker = (...args) => spawnSync('docker', args, { encoding: 'utf8' });
 
@@ -35,7 +35,7 @@ function requireDocker() {
   const result = docker('info');
   if (result.error || result.status !== 0)
     fail(
-      'Docker is not running. Start it, or develop against a file: TASKS_DB_DIALECT=sqlite TASKS_SQLITE_URL=file:./data/tasks.db',
+      'Docker is not running. Start it, or develop against a file: TUSK_DB_DIALECT=sqlite TUSK_SQLITE_URL=file:./data/tusk.db',
     );
 }
 
@@ -83,9 +83,9 @@ async function sqld() {
   await waitFor(SQLD.name, async () => (await fetch(`http://localhost:${SQLD.port}/health`)).ok);
   // The app makes its own namespaces when it starts; this only shows the admin API answers.
   console.log(`sqld is up. Use:\n`);
-  console.log(`  export TASKS_DB_DIALECT=sqld`);
-  console.log(`  export TASKS_SQLD_URL=http://localhost:${SQLD.port}`);
-  console.log(`  export TASKS_SQLD_ADMIN_URL=http://localhost:${SQLD.adminPort}`);
+  console.log(`  export TUSK_DB_DIALECT=sqld`);
+  console.log(`  export TUSK_SQLD_URL=http://localhost:${SQLD.port}`);
+  console.log(`  export TUSK_SQLD_ADMIN_URL=http://localhost:${SQLD.adminPort}`);
 }
 
 async function postgres() {
@@ -93,11 +93,11 @@ async function postgres() {
     '-p',
     `127.0.0.1:${POSTGRES.port}:5432`,
     '-e',
-    'POSTGRES_USER=tasks',
+    'POSTGRES_USER=tusk',
     '-e',
-    'POSTGRES_PASSWORD=tasks',
+    'POSTGRES_PASSWORD=tusk',
     '-e',
-    'POSTGRES_DB=tasks',
+    'POSTGRES_DB=tusk',
     '-v',
     `${POSTGRES.volume}:/var/lib/postgresql/data`,
     POSTGRES_IMAGE,
@@ -105,13 +105,11 @@ async function postgres() {
   await waitFor(
     POSTGRES.name,
     async () =>
-      docker('exec', POSTGRES.name, 'pg_isready', '-U', 'tasks', '-d', 'tasks').status === 0,
+      docker('exec', POSTGRES.name, 'pg_isready', '-U', 'tusk', '-d', 'tusk').status === 0,
   );
   console.log(`PostgreSQL is up. Use:\n`);
-  console.log(`  export TASKS_DB_DIALECT=postgres`);
-  console.log(
-    `  export TASKS_POSTGRES_URL=postgres://tasks:tasks@localhost:${POSTGRES.port}/tasks`,
-  );
+  console.log(`  export TUSK_DB_DIALECT=postgres`);
+  console.log(`  export TUSK_POSTGRES_URL=postgres://tusk:tusk@localhost:${POSTGRES.port}/tusk`);
 }
 
 function stop() {

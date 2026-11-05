@@ -16,7 +16,7 @@ export const themeScript = `(function () {
   try {
     var query = window.matchMedia('(prefers-color-scheme: dark)');
     var apply = function () {
-      var chosen = stored('tasks.theme');
+      var chosen = stored('tusk.theme');
       root.setAttribute('data-theme', chosen === 'light' || chosen === 'dark' ? chosen : query.matches ? 'dark' : 'light');
     };
     apply();

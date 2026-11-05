@@ -144,7 +144,7 @@ describe('a job runner', () => {
     runner.start();
     await w.advance(3000);
     expect(calls).toBe(3);
-    expect(w.lines[0]).toBe('[tasks] job flaky failed: TypeError EBOOM');
+    expect(w.lines[0]).toBe('[tusk] job flaky failed: TypeError EBOOM');
     expect(w.lines.join('\n')).not.toMatch(/Rao|token|title/);
     await runner.stop();
   });
@@ -294,7 +294,7 @@ describe('what may be said about an error', () => {
 });
 
 describe('starting the jobs', () => {
-  it('runs none in a process told TASKS_WORKER=off, and says so', async () => {
+  it('runs none in a process told TUSK_WORKER=off, and says so', async () => {
     const w = world();
     let runs = 0;
     const runner = startJobs(
@@ -305,7 +305,7 @@ describe('starting the jobs', () => {
     expect(runner).toBeUndefined();
     await w.advance(10_000);
     expect(runs).toBe(0);
-    expect(w.lines.join('\n')).toContain('TASKS_WORKER=off');
+    expect(w.lines.join('\n')).toContain('TUSK_WORKER=off');
   });
 
   it('runs them in a process that is the worker', async () => {

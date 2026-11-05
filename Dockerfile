@@ -35,7 +35,7 @@ RUN test -n "${PORT}" || { echo 'Build with: eval "docker build $(pnpm exec sove
 
 LABEL org.opencontainers.image.title="Tasks" \
       org.opencontainers.image.description="A private task manager that runs on its own or on a Sovereign instance" \
-      org.opencontainers.image.source="https://github.com/sovereignfs/tasks" \
+      org.opencontainers.image.source="https://github.com/sovereignfs/tusk" \
       org.opencontainers.image.licenses="AGPL-3.0-or-later"
 
 ENV NODE_ENV=production \
@@ -51,11 +51,11 @@ COPY --from=build --chown=node:node /app/migrations ./migrations
 
 # Licences travel with the image: ours, and the design system's NOTICE, which carries Lucide's ISC licence and asks that it accompany copies (a
 # standalone build prunes it).
-COPY --from=build /app/LICENSE /usr/share/licenses/tasks/LICENSE
+COPY --from=build /app/LICENSE /usr/share/licenses/tusk/LICENSE
 COPY --from=build /app/node_modules/@sovereignfs/ui/LICENSE /usr/share/licenses/sovereignfs-ui/LICENSE
 COPY --from=build /app/node_modules/@sovereignfs/ui/NOTICE /usr/share/licenses/sovereignfs-ui/NOTICE
 
-# The database file, when the instance keeps one (TASKS_SQLITE_URL=file:/data/tasks.db), and nothing else, is written. The directory is the
+# The database file, when the instance keeps one (TUSK_SQLITE_URL=file:/data/tusk.db), and nothing else, is written. The directory is the
 # app's user's, so that a volume made from it is too.
 RUN mkdir /data && chown node:node /data
 VOLUME /data

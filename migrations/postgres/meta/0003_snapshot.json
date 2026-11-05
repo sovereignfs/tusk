@@ -4,9 +4,9 @@
   "version": "7",
   "dialect": "postgresql",
   "tables": {
-    "tasks.account_settings": {
+    "tusk.account_settings": {
       "name": "account_settings",
-      "schema": "tasks",
+      "schema": "tusk",
       "columns": {
         "account_id": {
           "name": "account_id",
@@ -50,9 +50,9 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "tasks.applied_mutation": {
+    "tusk.applied_mutation": {
       "name": "applied_mutation",
-      "schema": "tasks",
+      "schema": "tusk",
       "columns": {
         "account_id": {
           "name": "account_id",
@@ -95,9 +95,9 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "tasks.list": {
+    "tusk.list": {
       "name": "list",
-      "schema": "tasks",
+      "schema": "tusk",
       "columns": {
         "id": {
           "name": "id",
@@ -173,9 +173,9 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "tasks.rate_bucket": {
+    "tusk.rate_bucket": {
       "name": "rate_bucket",
-      "schema": "tasks",
+      "schema": "tusk",
       "columns": {
         "key": {
           "name": "key",
@@ -220,9 +220,9 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "tasks.series": {
+    "tusk.series": {
       "name": "series",
-      "schema": "tasks",
+      "schema": "tusk",
       "columns": {
         "id": {
           "name": "id",
@@ -298,9 +298,9 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "tasks.task": {
+    "tusk.task": {
       "name": "task",
-      "schema": "tasks",
+      "schema": "tusk",
       "columns": {
         "id": {
           "name": "id",
@@ -412,9 +412,9 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "tasks.tombstone": {
+    "tusk.tombstone": {
       "name": "tombstone",
-      "schema": "tasks",
+      "schema": "tusk",
       "columns": {
         "table_name": {
           "name": "table_name",
@@ -488,7 +488,7 @@
   },
   "enums": {},
   "schemas": {
-    "tasks": "tasks"
+    "tusk": "tusk"
   },
   "sequences": {},
   "roles": {},

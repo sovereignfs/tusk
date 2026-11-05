@@ -65,7 +65,7 @@ function server(
 }
 
 async function device(owner: string, makeTransport = server(owner)): Promise<Device> {
-  const name = `tasks-${owner}-${id()}`;
+  const name = `tusk-desk-${owner}-${id()}`;
   names.push(name);
   const db = await openLocal(owner, name);
   open.push(db);

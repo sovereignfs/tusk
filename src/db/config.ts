@@ -4,22 +4,22 @@ import { readSetting, type Env, type ReadFile } from '../config/env';
  * Which database Tasks runs on, read from the settings in one place (DESIGN.md §22.1). The names are Sovereign's (`contracts/env.md`), with
  * this app's prefix.
  *
- *   TASKS_DB_DIALECT          sqld (default), sqlite or postgres
- *   TASKS_SQLD_URL            an sqld service, http(s)://host:port (default http://sqld:8080)
- *   TASKS_SQLD_ADMIN_URL      its admin API, used to create the namespaces (default http://sqld:8081)
- *   TASKS_SQLITE_URL          file:/path/tasks.db, a database file (required with sqlite)
- *   TASKS_POSTGRES_URL[_FILE] postgres://... (required with postgres); a secret, since it can carry a password
- *   TASKS_POSTGRES_POOL_MAX   connections in the pool (default 10)
+ *   TUSK_DB_DIALECT          sqld (default), sqlite or postgres
+ *   TUSK_SQLD_URL            an sqld service, http(s)://host:port (default http://sqld:8080)
+ *   TUSK_SQLD_ADMIN_URL      its admin API, used to create the namespaces (default http://sqld:8081)
+ *   TUSK_SQLITE_URL          file:/path/tusk.db, a database file (required with sqlite)
+ *   TUSK_POSTGRES_URL[_FILE] postgres://... (required with postgres); a secret, since it can carry a password
+ *   TUSK_POSTGRES_POOL_MAX   connections in the pool (default 10)
  *   PGSSLROOTCERT             CA file for sslmode=verify-ca / verify-full
- *   TASKS_DB_CONNECT_TIMEOUT_MS  how long to wait for a database that is still starting (default 30000)
- *   TASKS_MIGRATIONS_DIR      where the migrations are, if not `migrations/` beside the server
+ *   TUSK_DB_CONNECT_TIMEOUT_MS  how long to wait for a database that is still starting (default 30000)
+ *   TUSK_MIGRATIONS_DIR      where the migrations are, if not `migrations/` beside the server
  *
- * Nothing infers the dialect from a URL: `TASKS_DB_DIALECT` says which, and a URL that does not fit it is an error, not a guess.
+ * Nothing infers the dialect from a URL: `TUSK_DB_DIALECT` says which, and a URL that does not fit it is an error, not a guess.
  */
 
 /** The two logical databases: the app's tables and better-auth's. */
-export const APP_STORE = 'tasks';
-export const AUTH_STORE = 'tasks_auth';
+export const APP_STORE = 'tusk';
+export const AUTH_STORE = 'tusk_auth';
 
 /** Which of the two a handle is for. */
 export type Store = 'app' | 'auth';
@@ -39,7 +39,7 @@ export interface SqldConfig {
   adminUrl: string;
 }
 
-/** SQLite in a plain file, with the auth store beside it as `tasks_auth.db`. */
+/** SQLite in a plain file, with the auth store beside it as `tusk_auth.db`. */
 export interface FileConfig {
   dialect: 'sqlite';
   form: 'file';
@@ -75,40 +75,40 @@ export class DatabaseConfigError extends Error {
 export function resolveDatabaseSettings(env: Env, readFile?: ReadFile): DatabaseSettings {
   return {
     database: resolveDatabaseConfig(env, readFile),
-    connectTimeoutMs: positiveInteger(env.TASKS_DB_CONNECT_TIMEOUT_MS, DEFAULT_CONNECT_TIMEOUT_MS),
-    migrationsDir: (env.TASKS_MIGRATIONS_DIR ?? '').trim() || undefined,
+    connectTimeoutMs: positiveInteger(env.TUSK_DB_CONNECT_TIMEOUT_MS, DEFAULT_CONNECT_TIMEOUT_MS),
+    migrationsDir: (env.TUSK_MIGRATIONS_DIR ?? '').trim() || undefined,
   };
 }
 
 export function resolveDatabaseConfig(env: Env, readFile?: ReadFile): DatabaseConfig {
-  const raw = env.TASKS_DB_DIALECT?.trim().toLowerCase();
+  const raw = env.TUSK_DB_DIALECT?.trim().toLowerCase();
   const dialect = raw === undefined || raw === '' ? 'sqld' : raw;
 
   if (dialect === 'postgres') return resolvePostgres(env, readFile);
   if (dialect === 'sqld') return resolveSqld(env);
   if (dialect === 'sqlite') return resolveFile(env);
   throw new DatabaseConfigError(
-    `TASKS_DB_DIALECT must be "sqld", "sqlite" or "postgres" (got "${raw}").`,
+    `TUSK_DB_DIALECT must be "sqld", "sqlite" or "postgres" (got "${raw}").`,
   );
 }
 
 function resolveSqld(env: Env): SqldConfig {
-  const url = (env.TASKS_SQLD_URL ?? '').trim() || DEFAULT_SQLD_URL;
-  const parsed = parseUrl('TASKS_SQLD_URL', url);
+  const url = (env.TUSK_SQLD_URL ?? '').trim() || DEFAULT_SQLD_URL;
+  const parsed = parseUrl('TUSK_SQLD_URL', url);
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
     const hint =
       parsed.protocol === 'file:'
-        ? '; a database file is TASKS_DB_DIALECT=sqlite with TASKS_SQLITE_URL'
+        ? '; a database file is TUSK_DB_DIALECT=sqlite with TUSK_SQLITE_URL'
         : '';
     throw new DatabaseConfigError(
-      `TASKS_SQLD_URL must be http(s)://host:port for an sqld service (got "${parsed.protocol}//…")${hint}.`,
+      `TUSK_SQLD_URL must be http(s)://host:port for an sqld service (got "${parsed.protocol}//…")${hint}.`,
     );
   }
-  const adminUrl = (env.TASKS_SQLD_ADMIN_URL ?? '').trim() || DEFAULT_SQLD_ADMIN_URL;
-  const admin = parseUrl('TASKS_SQLD_ADMIN_URL', adminUrl);
+  const adminUrl = (env.TUSK_SQLD_ADMIN_URL ?? '').trim() || DEFAULT_SQLD_ADMIN_URL;
+  const admin = parseUrl('TUSK_SQLD_ADMIN_URL', adminUrl);
   if (admin.protocol !== 'http:' && admin.protocol !== 'https:') {
     throw new DatabaseConfigError(
-      `TASKS_SQLD_ADMIN_URL must be an http(s) URL (got "${admin.protocol}//…").`,
+      `TUSK_SQLD_ADMIN_URL must be an http(s) URL (got "${admin.protocol}//…").`,
     );
   }
   return {
@@ -120,15 +120,15 @@ function resolveSqld(env: Env): SqldConfig {
 }
 
 function resolveFile(env: Env): FileConfig {
-  const url = (env.TASKS_SQLITE_URL ?? '').trim();
+  const url = (env.TUSK_SQLITE_URL ?? '').trim();
   if (url === '') {
     throw new DatabaseConfigError(
-      'TASKS_DB_DIALECT=sqlite requires TASKS_SQLITE_URL, the database file (file:/data/tasks.db).',
+      'TUSK_DB_DIALECT=sqlite requires TUSK_SQLITE_URL, the database file (file:/data/tusk.db).',
     );
   }
   if (!url.startsWith('file:')) {
     throw new DatabaseConfigError(
-      'TASKS_SQLITE_URL must be file:/path to a database file; an sqld service is TASKS_DB_DIALECT=sqld with TASKS_SQLD_URL.',
+      'TUSK_SQLITE_URL must be file:/path to a database file; an sqld service is TUSK_DB_DIALECT=sqld with TUSK_SQLD_URL.',
     );
   }
   // `file:/abs/path`, `file:///abs/path` and `file:relative/path` all name a path.
@@ -136,12 +136,12 @@ function resolveFile(env: Env): FileConfig {
   if (path.startsWith('//')) path = path.slice(2);
   if (path === '' || path.startsWith(':memory:')) {
     throw new DatabaseConfigError(
-      'TASKS_SQLITE_URL "file:" needs a path to a database file; an in-memory database is not allowed.',
+      'TUSK_SQLITE_URL "file:" needs a path to a database file; an in-memory database is not allowed.',
     );
   }
   if (path.endsWith('/')) {
     throw new DatabaseConfigError(
-      `TASKS_SQLITE_URL "${url}" names a directory; it must name the database file.`,
+      `TUSK_SQLITE_URL "${url}" names a directory; it must name the database file.`,
     );
   }
   const slash = path.lastIndexOf('/');
@@ -150,10 +150,10 @@ function resolveFile(env: Env): FileConfig {
 }
 
 function resolvePostgres(env: Env, readFile?: ReadFile): PostgresConfig {
-  const url = (readSetting(env, 'TASKS_POSTGRES_URL', readFile) ?? '').trim();
+  const url = (readSetting(env, 'TUSK_POSTGRES_URL', readFile) ?? '').trim();
   if (url === '') {
     throw new DatabaseConfigError(
-      'TASKS_DB_DIALECT=postgres requires TASKS_POSTGRES_URL (or TASKS_POSTGRES_URL_FILE).',
+      'TUSK_DB_DIALECT=postgres requires TUSK_POSTGRES_URL (or TUSK_POSTGRES_URL_FILE).',
     );
   }
   // Not the value in a message: it can carry a password.
@@ -161,18 +161,18 @@ function resolvePostgres(env: Env, readFile?: ReadFile): PostgresConfig {
   try {
     parsed = new URL(url);
   } catch {
-    throw new DatabaseConfigError('TASKS_POSTGRES_URL is not a valid URL.');
+    throw new DatabaseConfigError('TUSK_POSTGRES_URL is not a valid URL.');
   }
   if (parsed.protocol !== 'postgres:' && parsed.protocol !== 'postgresql:') {
     throw new DatabaseConfigError(
-      `TASKS_POSTGRES_URL must be a postgres:// URL (got "${parsed.protocol}//…").`,
+      `TUSK_POSTGRES_URL must be a postgres:// URL (got "${parsed.protocol}//…").`,
     );
   }
   const rootCert = (env.PGSSLROOTCERT ?? '').trim();
   return {
     dialect: 'postgres',
     url,
-    poolMax: positiveInteger(env.TASKS_POSTGRES_POOL_MAX, DEFAULT_POOL_MAX),
+    poolMax: positiveInteger(env.TUSK_POSTGRES_POOL_MAX, DEFAULT_POOL_MAX),
     ...(rootCert === '' ? {} : { sslRootCertPath: rootCert }),
   };
 }

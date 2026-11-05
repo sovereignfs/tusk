@@ -21,7 +21,7 @@ export interface AuthDependencies {
 }
 
 /** The prefix of better-auth's cookies, so that ours do not collide with another app's on localhost. */
-export const COOKIE_PREFIX = 'tasks';
+export const COOKIE_PREFIX = 'tusk';
 
 export function createAuth({ settings, name, database }: AuthDependencies) {
   const schema = database.dialect === 'postgres' ? postgresAuth : sqliteAuth;

@@ -28,21 +28,21 @@ export type LoadResult =
 const GROUPS: readonly { readonly what: string; readonly names: readonly string[] }[] = [
   {
     what: 'Sovereign sign-in',
-    names: ['TASKS_CORE_URL', 'TASKS_CORE_CLIENT_ID', 'TASKS_CORE_CLIENT_SECRET'],
+    names: ['TUSK_CORE_URL', 'TUSK_CORE_CLIENT_ID', 'TUSK_CORE_CLIENT_SECRET'],
   },
   {
     what: 'Web Push',
-    names: ['TASKS_VAPID_PUBLIC_KEY', 'TASKS_VAPID_PRIVATE_KEY', 'TASKS_VAPID_SUBJECT'],
+    names: ['TUSK_VAPID_PUBLIC_KEY', 'TUSK_VAPID_PRIVATE_KEY', 'TUSK_VAPID_SUBJECT'],
   },
   {
     what: 'the GitHub App',
     names: [
-      'TASKS_GITHUB_APP_ID',
-      'TASKS_GITHUB_APP_SLUG',
-      'TASKS_GITHUB_APP_CLIENT_ID',
-      'TASKS_GITHUB_APP_CLIENT_SECRET',
-      'TASKS_GITHUB_APP_WEBHOOK_SECRET',
-      'TASKS_GITHUB_APP_PRIVATE_KEY',
+      'TUSK_GITHUB_APP_ID',
+      'TUSK_GITHUB_APP_SLUG',
+      'TUSK_GITHUB_APP_CLIENT_ID',
+      'TUSK_GITHUB_APP_CLIENT_SECRET',
+      'TUSK_GITHUB_APP_WEBHOOK_SECRET',
+      'TUSK_GITHUB_APP_PRIVATE_KEY',
     ],
   },
 ];
@@ -54,28 +54,28 @@ function isLocalHost(hostname: string): boolean {
   return LOCAL_HOSTS.has(hostname) || hostname.endsWith('.localhost');
 }
 
-/** Checks `TASKS_URL`. Returns the origin to keep, or says what is wrong. */
+/** Checks `TUSK_URL`. Returns the origin to keep, or says what is wrong. */
 function checkUrl(value: string): { url: string } | { problem: Problem } {
   let parsed: URL;
   try {
     parsed = new URL(value);
   } catch {
-    return { problem: 'TASKS_URL is not an address. Give it as https://tasks.example.com.' };
+    return { problem: 'TUSK_URL is not an address. Give it as https://tusk.example.com.' };
   }
   if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
-    return { problem: 'TASKS_URL must be an http or https address.' };
+    return { problem: 'TUSK_URL must be an http or https address.' };
   }
   if (parsed.protocol === 'http:' && !isLocalHost(parsed.hostname)) {
     return {
       problem:
-        'TASKS_URL must be https, except on localhost: passkeys, emailed links and the sign-in redirect are made from it.',
+        'TUSK_URL must be https, except on localhost: passkeys, emailed links and the sign-in redirect are made from it.',
     };
   }
   if (parsed.username || parsed.password) {
-    return { problem: 'TASKS_URL must not carry a user name or password.' };
+    return { problem: 'TUSK_URL must not carry a user name or password.' };
   }
   if ((parsed.pathname !== '/' && parsed.pathname !== '') || parsed.search || parsed.hash) {
-    return { problem: 'TASKS_URL is the address with no path, query or fragment.' };
+    return { problem: 'TUSK_URL is the address with no path, query or fragment.' };
   }
   return { url: parsed.origin };
 }
@@ -101,7 +101,7 @@ export function loadConfig(env: Env, readFile?: ReadFile): LoadResult {
   };
 
   let url: string | undefined;
-  const rawUrl = read('TASKS_URL');
+  const rawUrl = read('TUSK_URL');
   if (rawUrl !== undefined) {
     const checked = checkUrl(rawUrl);
     if ('problem' in checked) problems.push(checked.problem);
@@ -111,9 +111,9 @@ export function loadConfig(env: Env, readFile?: ReadFile): LoadResult {
   // Signing in: checked with the address, since links, cookies and passkeys are made from it.
   const auth = resolveAuth(read, url, problems);
 
-  const rawWorker = read('TASKS_WORKER');
+  const rawWorker = read('TUSK_WORKER');
   if (rawWorker !== undefined && rawWorker !== 'on' && rawWorker !== 'off') {
-    problems.push('TASKS_WORKER is on or off.');
+    problems.push('TUSK_WORKER is on or off.');
   }
 
   for (const group of GROUPS) {
@@ -127,8 +127,8 @@ export function loadConfig(env: Env, readFile?: ReadFile): LoadResult {
   }
 
   // Mail is optional, but a host with no sender would send nothing anyone could answer, so it stops here rather than at the first message.
-  if (read('TASKS_SMTP_HOST') !== undefined && read('TASKS_SMTP_FROM') === undefined) {
-    problems.push('TASKS_SMTP_HOST is set, and mail needs TASKS_SMTP_FROM as well.');
+  if (read('TUSK_SMTP_HOST') !== undefined && read('TUSK_SMTP_FROM') === undefined) {
+    problems.push('TUSK_SMTP_HOST is set, and mail needs TUSK_SMTP_FROM as well.');
   }
 
   // The database: which of the three forms, and the address it needs. A secret address may arrive as a file.
@@ -136,8 +136,8 @@ export function loadConfig(env: Env, readFile?: ReadFile): LoadResult {
   try {
     database = resolveDatabaseSettings({
       ...env,
-      TASKS_POSTGRES_URL: read('TASKS_POSTGRES_URL'),
-      TASKS_POSTGRES_URL_FILE: undefined,
+      TUSK_POSTGRES_URL: read('TUSK_POSTGRES_URL'),
+      TUSK_POSTGRES_URL_FILE: undefined,
     });
   } catch (error) {
     if (error instanceof DatabaseConfigError) problems.push(error.message);

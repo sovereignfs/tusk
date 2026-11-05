@@ -2,7 +2,7 @@ import { index, pgSchema, primaryKey, text } from 'drizzle-orm/pg-core';
 import { APP_STORE } from '../../config';
 import { counter, epochMs, fields, hhmm, id, isoDate, position, ref } from './columns';
 
-/** The app's schema; better-auth's is `tasks_auth` (DESIGN.md §22.1). */
+/** The app's schema; better-auth's is `tusk_auth` (DESIGN.md §22.1). */
 export const app = pgSchema(APP_STORE);
 
 /** See `schema/sqlite/app.ts`. */

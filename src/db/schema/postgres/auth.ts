@@ -2,7 +2,7 @@ import { boolean, index, integer, pgSchema, text, timestamp } from 'drizzle-orm/
 import { AUTH_STORE } from '../../config';
 import { epochMs } from './columns';
 
-/** The auth store's schema; the app's is `tasks`. */
+/** The auth store's schema; the app's is `tusk`. */
 export const auth = pgSchema(AUTH_STORE);
 
 /**

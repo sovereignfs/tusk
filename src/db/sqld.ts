@@ -2,7 +2,7 @@ import type { Client } from '@libsql/client/web';
 
 /**
  * sqld (the libSQL server) connectivity. One sqld serves several logical databases
- * through *namespaces*: `tasks` for the app and `tasks_auth` for better-auth, the
+ * through *namespaces*: `tusk` for the app and `tusk_auth` for better-auth, the
  * analogue of PostgreSQL's two schemas (DESIGN.md §22). A request picks its
  * namespace with the `x-namespace` header; namespaces are created through sqld's
  * separate admin API.

@@ -4,7 +4,7 @@ import { EMAIL, PASSWORD, ensureAccount, signOut, trySignIn } from './helpers';
 /**
  * The front address (task 2.2): a page for a visitor, the first list for someone signed in, and the sign-in page for a cookie that is forged.
  */
-test('a visitor reads what Tasks is, with a way to sign in, and it is there with no script at all', async ({
+test('a visitor reads what Tusk is, with a way to sign in, and it is there with no script at all', async ({
   browser,
   baseURL,
 }) => {
@@ -56,10 +56,10 @@ test('a forged session cookie gets the sign-in page and no data', async ({
   await ensureAccount(page);
   const url = new URL(baseURL ?? 'http://localhost');
   await context.addCookies([
-    { name: 'tasks.session_token', value: 'forged.value', domain: url.hostname, path: '/' },
+    { name: 'tusk.session_token', value: 'forged.value', domain: url.hostname, path: '/' },
   ]);
   await page.goto('/');
   await expect(page).toHaveURL(/\/sign-in$/);
-  await expect(page.getByRole('heading', { name: 'Sign in to Tasks' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Sign in to Tusk' })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Lists' })).toHaveCount(0);
 });

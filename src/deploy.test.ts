@@ -32,7 +32,7 @@ describe('the image', () => {
 
   it('copies the migrations beside the server, and the licences', () => {
     expect(dockerfile).toContain('/app/migrations ./migrations');
-    expect(dockerfile).toContain('/usr/share/licenses/tasks/LICENSE');
+    expect(dockerfile).toContain('/usr/share/licenses/tusk/LICENSE');
     expect(dockerfile).toContain('/usr/share/licenses/sovereignfs-ui/NOTICE');
   });
 
@@ -82,9 +82,9 @@ describe('the setups', () => {
   });
 
   it('select their database by name, and never leave it to be guessed', () => {
-    expect(read('deploy/compose.yaml')).toContain('TASKS_DB_DIALECT: sqld');
-    expect(read('deploy/compose.file.yaml')).toContain('TASKS_DB_DIALECT: sqlite');
-    expect(read('deploy/compose.postgres.yaml')).toContain('TASKS_DB_DIALECT: postgres');
+    expect(read('deploy/compose.yaml')).toContain('TUSK_DB_DIALECT: sqld');
+    expect(read('deploy/compose.file.yaml')).toContain('TUSK_DB_DIALECT: sqlite');
+    expect(read('deploy/compose.postgres.yaml')).toContain('TUSK_DB_DIALECT: postgres');
   });
 
   it('ask for a password for PostgreSQL rather than carrying one', () => {
@@ -96,10 +96,10 @@ describe('the example environment of a deployment', () => {
   it('names only settings the app reads, which are described in the repository’s own example', () => {
     const own = read('.env.example');
     const deploy = read('deploy/.env.example');
-    const names = [...deploy.matchAll(/^#? ?(TASKS_[A-Z0-9_]+)=/gm)].map((match) => match[1] ?? '');
+    const names = [...deploy.matchAll(/^#? ?(TUSK_[A-Z0-9_]+)=/gm)].map((match) => match[1] ?? '');
     expect(names.length).toBeGreaterThan(3);
-    // TASKS_PORT is Compose's: the port on the machine, which the app never reads.
-    for (const name of names.filter((n) => n !== 'TASKS_PORT')) {
+    // TUSK_PORT is Compose's: the port on the machine, which the app never reads.
+    for (const name of names.filter((n) => n !== 'TUSK_PORT')) {
       expect(own, name).toMatch(new RegExp(`^#? ?${name}=`, 'm'));
     }
   });

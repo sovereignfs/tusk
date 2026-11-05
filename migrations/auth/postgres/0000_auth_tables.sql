@@ -1,6 +1,6 @@
-CREATE SCHEMA "tasks_auth";
+CREATE SCHEMA "tusk_auth";
 --> statement-breakpoint
-CREATE TABLE "tasks_auth"."account" (
+CREATE TABLE "tusk_auth"."account" (
 	"id" text PRIMARY KEY NOT NULL,
 	"account_id" text NOT NULL,
 	"provider_id" text NOT NULL,
@@ -16,7 +16,7 @@ CREATE TABLE "tasks_auth"."account" (
 	"updated_at" timestamp with time zone NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "tasks_auth"."rate_limit" (
+CREATE TABLE "tusk_auth"."rate_limit" (
 	"id" text PRIMARY KEY NOT NULL,
 	"key" text NOT NULL,
 	"count" integer NOT NULL,
@@ -24,7 +24,7 @@ CREATE TABLE "tasks_auth"."rate_limit" (
 	CONSTRAINT "rate_limit_key_unique" UNIQUE("key")
 );
 --> statement-breakpoint
-CREATE TABLE "tasks_auth"."session" (
+CREATE TABLE "tusk_auth"."session" (
 	"id" text PRIMARY KEY NOT NULL,
 	"expires_at" timestamp with time zone NOT NULL,
 	"token" text NOT NULL,
@@ -36,7 +36,7 @@ CREATE TABLE "tasks_auth"."session" (
 	CONSTRAINT "session_token_unique" UNIQUE("token")
 );
 --> statement-breakpoint
-CREATE TABLE "tasks_auth"."user" (
+CREATE TABLE "tusk_auth"."user" (
 	"id" text PRIMARY KEY NOT NULL,
 	"name" text NOT NULL,
 	"email" text NOT NULL,
@@ -47,7 +47,7 @@ CREATE TABLE "tasks_auth"."user" (
 	CONSTRAINT "user_email_unique" UNIQUE("email")
 );
 --> statement-breakpoint
-CREATE TABLE "tasks_auth"."verification" (
+CREATE TABLE "tusk_auth"."verification" (
 	"id" text PRIMARY KEY NOT NULL,
 	"identifier" text NOT NULL,
 	"value" text NOT NULL,
@@ -56,8 +56,8 @@ CREATE TABLE "tasks_auth"."verification" (
 	"updated_at" timestamp with time zone NOT NULL
 );
 --> statement-breakpoint
-ALTER TABLE "tasks_auth"."account" ADD CONSTRAINT "account_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "tasks_auth"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "tasks_auth"."session" ADD CONSTRAINT "session_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "tasks_auth"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-CREATE INDEX "account_user_id_idx" ON "tasks_auth"."account" USING btree ("user_id");--> statement-breakpoint
-CREATE INDEX "session_user_id_idx" ON "tasks_auth"."session" USING btree ("user_id");--> statement-breakpoint
-CREATE INDEX "verification_identifier_idx" ON "tasks_auth"."verification" USING btree ("identifier");
+ALTER TABLE "tusk_auth"."account" ADD CONSTRAINT "account_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "tusk_auth"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "tusk_auth"."session" ADD CONSTRAINT "session_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "tusk_auth"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "account_user_id_idx" ON "tusk_auth"."account" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX "session_user_id_idx" ON "tusk_auth"."session" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX "verification_identifier_idx" ON "tusk_auth"."verification" USING btree ("identifier");

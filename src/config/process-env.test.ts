@@ -25,7 +25,7 @@ describe('where the environment is read', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('declares every TASKS_ setting the code names in .env.example', () => {
+  it('declares every TUSK_ setting the code names in .env.example', () => {
     const declared = new Set(
       [
         ...readFileSync(path.join(ROOT, '.env.example'), 'utf8').matchAll(
@@ -36,7 +36,7 @@ describe('where the environment is read', () => {
     const named = new Set<string>();
     for (const file of source) {
       const text = readFileSync(path.join(ROOT, file), 'utf8');
-      for (const match of text.matchAll(/['"`](TASKS_[A-Z0-9_]+)['"`]/g)) {
+      for (const match of text.matchAll(/['"`](TUSK_[A-Z0-9_]+)['"`]/g)) {
         const name = match[1];
         if (name) named.add(name);
       }

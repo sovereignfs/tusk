@@ -12,7 +12,7 @@ if (!port) {
 const entry = prepareStandalone();
 const server = spawn('node', [entry], {
   stdio: 'inherit',
-  env: { ...process.env, PORT: port, HOSTNAME: '127.0.0.1', TASKS_MIGRATIONS_DIR: migrationsDir },
+  env: { ...process.env, PORT: port, HOSTNAME: '127.0.0.1', TUSK_MIGRATIONS_DIR: migrationsDir },
 });
 // Passed on, so that Playwright stopping its web server stops this one too.
 for (const signal of ['SIGTERM', 'SIGINT']) process.on(signal, () => server.kill(signal));

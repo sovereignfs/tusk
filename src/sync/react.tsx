@@ -68,7 +68,7 @@ export function SyncProvider({ accountId, children }: { accountId: string; child
         return;
       }
       void requestPersistence();
-      const channel = new BroadcastChannel(`tasks-${accountId}`);
+      const channel = new BroadcastChannel(`tusk-${accountId}`);
       const made = new SyncClient({ db, transport: fetchTransport(), channel });
       const set = (status: SyncStatus) => alive && setState({ client: made, status });
       const stopRefusals = made.onRefused((refusals) => {
@@ -87,7 +87,7 @@ export function SyncProvider({ accountId, children }: { accountId: string; child
       channel.addEventListener('message', onChannel);
       const loop = startSyncLoop({
         client: made,
-        lockName: `tasks-sync-${accountId}`,
+        lockName: `tusk-sync-${accountId}`,
         environment: browserEnvironment(),
         onSignedOut: () => set('session-ended'),
         onUpdateRequired: () => set('update-required'),

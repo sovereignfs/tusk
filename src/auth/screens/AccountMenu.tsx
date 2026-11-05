@@ -30,7 +30,7 @@ export function AccountMenu({
   async function signOut() {
     setOffline(false);
     setLeaving(true);
-    const channel = new BroadcastChannel(`tasks-${accountId}`);
+    const channel = new BroadcastChannel(`tusk-${accountId}`);
     const result = await leaveDevice({
       accountId,
       client: client ?? undefined,

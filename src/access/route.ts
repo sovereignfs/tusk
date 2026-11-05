@@ -12,7 +12,7 @@ import { authSettings, getAuth } from '../auth/server';
  *
  *   404  sign-in is off: there is nobody to be, so there is nothing here (DESIGN.md §6)
  *   401  there is no session, or it has ended
- *   403  a request that changes something and does not come from this app's own address (`Origin` is not `TASKS_URL`'s, or is missing)
+ *   403  a request that changes something and does not come from this app's own address (`Origin` is not `TUSK_URL`'s, or is missing)
  */
 
 /** Methods that change nothing. Anything else is a write, and a method we have not heard of is one too. */
@@ -34,7 +34,7 @@ export type AccountHandler = (context: AccountContext) => Response | Promise<Res
 
 /** What the wrapper needs from the rest of the app, so that a test can give it a better-auth instance of its own. */
 export interface AccessDeps {
-  /** The address people use (`TASKS_URL`'s origin), or undefined when sign-in is off. */
+  /** The address people use (`TUSK_URL`'s origin), or undefined when sign-in is off. */
   origin(): string | undefined;
   /** The account the request's cookies belong to, or null. */
   accountOf(headers: Headers): Promise<string | null>;

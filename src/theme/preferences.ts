@@ -3,7 +3,7 @@
  * device. It is not the account's, so it is not sent anywhere; without storage a choice lasts until the page is left. `script.ts` applies what is
  * kept before first paint.
  */
-export const THEME_KEY = 'tasks.theme';
+export const THEME_KEY = 'tusk.theme';
 
 export type ThemeChoice = 'system' | 'light' | 'dark';
 

@@ -22,7 +22,7 @@ import { freshDatabase, testTarget } from './test-support';
 const { leg } = testTarget();
 
 /** A schema of the test's own in PostgreSQL, so that dropping it cannot reach anything else. */
-const probeSchema = pgSchema('tasks_probe');
+const probeSchema = pgSchema('tusk_probe');
 
 const sqliteProbe = sqliteTable('vocabulary_probe', {
   id: sqliteColumns.id('id'),
@@ -69,10 +69,10 @@ beforeAll(async () => {
   ({ database } = await freshDatabase());
   table =
     database.dialect === 'postgres'
-      ? sql.raw('"tasks_probe"."vocabulary_probe"')
+      ? sql.raw('"tusk_probe"."vocabulary_probe"')
       : sql.raw('"vocabulary_probe"');
   if (database.dialect === 'postgres') {
-    await dbRun(database, sql`DROP SCHEMA IF EXISTS tasks_probe CASCADE`);
+    await dbRun(database, sql`DROP SCHEMA IF EXISTS tusk_probe CASCADE`);
   }
   for (const statement of await createStatements(database.dialect)) {
     await dbRun(database, sql.raw(statement));
@@ -81,7 +81,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (database.dialect === 'postgres') {
-    await dbRun(database, sql`DROP SCHEMA IF EXISTS tasks_probe CASCADE`);
+    await dbRun(database, sql`DROP SCHEMA IF EXISTS tusk_probe CASCADE`);
   }
   await database.close();
 });
@@ -180,7 +180,7 @@ describe(`the column vocabulary (${leg})`, () => {
   it.runIf(leg === 'postgres')('declares the byte collation on the column itself', async () => {
     const row = await dbGet<{ collation: string | null }>(
       database,
-      sql`SELECT collation_name AS collation FROM information_schema.columns WHERE table_schema = 'tasks_probe' AND table_name = 'vocabulary_probe' AND column_name = 'rank'`,
+      sql`SELECT collation_name AS collation FROM information_schema.columns WHERE table_schema = 'tusk_probe' AND table_name = 'vocabulary_probe' AND column_name = 'rank'`,
     );
     expect(row?.collation).toBe('C');
   });

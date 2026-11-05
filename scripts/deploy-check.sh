@@ -2,8 +2,8 @@
 # Bring the image up in each of the documented setups (deploy/) from nothing, as an operator would, and check that each is up and keeps what it is
 # given (task 1.10):
 #
-#   eval "docker build $(pnpm exec sovereign-manifest docker-args) -t tasks:ci ."
-#   TASKS_IMAGE=tasks:ci scripts/deploy-check.sh        # all of them, or name some: sqld file postgres run
+#   eval "docker build $(pnpm exec sovereign-manifest docker-args) -t tusk:ci ."
+#   TUSK_IMAGE=tusk:ci scripts/deploy-check.sh        # all of them, or name some: sqld file postgres run
 #
 # For each compose setup it starts the files, waits for them to report healthy, asks /api/health which database it is on, takes the whole thing
 # down *without* its volumes and up again (so the migrations have run twice against the same database and nothing broke), and stops the container
@@ -22,8 +22,8 @@ set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$root/deploy"
 
-image="${TASKS_IMAGE:-tasks}"
-port="${TASKS_CHECK_PORT:-3987}"
+image="${TUSK_IMAGE:-tusk}"
+port="${TUSK_CHECK_PORT:-3987}"
 setups="${*:-sqld file postgres run}"
 
 if [ -e .env ]; then
@@ -36,10 +36,10 @@ key="$(openssl rand -base64 32)"
 password="$(openssl rand -hex 16)"
 
 cat >.env <<ENV
-TASKS_URL=http://localhost:$port
-TASKS_AUTH_LOCAL=1
-TASKS_AUTH_SECRET=$secret
-TASKS_ENCRYPTION_KEY=$key
+TUSK_URL=http://localhost:$port
+TUSK_AUTH_LOCAL=1
+TUSK_AUTH_SECRET=$secret
+TUSK_ENCRYPTION_KEY=$key
 POSTGRES_PASSWORD=$password
 ENV
 
@@ -48,12 +48,12 @@ files=""
 cleanup() {
   if [ -n "$project" ]; then docker compose -p "$project" $files down -v --remove-orphans >/dev/null 2>&1 || true; fi
   rm -f .env
-  docker rm -f tasks-check-run >/dev/null 2>&1 || true
-  docker volume rm tasks-check-run >/dev/null 2>&1 || true
+  docker rm -f tusk-check-run >/dev/null 2>&1 || true
+  docker volume rm tusk-check-run >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
-export TASKS_IMAGE="$image" TASKS_PORT="$port"
+export TUSK_IMAGE="$image" TUSK_PORT="$port"
 fail() {
   echo "FAIL: $*" >&2
   if [ -n "$project" ]; then docker compose -p "$project" $files logs --no-color --tail 40 >&2 || true; fi
@@ -79,7 +79,7 @@ stop_and_check() {
 # $1 the setup's name, $2 the compose files, $3 the database it must be on.
 check_compose() {
   echo "== $1"
-  project="tasks-check-$1"
+  project="tusk-check-$1"
   files="$2"
 
   up "$1"
@@ -101,24 +101,24 @@ check_compose() {
 # The one docker run of DESIGN.md §23, as written: a file, on a named volume, with the settings it names.
 check_run() {
   echo "== run"
-  docker volume rm tasks-check-run >/dev/null 2>&1 || true
-  docker run -d --name tasks-check-run -p "127.0.0.1:$port:3000" -v tasks-check-run:/data \
-    -e TASKS_DB_DIALECT=sqlite -e TASKS_SQLITE_URL=file:/data/tasks.db \
-    -e TASKS_URL="https://tasks.example.com" -e TASKS_AUTH_LOCAL=1 -e TASKS_AUTH_SECRET="$secret" -e TASKS_ENCRYPTION_KEY="$key" \
+  docker volume rm tusk-check-run >/dev/null 2>&1 || true
+  docker run -d --name tusk-check-run -p "127.0.0.1:$port:3000" -v tusk-check-run:/data \
+    -e TUSK_DB_DIALECT=sqlite -e TUSK_SQLITE_URL=file:/data/tusk.db \
+    -e TUSK_URL="https://tusk.example.com" -e TUSK_AUTH_LOCAL=1 -e TUSK_AUTH_SECRET="$secret" -e TUSK_ENCRYPTION_KEY="$key" \
     "$image" >/dev/null
   for attempt in $(seq 1 60); do
     if [ "$(database)" = sqlite ]; then break; fi
     if [ "$attempt" = 60 ]; then
-      docker logs --tail 40 tasks-check-run >&2
+      docker logs --tail 40 tusk-check-run >&2
       fail "run: did not come up"
     fi
     sleep 1
   done
-  [ "$(docker exec tasks-check-run id -un)" = node ] || fail "run: the process is root"
-  docker exec tasks-check-run test -f /data/tasks.db || fail "run: the database file is not on the volume"
-  stop_and_check tasks-check-run run
-  docker rm tasks-check-run >/dev/null
-  docker volume rm tasks-check-run >/dev/null
+  [ "$(docker exec tusk-check-run id -un)" = node ] || fail "run: the process is root"
+  docker exec tusk-check-run test -f /data/tusk.db || fail "run: the database file is not on the volume"
+  stop_and_check tusk-check-run run
+  docker rm tusk-check-run >/dev/null
+  docker volume rm tusk-check-run >/dev/null
   echo "   ok"
 }
 
@@ -127,12 +127,12 @@ check_refusal() {
   echo "== a wrong setting"
   local out status
   set +e
-  out="$(docker run --rm -e TASKS_URL=http://tasks.example.com "$image" 2>&1)"
+  out="$(docker run --rm -e TUSK_URL=http://tusk.example.com "$image" 2>&1)"
   status=$?
   set -e
-  [ "$status" -ne 0 ] || fail "a plain-http TASKS_URL did not stop the image"
-  echo "$out" | grep -q 'TASKS_URL' || fail "the refusal does not name TASKS_URL: $out"
-  if echo "$out" | grep -q 'tasks.example.com'; then fail "the refusal repeats the value"; fi
+  [ "$status" -ne 0 ] || fail "a plain-http TUSK_URL did not stop the image"
+  echo "$out" | grep -q 'TUSK_URL' || fail "the refusal does not name TUSK_URL: $out"
+  if echo "$out" | grep -q 'tusk.example.com'; then fail "the refusal repeats the value"; fi
   echo "   ok"
 }
 

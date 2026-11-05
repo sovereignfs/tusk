@@ -1,11 +1,11 @@
 # The smallest setup: one container, and the database is a file on a volume (DESIGN.md §23).
 #
-#   cp .env.example .env     # then edit it: at least TASKS_URL, TASKS_AUTH_SECRET and TASKS_ENCRYPTION_KEY
+#   cp .env.example .env     # then edit it: at least TUSK_URL, TUSK_AUTH_SECRET and TUSK_ENCRYPTION_KEY
 #   docker compose -f compose.file.yaml up -d --build
 #
 # One process, so there is nothing to wait for and nothing else to run. It suits one person or a small group; a second instance cannot
 # share the file, so this setup does not scale out. The file must stay on a local disk, never a network filesystem.
-name: tasks
+name: tusk
 
 services:
   web:
@@ -14,18 +14,18 @@ services:
       # The port is written in sovereign.manifest.json, which Compose cannot read; a test holds this to it.
       args:
         PORT: '3000'
-    image: ${TASKS_IMAGE:-tasks}
+    image: ${TUSK_IMAGE:-tusk}
     restart: unless-stopped
     env_file:
       - path: .env
         required: false
     environment:
-      TASKS_DB_DIALECT: sqlite
-      TASKS_SQLITE_URL: file:/data/tasks.db
+      TUSK_DB_DIALECT: sqlite
+      TUSK_SQLITE_URL: file:/data/tusk.db
     volumes:
-      - tasks-data:/data
+      - tusk-data:/data
     ports:
-      - '127.0.0.1:${TASKS_PORT:-3000}:3000'
+      - '127.0.0.1:${TUSK_PORT:-3000}:3000'
 
 volumes:
-  tasks-data:
+  tusk-data:

@@ -20,7 +20,7 @@ export function uuid5(name: string, namespace: string): string {
 }
 
 /** This app's own namespace: ids made from names here are not ids another app made from the same name. */
-export const TASKS_NAMESPACE = 'a9d1c3a0-6f4e-5b52-9c7e-3f1d2b8a4c60';
+export const TUSK_NAMESPACE = 'a9d1c3a0-6f4e-5b52-9c7e-3f1d2b8a4c60';
 
 function bytesOfUuid(value: string): Uint8Array {
   const hex = value.replace(/-/g, '');

@@ -20,7 +20,7 @@ export interface Stores {
   close(): Promise<void>;
 }
 
-const KEY = Symbol.for('tasks.database');
+const KEY = Symbol.for('tusk.database');
 type Holder = { [KEY]?: Promise<Stores> | undefined };
 
 export function getStores(settings: DatabaseSettings = getConfig().database): Promise<Stores> {
@@ -45,7 +45,7 @@ export async function getAuthDatabase(settings?: DatabaseSettings): Promise<Data
 
 async function boot(settings: DatabaseSettings): Promise<Stores> {
   const { database: config, connectTimeoutMs: timeoutMs, migrationsDir } = settings;
-  console.info(`[tasks] database: ${describeConfig(config)}`);
+  console.info(`[tusk] database: ${describeConfig(config)}`);
   await provisionStores(config, timeoutMs);
 
   const app = await openDatabase(config, 'app');
@@ -60,6 +60,6 @@ async function boot(settings: DatabaseSettings): Promise<Stores> {
     await close();
     throw error;
   }
-  console.info('[tasks] database: ready, migrations applied');
+  console.info('[tusk] database: ready, migrations applied');
   return { app, auth, close };
 }
