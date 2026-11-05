@@ -46,7 +46,7 @@ One person, running it alone, keeps real lists in it, and it works with the netw
 | #   | ID                                    | Task                                    | Priority | Depends on     | Status |
 | --- | ------------------------------------- | --------------------------------------- | -------- | -------------- | ------ |
 | 11  | [2.1](docs/epics/accounts.md)         | Local sign-in                           | P0       | 1.5, 1.8       | ✅     |
-| 12  | [3.1](docs/epics/lists-and-tasks.md)  | Access rules and input parsing          | P0       | 1.5, 2.1       | 📋     |
+| 12  | [3.1](docs/epics/lists-and-tasks.md)  | Access rules and input parsing          | P0       | 1.5, 2.1       | ✅     |
 | 13  | [13.1](docs/epics/sync.md)            | The change format and validators        | P0       | 3.1            | 📋     |
 | 14  | [13.2](docs/epics/sync.md)            | The sync endpoint                       | P0       | 13.1           | 📋     |
 | 15  | [13.3](docs/epics/sync.md)            | The local store and outbox              | P0       | 13.1           | 📋     |

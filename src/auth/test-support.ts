@@ -72,6 +72,11 @@ export class TestClient {
     return this.request('GET', path, undefined, headers);
   }
 
+  /** What a browser would send as `Cookie`, for a test that builds its own request (a route handler is called with one, not with a client). */
+  cookieHeader(): string {
+    return [...this.jar].map(([k, v]) => `${k}=${v}`).join('; ');
+  }
+
   has(cookieNameFragment: string): boolean {
     return [...this.jar.keys()].some((name) => name.includes(cookieNameFragment));
   }
@@ -82,7 +87,7 @@ export class TestClient {
     body: unknown,
     headers: Record<string, string>,
   ): Promise<Reply> {
-    const cookie = [...this.jar].map(([k, v]) => `${k}=${v}`).join('; ');
+    const cookie = this.cookieHeader();
     const request = new Request(new URL(path, this.origin), {
       method,
       redirect: 'manual',

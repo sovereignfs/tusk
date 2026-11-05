@@ -14,7 +14,7 @@ The product: one person's lists and tasks. A user action here is a pure function
 
 ## Tasks
 
-#### 📋 3.1 — Access rules and input parsing
+#### ✅ 3.1 — Access rules and input parsing
 
 **Goal:** the machinery that makes "the owner in every statement" hard to get wrong, before there is anything to get wrong.
 
@@ -28,6 +28,8 @@ The product: one person's lists and tasks. A user action here is a pure function
 - `src/access/two-accounts.ts`: a test helper seeding two accounts, used by every server test to call as the wrong one.
 
 **Accepts when:** a route not listed fails a test; a handler not going through the wrapper fails a test; an unparsable id reaches no statement.
+
+**Done as:** `src/access/routes.ts` lists the three pages and two routes there are, each `public` or `account`; a public route that changes something carries a `because` naming what stands in for a session, and `/api/auth` does. `routes.test.ts` walks `app/` and fails, both ways, on a route with no rule, a rule with no route, a method that does not match, an `account` route not exported as `accountRoute(…)` (a bare function, a lookalike name and an aliased export were each seen to be caught), an `account` page that never calls `requireAccount()`, and a public write with no `because`. `src/access/route.ts` is the wrapper: it answers 404 when sign-in is off, then 401 with no session or an ended one, then 403 for a write whose `Origin` is not `TASKS_URL`'s or is missing (any method that is not a read, so one nobody listed is a write), and only then calls the handler with `{ request, accountId, params }`; the id is better-auth's user id from the session and nothing in the request can set it. `src/access/parse.ts` has `uuid` (lower case, canonical, a version and variant: the form `crypto.randomUUID()` makes, so two spellings are never two rows), `text(min, max)` (counted in characters, refuses NUL, which PostgreSQL would reject, and does not walk a huge string), `isoDate` (a date that exists, leap years included), `hhmm` and `idArray(max 500)`; each answers with a result and a reason that never contains the input, and none depends on the server, so the browser can use them. `src/access/two-accounts.ts` seeds Ada and Grace on a real auth store and builds a request as either, or as nobody, with their cookies and the instance's `Origin`; `route.test.ts` calls the wrapper as each. 34 tests in `src/access`, passing on a file database, sqld and PostgreSQL 16. Seen to fail: an unlisted route, the `Origin` check removed (5 tests), the session check removed (3), and the id pattern loosened to anything (3). Not in this task: `/api/sync`, which does not exist, and so no test that it is `account`; 13.2 adds its rule and the test then covers it. The roles and actions of sharing (Fjord's `policy.ts`) are phase 2.
 
 #### 📋 3.2 — Positions
 
