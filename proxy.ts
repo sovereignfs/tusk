@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server';
+import { hasSessionCookie } from './src/auth/cookie';
 import { edgeSettings } from './src/config/edge';
 import { HSTS, contentSecurityPolicy, newNonce } from './src/security/csp';
 
@@ -30,10 +31,12 @@ export function proxy(request: NextRequest) {
   // Off means off (DESIGN.md §6): with local sign-in off, the sign-in pages are not there. A page cannot say so itself: the root loading state
   // has already sent a 200 by the time it would, so the proxy answers with the page that is not found, and its status.
   const absent = !authLocal && SIGN_IN_PAGES.has(request.nextUrl.pathname);
-  const response = absent
-    ? NextResponse.rewrite(new URL('/not-found', request.url), {
-        request: { headers: requestHeaders },
-      })
+  // The front address is the first list for someone with a session cookie, and the address stays `/` (DESIGN.md §14.1). Only the cookie is looked at:
+  // it cannot be checked here, and `/home` checks it and sends a forged one to sign in.
+  const signedIn = request.nextUrl.pathname === '/' && hasSessionCookie(request.cookies);
+  const target = absent ? '/not-found' : signedIn ? '/home' : null;
+  const response = target
+    ? NextResponse.rewrite(new URL(target, request.url), { request: { headers: requestHeaders } })
     : NextResponse.next({ request: { headers: requestHeaders } });
   if (page) response.headers.set('content-security-policy', policy);
   if (secure) response.headers.set('strict-transport-security', HSTS);

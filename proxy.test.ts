@@ -52,6 +52,51 @@ describe('the proxy', () => {
     expect(rewrite(proxy(request('/sign-up')))).toBeNull();
   });
 
+  it('sends the front address to the first list for a request with a session cookie, and keeps the address', () => {
+    const rewrite = (response: Response) => response.headers.get('x-middleware-rewrite');
+    for (const name of ['tasks.session_token', '__Secure-tasks.session_token']) {
+      const signedIn = new NextRequest('https://tasks.example.com/', {
+        headers: { cookie: `${name}=anything` },
+      });
+      expect(rewrite(proxy(signedIn)), name).toMatch(/\/home$/);
+    }
+    vi.stubEnv('TASKS_AUTH_LOCAL', '1');
+    // Only for the front address, and only for a cookie that is there: not for another page, an empty value, or a cookie of another name.
+    expect(rewrite(proxy(request('/')))).toBeNull();
+    expect(
+      rewrite(
+        proxy(
+          new NextRequest('https://tasks.example.com/', {
+            headers: { cookie: 'tasks.session_token=' },
+          }),
+        ),
+      ),
+    ).toBeNull();
+    expect(
+      rewrite(
+        proxy(
+          new NextRequest('https://tasks.example.com/', {
+            headers: { cookie: 'other=1; session_token=1' },
+          }),
+        ),
+      ),
+    ).toBeNull();
+    expect(
+      rewrite(
+        proxy(
+          new NextRequest('https://tasks.example.com/sign-in', {
+            headers: { cookie: 'tasks.session_token=x' },
+          }),
+        ),
+      ),
+    ).toBeNull();
+    // A policy and a nonce are on it all the same.
+    const signedIn = new NextRequest('https://tasks.example.com/', {
+      headers: { cookie: 'tasks.session_token=x' },
+    });
+    expect(proxy(signedIn).headers.get('content-security-policy')).toContain('nonce-');
+  });
+
   it('does not make a page of an API: its answer is data, and has no nonce to leak', () => {
     for (const path of ['/api/health', '/api/sync']) {
       const response = proxy(request(path));

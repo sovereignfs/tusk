@@ -20,7 +20,7 @@ test('signing in with the right password shows who is signed in, and signing out
 
   // Signed in, the sign-in page has nothing to ask.
   await page.goto('/sign-in');
-  await expect(page).toHaveURL(/\/home$/);
+  await expect(page).toHaveURL(/\/$/);
 
   await signOut(page);
   await page.reload();

@@ -26,6 +26,7 @@ Each release's section is also its GitHub release notes: the release workflow re
 - Signing out removes that person's tasks from the device, after sending what it can and asking before it throws away what it cannot; it needs a connection, so that no one else can use the session. A session that ends elsewhere shows sign-in and no data at the next sync, and keeps what was changed on the device for when the same person signs back in.
 - The app for someone signed in: a header, a sidebar of lists with their colour and count of open tasks, and a right-hand column that opens for a task and closes without adding a step to go back through. It reads from the device, so it shows at once with or without a network. On a phone the sidebar is left out until the mobile layout.
 - Lists: the first visit makes _My tasks_, a + in the sidebar adds a list (also with no network, and it is sent when the connection comes back), and lists are dragged into order, which changes one row. A list that is not there says so and leads back.
+- The front address is a page that says what Tasks is, with a way to sign in, for someone who is not signed in, and their first list for someone who is.
 
 ### Removed
 

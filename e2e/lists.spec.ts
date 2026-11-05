@@ -9,7 +9,7 @@ test.use({ viewport: { width: 1280, height: 800 } });
 async function signedIn(page: Page) {
   await ensureAccount(page);
   await trySignIn(page, EMAIL, PASSWORD);
-  await expect(page).toHaveURL(/\/home$/);
+  await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole('navigation', { name: 'Lists' })).toBeVisible();
 }
 
@@ -55,7 +55,7 @@ test('a list is made from the +, appears at once, and opens', async ({ page, bas
   await expect(row).toContainText('0');
   // The field is put away, and the person is where they were.
   await expect(page.getByLabel('New list name')).toHaveCount(0);
-  await expect(page).toHaveURL(/\/home$/);
+  await expect(page).toHaveURL(/\/$/);
 
   await row.click();
   await expect(page).toHaveURL(/\/lists\/[0-9a-f-]{36}$/);
@@ -167,6 +167,9 @@ test('a list that is not there says so and leads back, whether it never was or t
     await page.goto(`/lists/${id}`);
     await expect(page.getByRole('heading', { name: 'That list is not here' })).toBeVisible();
     await page.getByRole('link', { name: 'Go to your lists' }).click();
-    await expect(page).toHaveURL(/\/home$/);
+    await expect(page).toHaveURL(/\/$/);
+    // The page it leads to is the app, not only an address: the next step waits for it, and not for a navigation still on its way.
+    await expect(page.getByRole('navigation', { name: 'Lists' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   }
 });

@@ -38,24 +38,24 @@ test('a session that ended elsewhere stops data being shown at the next sync, an
   context,
 }) => {
   await signedIn(page);
-  await expect(page.getByRole('heading', { name: 'Tasks is being built' })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Lists' })).toBeVisible();
   const before = await localDatabases(page);
 
   // The session ends on the server (here, the browser forgets its cookie, which is what the server then sees); the page does not know.
   await context.clearCookies();
-  await expect(page.getByRole('heading', { name: 'Tasks is being built' })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Lists' })).toBeVisible();
   // Coming back online is one of the reasons a device syncs.
   await page.evaluate(() => window.dispatchEvent(new Event('online')));
 
   await expect(page.getByRole('heading', { name: 'Your session ended' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Tasks is being built' })).toHaveCount(0);
+  await expect(page.getByRole('navigation', { name: 'Lists' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'User menu' })).toHaveCount(0);
   // Nothing was thrown away: signing back in as the same account finds the same database.
   expect(await localDatabases(page)).toEqual(before);
 
   await page.getByRole('link', { name: 'Sign in' }).click();
   await trySignIn(page, EMAIL, PASSWORD);
-  await expect(page.getByRole('heading', { name: 'Tasks is being built' })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Lists' })).toBeVisible();
   expect(await localDatabases(page)).toEqual(before);
   await signOut(page);
 });

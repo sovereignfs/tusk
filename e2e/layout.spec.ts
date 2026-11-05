@@ -8,7 +8,7 @@ import { EMAIL, PASSWORD, ensureAccount, trySignIn } from './helpers';
 async function signedIn(page: Page) {
   await ensureAccount(page);
   await trySignIn(page, EMAIL, PASSWORD);
-  await expect(page).toHaveURL(/\/home$/);
+  await expect(page).toHaveURL(/\/$/);
 }
 
 /** Makes a list and a task on the server as a device would, so that this one finds them on its first load. */
@@ -66,10 +66,10 @@ test('two columns at first: a sidebar of 280px and the content, with no right co
   expect(
     await sidebar.evaluate((el) => (el.parentElement as HTMLElement).getBoundingClientRect().width),
   ).toBe(280);
-  await expect(page.getByRole('region', { name: 'Task' })).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Task', exact: true })).toHaveCount(0);
 
   // The content has about 24px of padding, and fills what is left.
-  const content = page.getByRole('heading', { name: 'Tasks is being built' });
+  const content = page.getByRole('heading', { level: 1 });
   const box = await content.boundingBox();
   expect(box?.x ?? 0).toBeGreaterThanOrEqual(280 + 24);
 });
@@ -100,9 +100,9 @@ test('the right column is there only while a task is open, is 360px, shows the t
   await page.reload();
   await expect(page.getByRole('link', { name })).toBeVisible();
 
-  const home = page.url();
+  const home = new URL('/home', page.url()).toString();
   await page.goto(`/home?task=${task}`);
-  const detail = page.getByRole('region', { name: 'Task' });
+  const detail = page.getByRole('region', { name: 'Task', exact: true });
   await expect(detail).toBeVisible();
   await expect(detail.getByRole('heading', { name: 'Buy oat milk' })).toBeVisible();
   expect(
@@ -113,7 +113,7 @@ test('the right column is there only while a task is open, is 360px, shows the t
 
   const entries = await page.evaluate(() => history.length);
   await detail.getByRole('button', { name: 'Close' }).click();
-  await expect(page.getByRole('region', { name: 'Task' })).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Task', exact: true })).toHaveCount(0);
   expect(page.url()).toBe(home);
   // Replaced, not pushed: closing a task does not add a step to go back through.
   expect(await page.evaluate(() => history.length)).toBe(entries);
@@ -122,7 +122,7 @@ test('the right column is there only while a task is open, is 360px, shows the t
 test('a task that is not there says so, and can be closed', async ({ page }) => {
   await signedIn(page);
   await page.goto(`/home?task=${crypto.randomUUID()}`);
-  const detail = page.getByRole('region', { name: 'Task' });
+  const detail = page.getByRole('region', { name: 'Task', exact: true });
   await expect(detail).toBeVisible();
   await detail.getByRole('button', { name: 'Close' }).click();
   await expect(detail).toHaveCount(0);
@@ -135,7 +135,7 @@ test.describe('at a phone’s width', () => {
     page,
   }) => {
     await signedIn(page);
-    await expect(page.getByRole('heading', { name: 'Tasks is being built' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
     await expect(page.getByRole('navigation', { name: 'Lists' })).toBeHidden();
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
