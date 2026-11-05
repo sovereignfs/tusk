@@ -164,5 +164,5 @@ The repository today is the scaffold's. `DESIGN.md` §5.1 is where things go as 
 ## Not in place yet
 
 Each is a task in `ROADMAP.md`, not a thing to assume exists: everything in `src/` beyond a smoke test, the tests of the design (sign-in is tested
-against a fake Sovereign, never a real instance, as Fjord Web does), the `deploy/` setups, and a CI workflow with a changes-classifier job. Add them in
+against a fake Sovereign, never a real instance, as Fjord Web does), the `deploy/` setups, and the CI jobs for the databases, browser tests and the image. Add them in
 their own `chore/` or `feat/` branches, and move the line out of this section as each lands. Nothing of the design is built.

@@ -12,3 +12,4 @@ Each release's section is also its GitHub release notes: the release workflow re
 
 - The repository's conventions: licence, contributing guide, pull request template and dependency updates.
 - Formatting with Prettier, linting with ESLint, and tests with Vitest.
+- Continuous integration, which runs only what a change can affect.

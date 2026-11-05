@@ -50,7 +50,7 @@ Turns the scaffold into a repository that can hold Tasks as `DESIGN.md` designs 
 
 **Done as:** Prettier and ESLint with Sovereign's configuration (strict TypeScript rules and jsx-a11y; `eslint-plugin-jsx-a11y` is allowed on ESLint 10 by one named peer rule); Vitest, with the design system inlined for its CSS Modules and files run one after another; a smoke test that reads the manifest, so a runner that finds nothing cannot pass; `typecheck` runs `next typegen` first. The repository was reformatted in a commit of its own. Each of format, lint, typecheck and test was seen to fail on a planted fault. The scaffold's one lint error (an error thrown without its cause) is fixed. Left out: git hooks (`simple-git-hooks`, `lint-staged`), which can follow if wanted.
 
-#### 📋 1.3 — Continuous integration
+#### ✅ 1.3 — Continuous integration
 
 **Goal:** CI that runs what a change can affect, and vouches for the commit that lands.
 
@@ -63,6 +63,8 @@ Turns the scaffold into a repository that can hold Tasks as `DESIGN.md` designs 
 - Jobs: `check` (format, lint, typecheck, build, and from 1.5 "committed migrations match the schemas"); `tests` as a matrix over `sqld`, `file` and `postgres`, with a service for each; from 1.9 `e2e`; from 1.10 `image`. Actions pinned by SHA.
 
 **Accepts when:** a documentation-only PR runs only the first job; a code PR runs all, and a planted failure in one database's leg fails it.
+
+**Done as:** `.github/workflows/ci.yml` runs on pull requests and on pushes to `main`, and weekly; skipped on a draft or with `skip-ci`. A `changes` job runs `scripts/ci-changes.sh` (29 tests in `scripts/test-ci-changes.sh`, one of which was seen to fail when the documents rule was removed) and sets `code` and `scripts`, so a change to documents alone runs nothing more. `check` runs format, lint, type-check, test, build and the manifest check; `scripts` runs shellcheck and the classifier's tests. Actions are pinned by SHA, and `actionlint` and `shellcheck` pass. Not here: the `tests` matrix over the three databases (1.5), `e2e` (1.9) and `image` (1.10), and the check that migrations match the schemas (1.5). It has not run on GitHub: nothing is pushed.
 
 #### 📋 1.4 — Configuration, start-up, and removing the scaffold
 
