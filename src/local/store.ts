@@ -1,11 +1,12 @@
 import type { IDBPTransaction, StoreNames } from 'idb';
-import type {
-  Change,
-  Mutation,
-  MutationResult,
-  Pull,
-  RefusalCode,
-  SyncTable,
+import {
+  type Change,
+  type Mutation,
+  type MutationResult,
+  type Pull,
+  type RefusalCode,
+  type SyncTable,
+  TABLES,
 } from '../sync/format';
 import type { LocalDatabase, LocalSchema, OutboxEntry } from './db';
 import { type LocalRow, applyChange, byPosition, mergePulled } from './rows';
@@ -16,9 +17,7 @@ import { type LocalRow, applyChange, byPosition, mergePulled } from './rows';
  * neither. A transaction here holds no `await` of anything but IndexedDB, which is what keeps it open.
  */
 type Tx = IDBPTransaction<LocalSchema, StoreNames<LocalSchema>[], 'readwrite'>;
-const WRITE_STORES = ['list', 'task', 'series', 'shadow', 'outbox', 'meta'] as const;
-
-const TABLES: readonly SyncTable[] = ['list', 'task', 'series'];
+const WRITE_STORES = [...TABLES, 'shadow', 'outbox', 'meta'] as const;
 const keyOf = (table: string, id: string) => `${table}\u0000${id}`;
 
 /**
@@ -213,7 +212,7 @@ export async function settle(
     // The last page of a snapshot: a row that was not sent was purged while the device was away, unless it has an edit waiting, which is kept (the server
     // will refuse it if the row is truly gone, and it is undone then).
     if (snapshot && !pull.more) {
-      for (const name of ['list', 'task', 'series'] as const) {
+      for (const name of TABLES) {
         let cursor = await tx.objectStore(name).openCursor();
         while (cursor) {
           const row = cursor.value as LocalRow & { snap?: string };
@@ -300,24 +299,21 @@ const live = (row: LocalRow): boolean => row.deletedAt === null;
 
 /** The lists, in order. */
 export async function listsOf(db: LocalDatabase): Promise<LocalRow[]> {
-  const rows = (await db.getAll('list')).filter(live) as (LocalRow & { position: string })[];
+  const rows = (await db.getAll('desk_list')).filter(live) as (LocalRow & { position: string })[];
   return rows.sort(byPosition);
 }
 
-/** A list's top-level tasks, in order. A subtask is `subtasksOf` its parent. */
-export async function tasksOf(db: LocalDatabase, listId: string): Promise<LocalRow[]> {
+/** A list's cards, in order. A card's checklist is `checksOf` it. */
+export async function cardsOf(db: LocalDatabase, listId: string): Promise<LocalRow[]> {
   const range = IDBKeyRange.bound([listId, ''], [listId, '￿']);
-  const rows = await db.getAllFromIndex('task', 'byListPosition', range);
-  const top = rows.filter(
-    (row) => live(row) && row.table === 'task' && row.parentId === null,
-  ) as (LocalRow & { table: 'task' })[];
-  return top.sort(byPosition);
+  const rows = await db.getAllFromIndex('desk_card', 'byListPosition', range);
+  return (rows.filter(live) as (LocalRow & { position: string })[]).sort(byPosition);
 }
 
-/** A task's subtasks, in order. */
-export async function subtasksOf(db: LocalDatabase, parentId: string): Promise<LocalRow[]> {
-  const rows = await db.getAllFromIndex('task', 'byParent', parentId);
-  return (rows.filter(live) as (LocalRow & { table: 'task' })[]).sort(byPosition);
+/** A card's checklist, in order. */
+export async function checksOf(db: LocalDatabase, cardId: string): Promise<LocalRow[]> {
+  const rows = await db.getAllFromIndex('desk_check', 'byCard', cardId);
+  return (rows.filter(live) as (LocalRow & { position: string })[]).sort(byPosition);
 }
 
 export async function getRow(
@@ -329,15 +325,16 @@ export async function getRow(
 }
 
 /**
- * How many open top-level tasks each list has, for the sidebar's count (DESIGN.md §10). "Open" is a task that is not deleted and has no completion
- * time. A completion time that is ciphertext cannot be read here, so such a task counts as open until the keys are in place (task 14.3).
+ * How many open cards each list has, for the sidebar's count (DESIGN.md §10.1). "Open" is a card that is not deleted and has no completion time (so
+ * one that is in progress is open). A completion time that is ciphertext cannot be read here, so such a card counts as open until the keys are in
+ * place (task 14.3).
  */
 export async function openCounts(db: LocalDatabase): Promise<Map<string, number>> {
   const counts = new Map<string, number>();
-  let cursor = await db.transaction('task').store.openCursor();
+  let cursor = await db.transaction('desk_card').store.openCursor();
   while (cursor) {
     const row = cursor.value;
-    if (row.table === 'task' && row.deletedAt === null && row.parentId === null) {
+    if (row.table === 'desk_card' && row.deletedAt === null) {
       const done = row.fields.completedAt;
       const completed = done !== undefined && 'v' in done && done.v !== null;
       if (!completed) counts.set(row.listId, (counts.get(row.listId) ?? 0) + 1);
@@ -349,29 +346,34 @@ export async function openCounts(db: LocalDatabase): Promise<Map<string, number>
 
 /** Every list row the device has, deleted ones too, for deciding whether an account has ever had a list. */
 export async function allLists(db: LocalDatabase): Promise<LocalRow[]> {
-  return db.getAll('list');
+  return db.getAll('desk_list');
 }
 
-/** How many task rows the device has, deleted ones too, which count against the account's limit until they are removed for good. */
-export async function taskCount(db: LocalDatabase): Promise<number> {
-  return db.count('task');
+/** How many card rows the device has, deleted ones too, which count against the account's limit until they are removed for good. */
+export async function cardCount(db: LocalDatabase): Promise<number> {
+  return db.count('desk_card');
+}
+
+/** How many checklist item rows the device has, deleted ones too, which count against the account's limit until they are removed for good. */
+export async function checkCount(db: LocalDatabase): Promise<number> {
+  return db.count('desk_check');
 }
 
 /**
- * For each top-level task with subtasks, how many it has and how many are done, for the ring on its row (DESIGN.md §11.2). Deleted subtasks are not
+ * For each card with a checklist, how many items it has and how many are done, for the ring on its row (DESIGN.md §10.3). Deleted items are not
  * counted. A completion time that is ciphertext cannot be read here, and counts as not done until the keys are in place (task 14.3).
  */
-export async function subtaskCounts(
+export async function checkCounts(
   db: LocalDatabase,
 ): Promise<Map<string, { done: number; total: number }>> {
   const counts = new Map<string, { done: number; total: number }>();
-  let cursor = await db.transaction('task').store.openCursor();
+  let cursor = await db.transaction('desk_check').store.openCursor();
   while (cursor) {
     const row = cursor.value;
-    if (row.table === 'task' && row.deletedAt === null && row.parentId !== null) {
-      const have = counts.get(row.parentId) ?? { done: 0, total: 0 };
+    if (row.table === 'desk_check' && row.deletedAt === null) {
+      const have = counts.get(row.cardId) ?? { done: 0, total: 0 };
       const completed = row.fields.completedAt;
-      counts.set(row.parentId, {
+      counts.set(row.cardId, {
         total: have.total + 1,
         done:
           have.done +
@@ -383,27 +385,22 @@ export async function subtaskCounts(
   return counts;
 }
 
-/** Every subtask a task has, **deleted ones too**: what restoring a parent needs, to find those that were deleted with it. */
-export async function allSubtasksOf(db: LocalDatabase, parentId: string): Promise<LocalRow[]> {
-  return (await db.getAllFromIndex('task', 'byParent', parentId)) as LocalRow[];
+/** Every item a card has, **deleted ones too**: what restoring a card needs, to find those that were deleted with it. */
+export async function allChecksOf(db: LocalDatabase, cardId: string): Promise<LocalRow[]> {
+  return (await db.getAllFromIndex('desk_check', 'byCard', cardId)) as LocalRow[];
 }
 
 /**
- * Every task a screen that looks across lists may show (Today, Starred, Search, export): **not deleted, not a subtask of a deleted task, and not of a
- * deleted list** (DESIGN.md §11.5). Deleting a list marks only the list, so its tasks are still live rows; this is where they stop being shown. A
- * query across lists goes through here and never through the store directly.
+ * Every card a screen that looks across lists may show (search, export, the Planner of phase 2): **not deleted, and not of a deleted list**
+ * (DESIGN.md §10.6). Deleting a list marks only the list, so its cards are still live rows; this is where they stop being shown. A query across lists
+ * goes through here and never through the store directly.
  */
-export async function visibleTasks(db: LocalDatabase): Promise<LocalRow[]> {
+export async function visibleCards(db: LocalDatabase): Promise<LocalRow[]> {
   const lists = new Set(
-    (await db.getAll('list')).filter((list) => list.deletedAt === null).map((list) => list.id),
+    (await db.getAll('desk_list')).filter((list) => list.deletedAt === null).map((list) => list.id),
   );
-  const tasks = (await db.getAll('task')) as LocalRow[];
-  const live = new Set(tasks.filter((task) => task.deletedAt === null).map((task) => task.id));
-  return tasks.filter(
-    (task) =>
-      task.table === 'task' &&
-      task.deletedAt === null &&
-      lists.has(task.listId) &&
-      (task.parentId === null || live.has(task.parentId)),
+  const cards = (await db.getAll('desk_card')) as LocalRow[];
+  return cards.filter(
+    (card) => card.table === 'desk_card' && card.deletedAt === null && lists.has(card.listId),
   );
 }

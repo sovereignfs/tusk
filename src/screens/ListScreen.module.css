@@ -14,7 +14,7 @@
   margin-bottom: var(--sv-space-4);
 }
 
-.tasks {
+.cards {
   display: flex;
   flex-direction: column;
   margin: 0;

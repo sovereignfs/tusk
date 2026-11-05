@@ -35,7 +35,9 @@ const answers = (): TransportResult => ({
 });
 const list = () => ({
   mutationId: ID(),
-  changes: [{ table: 'list' as const, id: ID(), position: 'a0', fields: { title: { v: 'x' } } }],
+  changes: [
+    { table: 'desk_list' as const, id: ID(), position: 'a0', fields: { title: { v: 'x' } } },
+  ],
 });
 
 /** A transport that takes whatever it is sent and says it applied it. */

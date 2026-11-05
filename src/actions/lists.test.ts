@@ -42,7 +42,7 @@ const row = (
   extra = {},
 ): LocalRow =>
   ({
-    table: 'list',
+    table: 'desk_list',
     id,
     position,
     deletedAt: null,
@@ -71,7 +71,7 @@ describe('making a list', () => {
     accepted(result);
     const change = mutationOf(result).changes[0];
     expect(change).toMatchObject({
-      table: 'list',
+      table: 'desk_list',
       fields: { title: { v: 'Garden' }, color: { v: 'black' } },
     });
     expect((change as { position: string }).position > 'a1').toBe(true);
@@ -121,12 +121,12 @@ describe('renaming and recolouring', () => {
     const renamed = renameList(list, ' Errands ', counting());
     accepted(renamed);
     expect(mutationOf(renamed).changes).toEqual([
-      { table: 'list', id: A, fields: { title: { v: 'Errands' } } },
+      { table: 'desk_list', id: A, fields: { title: { v: 'Errands' } } },
     ]);
     const coloured = setColor(list, 'red', counting());
     accepted(coloured);
     expect(mutationOf(coloured).changes).toEqual([
-      { table: 'list', id: A, fields: { color: { v: 'red' } } },
+      { table: 'desk_list', id: A, fields: { color: { v: 'red' } } },
     ]);
   });
 
@@ -150,7 +150,7 @@ describe('moving a list', () => {
     const result = moveList(lists, D, 1, counting());
     accepted(result);
     expect(mutationOf(result).changes).toHaveLength(1);
-    expect(mutationOf(result).changes[0]).toMatchObject({ table: 'list', id: D });
+    expect(mutationOf(result).changes[0]).toMatchObject({ table: 'desk_list', id: D });
     expect(positionOf(result) > 'a0' && positionOf(result) < 'a1').toBe(true);
   });
 
@@ -208,10 +208,10 @@ describe('deleting and undoing', () => {
   it('marks only the list, and the undo clears it', () => {
     const list = row(A, 'a0');
     expect(mutationOf(deleteList(list, counting())).changes).toEqual([
-      { table: 'list', id: A, deleted: true },
+      { table: 'desk_list', id: A, deleted: true },
     ]);
     expect(mutationOf(restoreList(list, counting())).changes).toEqual([
-      { table: 'list', id: A, deleted: false },
+      { table: 'desk_list', id: A, deleted: false },
     ]);
     accepted(deleteList(list, counting()));
     expect(deleteList(undefined, counting())).toEqual({ ok: false, reason: 'missing' });
@@ -224,7 +224,7 @@ describe('the first list', () => {
     const result = ensureFirstList('user-1', [], true, counting());
     accepted(result);
     expect(mutationOf(result).changes[0]).toMatchObject({
-      table: 'list',
+      table: 'desk_list',
       id: firstListId('user-1'),
       position: first(),
       fields: { title: { v: FIRST_LIST_TITLE } },

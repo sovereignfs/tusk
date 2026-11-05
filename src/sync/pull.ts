@@ -3,7 +3,15 @@ import type { Database } from '../db/client';
 import { dbAll, dbGet } from '../db/exec';
 import * as postgresSchema from '../db/schema/postgres';
 import * as sqliteSchema from '../db/schema/sqlite';
-import { LIMITS, type Pull, type PulledRow, type PulledTombstone, type SyncTable } from './format';
+import {
+  LIMITS,
+  type Pull,
+  type PulledRow,
+  type PulledTombstone,
+  type SyncTable,
+  TABLES,
+} from './format';
+import { tableOf } from './tables';
 import { decodeFields } from './validate';
 
 /**
@@ -36,14 +44,19 @@ export async function pull(
   options: PullOptions = {},
 ): Promise<Pull> {
   const limit = Math.min(Math.max(1, options.limit ?? LIMITS.pullDefault), LIMITS.pullMax);
-  const { list, task, series, tombstone } = schema(database);
+  const { tombstone } = schema(database);
 
-  // The `seq`s of everything pending, from all four tables, as one list.
-  const pending = sql`
-    SELECT seq FROM ${list} WHERE owner_id = ${accountId} AND seq > ${cursor}
-    UNION ALL SELECT seq FROM ${task} WHERE owner_id = ${accountId} AND seq > ${cursor}
-    UNION ALL SELECT seq FROM ${series} WHERE owner_id = ${accountId} AND seq > ${cursor}
-    UNION ALL SELECT seq FROM ${tombstone} WHERE account_id = ${accountId} AND seq > ${cursor}`;
+  // The `seq`s of everything pending, from all five tables, as one list.
+  const pending = sql.join(
+    [
+      ...TABLES.map(
+        (name) =>
+          sql`SELECT seq FROM ${tableOf(database, name)} WHERE owner_id = ${accountId} AND seq > ${cursor}`,
+      ),
+      sql`SELECT seq FROM ${tombstone} WHERE account_id = ${accountId} AND seq > ${cursor}`,
+    ],
+    sql` UNION ALL `,
+  );
 
   // The `seq` of the limit-th pending row, if there are that many: where this page ends, and there may be more.
   const edge = await dbGet<{ seq: number | string }>(
@@ -74,7 +87,7 @@ export async function pull(
   }
 
   const rows: PulledRow[] = [];
-  for (const name of ['list', 'task', 'series'] as const) {
+  for (const name of TABLES) {
     rows.push(...(await rowsOf(database, accountId, name, cursor, end)));
   }
   rows.sort(
@@ -97,7 +110,7 @@ interface RawRow {
   id: string;
   position?: string;
   listId?: string;
-  parentId?: string | null;
+  cardId?: string;
   deletedAt: number | string | null;
   seq: number | string;
   createdAt: number | string;
@@ -107,17 +120,19 @@ interface RawRow {
 async function rowsOf(
   database: Database,
   accountId: string,
-  name: 'list' | 'task' | 'series',
+  name: SyncTable,
   cursor: number,
   end: number,
 ): Promise<PulledRow[]> {
-  const target = schema(database)[name];
+  const target = tableOf(database, name);
   const columns =
-    name === 'list'
+    name === 'desk_list'
       ? sql`position`
-      : name === 'task'
-        ? sql`list_id AS "listId", parent_id AS "parentId", position`
-        : sql`list_id AS "listId"`;
+      : name === 'desk_card'
+        ? sql`list_id AS "listId", position`
+        : name === 'desk_check'
+          ? sql`card_id AS "cardId", position`
+          : sql`list_id AS "listId"`;
   const raw = await dbAll<RawRow>(
     database,
     sql`SELECT id, ${columns}, deleted_at AS "deletedAt", seq, created_at AS "createdAt", fields
@@ -134,13 +149,22 @@ async function rowsOf(
       createdAt: Number(row.createdAt),
       fields,
     };
-    if (name === 'list') return { table: 'list', ...base, position: row.position as string };
-    if (name === 'series') return { table: 'series', ...base, listId: row.listId as string };
+    if (name === 'desk_list')
+      return { table: 'desk_list', ...base, position: row.position as string };
+    if (name === 'desk_series')
+      return { table: 'desk_series', ...base, listId: row.listId as string };
+    if (name === 'desk_check') {
+      return {
+        table: 'desk_check',
+        ...base,
+        cardId: row.cardId as string,
+        position: row.position as string,
+      };
+    }
     return {
-      table: 'task',
+      table: 'desk_card',
       ...base,
       listId: row.listId as string,
-      parentId: row.parentId ?? null,
       position: row.position as string,
     };
   });

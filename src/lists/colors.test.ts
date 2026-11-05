@@ -21,7 +21,7 @@ describe('a list’s colour', () => {
 
   it('is what the server accepts for a list, and nothing else: the two cannot drift apart', () => {
     for (const color of LIST_COLORS)
-      expect(parseField('list', 'color', { v: color }).ok).toBe(true);
-    expect(parseField('list', 'color', { v: 'purple' }).ok).toBe(false);
+      expect(parseField('desk_list', 'color', { v: color }).ok).toBe(true);
+    expect(parseField('desk_list', 'color', { v: 'purple' }).ok).toBe(false);
   });
 });

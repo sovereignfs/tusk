@@ -6,6 +6,7 @@ import { freshDatabase } from '../db/test-support';
 import * as postgresSchema from '../db/schema/postgres';
 import * as sqliteSchema from '../db/schema/sqlite';
 import { type Change, type Mutation, type SyncTable } from './format';
+import { tableOf } from './tables';
 
 /**
  * What the tests of the server's side of sync share: a migrated app store, accounts to be, and the shapes of the mutations a device sends.
@@ -26,58 +27,76 @@ export const mutation = (...changes: Change[]): Mutation => ({ mutationId: id(),
 
 export const list = (
   extra: Partial<Change> & { title?: string } = {},
-): Change & { table: 'list' } => {
+): Change & { table: 'desk_list' } => {
   const { title = 'Home', ...rest } = extra as { title?: string } & Record<string, unknown>;
   return {
-    table: 'list',
+    table: 'desk_list',
     id: id(),
     position: 'a0',
     fields: { title: { v: title } },
     ...rest,
-  } as Change & { table: 'list' };
+  } as Change & { table: 'desk_list' };
 };
 
-export const task = (
+export const card = (
   listId: string,
   extra: Record<string, unknown> = {},
-): Change & { table: 'task' } =>
+): Change & { table: 'desk_card' } =>
   ({
-    table: 'task',
+    table: 'desk_card',
     id: id(),
     listId,
     position: 'a0',
     fields: { title: { v: 'Buy milk' } },
     ...extra,
-  }) as Change & { table: 'task' };
+  }) as Change & { table: 'desk_card' };
+
+/** An item of a card's checklist. */
+export const check = (
+  cardId: string,
+  extra: Record<string, unknown> = {},
+): Change & { table: 'desk_check' } =>
+  ({
+    table: 'desk_check',
+    id: id(),
+    cardId,
+    position: 'a0',
+    fields: { title: { v: 'Oat milk' } },
+    ...extra,
+  }) as Change & { table: 'desk_check' };
 
 export const series = (
   listId: string,
   extra: Record<string, unknown> = {},
-): Change & { table: 'series' } =>
+): Change & { table: 'desk_series' } =>
   ({
-    table: 'series',
+    table: 'desk_series',
     id: id(),
     listId,
     fields: { rule: { v: 'FREQ=DAILY' }, anchor: { v: '2026-11-05' } },
     ...extra,
-  }) as Change & { table: 'series' };
+  }) as Change & { table: 'desk_series' };
 
-const tables = (database: Database) =>
-  database.dialect === 'postgres' ? postgresSchema : sqliteSchema;
-
-/** Everything an account has on the three tables, as the database holds it, in a fixed order: to compare before and after. */
+/** Everything an account has on the four tables, as the database holds it, in a fixed order: to compare before and after. */
 export async function snapshot(
   database: Database,
   owner: string,
 ): Promise<Record<SyncTable, unknown[]>> {
-  const t = tables(database);
-  const read = (table: unknown) =>
+  const read = (table: SyncTable) =>
     dbAll<Record<string, unknown>>(
       database,
-      sql`SELECT * FROM ${table as never} WHERE owner_id = ${owner} ORDER BY id`,
+      sql`SELECT * FROM ${tableOf(database, table)} WHERE owner_id = ${owner} ORDER BY id`,
     );
-  return { list: await read(t.list), task: await read(t.task), series: await read(t.series) };
+  return {
+    desk_list: await read('desk_list'),
+    desk_card: await read('desk_card'),
+    desk_check: await read('desk_check'),
+    desk_series: await read('desk_series'),
+  };
 }
+
+const tables = (database: Database) =>
+  database.dialect === 'postgres' ? postgresSchema : sqliteSchema;
 
 export async function accountSeq(database: Database, owner: string): Promise<number | undefined> {
   const rows = await dbAll<{ seq: number | string }>(
@@ -94,7 +113,7 @@ export async function rowOf(
 ): Promise<Record<string, unknown> | undefined> {
   const rows = await dbAll<Record<string, unknown>>(
     database,
-    sql`SELECT * FROM ${tables(database)[table]} WHERE id = ${rowId}`,
+    sql`SELECT * FROM ${tableOf(database, table)} WHERE id = ${rowId}`,
   );
   return rows[0];
 }

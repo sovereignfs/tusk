@@ -3,7 +3,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import type { Database } from '../db/client';
 import { testTarget } from '../db/test-support';
 import { type LocalDatabase, deleteLocal, openLocal } from '../local/db';
-import { getRow, listsOf, outboxSize, tasksOf } from '../local/store';
+import { cardsOf, checksOf, getRow, listsOf, outboxSize } from '../local/store';
 import type { LocalRow } from '../local/rows';
 import { type SyncDeps, handleSync } from './endpoint';
 import { SyncClient } from './client';
@@ -87,20 +87,20 @@ async function settleAll(...devices: Device[]) {
 
 const everything = async (d: Device): Promise<LocalRow[]> => {
   const rows: LocalRow[] = [];
-  for (const table of ['list', 'task', 'series'] as const) {
+  for (const table of ['desk_list', 'desk_card', 'desk_check', 'desk_series'] as const) {
     rows.push(...((await d.client.db.getAll(table)) as LocalRow[]));
   }
   return rows.sort((a, b) => (a.id < b.id ? -1 : 1));
 };
 
 const newList = (title = 'Home') => ({
-  table: 'list' as const,
+  table: 'desk_list' as const,
   id: id(),
   position: 'a0',
   fields: { title: { v: title } },
 });
 const newTask = (listId: string, title = 'Buy milk') => ({
-  table: 'task' as const,
+  table: 'desk_card' as const,
   id: id(),
   listId,
   position: 'a0',
@@ -108,7 +108,7 @@ const newTask = (listId: string, title = 'Buy milk') => ({
 });
 const mutation = (...changes: object[]) => ({ mutationId: id(), changes });
 const title = async (d: Device, taskId: string) =>
-  JSON.stringify((await getRow(d.client.db, 'task', taskId))?.fields.title);
+  JSON.stringify((await getRow(d.client.db, 'desk_card', taskId))?.fields.title);
 
 describe(`devices of one account against the server (${leg})`, () => {
   it('a task made on one device arrives on another, exactly as it is on the first', async () => {
@@ -120,7 +120,7 @@ describe(`devices of one account against the server (${leg})`, () => {
     await settleAll(a, b);
 
     expect((await listsOf(b.client.db)).map((r) => r.id)).toEqual([l.id]);
-    expect((await tasksOf(b.client.db, l.id)).map((r) => r.id)).toEqual([t.id]);
+    expect((await cardsOf(b.client.db, l.id)).map((r) => r.id)).toEqual([t.id]);
     expect(await everything(a)).toEqual(await everything(b));
   });
 
@@ -132,16 +132,114 @@ describe(`devices of one account against the server (${leg})`, () => {
     const tasks = [newTask(l.id, 'one'), newTask(l.id, 'two'), newTask(l.id, 'three')];
     await a.client.commit(mutation(l));
     for (const t of tasks) await a.client.commit(mutation(t));
-    await a.client.commit(mutation({ table: 'task', id: tasks[0]?.id, deleted: true }));
+    await a.client.commit(mutation({ table: 'desk_card', id: tasks[0]?.id, deleted: true }));
     expect(await a.client.sync()).toEqual({ status: 'offline' });
     expect(await outboxSize(a.client.db)).toBe(5);
-    expect((await tasksOf(a.client.db, l.id)).length).toBe(2);
+    expect((await cardsOf(a.client.db, l.id)).length).toBe(2);
 
     a.online = true;
     await settleAll(a, b);
     expect(await outboxSize(a.client.db)).toBe(0);
     expect(await everything(a)).toEqual(await everything(b));
-    expect((await tasksOf(b.client.db, l.id)).length).toBe(2);
+    expect((await cardsOf(b.client.db, l.id)).length).toBe(2);
+  });
+
+  describe('a card’s checklist, on two devices', () => {
+    const newItem = (cardId: string, title = 'Oat milk', position = 'a0') => ({
+      table: 'desk_check' as const,
+      id: id(),
+      cardId,
+      position,
+      fields: { title: { v: title } },
+    });
+
+    it('arrives with the card, in order, ticked as it was, and the two devices agree', async () => {
+      const owner = account();
+      const [a, b] = [await device(owner), await device(owner)];
+      const l = newList();
+      const t = newTask(l.id);
+      const [one, two] = [newItem(t.id, 'one', 'a0'), newItem(t.id, 'two', 'a1')];
+      await a.client.commit(mutation(l, t, one, two));
+      await a.client.commit(
+        mutation({ table: 'desk_check', id: one.id, fields: { completedAt: { v: 5 } } }),
+      );
+      await settleAll(a, b);
+      expect((await checksOf(b.client.db, t.id)).map((r) => r.id)).toEqual([one.id, two.id]);
+      expect(await everything(a)).toEqual(await everything(b));
+    });
+
+    it('different items ticked while apart: both ticks stand', async () => {
+      const owner = account();
+      const [a, b] = [await device(owner), await device(owner)];
+      const l = newList();
+      const t = newTask(l.id);
+      const [one, two] = [newItem(t.id, 'one', 'a0'), newItem(t.id, 'two', 'a1')];
+      await a.client.commit(mutation(l, t, one, two));
+      await settleAll(a, b);
+      a.online = false;
+      b.online = false;
+      await a.client.commit(
+        mutation({ table: 'desk_check', id: one.id, fields: { completedAt: { v: 5 } } }),
+      );
+      await b.client.commit(
+        mutation({ table: 'desk_check', id: two.id, fields: { completedAt: { v: 6 } } }),
+      );
+      a.online = true;
+      b.online = true;
+      await settleAll(a, b);
+      for (const d of [a, b]) {
+        const items = await checksOf(d.client.db, t.id);
+        expect(items.map((r) => r.fields.completedAt)).toMatchObject([{ v: 5 }, { v: 6 }]);
+      }
+      expect(await everything(a)).toEqual(await everything(b));
+    });
+
+    it('one deletes the card and the other edits an item of it: the edit brings the card back', async () => {
+      const owner = account();
+      const [a, b] = [await device(owner), await device(owner)];
+      const l = newList();
+      const t = newTask(l.id);
+      const item = newItem(t.id);
+      await a.client.commit(mutation(l, t, item));
+      await settleAll(a, b);
+      a.online = false;
+      b.online = false;
+      await a.client.commit(mutation({ table: 'desk_card', id: t.id, deleted: true }));
+      await b.client.commit(
+        mutation({ table: 'desk_check', id: item.id, fields: { title: { v: 'Oat milk, 2' } } }),
+      );
+      a.online = true;
+      await a.client.sync();
+      b.online = true;
+      await settleAll(a, b);
+      for (const d of [a, b])
+        expect((await cardsOf(d.client.db, l.id)).map((r) => r.id)).toEqual([t.id]);
+      expect(await everything(a)).toEqual(await everything(b));
+    });
+
+    it('an item added to a card the other device moved to another list: it stays with the card', async () => {
+      const owner = account();
+      const [a, b] = [await device(owner), await device(owner)];
+      const [l, other] = [newList('One'), newList('Two')];
+      const t = newTask(l.id);
+      await a.client.commit(mutation(l, other, t));
+      await settleAll(a, b);
+      a.online = false;
+      b.online = false;
+      await a.client.commit(
+        mutation({ table: 'desk_card', id: t.id, listId: other.id, position: 'a0' }),
+      );
+      const added = newItem(t.id, 'late');
+      await b.client.commit(mutation(added));
+      a.online = true;
+      b.online = true;
+      await settleAll(a, b);
+      for (const d of [a, b]) {
+        expect((await cardsOf(d.client.db, other.id)).map((r) => r.id)).toEqual([t.id]);
+        expect((await checksOf(d.client.db, t.id)).map((r) => r.id)).toEqual([added.id]);
+      }
+      expect(await everything(a)).toEqual(await everything(b));
+    });
   });
 
   describe('two devices change a task while apart', () => {
@@ -160,17 +258,17 @@ describe(`devices of one account against the server (${leg})`, () => {
     it('different fields: both changes stand, on both devices', async () => {
       const { a, b, t } = await pair();
       await a.client.commit(
-        mutation({ table: 'task', id: t.id, fields: { notes: { v: 'from a' } } }),
+        mutation({ table: 'desk_card', id: t.id, fields: { description: { v: 'from a' } } }),
       );
       await b.client.commit(
-        mutation({ table: 'task', id: t.id, fields: { starred: { v: true } } }),
+        mutation({ table: 'desk_card', id: t.id, fields: { starred: { v: true } } }),
       );
       a.online = true;
       b.online = true;
       await settleAll(a, b);
       for (const d of [a, b]) {
-        expect((await getRow(d.client.db, 'task', t.id))?.fields).toMatchObject({
-          notes: { v: 'from a' },
+        expect((await getRow(d.client.db, 'desk_card', t.id))?.fields).toMatchObject({
+          description: { v: 'from a' },
           starred: { v: true },
           title: { v: 'Buy milk' },
         });
@@ -181,10 +279,10 @@ describe(`devices of one account against the server (${leg})`, () => {
     it('the same field: the one that reached the server later wins, on both devices', async () => {
       const { a, b, t } = await pair();
       await a.client.commit(
-        mutation({ table: 'task', id: t.id, fields: { title: { v: 'from a' } } }),
+        mutation({ table: 'desk_card', id: t.id, fields: { title: { v: 'from a' } } }),
       );
       await b.client.commit(
-        mutation({ table: 'task', id: t.id, fields: { title: { v: 'from b' } } }),
+        mutation({ table: 'desk_card', id: t.id, fields: { title: { v: 'from b' } } }),
       );
       // b reaches the server first, then a: a is later, so a wins.
       b.online = true;
@@ -198,33 +296,33 @@ describe(`devices of one account against the server (${leg})`, () => {
 
     it('one deletes and the other edits: the edit restores it', async () => {
       const { a, b, l, t } = await pair();
-      await a.client.commit(mutation({ table: 'task', id: t.id, deleted: true }));
+      await a.client.commit(mutation({ table: 'desk_card', id: t.id, deleted: true }));
       await b.client.commit(
-        mutation({ table: 'task', id: t.id, fields: { notes: { v: 'still needed' } } }),
+        mutation({ table: 'desk_card', id: t.id, fields: { description: { v: 'still needed' } } }),
       );
       a.online = true;
       await a.client.sync();
       b.online = true;
       await settleAll(a, b);
       for (const d of [a, b])
-        expect((await tasksOf(d.client.db, l.id)).map((r) => r.id)).toEqual([t.id]);
+        expect((await cardsOf(d.client.db, l.id)).map((r) => r.id)).toEqual([t.id]);
       expect(await everything(a)).toEqual(await everything(b));
     });
 
     it('both delete: it is deleted', async () => {
       const { a, b, l, t } = await pair();
-      await a.client.commit(mutation({ table: 'task', id: t.id, deleted: true }));
-      await b.client.commit(mutation({ table: 'task', id: t.id, deleted: true }));
+      await a.client.commit(mutation({ table: 'desk_card', id: t.id, deleted: true }));
+      await b.client.commit(mutation({ table: 'desk_card', id: t.id, deleted: true }));
       a.online = true;
       b.online = true;
       await settleAll(a, b);
-      for (const d of [a, b]) expect(await tasksOf(d.client.db, l.id)).toEqual([]);
+      for (const d of [a, b]) expect(await cardsOf(d.client.db, l.id)).toEqual([]);
       expect(await everything(a)).toEqual(await everything(b));
     });
 
     it('a task is added to a list the other device deleted: the list comes back', async () => {
       const { a, b, l, t } = await pair();
-      await a.client.commit(mutation({ table: 'list', id: l.id, deleted: true }));
+      await a.client.commit(mutation({ table: 'desk_list', id: l.id, deleted: true }));
       const added = newTask(l.id, 'late');
       await b.client.commit(mutation(added));
       a.online = true;
@@ -233,7 +331,7 @@ describe(`devices of one account against the server (${leg})`, () => {
       await settleAll(a, b);
       for (const d of [a, b]) {
         expect((await listsOf(d.client.db)).map((r) => r.id)).toEqual([l.id]);
-        expect((await tasksOf(d.client.db, l.id)).map((r) => r.id).sort()).toEqual(
+        expect((await cardsOf(d.client.db, l.id)).map((r) => r.id).sort()).toEqual(
           [added.id, t.id].sort(),
         );
       }
@@ -248,7 +346,7 @@ describe(`devices of one account against the server (${leg})`, () => {
       a.online = true;
       b.online = true;
       await settleAll(a, b);
-      const order = async (d: Device) => (await tasksOf(d.client.db, l.id)).map((r) => r.id);
+      const order = async (d: Device) => (await cardsOf(d.client.db, l.id)).map((r) => r.id);
       expect(await order(a)).toEqual(await order(b));
       expect(new Set(await order(a))).toEqual(new Set([t.id, x.id, y.id]));
     });
@@ -274,7 +372,7 @@ describe(`devices of one account against the server (${leg})`, () => {
 
     it('a change the server refuses is undone on the device that made it, which is told, and no other device ever sees it', async () => {
       const owner = account();
-      const limited = server(owner, { limits: { lists: 1, tasks: 1000 } });
+      const limited = server(owner, { limits: { lists: 1, cards: 1000 } });
       const [a, b] = [await device(owner, limited), await device(owner, limited)];
       const first = newList('first');
       await a.client.commit(mutation(first));
@@ -294,7 +392,7 @@ describe(`devices of one account against the server (${leg})`, () => {
 
     it('a mutation that depended on a refused one is refused in its turn and undone too', async () => {
       const owner = account();
-      const limited = server(owner, { limits: { lists: 1, tasks: 1000 } });
+      const limited = server(owner, { limits: { lists: 1, cards: 1000 } });
       const a = await device(owner, limited);
       await a.client.commit(mutation(newList('first')));
       await a.client.sync();
@@ -305,7 +403,7 @@ describe(`devices of one account against the server (${leg})`, () => {
       await a.client.sync();
       expect(a.refusals.sort()).toEqual(['limit', 'unavailable']);
       expect((await listsOf(a.client.db)).length).toBe(1);
-      expect((await a.client.db.getAll('task')).length).toBe(0);
+      expect((await a.client.db.getAll('desk_card')).length).toBe(0);
     });
   });
 
@@ -322,10 +420,10 @@ describe(`devices of one account against the server (${leg})`, () => {
       const t = newTask(l.id);
       await a.client.commit(mutation(l, t));
       await settleAll(a, b);
-      expect((await tasksOf(a.client.db, l.id)).length).toBe(1);
+      expect((await cardsOf(a.client.db, l.id)).length).toBe(1);
 
       a.online = false;
-      await b.client.commit(mutation({ table: 'task', id: t.id, deleted: true }));
+      await b.client.commit(mutation({ table: 'desk_card', id: t.id, deleted: true }));
       await b.client.sync();
       clock.now = T + 8 * DAY;
       await purge(database, clock.now);
@@ -333,7 +431,7 @@ describe(`devices of one account against the server (${leg})`, () => {
       a.online = true;
       await settleAll(a, b);
       // The row is not only hidden but gone, on both devices, and they agree.
-      expect(await getRow(a.client.db, 'task', t.id)).toBeUndefined();
+      expect(await getRow(a.client.db, 'desk_card', t.id)).toBeUndefined();
       expect(await everything(a)).toEqual(await everything(b));
     });
 
@@ -350,7 +448,7 @@ describe(`devices of one account against the server (${leg})`, () => {
 
       a.online = false;
       // While it is away: one task is deleted and purged, another is made, and the tombstone itself is forgotten.
-      await b.client.commit(mutation({ table: 'task', id: goes.id, deleted: true }));
+      await b.client.commit(mutation({ table: 'desk_card', id: goes.id, deleted: true }));
       const meanwhile = newTask(l.id, 'made while away');
       await b.client.commit(mutation(meanwhile));
       await b.client.sync();
@@ -362,7 +460,11 @@ describe(`devices of one account against the server (${leg})`, () => {
 
       // Its own edits, made offline: one to a task that survived, and a new task.
       await a.client.commit(
-        mutation({ table: 'task', id: stays.id, fields: { notes: { v: 'edited offline' } } }),
+        mutation({
+          table: 'desk_card',
+          id: stays.id,
+          fields: { description: { v: 'edited offline' } },
+        }),
       );
       const mine = newTask(l.id, 'made offline');
       await a.client.commit(mutation(mine));
@@ -386,13 +488,13 @@ describe(`devices of one account against the server (${leg})`, () => {
       // Its edits were sent, and kept: nothing it did was lost to the snapshot.
       expect(await outboxSize(a.client.db)).toBe(0);
       expect(a.refusals).toEqual([]);
-      expect((await getRow(a.client.db, 'task', stays.id))?.fields.notes).toMatchObject({
+      expect((await getRow(a.client.db, 'desk_card', stays.id))?.fields.description).toMatchObject({
         v: 'edited offline',
       });
-      expect(await getRow(a.client.db, 'task', mine.id)).toBeDefined();
+      expect(await getRow(a.client.db, 'desk_card', mine.id)).toBeDefined();
       // What it never heard was purged is gone, and what it never heard was made is there.
-      expect(await getRow(a.client.db, 'task', goes.id)).toBeUndefined();
-      expect(await getRow(a.client.db, 'task', meanwhile.id)).toBeDefined();
+      expect(await getRow(a.client.db, 'desk_card', goes.id)).toBeUndefined();
+      expect(await getRow(a.client.db, 'desk_card', meanwhile.id)).toBeDefined();
       expect(await everything(a)).toEqual(await everything(b));
     });
 
@@ -409,7 +511,7 @@ describe(`devices of one account against the server (${leg})`, () => {
       const { startSnapshot } = await import('../local/store');
       await startSnapshot(a.client.db, 'token');
       expect((await a.client.db.get('meta', 'cursor')) ?? 0).toBe(0);
-      expect((await tasksOf(a.client.db, l.id)).length).toBe(5);
+      expect((await cardsOf(a.client.db, l.id)).length).toBe(5);
     });
   });
 

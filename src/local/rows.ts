@@ -10,7 +10,7 @@ import type { Change, PulledRow } from '../sync/format';
  */
 export type LocalRow = PulledRow;
 
-const STRUCTURE_KEYS = ['listId', 'parentId', 'position'] as const;
+const STRUCTURE_KEYS = ['listId', 'cardId', 'position'] as const;
 
 /**
  * What a change does to a row, as the device shows it before the server has answered: the same rules the server applies (`apply.ts`), so that
@@ -34,7 +34,6 @@ export function applyChange(row: LocalRow | undefined, change: Change, now: numb
       seq: 0,
       createdAt: now,
       fields: {},
-      ...(change.table === 'task' ? { parentId: null } : {}),
     } as LocalRow);
 
   const fields = { ...base.fields };
@@ -67,7 +66,7 @@ export function mergePulled(base: LocalRow | undefined, pulled: PulledRow): Loca
   return { ...winner, fields } as LocalRow;
 }
 
-/** Whether one row sorts before another in a list: by position, compared by bytes and never by locale, and equal positions by id (DESIGN.md §11.3). */
+/** Whether one row sorts before another in a list: by position, compared by bytes and never by locale, and equal positions by id (DESIGN.md §10.4). */
 export function byPosition(
   a: { position: string; id: string },
   b: { position: string; id: string },

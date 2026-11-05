@@ -8,22 +8,22 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { type FormEvent, useRef } from 'react';
+import { isCompleted } from '../actions/cards';
 import {
-  completeTask,
-  createSubtask,
-  deleteTask,
-  isCompleted,
-  moveTask,
-  reopenTask,
-  restoreTask,
-  updateTask,
-} from '../actions/tasks';
+  addItem,
+  deleteItem,
+  moveItem,
+  renameItem,
+  restoreItem,
+  tickItem,
+  untickItem,
+} from '../actions/checks';
 import type { LocalRow } from '../local/rows';
-import { subtasksOf, taskCount } from '../local/store';
+import { checkCount, checksOf } from '../local/store';
 import { useLocal, useSync } from '../sync/react';
 import { Button, Checkbox, Input, useToast } from '../ui';
 import { text } from './fields';
-import styles from './TaskDetail.module.css';
+import styles from './CardDetail.module.css';
 import {
   VERTICAL_AUTOSCROLL,
   useDragClickGuard,
@@ -35,28 +35,28 @@ import { useUndo } from './Undo';
 const ids = { newId: () => crypto.randomUUID() };
 
 /**
- * A task's subtasks in the detail column (DESIGN.md §11.2): a checklist, in order, each with a tick and a title that is edited in place and saved as it
- * is left, and a field to add another at the bottom. **A subtask is one level deep and has no date, star or repeat**, so there is nothing here for them.
+ * A card's checklist in the detail column (DESIGN.md §10.3): items in order, each with a tick and a title that is edited in place and saved as it is
+ * left, and a field to add another at the bottom. An item has a title and a tick and nothing else, so there is nothing here for a date or a star.
  */
-export function Subtasks({ parent }: { parent: LocalRow }) {
+export function Checklist({ card }: { card: LocalRow }) {
   const client = useSync();
   const toast = useToast();
   const offerUndo = useUndo();
-  const subtasks = useLocal((db) => subtasksOf(db, parent.id), [parent.id]);
-  const count = useLocal(taskCount);
+  const items = useLocal((db) => checksOf(db, card.id), [card.id]);
+  const count = useLocal(checkCount);
   const field = useRef<HTMLInputElement>(null);
   // Where the one made last went, for the next to go below it while the list on the screen is still catching up.
-  const last = useRef<{ parent: string; position: string } | null>(null);
+  const last = useRef<{ card: string; position: string } | null>(null);
 
   function add(event: FormEvent) {
     event.preventDefault();
     const title = field.current?.value ?? '';
-    const below = last.current?.parent === parent.id ? last.current.position : undefined;
-    const result = createSubtask(parent, subtasks ?? [], { title }, ids, count ?? 0, below);
+    const below = last.current?.card === card.id ? last.current.position : undefined;
+    const result = addItem(card, items ?? [], { title }, ids, count ?? 0, below);
     if (!result.ok) {
       if (result.reason === 'limit')
         toast.show({
-          title: 'You have as many tasks as an account can hold.',
+          title: 'You have as many checklist items as an account can hold.',
           category: 'warning',
         });
       return;
@@ -64,31 +64,29 @@ export function Subtasks({ parent }: { parent: LocalRow }) {
     if (field.current) field.current.value = '';
     const made = result.mutation.changes[0];
     if (made && 'position' in made && made.position)
-      last.current = { parent: parent.id, position: made.position };
+      last.current = { card: card.id, position: made.position };
     void client.commit(result.mutation);
   }
 
-  function remove(sub: LocalRow) {
-    const result = deleteTask(sub, ids);
+  function remove(item: LocalRow) {
+    const result = deleteItem(item, ids);
     if (!result.ok) return;
     void client.commit(result.mutation);
-    offerUndo('Subtask deleted.', () => {
-      const back = restoreTask(sub, ids);
+    offerUndo('Item deleted.', () => {
+      const back = restoreItem(item, ids);
       if (back.ok) return client.commit(back.mutation);
     });
   }
 
   return (
-    <section className={styles.subtasks} aria-label="Subtasks">
-      <h3 className={styles.heading}>Subtasks</h3>
-      {subtasks !== undefined && subtasks.length > 0 ? (
-        <Checklist subtasks={subtasks} onDelete={remove} />
-      ) : null}
+    <section className={styles.section} aria-label="Checklist">
+      <h3 className={styles.heading}>Checklist</h3>
+      {items !== undefined && items.length > 0 ? <Items items={items} onDelete={remove} /> : null}
       <form onSubmit={add}>
         <Input
           ref={field}
-          aria-label="Add a subtask"
-          placeholder="Add a subtask…"
+          aria-label="Add an item"
+          placeholder="Add an item…"
           maxLength={500}
           autoComplete="off"
         />
@@ -97,7 +95,7 @@ export function Subtasks({ parent }: { parent: LocalRow }) {
   );
 }
 
-function SubtaskRow({ sub, onDelete }: { sub: LocalRow; onDelete: () => void }) {
+function ItemRow({ item, onDelete }: { item: LocalRow; onDelete: () => void }) {
   const client = useSync();
   const {
     attributes,
@@ -107,24 +105,24 @@ function SubtaskRow({ sub, onDelete }: { sub: LocalRow; onDelete: () => void }) 
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: sub.id });
-  const title = text(sub, 'title');
-  const done = isCompleted(sub);
+  } = useSortable({ id: item.id });
+  const title = text(item, 'title');
+  const done = isCompleted(item);
 
   function tick(next: boolean) {
-    const result = next ? completeTask(sub, Date.now(), ids) : reopenTask(sub, ids);
+    const result = next ? tickItem(item, Date.now(), ids) : untickItem(item, ids);
     if (result.ok) void client.commit(result.mutation);
   }
 
   function save(value: string) {
-    const result = updateTask(sub, { title: value }, ids);
+    const result = renameItem(item, value, ids);
     if (result.ok) void client.commit(result.mutation);
   }
 
   return (
     <li
       ref={setNodeRef}
-      className={`${styles.subtask} ${done ? styles.subtaskDone : ''}`}
+      className={`${styles.item} ${done ? styles.itemDone : ''}`}
       style={{
         transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
         transition,
@@ -135,22 +133,22 @@ function SubtaskRow({ sub, onDelete }: { sub: LocalRow; onDelete: () => void }) 
         type="button"
         ref={setActivatorNodeRef}
         className={styles.handle}
-        aria-label={`Move subtask: ${title}`}
+        aria-label={`Move item: ${title}`}
         {...attributes}
         {...listeners}
       >
         ⠿
       </button>
       <Checkbox
-        id={`sub-${sub.id}`}
+        id={`item-${item.id}`}
         label=""
         aria-label={`Done: ${title}`}
         checked={done}
         onChange={tick}
       />
       <input
-        className={styles.subtaskTitle}
-        aria-label={`Subtask: ${title}`}
+        className={styles.itemTitle}
+        aria-label={`Item: ${title}`}
         defaultValue={title}
         key={title}
         maxLength={500}
@@ -162,7 +160,7 @@ function SubtaskRow({ sub, onDelete }: { sub: LocalRow; onDelete: () => void }) 
         }}
         onKeyDown={(event) => event.key === 'Enter' && event.currentTarget.blur()}
       />
-      <Button variant="secondary" aria-label={`Delete subtask: ${title}`} onClick={onDelete}>
+      <Button variant="secondary" aria-label={`Delete item: ${title}`} onClick={onDelete}>
         ×
       </Button>
     </li>
@@ -170,18 +168,18 @@ function SubtaskRow({ sub, onDelete }: { sub: LocalRow; onDelete: () => void }) 
 }
 
 /**
- * The checklist, which can be dragged into order by the handle at the left of each row. The handle and not the whole row, because a row has a field
- * in it, and a drag that began on the field would stop a person selecting its text. One row is written (`moveTask`).
+ * The items, which can be dragged into order by the handle at the left of each row. The handle and not the whole row, because a row has a field in it,
+ * and a drag that began on the field would stop a person selecting its text. One row is written (`moveItem`).
  */
-function Checklist({
-  subtasks,
+function Items({
+  items,
   onDelete,
 }: {
-  subtasks: readonly LocalRow[];
-  onDelete: (sub: LocalRow) => void;
+  items: readonly LocalRow[];
+  onDelete: (item: LocalRow) => void;
 }) {
   const client = useSync();
-  const { rendered, show } = useOptimisticOrder(subtasks);
+  const { rendered, show } = useOptimisticOrder(items);
   const guard = useDragClickGuard();
   const sensors = useReorderSensors();
 
@@ -189,14 +187,14 @@ function Checklist({
     guard.end();
     const { active, over } = event;
     if (!over || active.id === over.id) return;
-    const from = rendered.findIndex((sub) => sub.id === active.id);
-    const to = rendered.findIndex((sub) => sub.id === over.id);
+    const from = rendered.findIndex((item) => item.id === active.id);
+    const to = rendered.findIndex((item) => item.id === over.id);
     if (from === -1 || to === -1) return;
-    const result = moveTask(rendered, String(active.id), to, ids);
+    const result = moveItem(rendered, String(active.id), to, ids);
     if (!result.ok) return;
     show(
       arrayMove(
-        rendered.map((sub) => sub.id),
+        rendered.map((item) => item.id),
         from,
         to,
       ),
@@ -206,7 +204,7 @@ function Checklist({
 
   return (
     <DndContext
-      id="subtasks"
+      id="checklist"
       sensors={sensors}
       autoScroll={VERTICAL_AUTOSCROLL}
       collisionDetection={closestCenter}
@@ -214,10 +212,13 @@ function Checklist({
       onDragEnd={onDragEnd}
       onDragCancel={guard.end}
     >
-      <SortableContext items={rendered.map((sub) => sub.id)} strategy={verticalListSortingStrategy}>
+      <SortableContext
+        items={rendered.map((item) => item.id)}
+        strategy={verticalListSortingStrategy}
+      >
         <ul className={styles.checklist}>
-          {rendered.map((sub) => (
-            <SubtaskRow key={sub.id} sub={sub} onDelete={() => onDelete(sub)} />
+          {rendered.map((item) => (
+            <ItemRow key={item.id} item={item} onDelete={() => onDelete(item)} />
           ))}
         </ul>
       </SortableContext>

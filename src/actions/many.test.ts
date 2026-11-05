@@ -3,17 +3,28 @@ import type { LocalRow } from '../local/rows';
 import { LIMITS } from '../sync/format';
 import { parseMutation } from '../sync/validate';
 import type { Ids } from './lists';
-import { type Group, deleteMany, restoreMany } from './tasks';
+import { type Group, deleteMany, restoreMany } from './cards';
 
 let n = 0;
 const ids: Ids = { newId: () => `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}` };
 const uuid = (i: number) => `70000000-0000-4000-8000-${String(i).padStart(12, '0')}`;
-const task = (i: number, extra: Record<string, unknown> = {}): LocalRow =>
+const card = (i: number, extra: Record<string, unknown> = {}): LocalRow =>
   ({
-    table: 'task',
+    table: 'desk_card',
     id: uuid(i),
     listId: uuid(0),
-    parentId: null,
+    position: 'a0',
+    deletedAt: null,
+    seq: 1,
+    createdAt: 1,
+    fields: { title: { v: 't', s: 1 } },
+    ...extra,
+  }) as LocalRow;
+const item = (i: number, cardId: number, extra: Record<string, unknown> = {}): LocalRow =>
+  ({
+    table: 'desk_check',
+    id: uuid(i),
+    cardId: uuid(cardId),
     position: 'a0',
     deletedAt: null,
     seq: 1,
@@ -22,30 +33,29 @@ const task = (i: number, extra: Record<string, unknown> = {}): LocalRow =>
     ...extra,
   }) as LocalRow;
 
-describe('acting on many tasks at once', () => {
-  it('deletes each with its live subtasks, in one mutation when they fit', () => {
+describe('acting on many cards at once', () => {
+  it('deletes each with its live checklist items, in one mutation when they fit', () => {
     const groups: Group[] = [
-      {
-        task: task(1),
-        subtasks: [task(2, { parentId: uuid(1) }), task(3, { parentId: uuid(1), deletedAt: 9 })],
-      },
-      { task: task(4), subtasks: [] },
+      { card: card(1), items: [item(2, 1), item(3, 1, { deletedAt: 9 })] },
+      { card: card(4), items: [] },
     ];
     const result = deleteMany(groups, ids);
     if (!result.ok) throw new Error('nothing');
     expect(result.mutations).toHaveLength(1);
     expect(result.mutations[0]?.changes.map((c) => c.id)).toEqual([uuid(1), uuid(2), uuid(4)]);
+    expect(result.mutations[0]?.changes.map((c) => c.table)).toEqual([
+      'desk_card',
+      'desk_check',
+      'desk_card',
+    ]);
     expect(parseMutation(result.mutations[0]).ok).toBe(true);
   });
 
-  it('splits a long list into mutations the server takes, and never a parent from its subtasks', () => {
-    // 300 parents of two subtasks each: 900 changes.
+  it('splits a long list into mutations the server takes, and never a card from its items', () => {
+    // 300 cards of two items each: 900 changes.
     const groups: Group[] = Array.from({ length: 300 }, (_, i) => ({
-      task: task(1000 + i * 3),
-      subtasks: [
-        task(1001 + i * 3, { parentId: uuid(1000 + i * 3) }),
-        task(1002 + i * 3, { parentId: uuid(1000 + i * 3) }),
-      ],
+      card: card(1000 + i * 3),
+      items: [item(1001 + i * 3, 1000 + i * 3), item(1002 + i * 3, 1000 + i * 3)],
     }));
     const result = deleteMany(groups, ids);
     if (!result.ok) throw new Error('nothing');
@@ -53,7 +63,7 @@ describe('acting on many tasks at once', () => {
     for (const m of result.mutations) {
       expect(m.changes.length).toBeLessThanOrEqual(LIMITS.changes);
       expect(parseMutation(m).ok).toBe(true);
-      // Every subtask is in the mutation of its parent: the ids in threes, parent first.
+      // Every item is in the mutation of its card: the ids in threes, card first.
       const sequence = m.changes.map((c) => Number(c.id.slice(-12)));
       for (let i = 0; i < sequence.length; i += 3) {
         expect(sequence[i]).toBe(1000 + Math.floor(((sequence[i] ?? 0) - 1000) / 3) * 3);
@@ -70,22 +80,18 @@ describe('acting on many tasks at once', () => {
     expect(restoreMany([], ids)).toEqual({ ok: false, reason: 'nothing' });
   });
 
-  it('restores exactly those that were deleted with each parent', () => {
-    const parent = task(1, { deletedAt: 5_000 });
+  it('restores exactly those that were deleted with each card', () => {
     const groups: Group[] = [
       {
-        task: parent,
-        subtasks: [
-          task(2, { parentId: uuid(1), deletedAt: 5_000 }),
-          task(3, { parentId: uuid(1), deletedAt: 1_000 }),
-        ],
+        card: card(1, { deletedAt: 5_000 }),
+        items: [item(2, 1, { deletedAt: 5_000 }), item(3, 1, { deletedAt: 1_000 })],
       },
     ];
     const result = restoreMany(groups, ids);
     if (!result.ok) throw new Error('nothing');
     expect(result.mutations[0]?.changes).toEqual([
-      { table: 'task', id: uuid(1), deleted: false },
-      { table: 'task', id: uuid(2), deleted: false },
+      { table: 'desk_card', id: uuid(1), deleted: false },
+      { table: 'desk_check', id: uuid(2), deleted: false },
     ]);
   });
 });

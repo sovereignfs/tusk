@@ -11,6 +11,7 @@ import { pull } from './pull';
 import { KEEP_TOMBSTONES_MS, PURGE_AFTER_MS, purge } from './purge';
 import {
   account,
+  card,
   accountSeq,
   list,
   makeStore,
@@ -18,7 +19,7 @@ import {
   rowOf,
   series,
   snapshot,
-  task,
+  check,
 } from './test-support';
 
 /**
@@ -49,75 +50,104 @@ describe(`the purge (${leg})`, () => {
   it('removes a row deleted over seven days ago, and not one deleted less than seven days ago', async () => {
     const owner = account();
     const l = list();
-    const old = task(l.id);
-    const recent = task(l.id);
+    const old = card(l.id);
+    const recent = card(l.id);
     await apply(owner, mutation(l, old, recent));
-    await apply(owner, mutation({ table: 'task', id: old.id, deleted: true }), T0);
-    await apply(owner, mutation({ table: 'task', id: recent.id, deleted: true }), T0 + 2 * DAY);
+    await apply(owner, mutation({ table: 'desk_card', id: old.id, deleted: true }), T0);
+    await apply(
+      owner,
+      mutation({ table: 'desk_card', id: recent.id, deleted: true }),
+      T0 + 2 * DAY,
+    );
 
     // Six days and twenty-three hours after the first: nothing is due.
-    expect((await purge(database, T0 + PURGE_AFTER_MS - 3_600_000)).purged.task).toBe(0);
-    expect(await rowOf(database, 'task', old.id)).toBeDefined();
+    expect((await purge(database, T0 + PURGE_AFTER_MS - 3_600_000)).purged.desk_card).toBe(0);
+    expect(await rowOf(database, 'desk_card', old.id)).toBeDefined();
 
     // Seven days and a second after it: the first goes, and the second, deleted two days later, stays.
     const result = await purge(database, T0 + PURGE_AFTER_MS + 1000);
-    expect(result.purged.task).toBeGreaterThanOrEqual(1);
-    expect(await rowOf(database, 'task', old.id)).toBeUndefined();
-    expect(await rowOf(database, 'task', recent.id)).toBeDefined();
+    expect(result.purged.desk_card).toBeGreaterThanOrEqual(1);
+    expect(await rowOf(database, 'desk_card', old.id)).toBeUndefined();
+    expect(await rowOf(database, 'desk_card', recent.id)).toBeDefined();
     expect((await tombstones(owner)).map((t) => t.id)).toEqual([old.id]);
   });
 
   it('leaves what is not deleted, and what was deleted and then restored, alone', async () => {
     const owner = account();
     const l = list();
-    const kept = task(l.id);
-    const restored = task(l.id);
+    const kept = card(l.id);
+    const restored = card(l.id);
     await apply(owner, mutation(l, kept, restored));
-    await apply(owner, mutation({ table: 'task', id: restored.id, deleted: true }), T0);
-    await apply(owner, mutation({ table: 'task', id: restored.id, deleted: false }), T0 + DAY);
+    await apply(owner, mutation({ table: 'desk_card', id: restored.id, deleted: true }), T0);
+    await apply(owner, mutation({ table: 'desk_card', id: restored.id, deleted: false }), T0 + DAY);
     await purge(database, T0 + 30 * DAY);
-    expect(await rowOf(database, 'task', kept.id)).toBeDefined();
-    expect(await rowOf(database, 'task', restored.id)).toBeDefined();
+    expect(await rowOf(database, 'desk_card', kept.id)).toBeDefined();
+    expect(await rowOf(database, 'desk_card', restored.id)).toBeDefined();
     expect(await tombstones(owner)).toEqual([]);
   });
 
-  it('takes a deleted parent’s subtasks, a deleted list’s tasks and series, and a subtask deleted on its own, and leaves the rest', async () => {
+  it('takes a deleted card’s checklist, a deleted list’s cards and series, and an item deleted on its own, and leaves the rest', async () => {
     const owner = account();
     const gone = list();
     const kept = list();
-    const inGone = task(gone.id);
-    const parent = task(kept.id);
-    const withParent = task(kept.id, { parentId: parent.id });
-    const alone = task(kept.id, { parentId: parent.id });
-    const survivor = task(kept.id);
+    const inGone = card(gone.id);
+    const parent = card(kept.id);
+    const withParent = check(parent.id);
+    const alone = check(parent.id);
+    const survivor = card(kept.id);
+    const itemOfSurvivor = check(survivor.id);
+    const itemInGone = check(inGone.id);
     const s = series(gone.id);
-    await apply(owner, mutation(gone, kept, inGone, parent, withParent, alone, survivor, s));
-    await apply(owner, mutation({ table: 'list', id: gone.id, deleted: true }), T0);
     await apply(
       owner,
       mutation(
-        { table: 'task', id: parent.id, deleted: true },
-        { table: 'task', id: withParent.id, deleted: true },
+        gone,
+        kept,
+        inGone,
+        parent,
+        withParent,
+        alone,
+        survivor,
+        itemOfSurvivor,
+        itemInGone,
+        s,
+      ),
+    );
+    await apply(owner, mutation({ table: 'desk_list', id: gone.id, deleted: true }), T0);
+    await apply(
+      owner,
+      mutation(
+        { table: 'desk_card', id: parent.id, deleted: true },
+        { table: 'desk_check', id: withParent.id, deleted: true },
       ),
       T0,
     );
-    await apply(owner, mutation({ table: 'task', id: alone.id, deleted: true }), T0);
+    await apply(owner, mutation({ table: 'desk_check', id: alone.id, deleted: true }), T0);
 
     await purge(database, T0 + 8 * DAY);
     const rows = await snapshot(database, owner);
-    expect((rows.list as { id: string }[]).map((r) => r.id)).toEqual([kept.id]);
-    expect((rows.task as { id: string }[]).map((r) => r.id)).toEqual([survivor.id]);
-    expect(rows.series).toEqual([]);
+    expect((rows.desk_list as { id: string }[]).map((r) => r.id)).toEqual([kept.id]);
+    expect((rows.desk_card as { id: string }[]).map((r) => r.id)).toEqual([survivor.id]);
+    expect((rows.desk_check as { id: string }[]).map((r) => r.id)).toEqual([itemOfSurvivor.id]);
+    expect(rows.desk_series).toEqual([]);
     const gonePairs = (await tombstones(owner)).map((t) => `${t.table_name}`).sort();
-    expect(gonePairs).toEqual(['list', 'series', 'task', 'task', 'task', 'task']);
+    expect(gonePairs).toEqual([
+      'desk_card',
+      'desk_card',
+      'desk_check',
+      'desk_check',
+      'desk_check',
+      'desk_list',
+      'desk_series',
+    ]);
   });
 
   it('gives every tombstone of a run one new seq, past what the account had, so that a pull finds them', async () => {
     const owner = account();
     const l = list();
-    const t = task(l.id);
+    const t = card(l.id);
     await apply(owner, mutation(l, t));
-    await apply(owner, mutation({ table: 'task', id: t.id, deleted: true }), T0);
+    await apply(owner, mutation({ table: 'desk_card', id: t.id, deleted: true }), T0);
     const before = (await accountSeq(database, owner)) ?? 0;
 
     await purge(database, T0 + 8 * DAY);
@@ -126,7 +156,7 @@ describe(`the purge (${leg})`, () => {
     expect(await accountSeq(database, owner)).toBe(Number(stone?.seq));
     // A device that was at `before` hears of it, and one that was at the end hears nothing.
     expect((await pull(database, owner, before)).tombstones).toEqual([
-      { table: 'task', id: t.id, seq: Number(stone?.seq) },
+      { table: 'desk_card', id: t.id, seq: Number(stone?.seq) },
     ]);
     expect((await pull(database, owner, Number(stone?.seq))).tombstones).toEqual([]);
   });
@@ -134,18 +164,23 @@ describe(`the purge (${leg})`, () => {
   it('does nothing the second time, and nothing to another account', async () => {
     const [ada, grace] = [account(), account()];
     const l = list();
-    const t = task(l.id);
+    const t = card(l.id);
     await apply(ada, mutation(l, t));
-    await apply(ada, mutation({ table: 'task', id: t.id, deleted: true }), T0);
+    await apply(ada, mutation({ table: 'desk_card', id: t.id, deleted: true }), T0);
     const gl = list();
-    const gt = task(gl.id);
+    const gt = card(gl.id);
     await apply(grace, mutation(gl, gt));
     const graceBefore = await snapshot(database, grace);
 
     await purge(database, T0 + 8 * DAY);
     const seq = await accountSeq(database, ada);
     const again = await purge(database, T0 + 8 * DAY);
-    expect(again.purged).toEqual({ list: 0, task: 0, series: 0 });
+    expect(again.purged).toEqual({
+      desk_list: 0,
+      desk_card: 0,
+      desk_check: 0,
+      desk_series: 0,
+    });
     expect(await accountSeq(database, ada)).toBe(seq);
     expect(await snapshot(database, grace)).toEqual(graceBefore);
     expect(await tombstones(grace)).toEqual([]);
@@ -154,11 +189,11 @@ describe(`the purge (${leg})`, () => {
   it('can run in two places at once: the rows go once and each has one tombstone', async () => {
     const owner = account();
     const l = list();
-    const tasks = Array.from({ length: 5 }, () => task(l.id));
-    await apply(owner, mutation(l, ...tasks));
+    const cards = Array.from({ length: 5 }, () => card(l.id));
+    await apply(owner, mutation(l, ...cards));
     await apply(
       owner,
-      mutation(...tasks.map((t) => ({ table: 'task' as const, id: t.id, deleted: true }))),
+      mutation(...cards.map((t) => ({ table: 'desk_card' as const, id: t.id, deleted: true }))),
       T0,
     );
     await Promise.all([
@@ -166,7 +201,7 @@ describe(`the purge (${leg})`, () => {
       purge(database, T0 + 8 * DAY),
       purge(database, T0 + 8 * DAY),
     ]);
-    expect((await snapshot(database, owner)).task).toEqual([]);
+    expect((await snapshot(database, owner)).desk_card).toEqual([]);
     expect(await tombstones(owner)).toHaveLength(5);
   });
 
@@ -174,9 +209,9 @@ describe(`the purge (${leg})`, () => {
     it('forgets a tombstone after ninety days, and remembers that it did: the account’s cursors below it need a snapshot', async () => {
       const owner = account();
       const l = list();
-      const t = task(l.id);
+      const t = card(l.id);
       await apply(owner, mutation(l, t));
-      await apply(owner, mutation({ table: 'task', id: t.id, deleted: true }), T0);
+      await apply(owner, mutation({ table: 'desk_card', id: t.id, deleted: true }), T0);
       const purgedAt = T0 + 8 * DAY;
       await purge(database, purgedAt);
       const [stone] = await tombstones(owner);

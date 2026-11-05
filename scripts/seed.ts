@@ -11,7 +11,8 @@ import * as postgresSchema from '../src/db/schema/postgres';
 import * as sqliteSchema from '../src/db/schema/sqlite';
 import { many } from '../src/position';
 import { applyMutation } from '../src/sync/apply';
-import type { Change, Mutation } from '../src/sync/format';
+import type { Change, Mutation, SyncTable } from '../src/sync/format';
+import { tableOf } from '../src/sync/tables';
 import { TUSK_NAMESPACE, uuid5 } from '../src/uuid5';
 import { firstListId } from '../src/actions/lists';
 
@@ -24,7 +25,7 @@ import { firstListId } from '../src/actions/lists';
  * - **Local only.** It refuses a database that is not on this machine: it makes an account with a password that is written in this file.
  * - **Removes only its own.** `--reset` deletes the rows whose ids it would make, and the account it made, and makes them again.
  * - It grows with the features: a feature that has a shape worth looking at adds it here, in the task that builds it.
- *   Subtasks are here (none done, some, and all while the parent is open); overdue, due today, upcoming, repeating and starred are not yet.
+ *   Checklists are here (none done, some, and all while the card is open); overdue, due today, upcoming, repeating and starred are not yet.
  */
 export const SEED_EMAIL = 'seed@example.test';
 /** A password for a development database on this machine, and for nothing else. */
@@ -46,7 +47,7 @@ const schema = (database: Database) =>
 interface Plan {
   mutations: Mutation[];
   /** Every row id the seed makes, so that a reset knows what is its own. */
-  ids: { list: string[]; task: string[]; series: string[] };
+  ids: { desk_list: string[]; desk_card: string[]; desk_check: string[]; desk_series: string[] };
 }
 
 const LONG_TITLE =
@@ -54,16 +55,16 @@ const LONG_TITLE =
     0,
     500,
   );
-const LONG_NOTES = Array.from(
+const LONG_DESCRIPTION = Array.from(
   { length: 40 },
-  (_, i) => `Line ${i + 1} of some long notes that a person kept about this one.`,
+  (_, i) => `Line ${i + 1} of a long description that a person kept about this one.`,
 ).join('\n');
 
 /** What the seed makes, for an account. Pure, so that a test can look at all of it and a reset can name it. */
 export function planSeed(accountId: string): Plan {
   const id = (name: string) => uuid5(`seed:${accountId}:${name}`, TUSK_NAMESPACE);
   const lists = [
-    { key: 'first', id: firstListId(accountId), title: 'My tasks', color: 'black' },
+    { key: 'first', id: firstListId(accountId), title: 'Backlog', color: 'black' },
     { key: 'work', id: id('list:work'), title: 'Work', color: 'blue' },
     { key: 'groceries', id: id('list:groceries'), title: 'Groceries', color: 'green' },
     { key: 'errands', id: id('list:errands'), title: 'Errands', color: 'amber' },
@@ -72,114 +73,131 @@ export function planSeed(accountId: string): Plan {
   ] as const;
   const listPositions = many(null, null, lists.length);
 
-  const tasks: { list: string; key: string; title: string; notes?: string; done?: number }[] = [
-    { list: 'first', key: 'plants', title: 'Water the plants', notes: 'The fern twice a week.' },
-    { list: 'first', key: 'bank', title: 'Call the bank' },
-    { list: 'first', key: 'long', title: LONG_TITLE, notes: LONG_NOTES },
-    { list: 'first', key: 'filed', title: 'File the receipts', done: 1_793_000_000_000 },
-    { list: 'first', key: 'booked', title: 'Book the dentist', done: 1_793_100_000_000 },
-    {
-      list: 'work',
-      key: 'report',
-      title: 'Finish the quarterly report',
-      notes: 'Numbers from finance first.',
-    },
-    { list: 'work', key: 'review', title: 'Review the pull request' },
-    { list: 'work', key: 'reply', title: 'Reply to the vendor', done: 1_793_200_000_000 },
-    { list: 'groceries', key: 'milk', title: 'Oat milk' },
-    { list: 'groceries', key: 'bread', title: 'Bread' },
-    ...Array.from({ length: 40 }, (_, i) => ({
-      list: 'errands',
-      key: `errand-${i}`,
-      title: `Errand number ${i + 1}`,
-    })),
-  ];
+  const cards: { list: string; key: string; title: string; description?: string; done?: number }[] =
+    [
+      {
+        list: 'first',
+        key: 'plants',
+        title: 'Water the plants',
+        description: 'The fern twice a week.',
+      },
+      { list: 'first', key: 'bank', title: 'Call the bank' },
+      { list: 'first', key: 'long', title: LONG_TITLE, description: LONG_DESCRIPTION },
+      { list: 'first', key: 'filed', title: 'File the receipts', done: 1_793_000_000_000 },
+      { list: 'first', key: 'booked', title: 'Book the dentist', done: 1_793_100_000_000 },
+      {
+        list: 'work',
+        key: 'report',
+        title: 'Finish the quarterly report',
+        description: 'Numbers from finance first.',
+      },
+      { list: 'work', key: 'review', title: 'Review the pull request' },
+      { list: 'work', key: 'reply', title: 'Reply to the vendor', done: 1_793_200_000_000 },
+      { list: 'groceries', key: 'milk', title: 'Oat milk' },
+      { list: 'groceries', key: 'bread', title: 'Bread' },
+      ...Array.from({ length: 40 }, (_, i) => ({
+        list: 'errands',
+        key: `errand-${i}`,
+        title: `Errand number ${i + 1}`,
+      })),
+    ];
 
-  // Subtasks at nothing done, part of them, and all of them while the parent is still open (finishing the parts is not finishing the thing).
-  const subtasks: { parent: string; key: string; title: string; done?: number }[] = [
-    { parent: 'plants', key: 'plants-1', title: 'The fern' },
-    { parent: 'plants', key: 'plants-2', title: 'The ivy' },
-    { parent: 'plants', key: 'plants-3', title: 'The cactus, barely' },
-    { parent: 'report', key: 'report-1', title: 'Get the numbers', done: 1_793_300_000_000 },
-    { parent: 'report', key: 'report-2', title: 'Write the summary' },
-    { parent: 'report', key: 'report-3', title: 'Check the charts' },
-    { parent: 'review', key: 'review-1', title: 'Read the description', done: 1_793_400_000_000 },
-    { parent: 'review', key: 'review-2', title: 'Run it', done: 1_793_410_000_000 },
+  // Checklists at nothing done, part of them, and all of them while the card is still open (finishing the parts is not finishing the thing).
+  const items: { card: string; key: string; title: string; done?: number }[] = [
+    { card: 'plants', key: 'plants-1', title: 'The fern' },
+    { card: 'plants', key: 'plants-2', title: 'The ivy' },
+    { card: 'plants', key: 'plants-3', title: 'The cactus, barely' },
+    { card: 'report', key: 'report-1', title: 'Get the numbers', done: 1_793_300_000_000 },
+    { card: 'report', key: 'report-2', title: 'Write the summary' },
+    { card: 'report', key: 'report-3', title: 'Check the charts' },
+    { card: 'review', key: 'review-1', title: 'Read the description', done: 1_793_400_000_000 },
+    { card: 'review', key: 'review-2', title: 'Run it', done: 1_793_410_000_000 },
   ];
 
   const changes: Change[] = lists.map((list, i) => ({
-    table: 'list',
+    table: 'desk_list',
     id: list.id,
     position: listPositions[i] as string,
     fields: { title: { v: list.title }, color: { v: list.color }, sort: { v: 'custom' } },
   }));
-  const taskIds: string[] = [];
-  const byList = new Map<string, typeof tasks>();
-  for (const task of tasks) byList.set(task.list, [...(byList.get(task.list) ?? []), task]);
+  const cardIds: string[] = [];
+  const checkIds: string[] = [];
+  const byList = new Map<string, typeof cards>();
+  for (const card of cards) byList.set(card.list, [...(byList.get(card.list) ?? []), card]);
   for (const [listKey, group] of byList) {
     const list = lists.find((l) => l.key === listKey);
     if (!list) continue;
     const positions = many(null, null, group.length);
-    group.forEach((task, i) => {
-      const taskId = id(`task:${task.key}`);
-      taskIds.push(taskId);
+    group.forEach((card, i) => {
+      const cardId = id(`card:${card.key}`);
+      cardIds.push(cardId);
       changes.push({
-        table: 'task',
-        id: taskId,
+        table: 'desk_card',
+        id: cardId,
         listId: list.id,
-        parentId: null,
         position: positions[i] as string,
         fields: {
-          title: { v: task.title },
-          ...(task.notes !== undefined ? { notes: { v: task.notes } } : {}),
-          ...(task.done !== undefined ? { completedAt: { v: task.done } } : {}),
+          title: { v: card.title },
+          ...(card.description !== undefined ? { description: { v: card.description } } : {}),
+          ...(card.done !== undefined ? { completedAt: { v: card.done } } : {}),
         },
       });
     });
   }
 
-  const parentOf = (key: string) => tasks.find((t) => t.key === key);
-  for (const parentKey of new Set(subtasks.map((sub) => sub.parent))) {
-    const parent = parentOf(parentKey);
-    const list = lists.find((l) => l.key === parent?.list);
-    if (!parent || !list) continue;
-    const mine = subtasks.filter((sub) => sub.parent === parentKey);
+  for (const cardKey of new Set(items.map((item) => item.card))) {
+    const mine = items.filter((item) => item.card === cardKey);
     const positions = many(null, null, mine.length);
-    mine.forEach((sub, i) => {
-      const subId = id(`task:${sub.key}`);
-      taskIds.push(subId);
+    mine.forEach((item, i) => {
+      const itemId = id(`check:${item.key}`);
+      checkIds.push(itemId);
       changes.push({
-        table: 'task',
-        id: subId,
-        listId: list.id,
-        parentId: id(`task:${parentKey}`),
+        table: 'desk_check',
+        id: itemId,
+        cardId: id(`card:${cardKey}`),
         position: positions[i] as string,
         fields: {
-          title: { v: sub.title },
-          ...(sub.done !== undefined ? { completedAt: { v: sub.done } } : {}),
+          title: { v: item.title },
+          ...(item.done !== undefined ? { completedAt: { v: item.done } } : {}),
         },
       });
     });
   }
 
-  // One mutation of the lists, and one of the tasks of each list, as a person would have made them, each with an id that is the same every time.
+  // One mutation of the lists, and one of the cards of each list with their checklists, as a person would have made them, each with an id that is the
+  // same every time.
+  const cardsOfList = (listKey: string) =>
+    new Set((byList.get(listKey) ?? []).map((card) => id(`card:${card.key}`)));
   const mutations: Mutation[] = [
-    { mutationId: id('mutation:lists'), changes: changes.filter((c) => c.table === 'list') },
+    { mutationId: id('mutation:lists'), changes: changes.filter((c) => c.table === 'desk_list') },
     ...[...byList.keys()].map((listKey) => ({
-      mutationId: id(`mutation:tasks:${listKey}`),
+      mutationId: id(`mutation:cards:${listKey}`),
       changes: changes.filter(
-        (c) => c.table === 'task' && c.listId === lists.find((l) => l.key === listKey)?.id,
+        (c) =>
+          (c.table === 'desk_card' && c.listId === lists.find((l) => l.key === listKey)?.id) ||
+          (c.table === 'desk_check' &&
+            c.cardId !== undefined &&
+            cardsOfList(listKey).has(c.cardId)),
       ),
     })),
   ];
-  return { mutations, ids: { list: lists.map((l) => l.id), task: taskIds, series: [] } };
+  return {
+    mutations,
+    ids: {
+      desk_list: lists.map((l) => l.id),
+      desk_card: cardIds,
+      desk_check: checkIds,
+      desk_series: [],
+    },
+  };
 }
 
 export interface SeedResult {
   accountId: string;
   created: boolean;
   lists: number;
-  tasks: number;
+  cards: number;
+  checks: number;
 }
 
 /** The account's id, if it exists. */
@@ -211,16 +229,14 @@ export async function removeSeed(stores: { app: Database; auth: Database }): Pro
   const plan = planSeed(accountId);
   const tables = schema(app);
   const mutationIds = plan.mutations.map((m) => m.mutationId);
-  const owned = async (table: unknown, ids: string[]) => {
-    for (const rowId of ids)
+  // Items first, then their cards, then the lists, as a purge does.
+  for (const name of ['desk_check', 'desk_card', 'desk_series', 'desk_list'] as const) {
+    for (const rowId of plan.ids[name])
       await dbRun(
         app,
-        sql`DELETE FROM ${table as never} WHERE id = ${rowId} AND owner_id = ${accountId}`,
+        sql`DELETE FROM ${tableOf(app, name)} WHERE id = ${rowId} AND owner_id = ${accountId}`,
       );
-  };
-  await owned(tables.task, plan.ids.task);
-  await owned(tables.list, plan.ids.list);
-  await owned(tables.series, plan.ids.series);
+  }
   for (const mutationId of mutationIds) {
     await dbRun(
       app,
@@ -250,17 +266,22 @@ export async function runSeed(
     if (result.status === 'refused')
       throw new Error(`the seed was refused (${result.code}) for mutation ${mutation.mutationId}`);
   }
-  const tables = schema(stores.app);
-  const count = async (table: unknown) =>
+  const count = async (name: SyncTable) =>
     Number(
       (
         await dbAll<{ n: number | string }>(
           stores.app,
-          sql`SELECT COUNT(*) AS n FROM ${table as never} WHERE owner_id = ${accountId}`,
+          sql`SELECT COUNT(*) AS n FROM ${tableOf(stores.app, name)} WHERE owner_id = ${accountId}`,
         )
       )[0]?.n ?? 0,
     );
-  return { accountId, created, lists: await count(tables.list), tasks: await count(tables.task) };
+  return {
+    accountId,
+    created,
+    lists: await count('desk_list'),
+    cards: await count('desk_card'),
+    checks: await count('desk_check'),
+  };
 }
 
 export async function main(argv: string[]): Promise<number> {
@@ -294,7 +315,7 @@ export async function main(argv: string[]): Promise<number> {
     if (argv.includes('--remove')) return 0;
     const result = await runSeed(stores, loaded.config.auth);
     console.log(
-      `${result.created ? 'Made' : 'Found'} ${SEED_EMAIL}; it has ${result.lists} lists and ${result.tasks} tasks.`,
+      `${result.created ? 'Made' : 'Found'} ${SEED_EMAIL}; it has ${result.lists} lists, ${result.cards} cards and ${result.checks} checklist items.`,
     );
     console.log(`Sign in with that address and the password in scripts/seed.ts (SEED_PASSWORD).`);
     return 0;

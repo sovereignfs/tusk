@@ -35,14 +35,14 @@ test('a device applies a mutation and is sent it back, and the route is for the 
   const listId = crypto.randomUUID();
   const mutationId = crypto.randomUUID();
   const sent = {
-    protocol: 1,
+    protocol: 2,
     cursor: 0,
     mutations: [
       {
         mutationId,
         changes: [
           {
-            table: 'list',
+            table: 'desk_list',
             id: listId,
             position: 'a0',
             fields: { title: { v: 'From a browser test' } },
@@ -70,7 +70,10 @@ test('a device applies a mutation and is sent it back, and the route is for the 
   const answer = await reply.json();
   expect(answer.results).toEqual([{ mutationId, status: 'applied', seq: expect.any(Number) }]);
   const pulled = answer.pull.rows.find((row: { id: string }) => row.id === listId);
-  expect(pulled).toMatchObject({ table: 'list', fields: { title: { v: 'From a browser test' } } });
+  expect(pulled).toMatchObject({
+    table: 'desk_list',
+    fields: { title: { v: 'From a browser test' } },
+  });
 
   // Sent again, as a device does after a lost answer: answered the same, and nothing new.
   const again = await (await request.post('/api/sync', { headers: { origin }, data: sent })).json();

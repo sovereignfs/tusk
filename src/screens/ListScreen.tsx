@@ -7,10 +7,10 @@ import { useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { uuid } from '../access/parse';
 import { setShowCompleted, setSort } from '../actions/lists';
-import { deleteMany, isCompleted, moveTask, restoreMany, type Group } from '../actions/tasks';
-import { SORTS, SORT_LABELS, canReorder, isSort, sortOf, sortTasks } from '../lists/sort';
+import { deleteMany, isCompleted, moveCard, restoreMany, type Group } from '../actions/cards';
+import { SORTS, SORT_LABELS, canReorder, isSort, sortOf, sortCards } from '../lists/sort';
 import type { LocalRow } from '../local/rows';
-import { allSubtasksOf, getRow, subtaskCounts, tasksOf } from '../local/store';
+import { allChecksOf, cardsOf, checkCounts, getRow } from '../local/store';
 import { useHasSynced, useLocal, useSync } from '../sync/react';
 import { Button, EmptyState, SegmentedControl, Select } from '../ui';
 import {
@@ -19,22 +19,22 @@ import {
   useOptimisticOrder,
   useReorderSensors,
 } from '../ui/dnd';
-import { AddTask } from './AddTask';
-import { SortableTaskRow, TaskRow } from './TaskRow';
+import { AddCard } from './AddCard';
+import { CardRow, SortableCardRow } from './CardRow';
 import { useUndo } from './Undo';
 import { plain, text } from './fields';
 import styles from './ListScreen.module.css';
 
 /**
- * A list (DESIGN.md §14.1), read from the working copy. **A list that is not there for this account says so, with a way back**: an id that is not an
+ * A list (DESIGN.md §17.4), read from the working copy. **A list that is not there for this account says so, with a way back**: an id that is not an
  * id, one that was deleted, one this account never had. It never waits for the network to say so, except on a device that has not yet been sent its
- * lists, where it says it is loading and not that the list is missing. The tasks are task 3.4's.
+ * lists, where it says it is loading and not that the list is missing. The cards are task 3.4's.
  */
 export function ListScreen({ listId }: { listId: string }) {
   const valid = uuid(listId).ok;
   // Wrapped, so that "not found" (a row of `undefined`) is told apart from "not read yet" (no result at all).
   const read = useLocal(
-    async (db) => ({ row: valid ? await getRow(db, 'list', listId) : undefined }),
+    async (db) => ({ row: valid ? await getRow(db, 'desk_list', listId) : undefined }),
     [listId, valid],
   );
   const synced = useHasSynced();
@@ -52,14 +52,14 @@ export function ListScreen({ listId }: { listId: string }) {
       />
     );
   }
-  return <ListTasks list={list} />;
+  return <ListCards list={list} />;
 }
 
 /**
- * The list's open tasks, which can be dragged into order. The drag is worked out against **the tasks as they are shown** (a filter, or a task
+ * The list's open cards, which can be dragged into order. The drag is worked out against **the cards as they are shown** (a filter, or a card
  * pinned to the top, makes that fewer than the list has), one row is written, and the screen shows the new order at once (`src/ui/dnd.ts`).
  */
-function OpenTasks({
+function OpenCards({
   open,
   openId,
   counts,
@@ -80,14 +80,14 @@ function OpenTasks({
     guard.end();
     const { active, over } = event;
     if (!over || active.id === over.id) return;
-    const from = rendered.findIndex((task) => task.id === active.id);
-    const to = rendered.findIndex((task) => task.id === over.id);
+    const from = rendered.findIndex((card) => card.id === active.id);
+    const to = rendered.findIndex((card) => card.id === over.id);
     if (from === -1 || to === -1) return;
-    const result = moveTask(rendered, String(active.id), to, { newId: () => crypto.randomUUID() });
+    const result = moveCard(rendered, String(active.id), to, { newId: () => crypto.randomUUID() });
     if (!result.ok) return;
     show(
       arrayMove(
-        rendered.map((task) => task.id),
+        rendered.map((card) => card.id),
         from,
         to,
       ),
@@ -97,13 +97,13 @@ function OpenTasks({
 
   if (!reorderable) {
     return (
-      <ul className={styles.tasks}>
-        {open.map((task) => (
-          <TaskRow
-            key={task.id}
-            task={task}
-            open={openId === task.id}
-            progress={counts?.get(task.id)}
+      <ul className={styles.cards}>
+        {open.map((card) => (
+          <CardRow
+            key={card.id}
+            card={card}
+            open={openId === card.id}
+            progress={counts?.get(card.id)}
           />
         ))}
       </ul>
@@ -112,7 +112,7 @@ function OpenTasks({
 
   return (
     <DndContext
-      id="tasks"
+      id="cards"
       sensors={sensors}
       autoScroll={VERTICAL_AUTOSCROLL}
       collisionDetection={closestCenter}
@@ -121,16 +121,16 @@ function OpenTasks({
       onDragCancel={guard.end}
     >
       <SortableContext
-        items={rendered.map((task) => task.id)}
+        items={rendered.map((card) => card.id)}
         strategy={verticalListSortingStrategy}
       >
-        <ul className={styles.tasks}>
-          {rendered.map((task) => (
-            <SortableTaskRow
-              key={task.id}
-              task={task}
-              open={openId === task.id}
-              progress={counts?.get(task.id)}
+        <ul className={styles.cards}>
+          {rendered.map((card) => (
+            <SortableCardRow
+              key={card.id}
+              card={card}
+              open={openId === card.id}
+              progress={counts?.get(card.id)}
             />
           ))}
         </ul>
@@ -144,17 +144,17 @@ type Filter = 'all' | 'active';
 const ids = { newId: () => crypto.randomUUID() };
 
 /**
- * The list's tasks, from the working copy, **the way the person wants to see them, remembered**: the order (`sort`) and whether the Completed
- * section is open (`showCompleted`) are fields of the list, so they survive a reload and reach the person's other devices (DESIGN.md §11.4). The
- * filter is for now and is not remembered. Under any order but Custom a task has no handle and cannot be dragged, since where it landed would be the
+ * The list's cards, from the working copy, **the way the person wants to see them, remembered**: the order (`sort`) and whether the Completed
+ * section is open (`showCompleted`) are fields of the list, so they survive a reload and reach the person's other devices (DESIGN.md §10.5). The
+ * filter is for now and is not remembered. Under any order but Custom a card has no handle and cannot be dragged, since where it landed would be the
  * sort's doing and not the person's.
  */
-function ListTasks({ list }: { list: LocalRow }) {
+function ListCards({ list }: { list: LocalRow }) {
   const client = useSync();
   const offerUndo = useUndo();
-  const tasks = useLocal((db) => tasksOf(db, list.id), [list.id]);
-  const counts = useLocal(subtaskCounts);
-  const openId = useSearchParams().get('task');
+  const cards = useLocal((db) => cardsOf(db, list.id), [list.id]);
+  const counts = useLocal(checkCounts);
+  const openId = useSearchParams().get('card');
   const [filter, setFilter] = useState<Filter>('all');
   const sort = sortOf(list);
   const showCompleted = (() => {
@@ -162,9 +162,9 @@ function ListTasks({ list }: { list: LocalRow }) {
     return field !== undefined && 'v' in field && field.v === true;
   })();
 
-  const all = tasks ?? [];
-  const open = sortTasks(
-    all.filter((task) => !isCompleted(task)),
+  const all = cards ?? [];
+  const open = sortCards(
+    all.filter((card) => !isCompleted(card)),
     sort,
   );
   // Most recently finished first, whatever the sort: it is a record of what was done.
@@ -184,22 +184,22 @@ function ListTasks({ list }: { list: LocalRow }) {
   }
 
   async function deleteCompleted() {
-    // Each completed task with the subtasks it has, deleted together; and the undo reads them again by then, deleted, which says which went with which.
+    // Each completed card with the checklist items it has, deleted together; and the undo reads them again by then, deleted, which says which went with which.
     const groups: Group[] = await client.read(async (db) =>
-      Promise.all(done.map(async (task) => ({ task, subtasks: await allSubtasksOf(db, task.id) }))),
+      Promise.all(done.map(async (card) => ({ card, items: await allChecksOf(db, card.id) }))),
     );
     const result = deleteMany(groups, ids);
     if (!result.ok) return;
     for (const mutation of result.mutations) await client.commit(mutation);
-    const doneIds = done.map((task) => task.id);
+    const doneIds = done.map((card) => card.id);
     offerUndo(
-      done.length === 1 ? 'Completed task deleted.' : `${done.length} completed tasks deleted.`,
+      done.length === 1 ? 'Completed card deleted.' : `${done.length} completed cards deleted.`,
       async () => {
         const back: Group[] = await client.read(async (db) => {
           const found: Group[] = [];
           for (const id of doneIds) {
-            const task = await getRow(db, 'task', id);
-            if (task) found.push({ task, subtasks: await allSubtasksOf(db, id) });
+            const card = await getRow(db, 'desk_card', id);
+            if (card) found.push({ card, items: await allChecksOf(db, id) });
           }
           return found;
         });
@@ -238,11 +238,11 @@ function ListTasks({ list }: { list: LocalRow }) {
           </Select>
         </div>
       </div>
-      <AddTask listId={list.id} tasks={open} />
-      {tasks !== undefined && all.length === 0 ? (
+      <AddCard listId={list.id} cards={open} />
+      {cards !== undefined && all.length === 0 ? (
         <p className={styles.muted}>Nothing here yet.</p>
       ) : null}
-      <OpenTasks open={open} openId={openId} counts={counts} reorderable={canReorder(sort)} />
+      <OpenCards open={open} openId={openId} counts={counts} reorderable={canReorder(sort)} />
       {done.length > 0 && filter === 'all' ? (
         <div className={styles.completed}>
           <div className={styles.completedBar}>
@@ -261,13 +261,13 @@ function ListTasks({ list }: { list: LocalRow }) {
             ) : null}
           </div>
           {showCompleted ? (
-            <ul className={styles.tasks}>
-              {done.map((task) => (
-                <TaskRow
-                  key={task.id}
-                  task={task}
-                  open={openId === task.id}
-                  progress={counts?.get(task.id)}
+            <ul className={styles.cards}>
+              {done.map((card) => (
+                <CardRow
+                  key={card.id}
+                  card={card}
+                  open={openId === card.id}
+                  progress={counts?.get(card.id)}
                 />
               ))}
             </ul>

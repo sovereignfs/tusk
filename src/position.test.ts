@@ -162,7 +162,7 @@ describe(`through ORDER BY (${leg})`, () => {
     const keys = [...new Set([...list, ...awkward])];
 
     const owner = account();
-    const table = database.dialect === 'postgres' ? postgresSchema.list : sqliteSchema.list;
+    const table = database.dialect === 'postgres' ? postgresSchema.deskList : sqliteSchema.deskList;
     for (const key of keys) {
       await dbRun(
         database,

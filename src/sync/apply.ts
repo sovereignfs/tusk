@@ -13,16 +13,17 @@ import {
   type SyncTable,
   encodeFields,
 } from './format';
+import { tableOf } from './tables';
 import { decodeFields, parseStructure } from './validate';
 
 /**
- * Applying a mutation (DESIGN.md §7, §8.3, §8.4): **one short transaction** in which the server increments the account's counter, checks and writes
+ * Applying a mutation (DESIGN.md §7.1, §8.3, §8.4): **one short transaction** in which the server increments the account's counter, checks and writes
  * each change, and records that the mutation was applied. All of it or none of it: one change that cannot be applied refuses the mutation and writes
  * nothing, because a mutation is what one action changes and half of it would be a state no action made.
  *
  * **The server trusts nothing a device says about ownership.** Who the caller is came from the session (`accountRoute`) and is the only owner
  * there is. A row is found and written with the owner in the statement (`WHERE id = … AND owner_id = …`), never looked up by id and then touched, and
- * anything a change points at (its list, its parent, its series) is looked up the same way. The answer is the same whether a row does not exist or is
+ * anything a change points at (its list, its card, its series) is looked up the same way. The answer is the same whether a row does not exist or is
  * another account's (`unavailable`), so it cannot be used to find out which. A client-made id that another account already uses is refused, not
  * merged.
  *
@@ -37,7 +38,7 @@ export interface ApplyOptions {
   /** `refuse` for an account with a key of its own, which sends no plain field (DESIGN.md §9.4). */
   plain?: 'check' | 'refuse';
   /** Smaller limits for a test; the real ones are in `LIMITS`. */
-  limits?: { lists: number; tasks: number };
+  limits?: { lists: number; cards: number; checks?: number };
 }
 
 export type ApplyResult =
@@ -62,13 +63,16 @@ const schema = (database: Database) =>
 
 /** The structural columns of each table, as the database names them. A closed list of ours: nothing a device sent is ever a column name. */
 const STRUCTURE_COLUMNS = {
-  list: [['position', 'position']],
-  task: [
+  desk_list: [['position', 'position']],
+  desk_card: [
     ['listId', 'list_id'],
-    ['parentId', 'parent_id'],
     ['position', 'position'],
   ],
-  series: [['listId', 'list_id']],
+  desk_check: [
+    ['cardId', 'card_id'],
+    ['position', 'position'],
+  ],
+  desk_series: [['listId', 'list_id']],
 } as const satisfies Record<SyncTable, readonly (readonly [string, string])[]>;
 
 const ident = (name: string): SQL => sql.raw(`"${name}"`);
@@ -79,12 +83,13 @@ interface Existing {
 }
 
 interface Touched {
-  tasks: Set<string>;
+  cards: Set<string>;
+  checks: Set<string>;
   series: Set<string>;
-  /** Lists this mutation deletes: not restored by a task in them that it also touches. */
+  /** Lists this mutation deletes: not restored by a card in them that it also touches. */
   deletedLists: Set<string>;
-  /** Tasks this mutation deletes. */
-  deletedTasks: Set<string>;
+  /** Cards this mutation deletes: not restored by a checklist item of theirs that it also touches. */
+  deletedCards: Set<string>;
   created: Record<SyncTable, number>;
 }
 
@@ -106,11 +111,12 @@ export async function applyMutation(
       if (again !== undefined) throw new Replayed(again);
 
       const touched: Touched = {
-        tasks: new Set(),
+        cards: new Set(),
+        checks: new Set(),
         series: new Set(),
         deletedLists: new Set(),
-        deletedTasks: new Set(),
-        created: { list: 0, task: 0, series: 0 },
+        deletedCards: new Set(),
+        created: { desk_list: 0, desk_card: 0, desk_check: 0, desk_series: 0 },
       };
       for (const change of mutation.changes) {
         await applyChange(tx, accountId, change, seq, options, touched);
@@ -122,7 +128,8 @@ export async function applyMutation(
         touched,
         options.limits ?? {
           lists: LIMITS.listsPerAccount,
-          tasks: LIMITS.tasksPerAccount,
+          cards: LIMITS.cardsPerAccount,
+          checks: LIMITS.checksPerAccount,
         },
       );
 
@@ -178,7 +185,7 @@ async function applyChange(
   touched: Touched,
 ): Promise<void> {
   const table = change.table;
-  const target = schema(tx)[table];
+  const target = tableOf(tx, table);
   const plain = options.plain ?? 'check';
 
   // The row, if this account has it: found with the owner in the statement. A row of another account is, to this account, not there.
@@ -189,7 +196,7 @@ async function applyChange(
 
   if (existing === undefined) {
     // It can only be new if it says what a new row needs. If not, it is an edit of a row that is not there for this account, unless what is wrong
-    // with it is not what a new row needs but what no change may be (a subtask with a date): that is its shape, and is said so.
+    // with it is not what a new row needs but what no change may be (a column its table does not have): that is its shape, and is said so.
     if (!parseStructure(change, { creating: true, plain }).ok) {
       throw new Refused(parseStructure(change, { plain }).ok ? 'unavailable' : 'structure');
     }
@@ -209,11 +216,12 @@ async function applyChange(
     );
   }
 
-  if (change.table === 'task') touched.tasks.add(change.id);
-  if (change.table === 'series') touched.series.add(change.id);
+  if (change.table === 'desk_card') touched.cards.add(change.id);
+  if (change.table === 'desk_check') touched.checks.add(change.id);
+  if (change.table === 'desk_series') touched.series.add(change.id);
   if (change.deleted === true) {
-    if (change.table === 'list') touched.deletedLists.add(change.id);
-    if (change.table === 'task') touched.deletedTasks.add(change.id);
+    if (change.table === 'desk_list') touched.deletedLists.add(change.id);
+    if (change.table === 'desk_card') touched.deletedCards.add(change.id);
   }
 }
 
@@ -242,7 +250,7 @@ function mergeFields(
 }
 
 /**
- * What the server copies out of the fields for the reminder job (DESIGN.md §22.3): the due date and time and when it was completed, when they are
+ * What the server copies out of the fields for the Planner and reminders of phase 2 (DESIGN.md §23.3): the due date and time and when it was completed, when they are
  * readable. A field that is ciphertext has no mirror, and a field never set has none either.
  */
 function mirrors(fields: StoredFields): {
@@ -271,7 +279,7 @@ async function insertRow(
   seq: number,
   now: number,
 ): Promise<void> {
-  const target = schema(tx)[change.table];
+  const target = tableOf(tx, change.table);
   const fields = mergeFields('{}', change.fields ?? {}, seq);
   const columns: SQL[] = [
     ident('id'),
@@ -296,7 +304,7 @@ async function insertRow(
       values.push(sql`${record[key] as string | null}`);
     }
   }
-  if (change.table === 'task') {
+  if (change.table === 'desk_card') {
     const mirror = mirrors(fields);
     columns.push(ident('due_date'), ident('due_time'), ident('completed_at'));
     values.push(sql`${mirror.dueDate}`, sql`${mirror.dueTime}`, sql`${mirror.completedAt}`);
@@ -318,10 +326,10 @@ async function updateRow(
   seq: number,
   now: number,
 ): Promise<void> {
-  const target = schema(tx)[change.table];
+  const target = tableOf(tx, change.table);
   const fields = mergeFields(existing.fields, change.fields ?? {}, seq);
 
-  // An edit of a deleted row restores it (DESIGN.md §8.4): losing someone's words is worse than a deleted task coming back. A delete of one that is
+  // An edit of a deleted row restores it (DESIGN.md §8.4): losing someone's words is worse than a deleted card coming back. A delete of one that is
   // deleted already keeps the time it was first deleted.
   const deletedAt = change.deleted === true ? (existing.deletedAt ?? now) : null;
 
@@ -331,17 +339,13 @@ async function updateRow(
     sql`${ident('fields')} = ${encodeFields(fields)}`,
     ...structureSets(change),
   ];
-  if (change.table === 'task') {
+  if (change.table === 'desk_card') {
     const mirror = mirrors(fields);
     sets.push(
       sql`${ident('due_date')} = ${mirror.dueDate}`,
       sql`${ident('due_time')} = ${mirror.dueTime}`,
       sql`${ident('completed_at')} = ${mirror.completedAt}`,
     );
-    // A reminder that was sent is for the time it was sent for: a new time is a new reminder.
-    if (change.fields && ('dueDate' in change.fields || 'dueTime' in change.fields)) {
-      sets.push(sql`${ident('reminder_sent_at')} = NULL`);
-    }
   }
   const updated = await dbAll<{ id: string }>(
     tx,
@@ -350,31 +354,16 @@ async function updateRow(
   if (updated.length === 0) throw new Refused('unavailable');
 }
 
-/** Whether fields hold what only a top-level task may have: a due date or time, a star, or a repeat. A field that is empty, false or unreadable does not. */
-function hasTopLevelOnlyField(fields: StoredFields): boolean {
-  const plain = (name: string) => {
-    const field = fields[name];
-    return field !== undefined && 'v' in field ? field.v : null;
-  };
-  return (
-    (plain('dueDate') ?? null) !== null ||
-    (plain('dueTime') ?? null) !== null ||
-    (plain('seriesId') ?? null) !== null ||
-    plain('starred') === true
-  );
-}
-
-interface TaskRow {
+interface CardRow {
   id: string;
   listId: string;
-  parentId: string | null;
   deletedAt: number | string | null;
   fields: string;
 }
 
 /**
  * What must hold after every change of the mutation is written, over the rows it touched, and is checked here and not change by change because a
- * mutation may do things in any order: move a task with its subtasks, make a list and put a task in it. Anything that does not hold refuses the
+ * mutation may do things in any order: make a list and put a card in it, move a card and tick its items. Anything that does not hold refuses the
  * mutation, and the transaction rolls back.
  */
 async function checkStructure(
@@ -383,56 +372,18 @@ async function checkStructure(
   touched: Touched,
   seq: number,
 ): Promise<void> {
-  const { task, series } = schema(tx);
+  const card = tableOf(tx, 'desk_card');
+  const check = tableOf(tx, 'desk_check');
+  const series = tableOf(tx, 'desk_series');
 
-  for (const id of touched.tasks) {
-    const row = await dbGet<TaskRow>(
+  for (const id of touched.cards) {
+    const row = await dbGet<CardRow>(
       tx,
-      sql`SELECT id, list_id AS "listId", parent_id AS "parentId", deleted_at AS "deletedAt", fields
-          FROM ${task} WHERE id = ${id} AND owner_id = ${accountId}`,
+      sql`SELECT id, list_id AS "listId", deleted_at AS "deletedAt", fields
+          FROM ${card} WHERE id = ${id} AND owner_id = ${accountId}`,
     );
     if (!row) throw new Refused('unavailable');
-    const live = row.deletedAt === null;
-
-    await requireList(tx, accountId, row.listId, live, touched, seq);
-
-    if (row.parentId !== null) {
-      const parent = await dbGet<{
-        listId: string;
-        parentId: string | null;
-        deletedAt: number | string | null;
-      }>(
-        tx,
-        sql`SELECT list_id AS "listId", parent_id AS "parentId", deleted_at AS "deletedAt"
-            FROM ${task} WHERE id = ${row.parentId} AND owner_id = ${accountId}`,
-      );
-      if (!parent) throw new Refused('unavailable');
-      // One level deep, and in the list of its parent (DESIGN.md §11.2).
-      if (parent.parentId !== null || parent.listId !== row.listId) throw new Refused('structure');
-      const children = await dbGet(
-        tx,
-        sql`SELECT 1 AS one FROM ${task} WHERE parent_id = ${row.id} AND owner_id = ${accountId} LIMIT 1`,
-      );
-      if (children) throw new Refused('structure');
-      // A subtask has a title, notes and a tick, and no date, star or repeat (DESIGN.md §11.2), which keeps Today and the reminders about top-level
-      // tasks. Where the fields can be read, one that has any of them is refused; ciphertext cannot be checked, and the browser holds to it.
-      const own = decodeFields(row.fields);
-      if (own.ok && hasTopLevelOnlyField(own.value)) throw new Refused('structure');
-      // A subtask that is edited brings its deleted parent back with it, as an edited task brings back its list.
-      if (live && parent.deletedAt !== null && !touched.deletedTasks.has(row.parentId)) {
-        await dbRun(
-          tx,
-          sql`UPDATE ${task} SET deleted_at = NULL, seq = ${seq} WHERE id = ${row.parentId} AND owner_id = ${accountId}`,
-        );
-      }
-    } else {
-      // A task that moved takes its subtasks with it: they are in its list, or the mutation that moved it did not move them all.
-      const strays = await dbGet(
-        tx,
-        sql`SELECT 1 AS one FROM ${task} WHERE parent_id = ${row.id} AND owner_id = ${accountId} AND list_id <> ${row.listId} LIMIT 1`,
-      );
-      if (strays) throw new Refused('structure');
-    }
+    await requireList(tx, accountId, row.listId, row.deletedAt === null, touched, seq);
 
     // A series it points at is the account's. It is a field, so only a readable one can be checked; one that is ciphertext is not.
     const decoded = decodeFields(row.fields);
@@ -443,6 +394,37 @@ async function checkStructure(
         sql`SELECT 1 AS one FROM ${series} WHERE id = ${pointer.v} AND owner_id = ${accountId}`,
       );
       if (!found) throw new Refused('unavailable');
+    }
+  }
+
+  // A checklist item's card is the account's (DESIGN.md §10.3). An item that is edited brings its deleted card back with it, as an edited card brings
+  // back its list; an item has no list of its own, so a card moving takes nothing with it.
+  for (const id of touched.checks) {
+    const row = await dbGet<{ cardId: string; deletedAt: number | string | null }>(
+      tx,
+      sql`SELECT card_id AS "cardId", deleted_at AS "deletedAt" FROM ${check} WHERE id = ${id} AND owner_id = ${accountId}`,
+    );
+    if (!row) throw new Refused('unavailable');
+    const parent = await dbGet<{ deletedAt: number | string | null }>(
+      tx,
+      sql`SELECT deleted_at AS "deletedAt" FROM ${card} WHERE id = ${row.cardId} AND owner_id = ${accountId}`,
+    );
+    if (!parent) throw new Refused('unavailable');
+    if (
+      row.deletedAt === null &&
+      parent.deletedAt !== null &&
+      !touched.deletedCards.has(row.cardId)
+    ) {
+      await dbRun(
+        tx,
+        sql`UPDATE ${card} SET deleted_at = NULL, seq = ${seq} WHERE id = ${row.cardId} AND owner_id = ${accountId}`,
+      );
+      // Which may in turn need its list back.
+      const restored = await dbGet<{ listId: string }>(
+        tx,
+        sql`SELECT list_id AS "listId" FROM ${card} WHERE id = ${row.cardId} AND owner_id = ${accountId}`,
+      );
+      if (restored) await requireList(tx, accountId, restored.listId, true, touched, seq);
     }
   }
 
@@ -457,7 +439,7 @@ async function checkStructure(
 }
 
 /**
- * A list a task or series points at is the account's. If the row is live and the list is deleted, the list is restored (DESIGN.md §8.4: a task added
+ * A list a card or series points at is the account's. If the row is live and the list is deleted, the list is restored (DESIGN.md §8.4: a card added
  * to a list another device deleted brings it back), unless this mutation is what deletes the list.
  */
 async function requireList(
@@ -468,7 +450,7 @@ async function requireList(
   touched: Touched,
   seq: number,
 ): Promise<void> {
-  const { list } = schema(tx);
+  const list = tableOf(tx, 'desk_list');
   const found = await dbGet<{ deletedAt: number | string | null }>(
     tx,
     sql`SELECT deleted_at AS "deletedAt" FROM ${list} WHERE id = ${listId} AND owner_id = ${accountId}`,
@@ -482,23 +464,24 @@ async function requireList(
   }
 }
 
-/** What an account may have (DESIGN.md §7), counted only where the mutation made rows, since that is the only way a count grows. */
+/** What an account may have (DESIGN.md §7.4), counted only where the mutation made rows, since that is the only way a count grows. */
 async function checkLimits(
   tx: Database,
   accountId: string,
   touched: Touched,
-  limits: { lists: number; tasks: number },
+  limits: { lists: number; cards: number; checks?: number },
 ): Promise<void> {
   const counts: [SyncTable, number][] = [
-    ['list', limits.lists],
-    ['task', limits.tasks],
-    ['series', limits.tasks],
+    ['desk_list', limits.lists],
+    ['desk_card', limits.cards],
+    ['desk_check', limits.checks ?? LIMITS.checksPerAccount],
+    ['desk_series', limits.cards],
   ];
   for (const [name, most] of counts) {
     if (touched.created[name] === 0) continue;
     const row = await dbGet<{ n: number | string }>(
       tx,
-      sql`SELECT COUNT(*) AS n FROM ${schema(tx)[name]} WHERE owner_id = ${accountId}`,
+      sql`SELECT COUNT(*) AS n FROM ${tableOf(tx, name)} WHERE owner_id = ${accountId}`,
     );
     if (Number(row?.n ?? 0) > most) throw new Refused('limit');
   }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { LocalRow } from '../local/rows';
-import { DEFAULT_SORT, SORTS, SORT_LABELS, canReorder, isSort, sortOf, sortTasks } from './sort';
+import { DEFAULT_SORT, SORTS, SORT_LABELS, canReorder, isSort, sortOf, sortCards } from './sort';
 import { parseField } from '../sync/validate';
 
 const row = (
@@ -10,10 +10,9 @@ const row = (
   fields: Record<string, { v: unknown; s: number }> = {},
 ): LocalRow =>
   ({
-    table: 'task',
+    table: 'desk_card',
     id,
     listId: 'l',
-    parentId: null,
     position,
     deletedAt: null,
     seq: 1,
@@ -26,19 +25,19 @@ describe('sorting a list', () => {
     expect([...SORTS]).toEqual(['custom', 'created', 'due', 'title']);
     for (const sort of SORTS) {
       expect(SORT_LABELS[sort].length).toBeGreaterThan(0);
-      expect(parseField('list', 'sort', { v: sort }).ok).toBe(true);
+      expect(parseField('desk_list', 'sort', { v: sort }).ok).toBe(true);
       expect(isSort(sort)).toBe(true);
     }
     for (const other of ['random', '', 'CUSTOM', 'toString', null, 3]) {
       expect(isSort(other)).toBe(false);
-      expect(parseField('list', 'sort', { v: other }).ok).toBe(false);
+      expect(parseField('desk_list', 'sort', { v: other }).ok).toBe(false);
     }
   });
 
   it('is read from the list, and custom for a list with none, a ciphertext one, or one this version does not know', () => {
     const list = (fields: Record<string, unknown>) =>
       ({
-        table: 'list',
+        table: 'desk_list',
         id: 'l',
         position: 'a0',
         deletedAt: null,
@@ -55,12 +54,12 @@ describe('sorting a list', () => {
 
   it('custom is by position as bytes, and equal positions by id', () => {
     const tasks = [row('c', 'a1', 1), row('b', 'a0', 2), row('a', 'a0', 3), row('d', 'B', 4)];
-    expect(sortTasks(tasks, 'custom').map((t) => t.id)).toEqual(['d', 'a', 'b', 'c']);
+    expect(sortCards(tasks, 'custom').map((t: LocalRow) => t.id)).toEqual(['d', 'a', 'b', 'c']);
   });
 
   it('created is newest first', () => {
     const tasks = [row('old', 'a0', 1), row('new', 'a1', 3), row('mid', 'a2', 2)];
-    expect(sortTasks(tasks, 'created').map((t) => t.id)).toEqual(['new', 'mid', 'old']);
+    expect(sortCards(tasks, 'created').map((t: LocalRow) => t.id)).toEqual(['new', 'mid', 'old']);
   });
 
   it('title is alphabetical as a person reads it: case and accents do not decide, and numbers go by value', () => {
@@ -74,7 +73,7 @@ describe('sorting a list', () => {
       named('6', 'Éclair'),
       named('7', 'apple'),
     ];
-    const sorted = sortTasks(tasks, 'title').map((t) => (t.fields.title as { v: string }).v);
+    const sorted = sortCards(tasks, 'title').map((t) => (t.fields.title as { v: string }).v);
     expect(sorted.slice(0, 2).map((t) => t.toLowerCase())).toEqual(['apple', 'apple']);
     expect(sorted.indexOf('task 2')).toBeLessThan(sorted.indexOf('task 10'));
     expect(sorted.indexOf('banana')).toBeLessThan(sorted.indexOf('cherry'));
@@ -95,7 +94,7 @@ describe('sorting a list', () => {
       due('allday', 'a3', '2026-11-05'),
       due('none1', 'a4'),
     ];
-    expect(sortTasks(tasks, 'due').map((t) => t.id)).toEqual([
+    expect(sortCards(tasks, 'due').map((t: LocalRow) => t.id)).toEqual([
       'morning',
       'noon',
       'allday',
@@ -107,12 +106,12 @@ describe('sorting a list', () => {
 
   it('does not change the array it was given, and is the same whatever order it was given in', () => {
     const tasks = [row('b', 'a1', 1), row('a', 'a0', 2)];
-    const before = tasks.map((t) => t.id);
-    sortTasks(tasks, 'title');
-    expect(tasks.map((t) => t.id)).toEqual(before);
+    const before = tasks.map((t: LocalRow) => t.id);
+    sortCards(tasks, 'title');
+    expect(tasks.map((t: LocalRow) => t.id)).toEqual(before);
     for (const sort of SORTS) {
-      expect(sortTasks([...tasks].reverse(), sort).map((t) => t.id)).toEqual(
-        sortTasks(tasks, sort).map((t) => t.id),
+      expect(sortCards([...tasks].reverse(), sort).map((t: LocalRow) => t.id)).toEqual(
+        sortCards(tasks, sort).map((t: LocalRow) => t.id),
       );
     }
   });

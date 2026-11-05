@@ -1,6 +1,14 @@
 import { getTableConfig } from 'drizzle-orm/sqlite-core';
 import { describe, expect, it } from 'vitest';
 import * as schema from '../db/schema/sqlite';
+
+const sqliteTable = (name: SyncTable) =>
+  ({
+    desk_list: schema.deskList,
+    desk_card: schema.deskCard,
+    desk_check: schema.deskCheck,
+    desk_series: schema.deskSeries,
+  })[name];
 import {
   FIELD_NAMES,
   LIMITS,
@@ -20,23 +28,23 @@ const CIPHER = 'YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0-IFgyNTUxOSBhYmM';
 
 /** One value that is right for every field there is. A field with no sample fails the first test, so a field cannot be added without its rule. */
 const SAMPLE: Record<SyncTable, Record<string, unknown>> = {
-  list: { title: 'Home', color: 'green', sort: 'due', showCompleted: true },
-  task: {
+  desk_list: { title: 'Home', color: 'green', sort: 'due', showCompleted: true },
+  desk_card: {
     title: 'Water the plants',
-    notes: 'Twice if it is hot.\nNot the cactus.',
+    description: 'Twice if it is hot.\nNot the cactus.',
     starred: false,
     dueDate: '2026-11-05',
     dueTime: '09:30',
     seriesId: ID(),
+    startedAt: 1_792_000_000_000,
     completedAt: 1_793_000_000_000,
-    reviewedAt: null,
-    dismissedOn: '2026-11-06',
   },
-  series: { rule: 'FREQ=WEEKLY;BYDAY=MO,WE', anchor: '2026-11-02' },
+  desk_check: { title: 'The fern', completedAt: 1_793_000_000_000 },
+  desk_series: { rule: 'FREQ=WEEKLY;BYDAY=MO,WE', anchor: '2026-11-02' },
 };
 
-const task = (extra: Record<string, unknown> = {}) => ({
-  table: 'task',
+const card = (extra: Record<string, unknown> = {}) => ({
+  table: 'desk_card',
   id: ID(),
   listId: ID(),
   position: 'a1',
@@ -44,7 +52,7 @@ const task = (extra: Record<string, unknown> = {}) => ({
   ...extra,
 });
 
-const mutation = (changes: unknown[] = [task()]) => ({ mutationId: ID(), changes });
+const mutation = (changes: unknown[] = [card()]) => ({ mutationId: ID(), changes });
 
 describe('the fields', () => {
   it('have a rule each, and a plain sample that passes it, in step with the format', () => {
@@ -69,36 +77,37 @@ describe('the fields', () => {
       'constructor',
       'hasOwnProperty',
     ]) {
-      expect(parseField('task', name, { v: 'x' }).ok, name).toBe(false);
+      expect(parseField('desk_card', name, { v: 'x' }).ok, name).toBe(false);
     }
-    expect(parseField('list', 'notes', { v: 'x' }).ok).toBe(false);
+    expect(parseField('desk_list', 'description', { v: 'x' }).ok).toBe(false);
   });
 
   it('refuse a wrong value for each field, plain', () => {
     const wrong: [SyncTable, string, unknown][] = [
-      ['list', 'title', ''],
-      ['list', 'title', 'a'.repeat(LIMITS.titleChars + 1)],
-      ['list', 'color', 'purple'],
-      ['list', 'sort', 'random'],
-      ['list', 'showCompleted', 'yes'],
-      ['task', 'title', ''],
-      ['task', 'title', 5],
-      ['task', 'title', 'has\u0000nul'],
-      ['task', 'notes', 'a'.repeat(LIMITS.notesChars + 1)],
-      ['task', 'starred', 1],
-      ['task', 'dueDate', '2026-02-30'],
-      ['task', 'dueDate', '5 November'],
-      ['task', 'dueTime', '24:00'],
-      ['task', 'seriesId', 'not-an-id'],
-      ['task', 'completedAt', -1],
-      ['task', 'completedAt', 1.5],
-      ['task', 'completedAt', '1793000000000'],
-      ['task', 'completedAt', Number.MAX_SAFE_INTEGER],
-      ['task', 'reviewedAt', Number.NaN],
-      ['task', 'dismissedOn', '2026-13-01'],
-      ['series', 'rule', ''],
-      ['series', 'rule', 'F'.repeat(LIMITS.ruleChars + 1)],
-      ['series', 'anchor', 'tomorrow'],
+      ['desk_list', 'title', ''],
+      ['desk_list', 'title', 'a'.repeat(LIMITS.titleChars + 1)],
+      ['desk_list', 'color', 'purple'],
+      ['desk_list', 'sort', 'random'],
+      ['desk_list', 'showCompleted', 'yes'],
+      ['desk_card', 'title', ''],
+      ['desk_card', 'title', 5],
+      ['desk_card', 'title', 'has\u0000nul'],
+      ['desk_card', 'description', 'a'.repeat(LIMITS.descriptionChars + 1)],
+      ['desk_card', 'starred', 1],
+      ['desk_card', 'dueDate', '2026-02-30'],
+      ['desk_card', 'dueDate', '5 November'],
+      ['desk_card', 'dueTime', '24:00'],
+      ['desk_card', 'seriesId', 'not-an-id'],
+      ['desk_card', 'completedAt', -1],
+      ['desk_card', 'completedAt', 1.5],
+      ['desk_card', 'completedAt', '1793000000000'],
+      ['desk_card', 'completedAt', Number.MAX_SAFE_INTEGER],
+      ['desk_card', 'startedAt', Number.NaN],
+      ['desk_check', 'title', ''],
+      ['desk_check', 'completedAt', 'yes'],
+      ['desk_series', 'rule', ''],
+      ['desk_series', 'rule', 'F'.repeat(LIMITS.ruleChars + 1)],
+      ['desk_series', 'anchor', 'tomorrow'],
     ];
     for (const [table, name, value] of wrong) {
       expect(
@@ -109,18 +118,11 @@ describe('the fields', () => {
   });
 
   it('take null where the field may be empty, and not where it may not', () => {
-    for (const name of [
-      'dueDate',
-      'dueTime',
-      'seriesId',
-      'completedAt',
-      'reviewedAt',
-      'dismissedOn',
-    ]) {
-      expect(parseField('task', name, { v: null }).ok, name).toBe(true);
+    for (const name of ['dueDate', 'dueTime', 'seriesId', 'startedAt', 'completedAt']) {
+      expect(parseField('desk_card', name, { v: null }).ok, name).toBe(true);
     }
-    for (const name of ['title', 'notes', 'starred'])
-      expect(parseField('task', name, { v: null }).ok, name).toBe(false);
+    for (const name of ['title', 'description', 'starred'])
+      expect(parseField('desk_card', name, { v: null }).ok, name).toBe(false);
   });
 
   it('are plain or ciphertext and nothing else', () => {
@@ -141,48 +143,55 @@ describe('the fields', () => {
       [],
       7,
     ]) {
-      expect(parseField('task', 'title', value).ok, JSON.stringify(value)).toBe(false);
+      expect(parseField('desk_card', 'title', value).ok, JSON.stringify(value)).toBe(false);
     }
   });
 
   it('hold ciphertext to a size by the field it is for, which is more than the text and not unbounded', () => {
     const title = LIMITS.titleChars;
     const longest = Math.ceil(((title * 4 + 256) * 4) / 3);
-    expect(parseField('task', 'title', { c: 'A'.repeat(longest) }).ok).toBe(true);
-    expect(parseField('task', 'title', { c: 'A'.repeat(longest + 1) }).ok).toBe(false);
+    expect(parseField('desk_card', 'title', { c: 'A'.repeat(longest) }).ok).toBe(true);
+    expect(parseField('desk_card', 'title', { c: 'A'.repeat(longest + 1) }).ok).toBe(false);
     // The same bytes in a field that is a flag are far too many.
-    expect(parseField('task', 'starred', { c: 'A'.repeat(longest) }).ok).toBe(false);
-    // Notes are the largest field, and ciphertext of the longest notes fits.
-    expect(parseField('task', 'notes', { c: 'A'.repeat(100_000) }).ok).toBe(true);
-    expect(parseField('task', 'notes', { c: 'A'.repeat(200_000) }).ok).toBe(false);
+    expect(parseField('desk_card', 'starred', { c: 'A'.repeat(longest) }).ok).toBe(false);
+    // Notes are the largest field, and ciphertext of the longest description fits.
+    expect(parseField('desk_card', 'description', { c: 'A'.repeat(100_000) }).ok).toBe(true);
+    expect(parseField('desk_card', 'description', { c: 'A'.repeat(200_000) }).ok).toBe(false);
   });
 
   it('do not check the content of ciphertext, since nothing of it can be known', () => {
-    expect(parseField('task', 'dueDate', { c: CIPHER }).ok).toBe(true);
-    expect(parseField('list', 'color', { c: CIPHER }).ok).toBe(true);
+    expect(parseField('desk_card', 'dueDate', { c: CIPHER }).ok).toBe(true);
+    expect(parseField('desk_list', 'color', { c: CIPHER }).ok).toBe(true);
   });
 });
 
 describe('a change', () => {
   it('is accepted whole, and what comes back is the same, plain and ciphertext alike', () => {
     for (const change of [
-      task(),
-      task({ parentId: ID(), fields: { title: { c: CIPHER }, notes: { c: CIPHER } } }),
+      card(),
+      card({ fields: { title: { c: CIPHER }, description: { c: CIPHER } } }),
       {
-        table: 'list',
+        table: 'desk_check',
+        id: ID(),
+        cardId: ID(),
+        position: 'a0',
+        fields: { title: { v: 'The fern' }, completedAt: { v: null } },
+      },
+      {
+        table: 'desk_list',
         id: ID(),
         position: 'Zz',
         fields: { title: { v: 'Home' }, color: { v: 'blue' } },
       },
       {
-        table: 'series',
+        table: 'desk_series',
         id: ID(),
         listId: ID(),
         fields: { rule: { c: CIPHER }, anchor: { v: '2026-11-02' } },
       },
-      { table: 'task', id: ID(), deleted: true },
-      { table: 'task', id: ID(), deleted: false },
-      { table: 'task', id: ID(), parentId: null },
+      { table: 'desk_card', id: ID(), deleted: true },
+      { table: 'desk_card', id: ID(), deleted: false },
+      { table: 'desk_check', id: ID(), cardId: ID() },
     ]) {
       const parsed = parseStructure(change);
       expect(parsed.ok, JSON.stringify(change)).toBe(true);
@@ -194,40 +203,43 @@ describe('a change', () => {
     const bad: unknown[] = [
       null,
       undefined,
-      'task',
+      'card',
       42,
       [],
       {},
-      { table: 'task' },
+      { table: 'desk_card' },
       { id: ID() },
       { table: 'notes', id: ID(), deleted: true },
-      { table: 'TASK', id: ID(), deleted: true },
-      { table: ['task'], id: ID(), deleted: true },
-      { table: 'task', id: 'abc', deleted: true },
-      { table: 'task', id: ID().toUpperCase(), deleted: true },
-      { table: 'task', id: ID(), deleted: 'yes' },
-      { table: 'task', id: ID(), listId: 'nope' },
-      { table: 'task', id: ID(), parentId: 'nope' },
-      { table: 'task', id: ID(), position: '' },
-      { table: 'task', id: ID(), position: 'has space' },
-      { table: 'task', id: ID(), position: 'é' },
-      { table: 'task', id: ID(), position: 'a'.repeat(LIMITS.positionChars + 1) },
-      { table: 'task', id: ID(), position: 5 },
-      { table: 'task', id: ID(), fields: [] },
-      { table: 'task', id: ID(), fields: 'title' },
-      { table: 'task', id: ID(), fields: { nosuch: { v: 1 } } },
-      { table: 'task', id: ID(), fields: { title: 'Buy milk' } },
-      { table: 'task', id: ID(), fields: {} }, // nothing changes
-      { table: 'list', id: ID() }, // nothing changes
-      { table: 'list', id: ID(), listId: ID() }, // a list has no list
-      { table: 'series', id: ID(), parentId: null }, // nor a series a parent
-      { table: 'series', id: ID(), position: 'a1' },
+      { table: 'DESK_CARD', id: ID(), deleted: true },
+      { table: ['desk_card'], id: ID(), deleted: true },
+      { table: 'desk_card', id: 'abc', deleted: true },
+      { table: 'desk_card', id: ID().toUpperCase(), deleted: true },
+      { table: 'desk_card', id: ID(), deleted: 'yes' },
+      { table: 'desk_card', id: ID(), listId: 'nope' },
+      { table: 'desk_check', id: ID(), cardId: 'nope' },
+      { table: 'desk_card', id: ID(), parentId: ID() }, // a card has no parent: an item is a row of its own
+      { table: 'desk_card', id: ID(), position: '' },
+      { table: 'desk_card', id: ID(), position: 'has space' },
+      { table: 'desk_card', id: ID(), position: 'é' },
+      { table: 'desk_card', id: ID(), position: 'a'.repeat(LIMITS.positionChars + 1) },
+      { table: 'desk_card', id: ID(), position: 5 },
+      { table: 'desk_card', id: ID(), fields: [] },
+      { table: 'desk_card', id: ID(), fields: 'title' },
+      { table: 'desk_card', id: ID(), fields: { nosuch: { v: 1 } } },
+      { table: 'desk_card', id: ID(), fields: { title: 'Buy milk' } },
+      { table: 'desk_card', id: ID(), fields: {} }, // nothing changes
+      { table: 'desk_list', id: ID() }, // nothing changes
+      { table: 'desk_list', id: ID(), listId: ID() }, // a list has no list
+      { table: 'desk_series', id: ID(), cardId: ID() }, // nor a series a card
+      { table: 'desk_check', id: ID(), listId: ID() }, // nor an item a list: it is where its card is
+      { table: 'desk_check', id: ID(), fields: { starred: { v: true } } }, // nor a star
+      { table: 'desk_series', id: ID(), position: 'a1' },
     ];
     for (const change of bad) expect(parseStructure(change).ok, JSON.stringify(change)).toBe(false);
   });
 
   it('refuses a device that names an owner, an order, a time, or a key of its own, rather than ignoring it', () => {
-    const base = { table: 'task', id: ID(), deleted: false };
+    const base = { table: 'desk_card', id: ID(), deleted: false };
     expect(parseStructure(base).ok).toBe(true);
     for (const extra of [
       { ownerId: ID() },
@@ -244,19 +256,17 @@ describe('a change', () => {
     }
     // A key that JSON can make and an object literal cannot: an own property named `__proto__` is seen, and refused, and pollutes nothing.
     const hostile = JSON.parse(
-      `{"table":"task","id":"${ID()}","deleted":true,"__proto__":{"ownerId":"x"}}`,
+      `{"table":"desk_card","id":"${ID()}","deleted":true,"__proto__":{"ownerId":"x"}}`,
     );
     expect(parseStructure(hostile).ok).toBe(false);
     expect(({} as Record<string, unknown>).ownerId).toBeUndefined();
   });
 
-  it('is refused when a subtask is made with a date, a time, a star or a repeat, and not when they are empty', () => {
-    const parent = ID();
-    const sub = (fields: Record<string, unknown>) => ({
-      table: 'task',
+  it('is refused when an item says something an item does not have: a date, a time, a star or a repeat', () => {
+    const item = (fields: Record<string, unknown>) => ({
+      table: 'desk_check',
       id: ID(),
-      listId: ID(),
-      parentId: parent,
+      cardId: ID(),
       position: 'a0',
       fields: { title: { v: 'x' }, ...fields },
     });
@@ -265,39 +275,42 @@ describe('a change', () => {
       { dueTime: { v: '09:00' } },
       { starred: { v: true } },
       { seriesId: { v: ID() } },
+      { description: { v: 'n' } },
     ]) {
-      expect(parseStructure(sub(fields)).ok, JSON.stringify(fields)).toBe(false);
+      expect(parseStructure(item(fields)).ok, JSON.stringify(fields)).toBe(false);
     }
-    for (const fields of [
-      {},
-      { dueDate: { v: null } },
-      { starred: { v: false } },
-      { notes: { v: 'n' } },
-      { dueDate: { c: CIPHER } },
-    ]) {
-      expect(parseStructure(sub(fields)).ok, JSON.stringify(fields)).toBe(true);
+    for (const fields of [{}, { completedAt: { v: null } }, { completedAt: { c: CIPHER } }]) {
+      expect(parseStructure(item(fields)).ok, JSON.stringify(fields)).toBe(true);
     }
-    // A top-level task may have all of them.
+    // A card may have all of them.
     expect(
       parseStructure({
-        table: 'task',
+        table: 'desk_card',
         id: ID(),
         listId: ID(),
-        parentId: null,
         position: 'a0',
         fields: { title: { v: 'x' }, dueDate: { v: '2026-11-05' }, starred: { v: true } },
       }).ok,
     ).toBe(true);
   });
 
-  it('is refused when a task is its own parent', () => {
-    const id = ID();
-    expect(parseStructure({ table: 'task', id, parentId: id }).ok).toBe(false);
-    expect(parseStructure({ table: 'task', id, parentId: ID() }).ok).toBe(true);
+  it('refuses a new item that does not say which card it is of, or what it is called', () => {
+    expect(
+      parseStructure(
+        { table: 'desk_check', id: ID(), position: 'a0', fields: { title: { v: 'x' } } },
+        { creating: true },
+      ).ok,
+    ).toBe(false);
+    expect(
+      parseStructure(
+        { table: 'desk_check', id: ID(), cardId: ID(), position: 'a0' },
+        { creating: true },
+      ).ok,
+    ).toBe(false);
   });
 
   it('is rebuilt from what it was allowed to say, so that nothing else rides along', () => {
-    const input = task();
+    const input = card();
     const parsed = parseStructure(input);
     expect(parsed.ok && parsed.value).not.toBe(input);
     expect(parsed.ok && parsed.value.fields).not.toBe(input.fields);
@@ -330,17 +343,17 @@ describe('a change', () => {
       }
     });
 
-    it('may leave out parentId, which is then a top-level task', () => {
-      expect(parseStructure(task(), { creating: true }).ok).toBe(true);
+    it('is a card with a list and a place and a title', () => {
+      expect(parseStructure(card(), { creating: true }).ok).toBe(true);
     });
 
     it('is not asked for it when the row already exists, so an update may say less', () => {
-      expect(parseStructure({ table: 'task', id: ID(), fields: { starred: { v: true } } }).ok).toBe(
-        true,
-      );
+      expect(
+        parseStructure({ table: 'desk_card', id: ID(), fields: { starred: { v: true } } }).ok,
+      ).toBe(true);
       expect(
         parseStructure(
-          { table: 'task', id: ID(), fields: { starred: { v: true } } },
+          { table: 'desk_card', id: ID(), fields: { starred: { v: true } } },
           { creating: true },
         ).ok,
       ).toBe(false);
@@ -349,23 +362,23 @@ describe('a change', () => {
 
   describe('on an account with a key of its own', () => {
     it('takes ciphertext and structure, and turns every plain field away', () => {
-      const sealed = task({ fields: { title: { c: CIPHER }, starred: { c: CIPHER } } });
+      const sealed = card({ fields: { title: { c: CIPHER }, starred: { c: CIPHER } } });
       expect(parseStructure(sealed, { plain: 'refuse' }).ok).toBe(true);
-      expect(parseStructure(task(), { plain: 'refuse' }).ok).toBe(false);
+      expect(parseStructure(card(), { plain: 'refuse' }).ok).toBe(false);
       expect(
-        parseStructure(task({ fields: { title: { c: CIPHER }, notes: { v: 'leak' } } }), {
+        parseStructure(card({ fields: { title: { c: CIPHER }, description: { v: 'leak' } } }), {
           plain: 'refuse',
         }).ok,
       ).toBe(false);
-      // Structure alone, with no field at all, is fine: moving or deleting a task is no secret.
+      // Structure alone, with no field at all, is fine: moving or deleting a card is no secret.
       expect(
-        parseStructure({ table: 'task', id: ID(), deleted: true }, { plain: 'refuse' }).ok,
+        parseStructure({ table: 'desk_card', id: ID(), deleted: true }, { plain: 'refuse' }).ok,
       ).toBe(true);
     });
 
     it('does not read what it turns away: a plain value of the wrong kind is refused either way', () => {
       expect(
-        parseStructure(task({ fields: { title: { v: { nested: 1 } } } }), { plain: 'refuse' }).ok,
+        parseStructure(card({ fields: { title: { v: { nested: 1 } } } }), { plain: 'refuse' }).ok,
       ).toBe(false);
     });
   });
@@ -374,12 +387,12 @@ describe('a change', () => {
     const secret = 'hunter2-the-secret-title';
     for (const change of [
       { table: secret, id: ID(), deleted: true },
-      { table: 'task', id: secret, deleted: true },
-      { table: 'task', id: ID(), [secret]: 1 },
-      { table: 'task', id: ID(), fields: { [secret]: { v: 1 } } },
-      { table: 'task', id: ID(), fields: { title: { v: secret + 'x'.repeat(2000) } } },
-      { table: 'task', id: ID(), fields: { dueDate: { v: secret } } },
-      { table: 'task', id: ID(), position: secret + ' ' },
+      { table: 'desk_card', id: secret, deleted: true },
+      { table: 'desk_card', id: ID(), [secret]: 1 },
+      { table: 'desk_card', id: ID(), fields: { [secret]: { v: 1 } } },
+      { table: 'desk_card', id: ID(), fields: { title: { v: secret + 'x'.repeat(2000) } } },
+      { table: 'desk_card', id: ID(), fields: { dueDate: { v: secret } } },
+      { table: 'desk_card', id: ID(), position: secret + ' ' },
     ]) {
       const parsed = parseStructure(change);
       expect(parsed.ok).toBe(false);
@@ -389,7 +402,7 @@ describe('a change', () => {
 
   it('agrees with the tables on which columns are structural', () => {
     const columnsOf = (table: SyncTable) =>
-      getTableConfig(schema[table]).columns.map((column) => column.name);
+      getTableConfig(sqliteTable(table)).columns.map((column) => column.name);
     const snake = (name: string) => name.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
     for (const table of TABLES) {
       const columns = columnsOf(table);
@@ -408,14 +421,20 @@ describe('a mutation', () => {
     const whole = {
       mutationId: ID(),
       changes: [
-        task({
+        card({
           id: parent,
           fields: { title: { v: 'Plan the trip' }, dueDate: { v: '2026-12-01' } },
         }),
-        task({ parentId: parent, fields: { title: { c: CIPHER }, notes: { c: CIPHER } } }),
-        { table: 'list', id: ID(), deleted: true },
         {
-          table: 'series',
+          table: 'desk_check',
+          id: ID(),
+          cardId: parent,
+          position: 'a1',
+          fields: { title: { c: CIPHER } },
+        },
+        { table: 'desk_list', id: ID(), deleted: true },
+        {
+          table: 'desk_series',
           id: ID(),
           listId: ID(),
           fields: { rule: { v: 'FREQ=DAILY' }, anchor: { v: '2026-11-05' } },
@@ -432,7 +451,7 @@ describe('a mutation', () => {
   });
 
   it('keeps the order of its changes, which is the order they apply in', () => {
-    const changes = Array.from({ length: 20 }, () => task());
+    const changes = Array.from({ length: 20 }, () => card());
     const parsed = parseMutation(mutation(changes));
     expect(parsed.ok && (parsed.value as Mutation).changes.map((c) => c.id)).toEqual(
       changes.map((c) => c.id),
@@ -446,55 +465,55 @@ describe('a mutation', () => {
       'm',
       {},
       { mutationId: ID() },
-      { changes: [task()] },
-      { mutationId: 'abc', changes: [task()] },
+      { changes: [card()] },
+      { mutationId: 'abc', changes: [card()] },
       { mutationId: ID(), changes: [] },
       { mutationId: ID(), changes: 'task' },
-      { mutationId: ID(), changes: [task(), 5] },
-      { mutationId: ID(), changes: [task(), { table: 'task', id: 'bad', deleted: true }] },
-      { mutationId: ID(), changes: [task()], protocol: 1 },
-      { mutationId: ID(), changes: [task()], ownerId: ID() },
+      { mutationId: ID(), changes: [card(), 5] },
+      { mutationId: ID(), changes: [card(), { table: 'desk_card', id: 'bad', deleted: true }] },
+      { mutationId: ID(), changes: [card()], protocol: 1 },
+      { mutationId: ID(), changes: [card()], ownerId: ID() },
     ];
     for (const value of bad)
       expect(parseMutation(value).ok, JSON.stringify(value)?.slice(0, 80)).toBe(false);
   });
 
   it('is refused whole for one bad change, since half of an action is a state no action made', () => {
-    const parsed = parseMutation(mutation([task(), task(), task({ listId: 'bad' })]));
+    const parsed = parseMutation(mutation([card(), card(), card({ listId: 'bad' })]));
     expect(parsed.ok).toBe(false);
   });
 
   it('takes 500 changes and not 501', () => {
     const many = (n: number) =>
-      mutation(Array.from({ length: n }, () => ({ table: 'task', id: ID(), deleted: true })));
+      mutation(Array.from({ length: n }, () => ({ table: 'desk_card', id: ID(), deleted: true })));
     expect(parseMutation(many(LIMITS.changes)).ok).toBe(true);
     expect(parseMutation(many(LIMITS.changes + 1)).ok).toBe(false);
   });
 
   it('is held to a size, by what its fields say, whatever they say it in', () => {
-    const notes = 'n'.repeat(LIMITS.notesChars);
+    const description = 'n'.repeat(LIMITS.descriptionChars);
     const withNotes = (count: number) =>
       mutation(
         Array.from({ length: count }, () =>
-          task({ fields: { title: { v: 't' }, notes: { v: notes } } }),
+          card({ fields: { title: { v: 't' }, description: { v: description } } }),
         ),
       );
-    // 20,000 characters of notes each: 40 fit in a million, 60 do not.
+    // 20,000 characters of description each: 40 fit in a million, 60 do not.
     expect(parseMutation(withNotes(40)).ok).toBe(true);
     expect(parseMutation(withNotes(60)).ok).toBe(false);
 
     const sealed = (count: number) =>
       mutation(
-        Array.from({ length: count }, () => task({ fields: { title: { c: 'A'.repeat(3000) } } })),
+        Array.from({ length: count }, () => card({ fields: { title: { c: 'A'.repeat(3000) } } })),
       );
     expect(parseMutation(sealed(300)).ok).toBe(true);
     expect(parseMutation(sealed(400)).ok).toBe(false);
   });
 
   it('takes the account’s mode through to every change', () => {
-    expect(parseMutation(mutation([task()]), { plain: 'refuse' }).ok).toBe(false);
+    expect(parseMutation(mutation([card()]), { plain: 'refuse' }).ok).toBe(false);
     expect(
-      parseMutation(mutation([task({ fields: { title: { c: CIPHER } } })]), { plain: 'refuse' }).ok,
+      parseMutation(mutation([card({ fields: { title: { c: CIPHER } } })]), { plain: 'refuse' }).ok,
     ).toBe(true);
   });
 });
@@ -503,7 +522,7 @@ describe('the fields of a row, as stored', () => {
   it('come back as they went in, plain and ciphertext alike, with the seq that wrote each', () => {
     const stored: StoredFields = {
       title: { v: 'Water the plants', s: 7 },
-      notes: { c: CIPHER, s: 9 },
+      description: { c: CIPHER, s: 9 },
       completedAt: { v: null, s: 12 },
       starred: { v: false, s: 3 },
       dueDate: { v: '2026-11-05', s: 4 },

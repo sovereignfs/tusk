@@ -7,7 +7,8 @@ import type { LocalRow } from './rows';
  * same device sees nothing of the first and signing out can delete exactly one. The UI reads and writes only this; the server is something the
  * sync loop talks to (`src/sync`).
  *
- * - `list`, `task`, `series`  the rows as the device shows them: the server's, with this device's unanswered edits laid over (`store.ts`).
+ * - `desk_list`, `desk_card`, `desk_check`, `desk_series`
+ *                              the rows as the device shows them: the server's, with this device's unanswered edits laid over (`store.ts`).
  * - `shadow`                  for a row that has unanswered edits, the row as the server last had it, so that an edit can be taken back and a
  *                              pull can be merged under the edits. A row with no unanswered edit has none.
  * - `outbox`                  the mutations not yet answered, in the order they were made. They are written in the same transaction as the rows
@@ -29,13 +30,10 @@ export interface Shadow {
 }
 
 export interface LocalSchema extends DBSchema {
-  list: { key: string; value: LocalRow; indexes: { byPosition: string } };
-  task: {
-    key: string;
-    value: LocalRow;
-    indexes: { byListPosition: [string, string]; byParent: string };
-  };
-  series: { key: string; value: LocalRow; indexes: { byList: string } };
+  desk_list: { key: string; value: LocalRow; indexes: { byPosition: string } };
+  desk_card: { key: string; value: LocalRow; indexes: { byListPosition: [string, string] } };
+  desk_check: { key: string; value: LocalRow; indexes: { byCard: string } };
+  desk_series: { key: string; value: LocalRow; indexes: { byList: string } };
   shadow: { key: [string, string]; value: Shadow };
   outbox: { key: number; value: OutboxEntry };
   meta: { key: string; value: unknown };
@@ -43,8 +41,12 @@ export interface LocalSchema extends DBSchema {
 
 export type LocalDatabase = IDBPDatabase<LocalSchema>;
 
-/** The version of the stores below. A change to them adds a step to `upgrade` and raises this; it never edits an earlier step. */
-export const LOCAL_VERSION = 1;
+/**
+ * The version of the stores below. A change to them adds a step to `upgrade` and raises this; it never edits an earlier step. **Version 2** is the Desk's
+ * tables (task 15.2): a database from version 1, which was made under the old names in the few hours that existed, is emptied and made again, since
+ * nothing was released and nothing in it was kept.
+ */
+export const LOCAL_VERSION = 2;
 
 /** The database for an account (DESIGN.md §8.1). */
 export const localName = (accountId: string): string => `tusk-desk-${accountId}`;
@@ -55,16 +57,19 @@ export async function openLocal(
 ): Promise<LocalDatabase> {
   return openDB<LocalSchema>(name, LOCAL_VERSION, {
     upgrade(db, oldVersion) {
-      if (oldVersion < 1) {
-        db.createObjectStore('list', { keyPath: 'id' }).createIndex('byPosition', [
+      if (oldVersion === 1) {
+        for (const name of Array.from(db.objectStoreNames)) db.deleteObjectStore(name);
+      }
+      if (oldVersion < 2) {
+        db.createObjectStore('desk_list', { keyPath: 'id' }).createIndex('byPosition', [
           'position',
           'id',
         ]);
-        const task = db.createObjectStore('task', { keyPath: 'id' });
-        // Queries by list and position (DESIGN.md §8.1): a list's tasks in order, and a task's subtasks.
-        task.createIndex('byListPosition', ['listId', 'position']);
-        task.createIndex('byParent', 'parentId');
-        db.createObjectStore('series', { keyPath: 'id' }).createIndex('byList', 'listId');
+        const card = db.createObjectStore('desk_card', { keyPath: 'id' });
+        // Queries by list and position (DESIGN.md §8.1): a list's cards in order, and a card's checklist.
+        card.createIndex('byListPosition', ['listId', 'position']);
+        db.createObjectStore('desk_check', { keyPath: 'id' }).createIndex('byCard', 'cardId');
+        db.createObjectStore('desk_series', { keyPath: 'id' }).createIndex('byList', 'listId');
         db.createObjectStore('shadow', { keyPath: ['table', 'id'] });
         db.createObjectStore('outbox', { keyPath: 'n', autoIncrement: true });
         db.createObjectStore('meta');

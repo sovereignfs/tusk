@@ -2,14 +2,14 @@ import type { LocalRow } from '../local/rows';
 import { byPosition } from '../local/rows';
 
 /**
- * How a list's tasks are ordered on the screen (DESIGN.md §11.4), **remembered per list** as a field of the list, so that it survives a reload and
+ * How a list's cards are ordered on the screen (DESIGN.md §10.5), **remembered per list** as a field of the list, so that it survives a reload and
  * reaches another device. Pure: no clock, no database.
  *
  * - `custom`   the order the person made by dragging (the position). **The only order that can be dragged**: under any other, a row has no handle and
  *               a drag does nothing, since where it lands would be decided by the sort and not by the person.
  * - `created`  newest first.
- * - `due`      soonest first; a task with no date after those that have one, in position order among themselves.
- * - `title`    alphabetical as a person reads it: case and accents do not decide, and "task 2" comes before "task 10".
+ * - `due`      soonest first; a card with no date after those that have one, in position order among themselves.
+ * - `title`    alphabetical as a person reads it: case and accents do not decide, and "card 2" comes before "card 10".
  */
 export const SORTS = ['custom', 'created', 'due', 'title'] as const;
 export type Sort = (typeof SORTS)[number];
@@ -43,11 +43,11 @@ const collator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: tr
 
 const tie = (a: LocalRow, b: LocalRow): number => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 
-/** The tasks in the order `sort` says. A new array: the one given is not changed. */
-export function sortTasks(tasks: readonly LocalRow[], sort: Sort): LocalRow[] {
+/** The cards in the order `sort` says. A new array: the one given is not changed. */
+export function sortCards(cards: readonly LocalRow[], sort: Sort): LocalRow[] {
   const positional = (a: LocalRow, b: LocalRow) =>
     'position' in a && 'position' in b ? byPosition(a, b) : tie(a, b);
-  const out = [...tasks];
+  const out = [...cards];
   switch (sort) {
     case 'custom':
       return out.sort(positional);
@@ -68,12 +68,12 @@ export function sortTasks(tasks: readonly LocalRow[], sort: Sort): LocalRow[] {
   }
 }
 
-/** A task's due date and time as one string that sorts chronologically (DESIGN.md §12), or undefined if it has no date or it cannot be read. */
-function dueOf(task: LocalRow): string | undefined {
-  const date = plainText(task, 'dueDate');
+/** A card's due date and time as one string that sorts chronologically (DESIGN.md §11), or undefined if it has no date or it cannot be read. */
+function dueOf(card: LocalRow): string | undefined {
+  const date = plainText(card, 'dueDate');
   if (date === '') return undefined;
-  return `${date} ${plainText(task, 'dueTime') || '99:99'}`;
+  return `${date} ${plainText(card, 'dueTime') || '99:99'}`;
 }
 
-/** Whether tasks can be dragged into order under this sort. */
+/** Whether cards can be dragged into order under this sort. */
 export const canReorder = (sort: Sort): boolean => sort === 'custom';

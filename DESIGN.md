@@ -210,7 +210,10 @@ What was built as Tasks becomes the Desk, and the app is renamed. The roadmap's 
 - **The migrations are squashed** into one first migration per dialect and store, since no version has been tagged and no database outside a
   developer's machine holds data. A developer's database is recreated (`pnpm seed --reset` makes a new one worth looking at).
 - **The Desk's tables replace `list`, `task` and `series`** (§23.3): `desk_list`, `desk_card`, `desk_check` and `desk_series`. Subtasks become
-  checklist items, in a table of their own. A card gains a description (the notes, renamed) and a start time for In progress.
+  checklist items, in a table of their own. A card gains a description (the notes, renamed) and a start time for In progress. The columns and fields
+  that only phase 2 reads are not made yet: a card's reminder column, and the fields of Today and Review (`reviewedAt`, `dismissedOn`, §25.3); a new
+  field needs no migration, and a new column gets one of its own. The sync protocol is version 2, so that a device holding the Tasks version is told
+  to update, and the database in the browser is made again.
 - **The first list is _Backlog_**, not _My tasks_, with the same derived id.
 - **The routes move:** `/home` and `/lists/<id>` become `/desk` and `/desk/<listId>`.
 - **The shell is the new one** (§17.2), with the Desk inside it.
@@ -335,7 +338,7 @@ Every write to a workspace is an **operation**, sent to `POST /api/ops`:
 
 ### 7.4 Limits
 
-So that one account cannot fill the server: 200 Desk lists and 50,000 Desk cards an account; 50 workspaces created by an account; 100 members in a
+So that one account cannot fill the server: 200 Desk lists, 50,000 Desk cards and 200,000 Desk checklist items an account; 50 workspaces created by an account; 100 members in a
 workspace; 500 boards in a workspace; 100 lists and 5,000 cards on a board; 50 labels on a board; 200 checklist items on a card; 1,000 comments on a
 card. A size per field, and a rate per account on `/api/sync`, `/api/ops`, adding a member by email, and the published pages.
 

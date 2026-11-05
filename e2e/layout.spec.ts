@@ -20,20 +20,20 @@ async function seed(request: APIRequestContext, origin: string) {
   const reply = await request.post('/api/sync', {
     headers: { origin },
     data: {
-      protocol: 1,
+      protocol: 2,
       cursor: 0,
       mutations: [
         {
           mutationId: crypto.randomUUID(),
           changes: [
             {
-              table: 'list',
+              table: 'desk_list',
               id: list,
               position: 'a0',
               fields: { title: { v: name }, color: { v: 'green' } },
             },
             {
-              table: 'task',
+              table: 'desk_card',
               id: task,
               listId: list,
               position: 'a0',
@@ -66,7 +66,7 @@ test('two columns at first: a sidebar of 280px and the content, with no right co
   expect(
     await sidebar.evaluate((el) => (el.parentElement as HTMLElement).getBoundingClientRect().width),
   ).toBe(280);
-  await expect(page.getByRole('region', { name: 'Task', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Card', exact: true })).toHaveCount(0);
 
   // The content has about 24px of padding, and fills what is left.
   const content = page.getByRole('heading', { level: 1 });
@@ -101,8 +101,8 @@ test('the right column is there only while a task is open, is 360px, shows the t
   await expect(page.getByRole('link', { name })).toBeVisible();
 
   const home = new URL('/home', page.url()).toString();
-  await page.goto(`/home?task=${task}`);
-  const detail = page.getByRole('region', { name: 'Task', exact: true });
+  await page.goto(`/home?card=${task}`);
+  const detail = page.getByRole('region', { name: 'Card', exact: true });
   await expect(detail).toBeVisible();
   await expect(detail.getByLabel('Title')).toHaveValue('Buy oat milk');
   expect(
@@ -113,7 +113,7 @@ test('the right column is there only while a task is open, is 360px, shows the t
 
   const entries = await page.evaluate(() => history.length);
   await detail.getByRole('button', { name: 'Close' }).click();
-  await expect(page.getByRole('region', { name: 'Task', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Card', exact: true })).toHaveCount(0);
   expect(page.url()).toBe(home);
   // Replaced, not pushed: closing a task does not add a step to go back through.
   expect(await page.evaluate(() => history.length)).toBe(entries);
@@ -121,8 +121,8 @@ test('the right column is there only while a task is open, is 360px, shows the t
 
 test('a task that is not there says so, and can be closed', async ({ page }) => {
   await signedIn(page);
-  await page.goto(`/home?task=${crypto.randomUUID()}`);
-  const detail = page.getByRole('region', { name: 'Task', exact: true });
+  await page.goto(`/home?card=${crypto.randomUUID()}`);
+  const detail = page.getByRole('region', { name: 'Card', exact: true });
   await expect(detail).toBeVisible();
   await detail.getByRole('button', { name: 'Close' }).click();
   await expect(detail).toHaveCount(0);

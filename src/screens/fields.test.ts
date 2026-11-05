@@ -7,7 +7,7 @@ const list = (
   fields: Record<string, { v: unknown; s: number } | { c: string; s: number }>,
 ): LocalRow =>
   ({
-    table: 'list',
+    table: 'desk_list',
     id: 'x',
     position: 'a0',
     deletedAt: null,

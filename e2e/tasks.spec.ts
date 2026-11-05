@@ -14,7 +14,7 @@ async function openNewList(page: Page): Promise<{ name: string; url: string }> {
   await trySignIn(page, EMAIL, PASSWORD);
   await expect(page.getByRole('navigation', { name: 'Lists' })).toBeVisible();
   // The page is ready when its working copy is open and has the first list in it: before that a click lands on a page nothing listens to yet.
-  await expect(page.getByRole('link', { name: /^My tasks/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /^Backlog/ })).toBeVisible();
   const name = unique('Tasks');
   await page.getByRole('button', { name: 'Add a list' }).click();
   await page.getByLabel('New list name').fill(name);
@@ -34,8 +34,8 @@ const rows = (page: Page) =>
     .first()
     .getByRole('listitem');
 const add = async (page: Page, title: string) => {
-  await page.getByLabel('Add a task').fill(title);
-  await page.getByLabel('Add a task').press('Enter');
+  await page.getByLabel('Add a card').fill(title);
+  await page.getByLabel('Add a card').press('Enter');
 };
 // The titles are the links: a row has a star as well, which is text.
 const titles = async (page: Page) =>
@@ -43,7 +43,7 @@ const titles = async (page: Page) =>
 
 test('Enter adds a task at the top, and the cursor stays for the next one', async ({ page }) => {
   await openNewList(page);
-  const input = page.getByLabel('Add a task');
+  const input = page.getByLabel('Add a card');
   // A list opens with the cursor in the field.
   await expect(input).toBeFocused();
   for (const title of ['one', 'two', 'three']) {
@@ -114,28 +114,28 @@ test('a task opens in the right column by its address, is edited as you leave ea
   const title = unique('Plan the trip');
   await add(page, title);
   await page.getByRole('link', { name: title }).click();
-  const detail = page.getByRole('region', { name: 'Task', exact: true });
+  const detail = page.getByRole('region', { name: 'Card', exact: true });
   await expect(detail).toBeVisible();
-  await expect(page).toHaveURL(/\?task=[0-9a-f-]{36}$/);
+  await expect(page).toHaveURL(/\?card=[0-9a-f-]{36}$/);
   const address = page.url();
 
   const renamed = `${title} (booked)`;
   await detail.getByLabel('Title').fill(renamed);
-  await detail.getByLabel('Notes').fill('Flights first.\nThen the hotel.');
+  await detail.getByLabel('Description').fill('Flights first.\nThen the hotel.');
   // Leaving the field saves it: there is no button.
   await detail.getByLabel('Title').press('Enter');
-  await detail.getByLabel('Notes').blur();
+  await detail.getByLabel('Description').blur();
   await expect(page.getByRole('link', { name: renamed })).toBeVisible();
 
   await page.reload();
   await expect(page).toHaveURL(address);
   await expect(detail.getByLabel('Title')).toHaveValue(renamed);
-  await expect(detail.getByLabel('Notes')).toHaveValue('Flights first.\nThen the hotel.');
+  await expect(detail.getByLabel('Description')).toHaveValue('Flights first.\nThen the hotel.');
 
   // A task that is not there shows nothing and does not fail.
-  await page.goto(`${url}?task=${crypto.randomUUID()}`);
+  await page.goto(`${url}?card=${crypto.randomUUID()}`);
   await expect(detail).toBeVisible();
-  await expect(detail.getByText('That task is not here any more.')).toBeVisible();
+  await expect(detail.getByText('That card is not here any more.')).toBeVisible();
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 });
 
@@ -144,7 +144,7 @@ test('a title that is emptied goes back to what it was, and nothing is saved', a
   const title = unique('Keep me');
   await add(page, title);
   await page.getByRole('link', { name: title }).click();
-  const field = page.getByRole('region', { name: 'Task', exact: true }).getByLabel('Title');
+  const field = page.getByRole('region', { name: 'Card', exact: true }).getByLabel('Title');
   await field.fill('   ');
   await field.blur();
   await expect(field).toHaveValue(title);
@@ -158,8 +158,8 @@ test('deleting offers Undo, which brings the task back', async ({ page }) => {
   await page.getByRole('button', { name: 'Delete' }).click();
 
   await expect(page.getByRole('link', { name: title })).toHaveCount(0);
-  await expect(page.getByRole('region', { name: 'Task', exact: true })).toHaveCount(0);
-  const bar = page.getByRole('status').filter({ hasText: 'Task deleted.' });
+  await expect(page.getByRole('region', { name: 'Card', exact: true })).toHaveCount(0);
+  const bar = page.getByRole('status').filter({ hasText: 'Card deleted.' });
   await expect(bar).toBeVisible();
   await bar.getByRole('button', { name: 'Undo' }).click();
   await expect(page.getByRole('link', { name: title })).toBeVisible();
@@ -187,7 +187,7 @@ test('with the network off, adding and ticking show at once, and are sent when i
       async () => {
         const reply = await page.request.post('/api/sync', {
           headers: { origin },
-          data: { protocol: 1, cursor: 0, mutations: [], limit: 2000 },
+          data: { protocol: 2, cursor: 0, mutations: [], limit: 2000 },
         });
         const body = await reply.json();
         return body.pull.rows.some(
@@ -195,7 +195,7 @@ test('with the network off, adding and ticking show at once, and are sent when i
             table: string;
             fields: { title?: { v: string }; completedAt?: { v: number | null } };
           }) =>
-            row.table === 'task' &&
+            row.table === 'desk_card' &&
             row.fields.title?.v === title &&
             typeof row.fields.completedAt?.v === 'number',
         );
@@ -212,13 +212,13 @@ test.describe('subtasks', () => {
     const title = unique('Plan the trip');
     await add(page, title);
     await page.getByRole('link', { name: title }).click();
-    const detail = page.getByRole('region', { name: 'Task', exact: true });
+    const detail = page.getByRole('region', { name: 'Card', exact: true });
     await expect(detail).toBeVisible();
     return { title, detail };
   }
   const addSub = async (detail: ReturnType<Page['getByRole']>, title: string) => {
-    await detail.getByLabel('Add a subtask').fill(title);
-    await detail.getByLabel('Add a subtask').press('Enter');
+    await detail.getByLabel('Add an item').fill(title);
+    await detail.getByLabel('Add an item').press('Enter');
   };
 
   test('are added from the keyboard, in order, with the cursor staying, and the row shows how far through it is', async ({
@@ -227,9 +227,9 @@ test.describe('subtasks', () => {
     const { title, detail } = await taskOpen(page);
     for (const sub of ['Flights', 'Hotel', 'Insurance']) {
       await addSub(detail, sub);
-      await expect(detail.getByLabel('Add a subtask')).toBeFocused();
+      await expect(detail.getByLabel('Add an item')).toBeFocused();
     }
-    const subs = detail.getByRole('region', { name: 'Subtasks' });
+    const subs = detail.getByRole('region', { name: 'Checklist' });
     await expect
       .poll(
         async () =>
@@ -241,9 +241,9 @@ test.describe('subtasks', () => {
       .toEqual(['Flights', 'Hotel', 'Insurance']);
 
     const ring = page.getByRole('listitem').filter({ hasText: title }).getByRole('img');
-    await expect(ring).toHaveAccessibleName('0 of 3 subtasks done');
+    await expect(ring).toHaveAccessibleName('0 of 3 items done');
     await subs.getByRole('checkbox', { name: 'Done: Hotel' }).click();
-    await expect(ring).toHaveAccessibleName('1 of 3 subtasks done');
+    await expect(ring).toHaveAccessibleName('1 of 3 items done');
     // They are not on the list's rows: a subtask is not a task of the list.
     await expect(page.getByRole('link', { name: 'Hotel' })).toHaveCount(0);
   });
@@ -255,16 +255,16 @@ test.describe('subtasks', () => {
     const { title, detail } = await taskOpen(page);
     const origin = new URL(baseURL ?? 'http://localhost').origin;
     for (const sub of ['One', 'Two', 'Three']) await addSub(detail, sub);
-    const subs = detail.getByRole('region', { name: 'Subtasks' });
+    const subs = detail.getByRole('region', { name: 'Checklist' });
     await subs.getByRole('checkbox', { name: 'Done: Two' }).click();
     await expect(
       page.getByRole('listitem').filter({ hasText: title }).getByRole('img'),
-    ).toHaveAccessibleName('1 of 3 subtasks done');
+    ).toHaveAccessibleName('1 of 3 items done');
 
     const completedAt = async () => {
       const reply = await page.request.post('/api/sync', {
         headers: { origin },
-        data: { protocol: 1, cursor: 0, mutations: [], limit: 2000 },
+        data: { protocol: 2, cursor: 0, mutations: [], limit: 2000 },
       });
       const rows = (await reply.json()).pull.rows as {
         table: string;
@@ -274,7 +274,7 @@ test.describe('subtasks', () => {
         rows
           .filter(
             (r) =>
-              r.table === 'task' &&
+              r.table === 'desk_card' &&
               ['One', 'Two', 'Three', title].includes(r.fields.title?.v ?? ''),
           )
           .map((r) => [r.fields.title?.v, r.fields.completedAt?.v ?? null]),
@@ -304,15 +304,15 @@ test.describe('subtasks', () => {
   }) => {
     const { detail } = await taskOpen(page);
     await addSub(detail, 'Only');
-    const subs = detail.getByRole('region', { name: 'Subtasks' });
+    const subs = detail.getByRole('region', { name: 'Checklist' });
     await subs.getByRole('checkbox', { name: 'Done: Only' }).click();
     await expect(detail.getByRole('checkbox', { name: 'Done' }).first()).not.toBeChecked();
 
-    await subs.getByRole('button', { name: 'Delete subtask: Only' }).click();
-    await expect(subs.getByRole('textbox', { name: 'Subtask: Only' })).toHaveCount(0);
-    const bar = page.getByRole('status').filter({ hasText: 'Subtask deleted.' });
+    await subs.getByRole('button', { name: 'Delete item: Only' }).click();
+    await expect(subs.getByRole('textbox', { name: 'Item: Only' })).toHaveCount(0);
+    const bar = page.getByRole('status').filter({ hasText: 'Item deleted.' });
     await bar.getByRole('button', { name: 'Undo' }).click();
-    await expect(subs.getByRole('textbox', { name: 'Subtask: Only' })).toBeVisible();
+    await expect(subs.getByRole('textbox', { name: 'Item: Only' })).toBeVisible();
   });
 
   test('a title is edited in place and saved as it is left, and an emptied one goes back', async ({
@@ -320,15 +320,13 @@ test.describe('subtasks', () => {
   }) => {
     const { detail } = await taskOpen(page);
     await addSub(detail, 'Flights');
-    const field = detail.getByRole('textbox', { name: 'Subtask: Flights' });
+    const field = detail.getByRole('textbox', { name: 'Item: Flights' });
     await field.fill('Flights and trains');
     await field.press('Enter');
-    await expect(
-      detail.getByRole('textbox', { name: 'Subtask: Flights and trains' }),
-    ).toBeVisible();
+    await expect(detail.getByRole('textbox', { name: 'Item: Flights and trains' })).toBeVisible();
     await page.reload();
-    await expect(page.getByRole('textbox', { name: 'Subtask: Flights and trains' })).toBeVisible();
-    const again = page.getByRole('textbox', { name: 'Subtask: Flights and trains' });
+    await expect(page.getByRole('textbox', { name: 'Item: Flights and trains' })).toBeVisible();
+    const again = page.getByRole('textbox', { name: 'Item: Flights and trains' });
     await again.fill('   ');
     await again.blur();
     await expect(again).toHaveValue('Flights and trains');
@@ -340,17 +338,16 @@ test.describe('putting tasks in order', () => {
   async function positions(page: Page, origin: string, wanted: string[]) {
     const reply = await page.request.post('/api/sync', {
       headers: { origin },
-      data: { protocol: 1, cursor: 0, mutations: [], limit: 2000 },
+      data: { protocol: 2, cursor: 0, mutations: [], limit: 2000 },
     });
     const rows = (await reply.json()).pull.rows as {
       table: string;
-      parentId?: string | null;
       position: string;
       fields: { title?: { v: string } };
     }[];
     return Object.fromEntries(
       rows
-        .filter((r) => r.table === 'task' && wanted.includes(r.fields.title?.v ?? ''))
+        .filter((r) => r.table === 'desk_card' && wanted.includes(r.fields.title?.v ?? ''))
         .map((r) => [r.fields.title?.v, r.position]),
     );
   }
@@ -395,7 +392,7 @@ test.describe('putting tasks in order', () => {
     await drag(page, third as string, first as string);
     await expect.poll(() => titles(page)).toEqual([third, first, second]);
     // Nothing sprang back, and the page did not navigate to the task that was dragged.
-    await expect(page).not.toHaveURL(/\?task=/);
+    await expect(page).not.toHaveURL(/\?card=/);
     await expect
       .poll(
         async () =>
@@ -425,7 +422,7 @@ test.describe('putting tasks in order', () => {
     // Enter was left to the link, which opens the task.
     await page.getByRole('link', { name: first as string }).focus();
     await page.keyboard.press('Enter');
-    await expect(page).toHaveURL(/\?task=/);
+    await expect(page).toHaveURL(/\?card=/);
   });
 
   test('a subtask is dragged by its handle, and the order holds after a reload', async ({
@@ -435,21 +432,21 @@ test.describe('putting tasks in order', () => {
     const title = unique('With parts');
     await add(page, title);
     await page.getByRole('link', { name: title }).click();
-    const detail = page.getByRole('region', { name: 'Task', exact: true });
+    const detail = page.getByRole('region', { name: 'Card', exact: true });
     for (const sub of ['One', 'Two', 'Three']) {
-      await detail.getByLabel('Add a subtask').fill(sub);
-      await detail.getByLabel('Add a subtask').press('Enter');
+      await detail.getByLabel('Add an item').fill(sub);
+      await detail.getByLabel('Add an item').press('Enter');
     }
     const order = async () =>
       detail
-        .getByRole('region', { name: 'Subtasks' })
+        .getByRole('region', { name: 'Checklist' })
         .getByRole('list')
         .getByRole('textbox')
         .evaluateAll((els) => els.map((el) => (el as HTMLInputElement).value));
     await expect.poll(order).toEqual(['One', 'Two', 'Three']);
 
-    const handle = detail.getByRole('button', { name: 'Move subtask: Three' });
-    const target = detail.getByRole('textbox', { name: 'Subtask: One' });
+    const handle = detail.getByRole('button', { name: 'Move item: Three' });
+    const target = detail.getByRole('textbox', { name: 'Item: One' });
     const from = await handle.boundingBox();
     const to = await target.boundingBox();
     if (!from || !to) throw new Error('rows are not on the page');
@@ -471,30 +468,30 @@ test('deleting a task with subtasks takes them with it, and Undo brings back tho
   const title = unique('Parent');
   await add(page, title);
   await page.getByRole('link', { name: title }).click();
-  const detail = page.getByRole('region', { name: 'Task', exact: true });
+  const detail = page.getByRole('region', { name: 'Card', exact: true });
   for (const sub of ['Kept', 'Earlier', 'Later']) {
-    await detail.getByLabel('Add a subtask').fill(sub);
-    await detail.getByLabel('Add a subtask').press('Enter');
+    await detail.getByLabel('Add an item').fill(sub);
+    await detail.getByLabel('Add an item').press('Enter');
   }
-  const subs = detail.getByRole('region', { name: 'Subtasks' });
+  const subs = detail.getByRole('region', { name: 'Checklist' });
   // One is deleted on its own first.
-  await subs.getByRole('button', { name: 'Delete subtask: Earlier' }).click();
-  await expect(subs.getByRole('textbox', { name: 'Subtask: Earlier' })).toHaveCount(0);
+  await subs.getByRole('button', { name: 'Delete item: Earlier' }).click();
+  await expect(subs.getByRole('textbox', { name: 'Item: Earlier' })).toHaveCount(0);
 
   await detail.getByRole('button', { name: 'Delete', exact: true }).click();
   await expect(page.getByRole('link', { name: title })).toHaveCount(0);
-  const bar = page.getByRole('status').filter({ hasText: 'Task deleted.' });
+  const bar = page.getByRole('status').filter({ hasText: 'Card deleted.' });
   await bar.getByRole('button', { name: 'Undo' }).click();
   await expect(page.getByRole('link', { name: title })).toBeVisible();
 
   await page.getByRole('link', { name: title }).click();
   const again = page
-    .getByRole('region', { name: 'Task', exact: true })
-    .getByRole('region', { name: 'Subtasks' });
-  await expect(again.getByRole('textbox', { name: 'Subtask: Kept' })).toBeVisible();
-  await expect(again.getByRole('textbox', { name: 'Subtask: Later' })).toBeVisible();
+    .getByRole('region', { name: 'Card', exact: true })
+    .getByRole('region', { name: 'Checklist' });
+  await expect(again.getByRole('textbox', { name: 'Item: Kept' })).toBeVisible();
+  await expect(again.getByRole('textbox', { name: 'Item: Later' })).toBeVisible();
   // The one that was deleted before is still deleted.
-  await expect(again.getByRole('textbox', { name: 'Subtask: Earlier' })).toHaveCount(0);
+  await expect(again.getByRole('textbox', { name: 'Item: Earlier' })).toHaveCount(0);
 });
 
 test.describe('seeing a list the way one wants', () => {
@@ -504,13 +501,13 @@ test.describe('seeing a list the way one wants', () => {
   async function listFields(page: Page, baseURL: string | undefined, name: string) {
     const reply = await page.request.post('/api/sync', {
       headers: { origin: origin(baseURL) },
-      data: { protocol: 1, cursor: 0, mutations: [], limit: 2000 },
+      data: { protocol: 2, cursor: 0, mutations: [], limit: 2000 },
     });
     const rows = (await reply.json()).pull.rows as {
       table: string;
       fields: Record<string, { v: unknown }>;
     }[];
-    return rows.find((r) => r.table === 'list' && r.fields.title?.v === name)?.fields;
+    return rows.find((r) => r.table === 'desk_list' && r.fields.title?.v === name)?.fields;
   }
 
   test('a sort other than Custom orders the tasks, takes away the handle so a drag does nothing, and is the same after a reload and on the server', async ({
@@ -603,7 +600,7 @@ test.describe('seeing a list the way one wants', () => {
     await expect(page.getByRole('button', { name: /Completed/ })).toHaveCount(0);
     await expect(page.getByRole('link', { name: keep })).toBeVisible();
 
-    const bar = page.getByRole('status').filter({ hasText: '2 completed tasks deleted.' });
+    const bar = page.getByRole('status').filter({ hasText: '2 completed cards deleted.' });
     await bar.getByRole('button', { name: 'Undo' }).click();
     await expect(page.getByRole('button', { name: /Completed \(2\)/ })).toBeVisible();
   });
@@ -612,22 +609,31 @@ test.describe('seeing a list the way one wants', () => {
 test.describe('moving a task and starring it', () => {
   const origin = (baseURL?: string) => new URL(baseURL ?? 'http://localhost').origin;
 
+  /** How many checklist items the server holds for a card: they stay with it when it moves, and have no list of their own. */
+  async function itemsOnServer(page: Page, baseURL: string | undefined, cardId: string) {
+    const reply = await page.request.post('/api/sync', {
+      headers: { origin: origin(baseURL) },
+      data: { protocol: 2, cursor: 0, mutations: [], limit: 2000 },
+    });
+    const rows = (await reply.json()).pull.rows as { table: string; cardId?: string }[];
+    return rows.filter((r) => r.table === 'desk_check' && r.cardId === cardId).length;
+  }
+
   async function tasksOnServer(page: Page, baseURL: string | undefined, wanted: string[]) {
     const reply = await page.request.post('/api/sync', {
       headers: { origin: origin(baseURL) },
-      data: { protocol: 1, cursor: 0, mutations: [], limit: 2000 },
+      data: { protocol: 2, cursor: 0, mutations: [], limit: 2000 },
     });
     const rows = (await reply.json()).pull.rows as {
       table: string;
       id: string;
       listId?: string;
-      parentId?: string | null;
       fields: { title?: { v: string }; starred?: { v: boolean } };
     }[];
-    return rows.filter((r) => r.table === 'task' && wanted.includes(r.fields.title?.v ?? ''));
+    return rows.filter((r) => r.table === 'desk_card' && wanted.includes(r.fields.title?.v ?? ''));
   }
 
-  test('a task moves to another list with its subtasks, at the top of it', async ({
+  test('a card moves to another list with its checklist, at the top of it', async ({
     page,
     baseURL,
   }) => {
@@ -644,23 +650,20 @@ test.describe('moving a task and starring it', () => {
     const sub = unique('Part');
     await add(page, title);
     await page.getByRole('link', { name: title }).click();
-    const detail = page.getByRole('region', { name: 'Task', exact: true });
-    await detail.getByLabel('Add a subtask').fill(sub);
-    await detail.getByLabel('Add a subtask').press('Enter');
-    await expect(detail.getByRole('textbox', { name: `Subtask: ${sub}` })).toBeVisible();
+    const detail = page.getByRole('region', { name: 'Card', exact: true });
+    await detail.getByLabel('Add an item').fill(sub);
+    await detail.getByLabel('Add an item').press('Enter');
+    await expect(detail.getByRole('textbox', { name: `Item: ${sub}` })).toBeVisible();
 
-    await detail.getByLabel('List').selectOption({ label: to });
+    await detail.getByLabel('List', { exact: true }).selectOption({ label: to });
     // It leaves this list, and is at the top of the other, subtask and all.
     await expect(page.getByRole('link', { name: title })).toHaveCount(0);
     await expect
       .poll(async () => {
-        const rows = await tasksOnServer(page, baseURL, [title, sub]);
+        const rows = await tasksOnServer(page, baseURL, [title]);
         const parent = rows.find((r) => r.fields.title?.v === title);
-        const part = rows.find((r) => r.fields.title?.v === sub);
         return (
-          parent?.listId !== undefined &&
-          parent.listId === part?.listId &&
-          part?.parentId === parent.id
+          parent?.listId !== undefined && (await itemsOnServer(page, baseURL, parent.id)) === 1
         );
       })
       .toBe(true);
@@ -672,8 +675,8 @@ test.describe('moving a task and starring it', () => {
     await page.getByRole('link', { name: title }).click();
     await expect(
       page
-        .getByRole('region', { name: 'Task', exact: true })
-        .getByRole('textbox', { name: `Subtask: ${sub}` }),
+        .getByRole('region', { name: 'Card', exact: true })
+        .getByRole('textbox', { name: `Item: ${sub}` }),
     ).toBeVisible();
   });
 
@@ -692,7 +695,7 @@ test.describe('moving a task and starring it', () => {
       'true',
     );
     // It did not open the task.
-    await expect(page).not.toHaveURL(/\\?task=/);
+    await expect(page).not.toHaveURL(/\\?card=/);
     await expect
       .poll(async () => (await tasksOnServer(page, baseURL, [title]))[0]?.fields.starred?.v)
       .toBe(true);
@@ -707,15 +710,15 @@ test.describe('moving a task and starring it', () => {
 
     // In the detail too, and a subtask has no star there.
     await page.getByRole('link', { name: title }).click();
-    const detail = page.getByRole('region', { name: 'Task', exact: true });
+    const detail = page.getByRole('region', { name: 'Card', exact: true });
     await expect(detail.getByRole('button', { name: 'Remove the star' }).first()).toHaveAttribute(
       'aria-pressed',
       'true',
     );
-    await detail.getByLabel('Add a subtask').fill('A part');
-    await detail.getByLabel('Add a subtask').press('Enter');
-    const subtasks = detail.getByRole('region', { name: 'Subtasks' });
-    await expect(subtasks.getByRole('textbox', { name: 'Subtask: A part' })).toBeVisible();
+    await detail.getByLabel('Add an item').fill('A part');
+    await detail.getByLabel('Add an item').press('Enter');
+    const subtasks = detail.getByRole('region', { name: 'Checklist' });
+    await expect(subtasks.getByRole('textbox', { name: 'Item: A part' })).toBeVisible();
     await expect(subtasks.getByRole('button', { name: /star/i })).toHaveCount(0);
   });
 });

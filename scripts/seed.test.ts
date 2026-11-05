@@ -10,7 +10,7 @@ import * as sqliteSchema from '../src/db/schema/sqlite';
 import { testTarget } from '../src/db/test-support';
 import { applyMutation } from '../src/sync/apply';
 import { LIMITS } from '../src/sync/format';
-import { account, id, list, mutation, snapshot, task } from '../src/sync/test-support';
+import { account, card, id, list, mutation, snapshot } from '../src/sync/test-support';
 import { parseMutation } from '../src/sync/validate';
 import { SEED_EMAIL, isLocalDatabase, planSeed, removeSeed, runSeed } from './seed';
 
@@ -106,12 +106,12 @@ describe('what the seed makes', () => {
       expect(parseMutation(m).ok, JSON.stringify(m).slice(0, 80)).toBe(true);
     expect(JSON.stringify(planSeed('account-1'))).toBe(JSON.stringify(plan));
     expect(JSON.stringify(planSeed('account-2'))).not.toBe(JSON.stringify(plan));
-    const all = [...plan.ids.list, ...plan.ids.task];
+    const all = [...plan.ids.desk_list, ...plan.ids.desk_card, ...plan.ids.desk_check];
     expect(new Set(all).size).toBe(all.length);
     expect(new Set(plan.mutations.map((m) => m.mutationId)).size).toBe(plan.mutations.length);
   });
 
-  it('covers the shapes worth looking at: an empty list, long titles and notes, done and open tasks, a list long enough to scroll', () => {
+  it('covers the shapes worth looking at: an empty list, long titles and descriptions, done and open cards, a list long enough to scroll', () => {
     const plan = planSeed('account-1');
     const changes = plan.mutations.flatMap((m) => m.changes);
     const titles = changes
@@ -121,46 +121,48 @@ describe('what the seed makes', () => {
     expect(
       changes.some(
         (c) =>
-          typeof (c.fields?.notes as { v?: string } | undefined)?.v === 'string' &&
-          (c.fields?.notes as { v: string }).v.length > 1000,
+          typeof (c.fields?.description as { v?: string } | undefined)?.v === 'string' &&
+          (c.fields?.description as { v: string }).v.length > 1000,
       ),
     ).toBe(true);
     expect(changes.some((c) => c.fields?.completedAt !== undefined)).toBe(true);
-    const lists = changes.filter((c) => c.table === 'list');
-    const tasks = changes.filter((c) => c.table === 'task');
-    const emptyLists = lists.filter((l) => !tasks.some((t) => 'listId' in t && t.listId === l.id));
+    const lists = changes.filter((c) => c.table === 'desk_list');
+    const cards = changes.filter((c) => c.table === 'desk_card');
+    const emptyLists = lists.filter((l) => !cards.some((t) => 'listId' in t && t.listId === l.id));
     expect(emptyLists.length).toBeGreaterThanOrEqual(1);
-    // Subtasks at nothing done, part of them, and all of them, each under a parent that is open.
-    const subs = tasks.filter((t) => 'parentId' in t && typeof t.parentId === 'string');
-    const byParent = new Map<string, boolean[]>();
-    for (const sub of subs) {
-      if (!('parentId' in sub) || typeof sub.parentId !== 'string') continue;
-      byParent.set(sub.parentId, [
-        ...(byParent.get(sub.parentId) ?? []),
-        sub.fields?.completedAt !== undefined,
+    // Checklists at nothing done, part of them, and all of them, each under a card that is open.
+    const items = changes.filter((c) => c.table === 'desk_check');
+    const byCard = new Map<string, boolean[]>();
+    for (const item of items) {
+      if (!('cardId' in item) || typeof item.cardId !== 'string') continue;
+      byCard.set(item.cardId, [
+        ...(byCard.get(item.cardId) ?? []),
+        item.fields?.completedAt !== undefined,
       ]);
     }
-    const shares = [...byParent.values()].map((done) => done.filter(Boolean).length / done.length);
+    const shares = [...byCard.values()].map((done) => done.filter(Boolean).length / done.length);
     expect(shares).toContain(0);
     expect(shares).toContain(1);
     expect(shares.some((share) => share > 0 && share < 1)).toBe(true);
-    for (const parentId of byParent.keys()) {
-      expect(tasks.find((t) => t.id === parentId)?.fields?.completedAt).toBeUndefined();
+    for (const cardId of byCard.keys()) {
+      expect(cards.find((t) => t.id === cardId)?.fields?.completedAt).toBeUndefined();
     }
     const biggest = Math.max(
-      ...lists.map((l) => tasks.filter((t) => 'listId' in t && t.listId === l.id).length),
+      ...lists.map((l) => cards.filter((t) => 'listId' in t && t.listId === l.id).length),
     );
     expect(biggest).toBeGreaterThanOrEqual(30);
   });
 });
 
 describe(`running it (${leg})`, () => {
-  it('makes an account, its lists and its tasks, through the store', async () => {
+  it('makes an account, its lists, cards and checklists, through the store', async () => {
     const result = await runSeed(stores(), auth.settings, { now: 1_800_000_000_000 });
     expect(result.created).toBe(true);
     expect(result.lists).toBe(6);
-    expect(result.tasks).toBe(planSeed(result.accountId).ids.task.length);
-    expect(result.tasks).toBe(58);
+    expect(result.cards).toBe(planSeed(result.accountId).ids.desk_card.length);
+    expect(result.checks).toBe(planSeed(result.accountId).ids.desk_check.length);
+    expect(result.cards).toBe(50);
+    expect(result.checks).toBe(8);
     expect((await userRows()).length).toBe(1);
   });
 
@@ -189,9 +191,9 @@ describe(`running it (${leg})`, () => {
     const seeded = await runSeed(stores(), auth.settings);
     const other = account();
     const l = list({ title: 'Someone else’s' });
-    await applyMutation(app, other, mutation(l, task(l.id)), { now: 1_800_000_100_000 });
+    await applyMutation(app, other, mutation(l, card(l.id)), { now: 1_800_000_100_000 });
     const mine = list({ title: 'Made by hand in the seed account' });
-    await applyMutation(app, seeded.accountId, mutation(mine, task(mine.id)), {
+    await applyMutation(app, seeded.accountId, mutation(mine, card(mine.id)), {
       now: 1_800_000_100_000,
     });
     const theirs = await snapshot(app, other);
@@ -201,9 +203,9 @@ describe(`running it (${leg})`, () => {
     expect(await userRows()).toEqual([]);
     expect(await snapshot(app, other)).toEqual(theirs);
     const rows = await snapshot(app, seeded.accountId);
-    expect(rows.list).toHaveLength(1);
-    expect(rows.list[0]).toMatchObject({ id: mine.id });
-    expect(rows.task).toHaveLength(1);
+    expect(rows.desk_list).toHaveLength(1);
+    expect(rows.desk_list[0]).toMatchObject({ id: mine.id });
+    expect(rows.desk_card).toHaveLength(1);
     expect(await removeSeed(stores())).toBe(false);
   });
 

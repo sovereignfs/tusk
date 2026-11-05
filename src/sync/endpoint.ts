@@ -27,7 +27,7 @@ export interface SyncDeps {
   /** `refuse` for an account with a key of its own (§9.4). Until personal keys exist (task 14.2) every account is `check`. */
   plain?: 'check' | 'refuse';
   /** Smaller limits for a test. */
-  limits?: { lists: number; tasks: number };
+  limits?: { lists: number; cards: number; checks?: number };
 }
 
 /** A device syncs after a write, on focus and on a timer; this is enough for all of that, and not enough to be used to hammer the server. */

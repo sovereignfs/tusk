@@ -1,5 +1,5 @@
 /**
- * How far through its subtasks a task is, as a small ring beside its title (DESIGN.md §11.2). It is a picture of two numbers that are also said in
+ * How far through its checklist items a card is, as a small ring beside its title (DESIGN.md §10.3). It is a picture of two numbers that are also said in
  * words, for a screen reader, so that the ring is never the only way to know.
  */
 export function ProgressRing({ done, total }: { done: number; total: number }) {
@@ -12,7 +12,7 @@ export function ProgressRing({ done, total }: { done: number; total: number }) {
       height="18"
       viewBox="0 0 18 18"
       role="img"
-      aria-label={`${done} of ${total} subtasks done`}
+      aria-label={`${done} of ${total} items done`}
       style={{ flexShrink: 0 }}
     >
       <circle

@@ -22,7 +22,7 @@ async function database(account = ID()): Promise<LocalDatabase> {
 }
 
 const list = () => ({
-  table: 'list' as const,
+  table: 'desk_list' as const,
   id: ID(),
   position: 'a0',
   fields: { title: { v: 'Home' } },
@@ -68,7 +68,7 @@ describe('committing', () => {
     await expect(
       client.commit({
         mutationId: ID(),
-        changes: [{ table: 'list', id: 'not-an-id', position: 'a0' }],
+        changes: [{ table: 'desk_list', id: 'not-an-id', position: 'a0' }],
       }),
     ).rejects.toBeInstanceOf(InvalidMutation);
     await expect(client.commit({ mutationId: ID(), changes: [] })).rejects.toThrow(InvalidMutation);
@@ -166,7 +166,7 @@ describe('a new device', () => {
     const t = transport((request, call) => {
       void holder.client?.read(listsOf).then((rows) => seenAtAsk.push(rows.length));
       const row = {
-        table: 'list' as const,
+        table: 'desk_list' as const,
         id: ID(),
         position: 'a0',
         deletedAt: null,

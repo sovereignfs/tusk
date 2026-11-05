@@ -18,9 +18,9 @@ export const accountSettings = app.table('account_settings', {
   createdAt: epochMs('created_at').notNull(),
 });
 
-/** The three tables that sync; see `schema/sqlite/app.ts`, which says what each column is. */
-export const list = app.table(
-  'list',
+/** The four tables that sync; see `schema/sqlite/app.ts`, which says what each column is. */
+export const deskList = app.table(
+  'desk_list',
   {
     id: id('id'),
     ownerId: ref('owner_id').notNull(),
@@ -31,31 +31,47 @@ export const list = app.table(
     fields: fields('fields').notNull().default('{}'),
   },
   // Pull is the rows of an account past a cursor.
-  (table) => [index('list_owner_seq_idx').on(table.ownerId, table.seq)],
+  (table) => [index('desk_list_owner_seq_idx').on(table.ownerId, table.seq)],
 );
 
-export const task = app.table(
-  'task',
+/** See `schema/sqlite/app.ts`. */
+export const deskCard = app.table(
+  'desk_card',
   {
     id: id('id'),
     ownerId: ref('owner_id').notNull(),
     listId: ref('list_id').notNull(),
-    parentId: ref('parent_id'),
     position: position('position').notNull(),
     deletedAt: epochMs('deleted_at'),
     seq: counter('seq').notNull(),
     createdAt: epochMs('created_at').notNull(),
-    reminderSentAt: epochMs('reminder_sent_at'),
     dueDate: isoDate('due_date'),
     dueTime: hhmm('due_time'),
     completedAt: epochMs('completed_at'),
     fields: fields('fields').notNull().default('{}'),
   },
-  (table) => [index('task_owner_seq_idx').on(table.ownerId, table.seq)],
+  (table) => [index('desk_card_owner_seq_idx').on(table.ownerId, table.seq)],
 );
 
-export const series = app.table(
-  'series',
+/** See `schema/sqlite/app.ts`. */
+export const deskCheck = app.table(
+  'desk_check',
+  {
+    id: id('id'),
+    ownerId: ref('owner_id').notNull(),
+    cardId: ref('card_id').notNull(),
+    position: position('position').notNull(),
+    deletedAt: epochMs('deleted_at'),
+    seq: counter('seq').notNull(),
+    createdAt: epochMs('created_at').notNull(),
+    fields: fields('fields').notNull().default('{}'),
+  },
+  (table) => [index('desk_check_owner_seq_idx').on(table.ownerId, table.seq)],
+);
+
+/** See `schema/sqlite/app.ts`. */
+export const deskSeries = app.table(
+  'desk_series',
   {
     id: id('id'),
     ownerId: ref('owner_id').notNull(),
@@ -65,7 +81,7 @@ export const series = app.table(
     createdAt: epochMs('created_at').notNull(),
     fields: fields('fields').notNull().default('{}'),
   },
-  (table) => [index('series_owner_seq_idx').on(table.ownerId, table.seq)],
+  (table) => [index('desk_series_owner_seq_idx').on(table.ownerId, table.seq)],
 );
 
 /** See `schema/sqlite/app.ts`. */

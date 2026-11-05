@@ -11,7 +11,7 @@ import { testTarget } from '../db/test-support';
 import { type Limiter, RateLimiter } from '../limits/rate';
 import { LIMITS, PROTOCOL_VERSION, type SyncResponse } from './format';
 import { type SyncDeps, handleSync, readCapped, syncResponse } from './endpoint';
-import { accountSeq, id, list, mutation, snapshot, task } from './test-support';
+import { accountSeq, id, list, mutation, snapshot, card } from './test-support';
 
 /**
  * `POST /api/sync` (DESIGN.md §8.3), with two real accounts and real sessions: what the route answers to a request, and to each mutation in it.
@@ -52,7 +52,7 @@ const answer = async (response: Response) => (await response.json()) as SyncResp
 describe(`POST /api/sync (${leg})`, () => {
   it('applies what a device sends, answers each mutation, and sends back what changed', async () => {
     const l = list();
-    const m = mutation(l, task(l.id));
+    const m = mutation(l, card(l.id));
     const response = await post(t.ada, body({ mutations: [m] }));
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toBe('application/json');
@@ -62,7 +62,7 @@ describe(`POST /api/sync (${leg})`, () => {
     expect(sync.protocol).toBe(PROTOCOL_VERSION);
     expect(sync.results).toEqual([{ mutationId: m.mutationId, status: 'applied', seq: 1 }]);
     expect(sync.pull.cursor).toBe(1);
-    expect(sync.pull.rows.map((row) => row.table).sort()).toEqual(['list', 'task']);
+    expect(sync.pull.rows.map((row) => row.table).sort()).toEqual(['desk_card', 'desk_list']);
   });
 
   it('answers a repeat as it answered the first time, and writes nothing', async () => {
@@ -79,7 +79,7 @@ describe(`POST /api/sync (${leg})`, () => {
     const l = list();
     const first = await answer(await post(t.ada, body({ mutations: [mutation(l)], cursor: 0 })));
     const cursor = first.pull.cursor;
-    const added = task(l.id);
+    const added = card(l.id);
     const next = await answer(await post(t.ada, body({ mutations: [mutation(added)], cursor })));
     expect(next.pull.rows.map((row) => row.id)).toEqual([added.id]);
     expect(next.pull.cursor).toBe(cursor + 1);
@@ -96,7 +96,7 @@ describe(`POST /api/sync (${leg})`, () => {
               mutationId: id(),
               changes: [
                 {
-                  table: 'task',
+                  table: 'desk_card',
                   id: id(),
                   ownerId: t.grace.id,
                   listId: id(),
@@ -121,12 +121,16 @@ describe(`POST /api/sync (${leg})`, () => {
   describe('as the wrong account', () => {
     it('cannot change what is another’s, and learns nothing of whether it exists', async () => {
       const l = list();
-      const secret = task(l.id);
+      const secret = card(l.id);
       await post(t.ada, body({ mutations: [mutation(l, secret)] }));
       const adaBefore = await snapshot(database, t.ada.id);
 
-      const edit = mutation({ table: 'task', id: secret.id, fields: { title: { v: 'taken' } } });
-      const nobody = mutation({ table: 'task', id: id(), fields: { title: { v: 'taken' } } });
+      const edit = mutation({
+        table: 'desk_card',
+        id: secret.id,
+        fields: { title: { v: 'taken' } },
+      });
+      const nobody = mutation({ table: 'desk_card', id: id(), fields: { title: { v: 'taken' } } });
       const stolen = await answer(await post(t.grace, body({ mutations: [edit, nobody] })));
       expect(stolen.results.map((r) => (r.status === 'refused' ? r.code : r.status))).toEqual([
         'unavailable',
@@ -145,7 +149,7 @@ describe(`POST /api/sync (${leg})`, () => {
       const sync = await answer(
         await post(
           t.grace,
-          body({ mutations: [mutation(task(l.id)), mutation({ ...list(), id: l.id })] }),
+          body({ mutations: [mutation(card(l.id)), mutation({ ...list(), id: l.id })] }),
         ),
       );
       expect(sync.results.map((r) => r.status)).toEqual(['refused', 'refused']);
@@ -208,9 +212,9 @@ describe(`POST /api/sync (${leg})`, () => {
       }
     });
 
-    it('is 426 for another protocol, saying which this one speaks, and nothing is applied', async () => {
+    it('is 426 for another protocol, version 1 of the Tasks days included, saying which this one speaks, and nothing is applied', async () => {
       const before = await accountSeq(database, t.ada.id);
-      for (const protocol of [0, PROTOCOL_VERSION + 1, '1', undefined]) {
+      for (const protocol of [0, 1, PROTOCOL_VERSION + 1, '2', undefined]) {
         const response = await ask({ ...body({ mutations: [mutation(list())] }), protocol });
         expect(response.status, String(protocol)).toBe(426);
         expect(await response.json()).toEqual({

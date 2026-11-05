@@ -97,7 +97,9 @@ const ok = (): TransportResult => ({
 
 const list = () => ({
   mutationId: ID(),
-  changes: [{ table: 'list' as const, id: ID(), position: 'a0', fields: { title: { v: 'x' } } }],
+  changes: [
+    { table: 'desk_list' as const, id: ID(), position: 'a0', fields: { title: { v: 'x' } } },
+  ],
 });
 
 describe('the sync loop', () => {

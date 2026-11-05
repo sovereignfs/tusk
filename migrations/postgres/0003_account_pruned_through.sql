@@ -1,1 +1,0 @@
-ALTER TABLE "tusk"."account_settings" ADD COLUMN "pruned_through" bigint DEFAULT 0 NOT NULL;

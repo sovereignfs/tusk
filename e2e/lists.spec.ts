@@ -13,7 +13,7 @@ async function signedIn(page: Page) {
   await expect(page.getByRole('navigation', { name: 'Lists' })).toBeVisible();
   // Ready when the working copy is open and has the first list in it: before that the page is still being put together, and a field typed into may be
   // replaced under the keyboard.
-  await expect(page.getByRole('link', { name: /^My tasks/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /^Backlog/ })).toBeVisible();
 }
 
 const unique = (stem: string) => `${stem} ${crypto.randomUUID().slice(0, 8)}`;
@@ -28,10 +28,10 @@ async function addList(page: Page, name: string) {
 async function onServer(page: Page, origin: string) {
   const reply = await page.request.post('/api/sync', {
     headers: { origin },
-    data: { protocol: 1, cursor: 0, mutations: [], limit: 2000 },
+    data: { protocol: 2, cursor: 0, mutations: [], limit: 2000 },
   });
   const body = await reply.json();
-  return body.pull.rows.filter((row: { table: string }) => row.table === 'list') as {
+  return body.pull.rows.filter((row: { table: string }) => row.table === 'desk_list') as {
     id: string;
     position: string;
     deletedAt: number | null;
@@ -43,9 +43,9 @@ test('there is always a first list, made once however many devices come first', 
   page,
 }) => {
   await signedIn(page);
-  await expect(page.getByRole('link', { name: /^My tasks/ })).toHaveCount(1);
+  await expect(page.getByRole('link', { name: /^Backlog/ })).toHaveCount(1);
   await page.reload();
-  await expect(page.getByRole('link', { name: /^My tasks/ })).toHaveCount(1);
+  await expect(page.getByRole('link', { name: /^Backlog/ })).toHaveCount(1);
 });
 
 test('a list is made from the +, appears at once, and opens', async ({ page, baseURL }) => {
@@ -77,7 +77,7 @@ test('a list is made from the +, appears at once, and opens', async ({ page, bas
 test('an empty name makes nothing, and Escape puts the field away', async ({ page }) => {
   await signedIn(page);
   // Counted once the lists are in the sidebar, and not while they are still being read from the device.
-  await expect(page.getByRole('link', { name: /^My tasks/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /^Backlog/ })).toBeVisible();
   const before = await page.getByRole('navigation', { name: 'Lists' }).getByRole('link').count();
   await page.getByRole('button', { name: 'Add a list' }).click();
   await page.getByLabel('New list name').fill('   ');

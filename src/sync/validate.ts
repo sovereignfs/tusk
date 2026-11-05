@@ -47,11 +47,11 @@ const ok = <T>(value: T): Parsed<T> => ({ ok: true, value });
 const MAX_EPOCH_MS = 8_640_000_000_000_000;
 const epochMs = integer(0, MAX_EPOCH_MS);
 
-/** The four orders a list can be shown in (§11.4); its colours are `lists/colors.ts`'s. */
+/** The four orders a list can be shown in (§10.5); its colours are `lists/colors.ts`'s. */
 const SORTS = ['custom', 'created', 'due', 'title'] as const;
 
 /**
- * A position key: the digits of base 62, which is what the fractional index writes (§11.3, §22.2). Only the alphabet and the length are checked
+ * A position key: the digits of base 62, which is what the fractional index writes (§10.4, §23.2). Only the alphabet and the length are checked
  * here; that it sorts between its neighbours is the position module's (task 3.2).
  */
 const position: Parser<string> = (value) =>
@@ -71,27 +71,30 @@ const TITLE: FieldSpec = { plain: text(1, LIMITS.titleChars), chars: LIMITS.titl
 const SHORT = 64;
 const short = (plain: Parser<Scalar>): FieldSpec => ({ plain, chars: SHORT });
 
-/** What each field of each table holds (§22.3). **Every field in `FIELD_NAMES` has a rule, and a test holds the two together.** */
+/** What each field of each table holds (§23.3). **Every field in `FIELD_NAMES` has a rule, and a test holds the two together.** */
 const FIELDS: Record<SyncTable, Record<string, FieldSpec>> = {
-  list: {
+  desk_list: {
     title: TITLE,
     color: short(oneOf(...LIST_COLORS)),
     sort: short(oneOf(...SORTS)),
     showCompleted: short(bool),
   },
-  task: {
+  desk_card: {
     title: TITLE,
-    notes: { plain: text(0, LIMITS.notesChars), chars: LIMITS.notesChars },
+    description: { plain: text(0, LIMITS.descriptionChars), chars: LIMITS.descriptionChars },
     starred: short(bool),
     dueDate: short(nullable(isoDate)),
     dueTime: short(nullable(hhmm)),
     seriesId: short(nullable(uuid)),
+    startedAt: short(nullable(epochMs)),
     completedAt: short(nullable(epochMs)),
-    reviewedAt: short(nullable(epochMs)),
-    dismissedOn: short(nullable(isoDate)),
   },
-  // A rule is an RRULE string; task 5.1 holds it to the allow-list of §13.2, which this only bounds.
-  series: {
+  desk_check: {
+    title: TITLE,
+    completedAt: short(nullable(epochMs)),
+  },
+  // A rule is an RRULE string; task 5.1 holds it to the allow-list of §12.2, which this only bounds.
+  desk_series: {
     rule: { plain: text(1, LIMITS.ruleChars), chars: LIMITS.ruleChars },
     anchor: short(isoDate),
   },
@@ -202,7 +205,7 @@ export function parseStructure(value: unknown, options: ChangeOptions = {}): Par
   const out: Record<string, unknown> = { table: kind, id: id.value };
   const structural: Record<string, Parser<unknown>> = {
     listId: uuid,
-    parentId: nullable(uuid),
+    cardId: uuid,
     position,
   };
   for (const key of STRUCTURE[kind]) {
@@ -234,21 +237,6 @@ export function parseStructure(value: unknown, options: ChangeOptions = {}): Par
       fields[name] = shaped.value;
     }
     if (Object.keys(fields).length > 0) out.fields = fields;
-  }
-
-  if (kind === 'task' && out.parentId === out.id)
-    return no('parentId: a task is not its own parent');
-
-  // A subtask has no date, star or repeat (§11.2): a change that makes one with any of them is refused here, where it can be seen, and an edit of one
-  // that already is a subtask is refused by the server, which knows the row (`apply.ts`).
-  if (kind === 'task' && typeof out.parentId === 'string') {
-    const set = (name: string) => {
-      const field = fields[name];
-      return field !== undefined && 'v' in field && field.v !== null && field.v !== false;
-    };
-    if (set('dueDate') || set('dueTime') || set('seriesId') || set('starred')) {
-      return no('a subtask has no date, star or repeat');
-    }
   }
 
   if (creating) {

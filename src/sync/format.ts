@@ -1,5 +1,5 @@
 /**
- * What a device may send, and what the server stores (DESIGN.md §8.2, §22.3): **one definition, used by the browser before it queues a change and by
+ * What a device may send, and what the server stores (DESIGN.md §8.2, §23.3): **one definition, used by the browser before it queues a change and by
  * the server when it applies one.** Nothing here depends on the server, a browser or a database, so both can import it. `validate.ts` is the rules.
  *
  * A **mutation** is what one user action changes, applied once or not at all: its id makes replaying it harmless. It holds **changes**, each to one
@@ -9,7 +9,7 @@
  * {
  *   "mutationId": "6f1c…",
  *   "changes": [
- *     { "table": "task", "id": "a3d9…", "listId": "7b20…", "position": "a1",
+ *     { "table": "desk_card", "id": "a3d9…", "listId": "7b20…", "position": "a1",
  *       "fields": { "title": { "v": "Water the plants" }, "completedAt": { "v": 1793000000000 } } }
  *   ]
  * }
@@ -17,10 +17,13 @@
  */
 
 /** Bumped when a device and the server stop understanding each other. A device that is too old is told to update; its outbox is kept (§8.3). */
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
 
-/** The tables that sync (§22.3). */
-export const TABLES = ['list', 'task', 'series'] as const;
+/**
+ * The tables that sync (§23.3): the Desk's. A list is a category, a card is one thing to do, a check is one item of a card's checklist, and a series
+ * is a card's repeat.
+ */
+export const TABLES = ['desk_list', 'desk_card', 'desk_check', 'desk_series'] as const;
 export type SyncTable = (typeof TABLES)[number];
 
 /**
@@ -35,23 +38,25 @@ export type FieldValue = { readonly v: Scalar } | { readonly c: string };
 export type Fields = Readonly<Record<string, FieldValue>>;
 
 /**
- * The names of the fields each table has (§22.3). The server refuses any other, so a device cannot store what the app never reads. The first of each
+ * The names of the fields each table has (§23.3). The server refuses any other, so a device cannot store what the app never reads. The first of each
  * is the one a new row cannot do without.
  */
 export const FIELD_NAMES = {
-  list: ['title', 'color', 'sort', 'showCompleted'],
-  task: [
+  desk_list: ['title', 'color', 'sort', 'showCompleted'],
+  // `startedAt` and `completedAt` are a card's status (§10.2): Done if `completedAt`, In progress if only `startedAt`, else Open. Phase 2 adds the fields
+  // of Today and Review (`reviewedAt`, `dismissedOn`, §25.3).
+  desk_card: [
     'title',
-    'notes',
+    'description',
     'starred',
     'dueDate',
     'dueTime',
     'seriesId',
+    'startedAt',
     'completedAt',
-    'reviewedAt',
-    'dismissedOn',
   ],
-  series: ['rule', 'anchor'],
+  desk_check: ['title', 'completedAt'],
+  desk_series: ['rule', 'anchor'],
 } as const satisfies Record<SyncTable, readonly string[]>;
 
 /**
@@ -59,9 +64,9 @@ export const FIELD_NAMES = {
  * its table needs (`validate.ts`, `creating`).
  *
  * - `deleted`  `true` deletes the row and `false` restores it. The server stamps the time, so a device's clock decides nothing about when a row goes.
- * - `listId`   the row's list. A subtask's is its parent's.
- * - `parentId` a top-level task, or `null`.
- * - `position` the row's place among its siblings (§11.3).
+ * - `listId`   the row's list.
+ * - `cardId`   the card a checklist item belongs to.
+ * - `position` the row's place among its siblings (§10.4).
  *
  * **There is no `ownerId`, `seq` or `createdAt`:** who owns a row is the session's, not the device's (§7), and the order and the time are the
  * server's. A change that names one is refused, not ignored.
@@ -73,23 +78,28 @@ interface Common {
 }
 
 export interface ListChange extends Common {
-  readonly table: 'list';
+  readonly table: 'desk_list';
   readonly position?: string;
 }
 
-export interface TaskChange extends Common {
-  readonly table: 'task';
+export interface CardChange extends Common {
+  readonly table: 'desk_card';
   readonly listId?: string;
-  readonly parentId?: string | null;
+  readonly position?: string;
+}
+
+export interface CheckChange extends Common {
+  readonly table: 'desk_check';
+  readonly cardId?: string;
   readonly position?: string;
 }
 
 export interface SeriesChange extends Common {
-  readonly table: 'series';
+  readonly table: 'desk_series';
   readonly listId?: string;
 }
 
-export type Change = ListChange | TaskChange | SeriesChange;
+export type Change = ListChange | CardChange | CheckChange | SeriesChange;
 
 /** What one user action changes (§8.2). */
 export interface Mutation {
@@ -99,23 +109,26 @@ export interface Mutation {
 
 /** The structural columns a change may carry, by table. */
 export const STRUCTURE = {
-  list: ['position'],
-  task: ['listId', 'parentId', 'position'],
-  series: ['listId'],
+  desk_list: ['position'],
+  desk_card: ['listId', 'position'],
+  desk_check: ['cardId', 'position'],
+  desk_series: ['listId'],
 } as const satisfies Record<SyncTable, readonly string[]>;
 
-/** The structural columns a new row cannot do without; `parentId` is not here, since `null` is a top-level task. */
+/** The structural columns a new row cannot do without. */
 export const REQUIRED_ON_CREATE = {
-  list: ['position'],
-  task: ['listId', 'position'],
-  series: ['listId'],
+  desk_list: ['position'],
+  desk_card: ['listId', 'position'],
+  desk_check: ['cardId', 'position'],
+  desk_series: ['listId'],
 } as const satisfies Record<SyncTable, readonly string[]>;
 
-/** The fields a new row cannot do without: a list and a task need a title, and a series a rule and where it starts. */
+/** The fields a new row cannot do without: a list, a card and a checklist item need a title, and a series a rule and where it starts. */
 export const REQUIRED_FIELDS_ON_CREATE = {
-  list: ['title'],
-  task: ['title'],
-  series: ['rule', 'anchor'],
+  desk_list: ['title'],
+  desk_card: ['title'],
+  desk_check: ['title'],
+  desk_series: ['rule', 'anchor'],
 } as const satisfies Record<SyncTable, readonly string[]>;
 
 /**
@@ -125,21 +138,22 @@ export const REQUIRED_FIELDS_ON_CREATE = {
 export const LIMITS = {
   /** Changes in one mutation. */
   changes: 500,
-  /** Everything one mutation says, summed over its fields: a few full notes, or a great many titles. */
+  /** Everything one mutation says, summed over its fields: a few full descriptions, or a great many titles. */
   mutationChars: 1_000_000,
   /** A position key: base 62 digits, and a long run of insertions makes a longer one. */
   positionChars: 64,
-  /** A title, of a list or a task, in characters. */
+  /** A title, of a list, a card or a checklist item, in characters. */
   titleChars: 500,
-  /** A task's notes, in characters. */
-  notesChars: 20_000,
-  /** A recurrence rule (RRULE), in characters (§13.2). */
+  /** A card's description, in characters. */
+  descriptionChars: 20_000,
+  /** A recurrence rule (RRULE), in characters (§12.2). */
   ruleChars: 200,
   /** Mutations in one request, so that one request is one short piece of work. */
   mutationsPerRequest: 20,
-  /** What an account may have (§7). A deleted row counts until it is removed for good. */
+  /** What an account may have (§7.4). A deleted row counts until it is removed for good. */
   listsPerAccount: 200,
-  tasksPerAccount: 50_000,
+  cardsPerAccount: 50_000,
+  checksPerAccount: 200_000,
   /** A request body, in bytes: a mutation of a million characters is well within it, even if every character is escaped. */
   bodyBytes: 8 * 1024 * 1024,
   /** The rows a pull aims to return at once, and the most a device may ask for. */
@@ -148,13 +162,13 @@ export const LIMITS = {
 } as const;
 
 /**
- * What a row's `fields` column holds: each field's value and **the `seq` that last wrote it** (§22.2), which is how two devices' changes to
+ * What a row's `fields` column holds: each field's value and **the `seq` that last wrote it** (§23.2), which is how two devices' changes to
  * different fields both stand and the later of two to one field wins (§8.4).
  */
 export type StoredField = FieldValue & { readonly s: number };
 export type StoredFields = Readonly<Record<string, StoredField>>;
 
-/** The text of a `fields` column. Plain and ciphertext alike, and in the same form on all three databases (§22.2). */
+/** The text of a `fields` column. Plain and ciphertext alike, and in the same form on all three databases (§23.2). */
 export function encodeFields(fields: StoredFields): string {
   return JSON.stringify(fields);
 }
@@ -176,9 +190,9 @@ export interface SyncRequest {
  * Why a mutation was not applied. None says more than the device needs, and none says whether a row belongs to someone else.
  *
  * - `invalid`      it is not a mutation (`validate.ts`), or a value in it is not allowed.
- * - `unavailable`  a row, or a list or parent it points at, is not there for this account: the same answer whether it does not exist or is another's.
- * - `structure`    it would break the shape of the data: a subtask of a subtask, a parent in another list, a subtask left behind in a moved task's list.
- * - `limit`        the account has as many lists or tasks as it may.
+ * - `unavailable`  a row, or a list or card it points at, is not there for this account: the same answer whether it does not exist or is another's.
+ * - `structure`    it would break the shape of the data: a change that names a column its table does not have, or one that cannot be a new row.
+ * - `limit`        the account has as many lists, cards or checklist items as it may.
  */
 export type RefusalCode = 'invalid' | 'unavailable' | 'structure' | 'limit';
 
@@ -197,14 +211,18 @@ interface RowBase {
   readonly fields: StoredFields;
 }
 export type PulledRow =
-  | (RowBase & { readonly table: 'list'; readonly position: string })
+  | (RowBase & { readonly table: 'desk_list'; readonly position: string })
   | (RowBase & {
-      readonly table: 'task';
+      readonly table: 'desk_card';
       readonly listId: string;
-      readonly parentId: string | null;
       readonly position: string;
     })
-  | (RowBase & { readonly table: 'series'; readonly listId: string });
+  | (RowBase & {
+      readonly table: 'desk_check';
+      readonly cardId: string;
+      readonly position: string;
+    })
+  | (RowBase & { readonly table: 'desk_series'; readonly listId: string });
 
 /** A row that was removed for good (§8.7). */
 export interface PulledTombstone {

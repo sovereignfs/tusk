@@ -8,7 +8,7 @@ import { testTarget } from '../db/test-support';
 import { applyMutation } from './apply';
 import type { Mutation, Pull } from './format';
 import { pull } from './pull';
-import { account, id, list, makeStore, mutation, task } from './test-support';
+import { account, card, check, id, list, makeStore, mutation } from './test-support';
 
 /**
  * Pull (DESIGN.md §8.3): what changed for an account since a cursor, in pages, and **a cursor that never skips a row**.
@@ -63,55 +63,47 @@ describe(`pull (${leg})`, () => {
   it('is every row of the account from zero, with its structure, deletion, fields and the seq each field was written at', async () => {
     const ada = account();
     const l = list({ title: 'Home' });
-    const t = task(l.id, { position: 'a3' });
-    const sub = task(l.id, { parentId: t.id });
+    const t = card(l.id, { position: 'a3' });
+    const sub = check(t.id);
     await apply(ada, mutation(l, t, sub));
-    await apply(ada, mutation({ table: 'task', id: sub.id, deleted: true }));
-    await apply(ada, mutation({ table: 'task', id: t.id, fields: { notes: { v: 'later' } } }));
+    await apply(ada, mutation({ table: 'desk_check', id: sub.id, deleted: true }));
+    await apply(
+      ada,
+      mutation({ table: 'desk_card', id: t.id, fields: { description: { v: 'later' } } }),
+    );
 
     const [page] = await pullAll(ada);
     expect(page?.cursor).toBe(3);
     expect(page?.more).toBe(false);
     const byId = new Map(page?.rows.map((row) => [row.id, row]));
     expect(byId.get(l.id)).toMatchObject({
-      table: 'list',
+      table: 'desk_list',
       position: 'a0',
       deletedAt: null,
       seq: 1,
       fields: { title: { v: 'Home', s: 1 } },
     });
     expect(byId.get(t.id)).toMatchObject({
-      table: 'task',
+      table: 'desk_card',
       listId: l.id,
-      parentId: null,
       position: 'a3',
       seq: 3,
-      fields: { title: { v: 'Buy milk', s: 1 }, notes: { v: 'later', s: 3 } },
+      fields: { title: { v: 'Buy milk', s: 1 }, description: { v: 'later', s: 3 } },
     });
-    expect(byId.get(sub.id)).toMatchObject({ parentId: t.id, seq: 2 });
+    expect(byId.get(sub.id)).toMatchObject({ table: 'desk_check', cardId: t.id, seq: 2 });
     expect(Number(byId.get(sub.id)?.deletedAt)).toBeGreaterThan(0);
     // The owner and the mirrors are the server's, and are not sent.
     expect(JSON.stringify(page)).not.toContain(ada);
     expect(Object.keys(byId.get(t.id) ?? {}).sort()).toEqual(
-      [
-        'createdAt',
-        'deletedAt',
-        'fields',
-        'id',
-        'listId',
-        'parentId',
-        'position',
-        'seq',
-        'table',
-      ].sort(),
+      ['createdAt', 'deletedAt', 'fields', 'id', 'listId', 'position', 'seq', 'table'].sort(),
     );
   });
 
   it('is only what is past the cursor', async () => {
     const ada = account();
     const l = list();
-    const a = task(l.id);
-    const b = task(l.id);
+    const a = card(l.id);
+    const b = card(l.id);
     await apply(ada, mutation(l));
     const second = await apply(ada, mutation(a));
     await apply(ada, mutation(b));
@@ -123,7 +115,7 @@ describe(`pull (${leg})`, () => {
     const ada = account();
     const grace = account();
     const aList = list();
-    await apply(ada, mutation(aList, task(aList.id)));
+    await apply(ada, mutation(aList, card(aList.id)));
     const gList = list();
     await apply(grace, mutation(gList));
     expect(ids(await pullAll(grace)).sort()).toEqual([gList.id]);
@@ -135,9 +127,9 @@ describe(`pull (${leg})`, () => {
     const ada = account();
     const l = list();
     await apply(ada, mutation(l));
-    const big = Array.from({ length: 7 }, () => task(l.id));
+    const big = Array.from({ length: 7 }, () => card(l.id));
     await apply(ada, mutation(...big));
-    await apply(ada, mutation(task(l.id)));
+    await apply(ada, mutation(card(l.id)));
 
     const pages = await pullAll(ada, 0, 3);
     // The second mutation is seven rows and the limit three: it comes whole, on a page of its own.
@@ -159,7 +151,7 @@ describe(`pull (${leg})`, () => {
     await apply(ada, mutation(l));
     const made: string[] = [l.id];
     for (let i = 0; i < 25; i++) {
-      const t = task(l.id);
+      const t = card(l.id);
       made.push(t.id);
       await apply(ada, mutation(t));
     }
@@ -176,7 +168,7 @@ describe(`pull (${leg})`, () => {
     const ada = account();
     const l = list();
     await apply(ada, mutation(l));
-    await apply(ada, mutation(task(l.id)));
+    await apply(ada, mutation(card(l.id)));
     const page = await pull(database, ada, 0, { limit: 2 });
     expect(page.rows).toHaveLength(2);
     expect(page.more).toBe(false);
@@ -193,15 +185,15 @@ describe(`pull (${leg})`, () => {
     const others = id();
     await dbRun(
       database,
-      sql`INSERT INTO ${tombstone} (table_name, id, account_id, seq, deleted_at) VALUES ('task', ${gone}, ${ada}, ${mine.seq + 4}, 1)`,
+      sql`INSERT INTO ${tombstone} (table_name, id, account_id, seq, deleted_at) VALUES ('desk_card', ${gone}, ${ada}, ${mine.seq + 4}, 1)`,
     );
     await dbRun(
       database,
-      sql`INSERT INTO ${tombstone} (table_name, id, account_id, seq, deleted_at) VALUES ('task', ${others}, ${grace}, ${mine.seq + 4}, 1)`,
+      sql`INSERT INTO ${tombstone} (table_name, id, account_id, seq, deleted_at) VALUES ('desk_card', ${others}, ${grace}, ${mine.seq + 4}, 1)`,
     );
 
     const [page] = await pullAll(ada);
-    expect(page?.tombstones).toEqual([{ table: 'task', id: gone, seq: mine.seq + 4 }]);
+    expect(page?.tombstones).toEqual([{ table: 'desk_card', id: gone, seq: mine.seq + 4 }]);
     expect(page?.cursor).toBe(mine.seq + 4);
     expect((await pullAll(ada, mine.seq + 4))[0]?.tombstones).toEqual([]);
   });
@@ -223,7 +215,7 @@ describe(`pull (${leg})`, () => {
     let writing = true;
     const writer = (async () => {
       for (let i = 0; i < 40; i++) {
-        const t = task(l.id);
+        const t = card(l.id);
         await apply(ada, mutation(t));
         made.add(t.id);
       }

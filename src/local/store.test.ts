@@ -8,14 +8,15 @@ import {
   isPending,
   listsOf,
   openCounts,
-  visibleTasks,
+  visibleCards,
   outboxSize,
   readCursor,
   readOutbox,
   settle,
   startSnapshot,
-  subtasksOf,
-  tasksOf,
+  cardsOf,
+  checkCounts,
+  checksOf,
 } from './store';
 
 /**
@@ -56,13 +57,21 @@ const mutation = (...changes: Mutation['changes'][number][]): Mutation => ({
   changes,
 });
 const newList = (title = 'Home') => ({
-  table: 'list' as const,
+  table: 'desk_list' as const,
   id: ID(),
   position: 'a0',
   fields: { title: { v: title } },
 });
-const newTask = (listId: string, extra: Record<string, unknown> = {}) => ({
-  table: 'task' as const,
+const newItem = (cardId: string, extra: Record<string, unknown> = {}) => ({
+  table: 'desk_check' as const,
+  id: ID(),
+  cardId,
+  position: 'a0',
+  fields: { title: { v: 'Oat milk' } },
+  ...extra,
+});
+const newCard = (listId: string, extra: Record<string, unknown> = {}) => ({
+  table: 'desk_card' as const,
   id: ID(),
   listId,
   position: 'a0',
@@ -81,7 +90,7 @@ const pull = (
   more = false,
   tombstones: Pull['tombstones'] = [],
 ): Pull => ({ cursor, more, rows, tombstones });
-const taskRow = (
+const cardRow = (
   id: string,
   listId: string,
   seq: number,
@@ -89,10 +98,9 @@ const taskRow = (
   extra: Record<string, unknown> = {},
 ) =>
   ({
-    table: 'task',
+    table: 'desk_card',
     id,
     listId,
-    parentId: null,
     position: 'a0',
     deletedAt: null,
     seq,
@@ -105,13 +113,13 @@ describe('committing', () => {
   it('writes the rows and the outbox together, and a screen reads it at once', async () => {
     const { db } = await device();
     const l = newList();
-    const t = newTask(l.id);
+    const t = newCard(l.id);
     await commitMutation(db, mutation(l, t), 5000);
 
     expect((await listsOf(db)).map((r) => r.id)).toEqual([l.id]);
-    expect((await tasksOf(db, l.id)).map((r) => r.id)).toEqual([t.id]);
+    expect((await cardsOf(db, l.id)).map((r) => r.id)).toEqual([t.id]);
     expect(await outboxSize(db)).toBe(1);
-    expect(await isPending(db, 'task', t.id)).toBe(true);
+    expect(await isPending(db, 'desk_card', t.id)).toBe(true);
   });
 
   it('loses nothing if the tab closes at any moment: it is in both or in neither, and after a reopen it is still there', async () => {
@@ -120,13 +128,13 @@ describe('committing', () => {
     await commitMutation(db, mutation(l), 1000);
 
     // A write that fails part-way (here, the transaction aborts when the outbox is written) leaves neither the rows nor the outbox changed.
-    const t = newTask(l.id);
+    const t = newCard(l.id);
     const broken = {
       ...mutation(t),
-      changes: [t, { ...t, id: ID(), table: 'nonesuch' as 'task' }],
-    };
+      changes: [t, { ...t, id: ID(), table: 'nonesuch' }],
+    } as unknown as Mutation;
     await expect(commitMutation(db, broken, 2000)).rejects.toThrow();
-    expect(await tasksOf(db, l.id)).toEqual([]);
+    expect(await cardsOf(db, l.id)).toEqual([]);
     expect(await outboxSize(db)).toBe(1);
 
     // And what was committed survives the connection being closed and opened again, as it would across a closed tab.
@@ -139,7 +147,7 @@ describe('committing', () => {
     const { db } = await device();
     const l = newList();
     const made = [mutation(l)];
-    for (let i = 0; i < 5; i++) made.push(mutation(newTask(l.id)));
+    for (let i = 0; i < 5; i++) made.push(mutation(newCard(l.id)));
     for (const m of made) await commitMutation(db, m, 1);
     expect((await readOutbox(db, 100)).map((e) => e.mutation.mutationId)).toEqual(
       made.map((m) => m.mutationId),
@@ -149,22 +157,22 @@ describe('committing', () => {
     );
   });
 
-  it('shows lists and tasks in order by position, a deleted row not at all, and subtasks under their parent', async () => {
+  it('shows lists and cards in order by position, a deleted row not at all, and checklist items under their card', async () => {
     const { db } = await device();
     const l = newList();
-    const a = newTask(l.id, { position: 'b' });
-    const b = newTask(l.id, { position: 'a' });
-    const sub = newTask(l.id, { parentId: a.id, position: 'a' });
-    const gone = newTask(l.id, { position: 'c' });
+    const a = newCard(l.id, { position: 'b' });
+    const b = newCard(l.id, { position: 'a' });
+    const sub = newItem(a.id, { position: 'a' });
+    const gone = newCard(l.id, { position: 'c' });
     const second = { ...newList('Work'), position: 'a0' };
     await commitMutation(db, mutation(l, second, a, b, sub, gone), 1);
-    await commitMutation(db, mutation({ table: 'task', id: gone.id, deleted: true }), 2);
+    await commitMutation(db, mutation({ table: 'desk_card', id: gone.id, deleted: true }), 2);
 
-    expect((await tasksOf(db, l.id)).map((r) => r.id)).toEqual([b.id, a.id]);
-    expect((await subtasksOf(db, a.id)).map((r) => r.id)).toEqual([sub.id]);
+    expect((await cardsOf(db, l.id)).map((r) => r.id)).toEqual([b.id, a.id]);
+    expect((await checksOf(db, a.id)).map((r) => r.id)).toEqual([sub.id]);
     expect((await listsOf(db)).map((r) => r.id).sort()).toEqual([l.id, second.id].sort());
     // Not gone: only not shown, so that Undo can bring it back.
-    expect(await getRow(db, 'task', gone.id)).toMatchObject({ deletedAt: 2 });
+    expect(await getRow(db, 'desk_card', gone.id)).toMatchObject({ deletedAt: 2 });
   });
 });
 
@@ -172,7 +180,7 @@ describe('settling what the server answered', () => {
   it('drops an answered mutation from the outbox, moves the cursor, and keeps what the device shows', async () => {
     const { db } = await device();
     const l = newList();
-    const t = newTask(l.id);
+    const t = newCard(l.id);
     const m = mutation(l, t);
     await commitMutation(db, m, 1);
     const sent = await readOutbox(db, 10);
@@ -181,14 +189,14 @@ describe('settling what the server answered', () => {
     expect(settled).toEqual({ refused: [], more: false, answered: 1 });
     expect(await outboxSize(db)).toBe(0);
     expect(await readCursor(db)).toBe(1);
-    expect(await isPending(db, 'task', t.id)).toBe(false);
-    expect((await tasksOf(db, l.id)).map((r) => r.id)).toEqual([t.id]);
+    expect(await isPending(db, 'desk_card', t.id)).toBe(false);
+    expect((await cardsOf(db, l.id)).map((r) => r.id)).toEqual([t.id]);
   });
 
   it('takes the server’s version of the rows it answered, as it arrives, per field', async () => {
     const { db } = await device();
     const l = newList();
-    const t = newTask(l.id);
+    const t = newCard(l.id);
     const m = mutation(l, t);
     await commitMutation(db, m, 1);
     const sent = await readOutbox(db, 10);
@@ -198,50 +206,55 @@ describe('settling what the server answered', () => {
       [answer(m, 3)],
       pull(
         [
-          taskRow(t.id, l.id, 3, {
+          cardRow(t.id, l.id, 3, {
             title: { v: 'Buy milk', s: 3 },
-            notes: { v: 'from another device', s: 2 },
+            description: { v: 'from another device', s: 2 },
           }),
         ],
         3,
       ),
       100,
     );
-    expect(await getRow(db, 'task', t.id)).toMatchObject({
+    expect(await getRow(db, 'desk_card', t.id)).toMatchObject({
       seq: 3,
-      fields: { title: { v: 'Buy milk', s: 3 }, notes: { v: 'from another device', s: 2 } },
+      fields: { title: { v: 'Buy milk', s: 3 }, description: { v: 'from another device', s: 2 } },
     });
   });
 
   it('does not let a pull overwrite an edit that is waiting, and shows it again once it is answered', async () => {
     const { db } = await device();
     const l = newList();
-    const t = newTask(l.id);
+    const t = newCard(l.id);
     const first = mutation(l, t);
     await commitMutation(db, first, 1);
     await settle(
       db,
       await readOutbox(db, 10),
       [answer(first, 1)],
-      pull([taskRow(t.id, l.id, 1, { title: { v: 'Buy milk', s: 1 } })], 1),
+      pull([cardRow(t.id, l.id, 1, { title: { v: 'Buy milk', s: 1 } })], 1),
       2,
     );
 
     // The person renames it here; before it is sent, another device’s rename and a note arrive.
-    const edit = mutation({ table: 'task', id: t.id, fields: { title: { v: 'Mine' } } });
+    const edit = mutation({ table: 'desk_card', id: t.id, fields: { title: { v: 'Mine' } } });
     await commitMutation(db, edit, 3);
     await settle(
       db,
       [],
       [],
       pull(
-        [taskRow(t.id, l.id, 5, { title: { v: 'Theirs', s: 5 }, notes: { v: 'a note', s: 5 } })],
+        [
+          cardRow(t.id, l.id, 5, {
+            title: { v: 'Theirs', s: 5 },
+            description: { v: 'a note', s: 5 },
+          }),
+        ],
         5,
       ),
       4,
     );
-    expect(await getRow(db, 'task', t.id)).toMatchObject({
-      fields: { title: { v: 'Mine', s: 5 }, notes: { v: 'a note', s: 5 } },
+    expect(await getRow(db, 'desk_card', t.id)).toMatchObject({
+      fields: { title: { v: 'Mine', s: 5 }, description: { v: 'a note', s: 5 } },
     });
 
     // Answered: the server applied it after theirs, so it wins, and the device agrees with the row the server then sends.
@@ -251,16 +264,21 @@ describe('settling what the server answered', () => {
       sent,
       [answer(edit, 6)],
       pull(
-        [taskRow(t.id, l.id, 6, { title: { v: 'Mine', s: 6 }, notes: { v: 'a note', s: 5 } })],
+        [
+          cardRow(t.id, l.id, 6, {
+            title: { v: 'Mine', s: 6 },
+            description: { v: 'a note', s: 5 },
+          }),
+        ],
         6,
       ),
       5,
     );
-    expect(await getRow(db, 'task', t.id)).toMatchObject({
+    expect(await getRow(db, 'desk_card', t.id)).toMatchObject({
       seq: 6,
-      fields: { title: { v: 'Mine', s: 6 }, notes: { v: 'a note', s: 5 } },
+      fields: { title: { v: 'Mine', s: 6 }, description: { v: 'a note', s: 5 } },
     });
-    expect(await isPending(db, 'task', t.id)).toBe(false);
+    expect(await isPending(db, 'desk_card', t.id)).toBe(false);
   });
 
   it('does not let a pull that is behind the cursor move it back', async () => {
@@ -273,23 +291,25 @@ describe('settling what the server answered', () => {
   it('undoes a refused mutation, back to what the server had, and reports it for the person to be told', async () => {
     const { db } = await device();
     const l = newList();
-    const t = newTask(l.id);
+    const t = newCard(l.id);
     const base = mutation(l, t);
     await commitMutation(db, base, 1);
     await settle(
       db,
       await readOutbox(db, 10),
       [answer(base, 1)],
-      pull([taskRow(t.id, l.id, 1, { title: { v: 'Buy milk', s: 1 } })], 1),
+      pull([cardRow(t.id, l.id, 1, { title: { v: 'Buy milk', s: 1 } })], 1),
       2,
     );
 
     const bad = mutation(
-      { table: 'task', id: t.id, fields: { title: { v: 'Changed' } } },
-      newTask(l.id),
+      { table: 'desk_card', id: t.id, fields: { title: { v: 'Changed' } } },
+      newCard(l.id),
     );
     await commitMutation(db, bad, 3);
-    expect(JSON.stringify((await getRow(db, 'task', t.id))?.fields.title)).toContain('Changed');
+    expect(JSON.stringify((await getRow(db, 'desk_card', t.id))?.fields.title)).toContain(
+      'Changed',
+    );
 
     const settled = await settle(
       db,
@@ -300,29 +320,35 @@ describe('settling what the server answered', () => {
     );
     expect(settled.refused).toHaveLength(1);
     expect(settled.refused[0]).toMatchObject({ mutationId: bad.mutationId, code: 'limit' });
-    expect(JSON.stringify((await getRow(db, 'task', t.id))?.fields.title)).toContain('Buy milk');
+    expect(JSON.stringify((await getRow(db, 'desk_card', t.id))?.fields.title)).toContain(
+      'Buy milk',
+    );
     // The row it would have made is gone, and nothing is left waiting or remembered.
-    expect((await tasksOf(db, l.id)).map((r) => r.id)).toEqual([t.id]);
+    expect((await cardsOf(db, l.id)).map((r) => r.id)).toEqual([t.id]);
     expect(await outboxSize(db)).toBe(0);
-    expect(await isPending(db, 'task', t.id)).toBe(false);
+    expect(await isPending(db, 'desk_card', t.id)).toBe(false);
   });
 
   it('keeps a later edit when an earlier mutation of the same row is the one refused', async () => {
     const { db } = await device();
     const l = newList();
-    const t = newTask(l.id);
+    const t = newCard(l.id);
     const base = mutation(l, t);
     await commitMutation(db, base, 1);
     await settle(
       db,
       await readOutbox(db, 10),
       [answer(base, 1)],
-      pull([taskRow(t.id, l.id, 1, { title: { v: 'Buy milk', s: 1 } })], 1),
+      pull([cardRow(t.id, l.id, 1, { title: { v: 'Buy milk', s: 1 } })], 1),
       2,
     );
 
-    const first = mutation({ table: 'task', id: t.id, fields: { title: { v: 'First' } } });
-    const second = mutation({ table: 'task', id: t.id, fields: { notes: { v: 'Second' } } });
+    const first = mutation({ table: 'desk_card', id: t.id, fields: { title: { v: 'First' } } });
+    const second = mutation({
+      table: 'desk_card',
+      id: t.id,
+      fields: { description: { v: 'Second' } },
+    });
     await commitMutation(db, first, 3);
     await commitMutation(db, second, 4);
     const sent = await readOutbox(db, 1); // only the first goes out
@@ -333,9 +359,9 @@ describe('settling what the server answered', () => {
       pull([], 1),
       5,
     );
-    expect((await getRow(db, 'task', t.id))?.fields).toEqual({
+    expect((await getRow(db, 'desk_card', t.id))?.fields).toEqual({
       title: { v: 'Buy milk', s: 1 },
-      notes: { v: 'Second', s: 0 },
+      description: { v: 'Second', s: 0 },
     });
     expect(await outboxSize(db)).toBe(1);
   });
@@ -343,18 +369,18 @@ describe('settling what the server answered', () => {
   it('forgets a row the server removed for good', async () => {
     const { db } = await device();
     const l = newList();
-    const t = newTask(l.id);
+    const t = newCard(l.id);
     const m = mutation(l, t);
     await commitMutation(db, m, 1);
     await settle(
       db,
       await readOutbox(db, 10),
       [answer(m, 1)],
-      pull([taskRow(t.id, l.id, 1, { title: { v: 'x', s: 1 } })], 1),
+      pull([cardRow(t.id, l.id, 1, { title: { v: 'x', s: 1 } })], 1),
       2,
     );
-    await settle(db, [], [], pull([], 9, false, [{ table: 'task', id: t.id, seq: 9 }]), 3);
-    expect(await getRow(db, 'task', t.id)).toBeUndefined();
+    await settle(db, [], [], pull([], 9, false, [{ table: 'desk_card', id: t.id, seq: 9 }]), 3);
+    expect(await getRow(db, 'desk_card', t.id)).toBeUndefined();
   });
 
   it('says there is more to pull when the server does', async () => {
@@ -364,20 +390,20 @@ describe('settling what the server answered', () => {
 });
 
 describe('counts for the sidebar', () => {
-  it('are the open top-level tasks of each list: not deleted, not completed, not subtasks', async () => {
+  it('are the open cards of each list: not deleted, not completed, and an item is not a card', async () => {
     const { db } = await device();
     const [a, b] = [newList('A'), newList('B')];
-    const open1 = newTask(a.id);
-    const open2 = newTask(a.id);
-    const done = newTask(a.id, {
+    const open1 = newCard(a.id);
+    const open2 = newCard(a.id);
+    const done = newCard(a.id, {
       fields: { title: { v: 'done' }, completedAt: { v: 1_793_000_000_000 } },
     });
-    const reopened = newTask(a.id, { fields: { title: { v: 'again' }, completedAt: { v: null } } });
-    const gone = newTask(a.id);
-    const sub = newTask(a.id, { parentId: open1.id });
-    const sealed = newTask(b.id, { fields: { title: { c: 'YWdl' }, completedAt: { c: 'YWdl' } } });
+    const reopened = newCard(a.id, { fields: { title: { v: 'again' }, completedAt: { v: null } } });
+    const gone = newCard(a.id);
+    const sub = newItem(open1.id);
+    const sealed = newCard(b.id, { fields: { title: { c: 'YWdl' }, completedAt: { c: 'YWdl' } } });
     await commitMutation(db, mutation(a, b, open1, open2, done, reopened, gone, sub, sealed), 1);
-    await commitMutation(db, mutation({ table: 'task', id: gone.id, deleted: true }), 2);
+    await commitMutation(db, mutation({ table: 'desk_card', id: gone.id, deleted: true }), 2);
 
     const counts = await openCounts(db);
     expect(counts.get(a.id)).toBe(3);
@@ -385,35 +411,41 @@ describe('counts for the sidebar', () => {
     expect(counts.get(b.id)).toBe(1);
     expect(await openCounts((await device()).db)).toEqual(new Map());
   });
+
+  it('count a card’s checklist for the ring on its row: the items it has, and how many are done, not those deleted', async () => {
+    const { db } = await device();
+    const l = newList();
+    const c = newCard(l.id);
+    const one = newItem(c.id, { position: 'a0' });
+    const two = newItem(c.id, {
+      position: 'a1',
+      fields: { title: { v: 'two' }, completedAt: { v: 1_793_000_000_000 } },
+    });
+    const three = newItem(c.id, { position: 'a2' });
+    await commitMutation(db, mutation(l, c, one, two, three), 1);
+    await commitMutation(db, mutation({ table: 'desk_check', id: three.id, deleted: true }), 2);
+    expect((await checkCounts(db)).get(c.id)).toEqual({ done: 1, total: 2 });
+    expect((await checkCounts((await device()).db)).size).toBe(0);
+  });
 });
 
 describe('what a view across lists may show', () => {
-  it('leaves out what is deleted, what is in a deleted list, and what is under a deleted task, and nothing else', async () => {
+  it('leaves out what is deleted and what is in a deleted list, and nothing else', async () => {
     const { db } = await device();
     const [a, b] = [newList('A'), newList('B')];
-    const shown = newTask(a.id);
-    const deleted = newTask(a.id);
-    const inDeletedList = newTask(b.id);
-    const parent = newTask(a.id);
-    const keptSub = newTask(a.id, { parentId: parent.id });
-    const orphan = newTask(a.id);
-    const underDeleted = newTask(a.id, { parentId: orphan.id });
-    await commitMutation(
-      db,
-      mutation(a, b, shown, deleted, inDeletedList, parent, keptSub, orphan, underDeleted),
-      1,
-    );
-    await commitMutation(db, mutation({ table: 'task', id: deleted.id, deleted: true }), 2);
-    await commitMutation(db, mutation({ table: 'list', id: b.id, deleted: true }), 3);
-    // The parent is deleted, and its subtask is a live row under it.
-    await commitMutation(db, mutation({ table: 'task', id: orphan.id, deleted: true }), 4);
+    const shown = newCard(a.id);
+    const deleted = newCard(a.id);
+    const inDeletedList = newCard(b.id);
+    await commitMutation(db, mutation(a, b, shown, deleted, inDeletedList), 1);
+    await commitMutation(db, mutation({ table: 'desk_card', id: deleted.id, deleted: true }), 2);
+    await commitMutation(db, mutation({ table: 'desk_list', id: b.id, deleted: true }), 3);
 
-    const ids = (await visibleTasks(db)).map((t) => t.id).sort();
-    expect(ids).toEqual([shown.id, parent.id, keptSub.id].sort());
+    const ids = (await visibleCards(db)).map((t) => t.id).sort();
+    expect(ids).toEqual([shown.id]);
     // Bringing the list back brings its tasks back, as they were.
-    await commitMutation(db, mutation({ table: 'list', id: b.id, deleted: false }), 5);
-    expect((await visibleTasks(db)).map((t) => t.id)).toContain(inDeletedList.id);
-    expect((await visibleTasks(db)).map((t) => t.id)).not.toContain(deleted.id);
+    await commitMutation(db, mutation({ table: 'desk_list', id: b.id, deleted: false }), 5);
+    expect((await visibleCards(db)).map((t) => t.id)).toContain(inDeletedList.id);
+    expect((await visibleCards(db)).map((t) => t.id)).not.toContain(deleted.id);
   });
 });
 
@@ -421,7 +453,7 @@ describe('starting again from a snapshot', () => {
   it('shows what it has while the pages arrive, and removes what the server did not send only when the last page is in', async () => {
     const { db } = await device();
     const l = newList();
-    const [kept, purged] = [newTask(l.id), newTask(l.id)];
+    const [kept, purged] = [newCard(l.id), newCard(l.id)];
     const first = mutation(l, kept, purged);
     await commitMutation(db, first, 1);
     await settle(
@@ -430,8 +462,8 @@ describe('starting again from a snapshot', () => {
       [answer(first, 1)],
       pull(
         [
-          taskRow(kept.id, l.id, 1, { title: { v: 'kept', s: 1 } }),
-          taskRow(purged.id, l.id, 1, { title: { v: 'purged', s: 1 } }),
+          cardRow(kept.id, l.id, 1, { title: { v: 'kept', s: 1 } }),
+          cardRow(purged.id, l.id, 1, { title: { v: 'purged', s: 1 } }),
         ],
         1,
       ),
@@ -445,55 +477,49 @@ describe('starting again from a snapshot', () => {
       db,
       [],
       [],
-      pull([taskRow(kept.id, l.id, 4, { title: { v: 'kept', s: 4 } })], 4, true),
+      pull([cardRow(kept.id, l.id, 4, { title: { v: 'kept', s: 4 } })], 4, true),
       3,
     );
-    expect(await getRow(db, 'task', purged.id)).toBeDefined();
+    expect(await getRow(db, 'desk_card', purged.id)).toBeDefined();
     expect(await readCursor(db)).toBe(4);
     // The last page does not: it was purged while the device was away.
     await settle(db, [], [], pull([], 6, false), 4);
-    expect(await getRow(db, 'task', purged.id)).toBeUndefined();
-    expect(await getRow(db, 'task', kept.id)).toBeDefined();
+    expect(await getRow(db, 'desk_card', purged.id)).toBeUndefined();
+    expect(await getRow(db, 'desk_card', kept.id)).toBeDefined();
     expect(await db.get('meta', 'snapshot')).toBeUndefined();
     // And the rows are as the server's rows are, with no trace of the tag.
-    expect(Object.keys((await getRow(db, 'task', kept.id)) ?? {}).sort()).toEqual(
-      [
-        'createdAt',
-        'deletedAt',
-        'fields',
-        'id',
-        'listId',
-        'parentId',
-        'position',
-        'seq',
-        'table',
-      ].sort(),
+    expect(Object.keys((await getRow(db, 'desk_card', kept.id)) ?? {}).sort()).toEqual(
+      ['createdAt', 'deletedAt', 'fields', 'id', 'listId', 'position', 'seq', 'table'].sort(),
     );
   });
 
   it('keeps a row that has an edit waiting, which the server will refuse if the row is truly gone', async () => {
     const { db } = await device();
     const l = newList();
-    const t = newTask(l.id);
+    const t = newCard(l.id);
     const base = mutation(l, t);
     await commitMutation(db, base, 1);
     await settle(
       db,
       await readOutbox(db, 10),
       [answer(base, 1)],
-      pull([taskRow(t.id, l.id, 1, { title: { v: 'x', s: 1 } })], 1),
+      pull([cardRow(t.id, l.id, 1, { title: { v: 'x', s: 1 } })], 1),
       2,
     );
     await commitMutation(
       db,
-      mutation({ table: 'task', id: t.id, fields: { notes: { v: 'edited while away' } } }),
+      mutation({
+        table: 'desk_card',
+        id: t.id,
+        fields: { description: { v: 'edited while away' } },
+      }),
       3,
     );
 
     await startSnapshot(db, 'two');
     await settle(db, [], [], pull([], 5, false), 4);
-    expect(await getRow(db, 'task', t.id)).toMatchObject({
-      fields: { notes: { v: 'edited while away' } },
+    expect(await getRow(db, 'desk_card', t.id)).toMatchObject({
+      fields: { description: { v: 'edited while away' } },
     });
     expect(await outboxSize(db)).toBe(1);
   });

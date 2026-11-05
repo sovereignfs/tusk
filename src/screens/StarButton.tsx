@@ -1,6 +1,6 @@
 'use client';
 
-import { isStarred, setStarred } from '../actions/tasks';
+import { isStarred, setStarred } from '../actions/cards';
 import type { LocalRow } from '../local/rows';
 import { useSync } from '../sync/react';
 import styles from './StarButton.module.css';
@@ -8,14 +8,14 @@ import styles from './StarButton.module.css';
 const ids = { newId: () => crypto.randomUUID() };
 
 /**
- * A star (DESIGN.md §11.1), **its own click target**: a click on it stars or un-stars and opens nothing, and a drag of the row does not start on it.
+ * A star (DESIGN.md §10.2), **its own click target**: a click on it stars or un-stars and opens nothing, and a drag of the row does not start on it.
  * It is a button that is pressed or not, named for what it does. The design system has no star icon yet, so the glyph is text; an icon for it belongs in
- * `@sovereignfs/ui`. A subtask has none, and renders nothing.
+ * `@sovereignfs/ui`. A checklist item has none, and renders nothing.
  */
-export function StarButton({ task }: { task: LocalRow }) {
+export function StarButton({ card }: { card: LocalRow }) {
   const client = useSync();
-  if (task.table !== 'task' || task.parentId !== null) return null;
-  const starred = isStarred(task);
+  if (card.table !== 'desk_card') return null;
+  const starred = isStarred(card);
   return (
     <button
       type="button"
@@ -26,7 +26,7 @@ export function StarButton({ task }: { task: LocalRow }) {
       // A pointer down on it is not the start of a drag of the row it is in.
       onPointerDown={(event) => event.stopPropagation()}
       onClick={() => {
-        const result = setStarred(task, !starred, ids);
+        const result = setStarred(card, !starred, ids);
         if (result.ok) void client.commit(result.mutation);
       }}
     >

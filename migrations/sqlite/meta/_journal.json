@@ -5,29 +5,8 @@
     {
       "idx": 0,
       "version": "6",
-      "when": 1793879123287,
+      "when": 1793915251707,
       "tag": "0000_init",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1793884328722,
-      "tag": "0001_lists_tasks_series",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1793884782690,
-      "tag": "0002_sync_bookkeeping",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "6",
-      "when": 1793894643554,
-      "tag": "0003_account_pruned_through",
       "breakpoints": true
     }
   ]

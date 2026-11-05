@@ -120,9 +120,10 @@ describe('schema parity', () => {
 
   it('covers the tables that sync, and better-auth’s', () => {
     for (const table of [
-      'list',
-      'task',
-      'series',
+      'desk_list',
+      'desk_card',
+      'desk_check',
+      'desk_series',
       'account_settings',
       'user',
       'session',
