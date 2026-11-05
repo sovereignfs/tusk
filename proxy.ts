@@ -13,8 +13,10 @@ import { HSTS, contentSecurityPolicy, newNonce } from './src/security/csp';
  *
  * The service worker's cached shell (task 1.11) cannot carry a fresh nonce, so the worker builds that page itself, with a policy of its own.
  */
+const SIGN_IN_PAGES = new Set(['/sign-in', '/sign-up']);
+
 export function proxy(request: NextRequest) {
-  const { secure, development } = edgeSettings();
+  const { secure, development, authLocal } = edgeSettings();
   const page = !request.nextUrl.pathname.startsWith('/api/');
   const nonce = newNonce();
   const policy = contentSecurityPolicy({ nonce, secure, development });
@@ -25,7 +27,14 @@ export function proxy(request: NextRequest) {
     requestHeaders.set('content-security-policy', policy);
   }
 
-  const response = NextResponse.next({ request: { headers: requestHeaders } });
+  // Off means off (DESIGN.md §6): with local sign-in off, the sign-in pages are not there. A page cannot say so itself: the root loading state
+  // has already sent a 200 by the time it would, so the proxy answers with the page that is not found, and its status.
+  const absent = !authLocal && SIGN_IN_PAGES.has(request.nextUrl.pathname);
+  const response = absent
+    ? NextResponse.rewrite(new URL('/not-found', request.url), {
+        request: { headers: requestHeaders },
+      })
+    : NextResponse.next({ request: { headers: requestHeaders } });
   if (page) response.headers.set('content-security-policy', policy);
   if (secure) response.headers.set('strict-transport-security', HSTS);
   return response;

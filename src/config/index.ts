@@ -1,3 +1,4 @@
+import { resolveAuth, type AuthSettings } from '../auth/config';
 import { DatabaseConfigError, resolveDatabaseSettings, type DatabaseSettings } from '../db/config';
 import { readSetting, SettingFileError, type Env, type ReadFile } from './env';
 
@@ -7,6 +8,8 @@ export interface Config {
   readonly url: string | undefined;
   /** Whether this process runs the background jobs (DESIGN.md §5): off for all but one process when several share a database. */
   readonly worker: boolean;
+  /** How people sign in, or `undefined` when no way is on: there is then no sign-in, and its addresses answer 404 (DESIGN.md §6). */
+  readonly auth: AuthSettings | undefined;
   /** Which database, and how to wait for it and migrate it (DESIGN.md §22.1). */
   readonly database: DatabaseSettings;
 }
@@ -105,6 +108,9 @@ export function loadConfig(env: Env, readFile?: ReadFile): LoadResult {
     else url = checked.url;
   }
 
+  // Signing in: checked with the address, since links, cookies and passkeys are made from it.
+  const auth = resolveAuth(read, url, problems);
+
   const rawWorker = read('TASKS_WORKER');
   if (rawWorker !== undefined && rawWorker !== 'on' && rawWorker !== 'off') {
     problems.push('TASKS_WORKER is on or off.');
@@ -139,5 +145,5 @@ export function loadConfig(env: Env, readFile?: ReadFile): LoadResult {
   }
 
   if (problems.length > 0 || database === undefined) return { ok: false, problems };
-  return { ok: true, config: { url, worker: rawWorker !== 'off', database } };
+  return { ok: true, config: { url, auth, worker: rawWorker !== 'off', database } };
 }
