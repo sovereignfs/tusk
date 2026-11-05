@@ -59,7 +59,7 @@ One person, running it alone, keeps real lists in it, and it works with the netw
 | 22  | [11.1](docs/epics/release.md)         | Development seed                        | P1       | 3.4            | ✅     |
 | 23  | [3.5](docs/epics/lists-and-tasks.md)  | Subtasks                                | P1       | 3.4            | ✅     |
 | 24  | [3.6](docs/epics/lists-and-tasks.md)  | Manual order                            | P1       | 3.2, 3.4       | ✅     |
-| 25  | [3.7](docs/epics/lists-and-tasks.md)  | Undo                                    | P1       | 3.3, 3.4       | 📋     |
+| 25  | [3.7](docs/epics/lists-and-tasks.md)  | Undo                                    | P1       | 3.3, 3.4       | ✅     |
 | 26  | [13.7](docs/epics/sync.md)            | Keeping the history small               | P1       | 1.6, 13.2      | 📋     |
 | 27  | [3.9](docs/epics/lists-and-tasks.md)  | Filter, sort and completed              | P1       | 3.4            | 📋     |
 | 28  | [3.8](docs/epics/lists-and-tasks.md)  | Moving a task to another list           | P1       | 3.5            | 📋     |

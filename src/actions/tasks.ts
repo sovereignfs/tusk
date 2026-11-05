@@ -120,15 +120,43 @@ export function reopenTask(task: LocalRow | undefined, ids: Ids): ActionResult {
   return mutationOf(ids, [{ table: 'task', id: task.id, fields: { completedAt: { v: null } } }]);
 }
 
-/** Deletes a task, which can be undone with `restoreTask` for as long as the row is kept (DESIGN.md §11.5). */
-export function deleteTask(task: LocalRow | undefined, ids: Ids): ActionResult {
+/**
+ * Deletes a task, which can be undone with `restoreTask` for as long as the row is kept (DESIGN.md §11.5). **Deleting a parent marks its live subtasks
+ * in the same mutation**, which is stamped with one time, so that restoring it can bring back exactly those and not a subtask that was deleted
+ * earlier. `subtasks` is the parent's, as rendered.
+ */
+export function deleteTask(
+  task: LocalRow | undefined,
+  ids: Ids,
+  subtasks: readonly LocalRow[] = [],
+): ActionResult {
   if (!task) return { ok: false, reason: 'missing' };
-  return mutationOf(ids, [{ table: 'task', id: task.id, deleted: true }]);
+  const changes: Mutation['changes'][number][] = [{ table: 'task', id: task.id, deleted: true }];
+  if (task.table === 'task' && task.parentId === null) {
+    for (const sub of subtasks)
+      if (sub.deletedAt === null) changes.push({ table: 'task', id: sub.id, deleted: true });
+  }
+  return mutationOf(ids, changes);
 }
 
-export function restoreTask(task: LocalRow | undefined, ids: Ids): ActionResult {
+/**
+ * Undo of `deleteTask`. `subtasks` is **every** subtask the parent has, deleted ones too: those that were deleted with it, which carry the time it was
+ * deleted at, come back with it, and one that was deleted before stays deleted.
+ */
+export function restoreTask(
+  task: LocalRow | undefined,
+  ids: Ids,
+  subtasks: readonly LocalRow[] = [],
+): ActionResult {
   if (!task) return { ok: false, reason: 'missing' };
-  return mutationOf(ids, [{ table: 'task', id: task.id, deleted: false }]);
+  const changes: Mutation['changes'][number][] = [{ table: 'task', id: task.id, deleted: false }];
+  if (task.table === 'task' && task.parentId === null && task.deletedAt !== null) {
+    for (const sub of subtasks) {
+      if (sub.deletedAt === task.deletedAt)
+        changes.push({ table: 'task', id: sub.id, deleted: false });
+    }
+  }
+  return mutationOf(ids, changes);
 }
 
 /**

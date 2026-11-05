@@ -8,6 +8,7 @@ import {
   isPending,
   listsOf,
   openCounts,
+  visibleTasks,
   outboxSize,
   readCursor,
   readOutbox,
@@ -382,6 +383,36 @@ describe('counts for the sidebar', () => {
     // Ciphertext cannot be read, so it counts as open until the keys are in place.
     expect(counts.get(b.id)).toBe(1);
     expect(await openCounts((await device()).db)).toEqual(new Map());
+  });
+});
+
+describe('what a view across lists may show', () => {
+  it('leaves out what is deleted, what is in a deleted list, and what is under a deleted task, and nothing else', async () => {
+    const { db } = await device();
+    const [a, b] = [newList('A'), newList('B')];
+    const shown = newTask(a.id);
+    const deleted = newTask(a.id);
+    const inDeletedList = newTask(b.id);
+    const parent = newTask(a.id);
+    const keptSub = newTask(a.id, { parentId: parent.id });
+    const orphan = newTask(a.id);
+    const underDeleted = newTask(a.id, { parentId: orphan.id });
+    await commitMutation(
+      db,
+      mutation(a, b, shown, deleted, inDeletedList, parent, keptSub, orphan, underDeleted),
+      1,
+    );
+    await commitMutation(db, mutation({ table: 'task', id: deleted.id, deleted: true }), 2);
+    await commitMutation(db, mutation({ table: 'list', id: b.id, deleted: true }), 3);
+    // The parent is deleted, and its subtask is a live row under it.
+    await commitMutation(db, mutation({ table: 'task', id: orphan.id, deleted: true }), 4);
+
+    const ids = (await visibleTasks(db)).map((t) => t.id).sort();
+    expect(ids).toEqual([shown.id, parent.id, keptSub.id].sort());
+    // Bringing the list back brings its tasks back, as they were.
+    await commitMutation(db, mutation({ table: 'list', id: b.id, deleted: false }), 5);
+    expect((await visibleTasks(db)).map((t) => t.id)).toContain(inDeletedList.id);
+    expect((await visibleTasks(db)).map((t) => t.id)).not.toContain(deleted.id);
   });
 });
 

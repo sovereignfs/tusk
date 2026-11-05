@@ -429,6 +429,36 @@ describe(`applying a mutation (${leg})`, () => {
     });
   });
 
+  describe('a parent deleted with its subtasks', () => {
+    it('is stamped with one time for all of them, so that restoring finds exactly those', async () => {
+      const ada = account();
+      const l = list();
+      const parent = task(l.id);
+      const early = task(l.id, { parentId: parent.id });
+      const withIt = task(l.id, { parentId: parent.id });
+      applied(await apply(ada, mutation(l, parent, early, withIt)));
+      // One subtask is deleted on its own, earlier.
+      applied(await apply(ada, mutation({ table: 'task', id: early.id, deleted: true })));
+      applied(
+        await apply(
+          ada,
+          mutation(
+            { table: 'task', id: parent.id, deleted: true },
+            { table: 'task', id: withIt.id, deleted: true },
+          ),
+        ),
+      );
+      const [p, w, e] = await Promise.all([
+        rowOf(database, 'task', parent.id),
+        rowOf(database, 'task', withIt.id),
+        rowOf(database, 'task', early.id),
+      ]);
+      expect(Number(p?.deleted_at)).toBeGreaterThan(0);
+      expect(w?.deleted_at).toEqual(p?.deleted_at);
+      expect(Number(e?.deleted_at)).toBeLessThan(Number(p?.deleted_at));
+    });
+  });
+
   describe('subtasks', () => {
     async function setup() {
       const ada = account();

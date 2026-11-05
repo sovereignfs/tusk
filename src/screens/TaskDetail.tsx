@@ -11,7 +11,7 @@ import {
   updateTask,
 } from '../actions/tasks';
 import type { LocalRow } from '../local/rows';
-import { getRow, subtasksOf } from '../local/store';
+import { allSubtasksOf, getRow, subtasksOf } from '../local/store';
 import { useLocal, useSync } from '../sync/react';
 import { Button, Checkbox, FormField, Input, Textarea } from '../ui';
 import { text } from './fields';
@@ -81,12 +81,19 @@ function Fields({ task, onDeleted }: { task: LocalRow; onDeleted: () => void }) 
     if (result.ok) void client.commit(result.mutation);
   }
 
-  function remove() {
-    const result = deleteTask(task, ids);
+  async function remove() {
+    // A parent takes its live subtasks with it, and Undo brings back those, and not one that was deleted before.
+    const subtasks = await client.read((db) => allSubtasksOf(db, task.id));
+    const result = deleteTask(task, ids, subtasks);
     if (!result.ok) return;
     void client.commit(result.mutation);
-    offerUndo('Task deleted.', () => {
-      const back = restoreTask(task, ids);
+    offerUndo('Task deleted.', async () => {
+      // The rows as they are by then, deleted: the parent's deletion time is what says which subtasks went with it.
+      const now = await client.read(async (db) => ({
+        task: await getRow(db, 'task', task.id),
+        subtasks: await allSubtasksOf(db, task.id),
+      }));
+      const back = restoreTask(now.task, ids, now.subtasks);
       if (back.ok) return client.commit(back.mutation);
     });
     onDeleted();
@@ -136,7 +143,7 @@ function Fields({ task, onDeleted }: { task: LocalRow; onDeleted: () => void }) 
       </FormField>
       {task.table === 'task' && task.parentId === null ? <Subtasks parent={task} /> : null}
       <div>
-        <Button variant="secondary" onClick={remove}>
+        <Button variant="secondary" onClick={() => void remove()}>
           Delete
         </Button>
       </div>

@@ -461,3 +461,36 @@ test.describe('putting tasks in order', () => {
     await expect.poll(order).toEqual(['Three', 'One', 'Two']);
   });
 });
+
+test('deleting a task with subtasks takes them with it, and Undo brings back those and not one that was deleted before', async ({
+  page,
+}) => {
+  await openNewList(page);
+  const title = unique('Parent');
+  await add(page, title);
+  await page.getByRole('link', { name: title }).click();
+  const detail = page.getByRole('region', { name: 'Task', exact: true });
+  for (const sub of ['Kept', 'Earlier', 'Later']) {
+    await detail.getByLabel('Add a subtask').fill(sub);
+    await detail.getByLabel('Add a subtask').press('Enter');
+  }
+  const subs = detail.getByRole('region', { name: 'Subtasks' });
+  // One is deleted on its own first.
+  await subs.getByRole('button', { name: 'Delete subtask: Earlier' }).click();
+  await expect(subs.getByRole('textbox', { name: 'Subtask: Earlier' })).toHaveCount(0);
+
+  await detail.getByRole('button', { name: 'Delete', exact: true }).click();
+  await expect(page.getByRole('link', { name: title })).toHaveCount(0);
+  const bar = page.getByRole('status').filter({ hasText: 'Task deleted.' });
+  await bar.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.getByRole('link', { name: title })).toBeVisible();
+
+  await page.getByRole('link', { name: title }).click();
+  const again = page
+    .getByRole('region', { name: 'Task', exact: true })
+    .getByRole('region', { name: 'Subtasks' });
+  await expect(again.getByRole('textbox', { name: 'Subtask: Kept' })).toBeVisible();
+  await expect(again.getByRole('textbox', { name: 'Subtask: Later' })).toBeVisible();
+  // The one that was deleted before is still deleted.
+  await expect(again.getByRole('textbox', { name: 'Subtask: Earlier' })).toHaveCount(0);
+});

@@ -410,6 +410,53 @@ describe('deleting', () => {
     accepted(deleteTask(t, counting()));
     expect(deleteTask(undefined, counting())).toEqual({ ok: false, reason: 'missing' });
   });
+
+  it('takes a parent’s live subtasks with it, in the one mutation, and not one that is deleted already', () => {
+    const gone = { ...sub(S2, 'a1', T1), deletedAt: 1_000 } as LocalRow;
+    const result = deleteTask(task(T1, 'a0'), counting(), [
+      sub(S1, 'a0', T1),
+      gone,
+      sub(S3, 'a2', T1),
+    ]);
+    accepted(result);
+    expect(mutationOf(result).changes).toEqual([
+      { table: 'task', id: T1, deleted: true },
+      { table: 'task', id: S1, deleted: true },
+      { table: 'task', id: S3, deleted: true },
+    ]);
+  });
+
+  it('deleting a subtask is only that subtask', () => {
+    expect(
+      mutationOf(deleteTask(sub(S1, 'a0', T1), counting(), [sub(S2, 'a0', S1)])).changes,
+    ).toEqual([{ table: 'task', id: S1, deleted: true }]);
+  });
+
+  it('is undone exactly: the subtasks that went with the parent come back, and one that was deleted before stays deleted', () => {
+    const parent = { ...task(T1, 'a0'), deletedAt: 5_000 } as LocalRow;
+    const withIt = { ...sub(S1, 'a0', T1), deletedAt: 5_000 } as LocalRow;
+    const before = { ...sub(S2, 'a1', T1), deletedAt: 1_000 } as LocalRow;
+    const alsoWithIt = { ...sub(S3, 'a2', T1), deletedAt: 5_000 } as LocalRow;
+    const result = restoreTask(parent, counting(), [withIt, before, alsoWithIt]);
+    accepted(result);
+    expect(mutationOf(result).changes).toEqual([
+      { table: 'task', id: T1, deleted: false },
+      { table: 'task', id: S1, deleted: false },
+      { table: 'task', id: S3, deleted: false },
+    ]);
+  });
+
+  it('restoring a task that is not deleted, or a subtask, brings back nothing else', () => {
+    expect(
+      mutationOf(restoreTask(task(T1, 'a0'), counting(), [sub(S1, 'a0', T1)])).changes,
+    ).toHaveLength(1);
+    const deletedSub = { ...sub(S1, 'a0', T1), deletedAt: 5 } as LocalRow;
+    expect(
+      mutationOf(
+        restoreTask(deletedSub, counting(), [{ ...sub(S2, 'a0', S1), deletedAt: 5 } as LocalRow]),
+      ).changes,
+    ).toHaveLength(1);
+  });
 });
 
 describe(`the plugin's flaw is gone (${leg}): another account's task cannot be changed by any of these, by any route`, () => {

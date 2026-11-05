@@ -331,3 +331,28 @@ export async function subtaskCounts(
   }
   return counts;
 }
+
+/** Every subtask a task has, **deleted ones too**: what restoring a parent needs, to find those that were deleted with it. */
+export async function allSubtasksOf(db: LocalDatabase, parentId: string): Promise<LocalRow[]> {
+  return (await db.getAllFromIndex('task', 'byParent', parentId)) as LocalRow[];
+}
+
+/**
+ * Every task a screen that looks across lists may show (Today, Starred, Search, export): **not deleted, not a subtask of a deleted task, and not of a
+ * deleted list** (DESIGN.md §11.5). Deleting a list marks only the list, so its tasks are still live rows; this is where they stop being shown. A
+ * query across lists goes through here and never through the store directly.
+ */
+export async function visibleTasks(db: LocalDatabase): Promise<LocalRow[]> {
+  const lists = new Set(
+    (await db.getAll('list')).filter((list) => list.deletedAt === null).map((list) => list.id),
+  );
+  const tasks = (await db.getAll('task')) as LocalRow[];
+  const live = new Set(tasks.filter((task) => task.deletedAt === null).map((task) => task.id));
+  return tasks.filter(
+    (task) =>
+      task.table === 'task' &&
+      task.deletedAt === null &&
+      lists.has(task.listId) &&
+      (task.parentId === null || live.has(task.parentId)),
+  );
+}

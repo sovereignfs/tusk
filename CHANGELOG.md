@@ -30,6 +30,7 @@ Each release's section is also its GitHub release notes: the release workflow re
 - Tasks: add one by typing and pressing Enter (it goes to the top and the cursor stays), tick it off, open it in the right-hand column to change its title and notes (saved as you leave the field), and delete it with ten seconds to undo. All of it works with no network and is sent when the connection comes back.
 - Subtasks: a checklist in a task's detail, one level deep, with a ring on the task's row showing how far through it is. Ticking a task ticks its open subtasks, and leaves the time of those already done; ticking the last subtask does not tick the task.
 - Tasks and subtasks are dragged into order, which changes one row, and by keyboard: Space lifts a row, the arrows move it, Space puts it down.
+- Deleting a task takes its subtasks with it, and Undo brings back exactly those, not one that was deleted before.
 
 ### Removed
 
