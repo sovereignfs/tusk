@@ -12,11 +12,15 @@
   gap: var(--sv-space-2);
 }
 
-.title {
-  margin: 0;
-  font-size: var(--sv-font-size-lg);
-  font-weight: var(--sv-font-weight-semibold);
-  overflow-wrap: anywhere;
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sv-space-1);
+}
+
+.label {
+  color: var(--sv-color-text-muted);
+  font-size: var(--sv-font-size-sm);
 }
 
 .muted {

@@ -104,7 +104,7 @@ test('the right column is there only while a task is open, is 360px, shows the t
   await page.goto(`/home?task=${task}`);
   const detail = page.getByRole('region', { name: 'Task', exact: true });
   await expect(detail).toBeVisible();
-  await expect(detail.getByRole('heading', { name: 'Buy oat milk' })).toBeVisible();
+  await expect(detail.getByLabel('Title')).toHaveValue('Buy oat milk');
   expect(
     await detail.evaluate((el) => (el.parentElement as HTMLElement).getBoundingClientRect().width),
   ).toBe(360);

@@ -1,0 +1,16 @@
+.bar {
+  position: fixed;
+  bottom: var(--sv-space-6);
+  left: 50%;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: var(--sv-space-4);
+  padding: var(--sv-space-2) var(--sv-space-2) var(--sv-space-2) var(--sv-space-4);
+  border: var(--sv-border-width-hairline) solid var(--sv-color-border-strong);
+  border-radius: var(--sv-radius-md);
+  background: var(--sv-color-surface-raised);
+  color: var(--sv-color-text-primary);
+  box-shadow: var(--sv-shadow-popover);
+  transform: translateX(-50%);
+}

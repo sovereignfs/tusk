@@ -176,10 +176,14 @@ export function useLocal<T>(
     let reading = 0;
     const read = () => {
       const mine = ++reading;
-      void client.read(latest.current).then((result) => {
-        // Only the newest read counts, so that a slow earlier one cannot put older data over newer.
-        if (alive && mine === reading) setValue(result);
-      });
+      void client
+        .read(latest.current)
+        .then((result) => {
+          // Only the newest read counts, so that a slow earlier one cannot put older data over newer.
+          if (alive && mine === reading) setValue(result);
+        })
+        // A read that meets a copy that has just been closed (signing out, another tab deleting it) has nothing to show and nothing to report.
+        .catch(() => undefined);
     };
     read();
     const stop = client.subscribe(read);
@@ -202,7 +206,11 @@ export function useHasSynced(): boolean | undefined {
   const [synced, setSynced] = useState<boolean | undefined>(undefined);
   useEffect(() => {
     let alive = true;
-    const read = () => void client.hasSynced().then((value) => alive && setSynced(value));
+    const read = () =>
+      void client
+        .hasSynced()
+        .then((value) => alive && setSynced(value))
+        .catch(() => undefined);
     read();
     const stop = client.subscribe(read);
     return () => {

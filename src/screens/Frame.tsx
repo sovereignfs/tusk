@@ -6,6 +6,7 @@ import { ThreeColumnLayout, useIsMobile } from '../ui';
 import { FirstList } from './FirstList';
 import { Sidebar } from './Sidebar';
 import { TaskDetail } from './TaskDetail';
+import { UndoProvider } from './Undo';
 
 /**
  * Below the shell's header (DESIGN.md §15.2): a sidebar of 280px, the content, and a right sidebar of 360px **that is there only while a task is
@@ -21,7 +22,7 @@ export function Frame({ children }: { children: ReactNode }) {
   const mobile = useIsMobile();
 
   return (
-    <>
+    <UndoProvider>
       <FirstList />
       <ThreeColumnLayout sidebarHidden={mobile}>
         <Sidebar />
@@ -30,6 +31,6 @@ export function Frame({ children }: { children: ReactNode }) {
         </div>
         {task && !mobile ? <TaskDetail taskId={task} /> : null}
       </ThreeColumnLayout>
-    </>
+    </UndoProvider>
   );
 }

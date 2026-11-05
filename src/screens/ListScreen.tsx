@@ -2,10 +2,15 @@
 
 import Link from 'next/link';
 import { uuid } from '../access/parse';
-import { getRow } from '../local/store';
+import { useSearchParams } from 'next/navigation';
+import { isCompleted } from '../actions/tasks';
+import type { LocalRow } from '../local/rows';
+import { getRow, tasksOf } from '../local/store';
 import { useHasSynced, useLocal } from '../sync/react';
 import { EmptyState } from '../ui';
-import { text } from './fields';
+import { AddTask } from './AddTask';
+import { TaskRow } from './TaskRow';
+import { plain, text } from './fields';
 import styles from './ListScreen.module.css';
 
 /**
@@ -35,10 +40,42 @@ export function ListScreen({ listId }: { listId: string }) {
       />
     );
   }
+  return <ListTasks list={list} />;
+}
+
+/** The list's tasks, from the working copy: the open ones in order, then the ones that are done, under a heading that opens and closes. */
+function ListTasks({ list }: { list: LocalRow }) {
+  const tasks = useLocal((db) => tasksOf(db, list.id), [list.id]);
+  const openId = useSearchParams().get('task');
+  const all = tasks ?? [];
+  const open = all.filter((task) => !isCompleted(task));
+  // Most recently finished first.
+  const done = all
+    .filter(isCompleted)
+    .sort((a, b) => Number(plain(b, 'completedAt')) - Number(plain(a, 'completedAt')));
+
   return (
     <section aria-label={text(list, 'title', 'List')}>
       <h1 className={styles.title}>{text(list, 'title', 'Untitled list')}</h1>
-      <p className={styles.muted}>There are no tasks to show yet.</p>
+      <AddTask listId={list.id} tasks={open} />
+      {tasks !== undefined && all.length === 0 ? (
+        <p className={styles.muted}>Nothing here yet.</p>
+      ) : null}
+      <ul className={styles.tasks}>
+        {open.map((task) => (
+          <TaskRow key={task.id} task={task} open={openId === task.id} />
+        ))}
+      </ul>
+      {done.length > 0 ? (
+        <details className={styles.completed}>
+          <summary className={styles.completedHeading}>Completed ({done.length})</summary>
+          <ul className={styles.tasks}>
+            {done.map((task) => (
+              <TaskRow key={task.id} task={task} open={openId === task.id} />
+            ))}
+          </ul>
+        </details>
+      ) : null}
     </section>
   );
 }

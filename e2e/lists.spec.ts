@@ -73,6 +73,8 @@ test('a list is made from the +, appears at once, and opens', async ({ page, bas
 
 test('an empty name makes nothing, and Escape puts the field away', async ({ page }) => {
   await signedIn(page);
+  // Counted once the lists are in the sidebar, and not while they are still being read from the device.
+  await expect(page.getByRole('link', { name: /^My tasks/ })).toBeVisible();
   const before = await page.getByRole('navigation', { name: 'Lists' }).getByRole('link').count();
   await page.getByRole('button', { name: 'Add a list' }).click();
   await page.getByLabel('New list name').fill('   ');
@@ -129,6 +131,11 @@ test('lists are dragged into order, at once, and the order is the same after a r
     )
     .toBe(3);
   const before = new Map((await onServer(page, origin)).map((l) => [l.id, l.position]));
+
+  // The sidebar scrolls once an account has many lists (the tests share one): the three are brought into view together, and measured after that.
+  await sidebar.getByRole('link', { name: new RegExp(`^${names[2]}`) }).scrollIntoViewIfNeeded();
+  await sidebar.getByRole('link', { name: new RegExp(`^${names[0]}`) }).scrollIntoViewIfNeeded();
+  await sidebar.getByRole('link', { name: new RegExp(`^${names[2]}`) }).scrollIntoViewIfNeeded();
 
   // The third is dragged above the first.
   const from = await sidebar.getByRole('link', { name: new RegExp(`^${names[2]}`) }).boundingBox();

@@ -300,3 +300,8 @@ export async function openCounts(db: LocalDatabase): Promise<Map<string, number>
 export async function allLists(db: LocalDatabase): Promise<LocalRow[]> {
   return db.getAll('list');
 }
+
+/** How many task rows the device has, deleted ones too, which count against the account's limit until they are removed for good. */
+export async function taskCount(db: LocalDatabase): Promise<number> {
+  return db.count('task');
+}

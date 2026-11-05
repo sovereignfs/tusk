@@ -82,7 +82,6 @@ function AddList({ lists }: { lists: readonly LocalRow[] }) {
   const client = useSync();
   const toast = useToast();
   const [adding, setAdding] = useState(false);
-  const [title, setTitle] = useState('');
   const field = useRef<HTMLInputElement>(null);
   // Every list row there is, deleted ones too, which count against the limit until they are removed for good.
   const everything = useLocal(allLists);
@@ -93,11 +92,12 @@ function AddList({ lists }: { lists: readonly LocalRow[] }) {
 
   const stop = () => {
     setAdding(false);
-    setTitle('');
   };
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    // Read from the field, not from state, which is a keystroke behind when a title is typed and sent in the same breath.
+    const title = field.current?.value ?? '';
     const result = createList(lists, { title }, ids, everything ?? lists);
     if (!result.ok) {
       if (result.reason === 'limit') {
@@ -139,11 +139,9 @@ function AddList({ lists }: { lists: readonly LocalRow[] }) {
             className={styles.input}
             aria-label="New list name"
             placeholder="Name the list"
-            value={title}
             maxLength={500}
-            onChange={(event) => setTitle(event.target.value)}
             onKeyDown={(event) => event.key === 'Escape' && stop()}
-            onBlur={() => title.trim() === '' && stop()}
+            onBlur={(event) => event.currentTarget.value.trim() === '' && stop()}
           />
         </form>
       ) : null}
