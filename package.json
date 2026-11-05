@@ -23,6 +23,7 @@
     "db:generate": "node scripts/db-generate.mjs",
     "db:dev": "node scripts/dev-db.mjs",
     "boot-check": "node scripts/boot-check.mjs",
+    "seed": "node scripts/seed-run.mjs",
     "e2e": "playwright test"
   },
   "dependencies": {
