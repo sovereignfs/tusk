@@ -46,6 +46,21 @@ export async function dbRun(database: Database, query: SQL): Promise<void> {
   await database.db.execute(query);
 }
 
+const queues = new WeakMap<object, Promise<unknown>>();
+
+/** Runs `work` after every earlier piece of work for the same `key` has ended, whether it succeeded or not. */
+function oneAtATime<T>(key: object, work: () => Promise<T>): Promise<T> {
+  const turn = (queues.get(key) ?? Promise.resolve()).then(work, work);
+  queues.set(
+    key,
+    turn.then(
+      () => undefined,
+      () => undefined,
+    ),
+  );
+  return turn;
+}
+
 /**
  * Runs `work` in one transaction, on either dialect: it commits if `work` returns and rolls back if it throws. `work` is given a handle to
  * run its statements on, and anything it runs on the original handle is outside the transaction, so it uses only the one it is given.
@@ -58,9 +73,15 @@ export async function transaction<T>(
   work: (tx: Database) => Promise<T>,
 ): Promise<T> {
   if (database.dialect === 'sqlite') {
-    return database.db.transaction((tx) =>
-      work({ ...database, db: tx as unknown as typeof database.db }),
-    );
+    const run = () =>
+      database.db.transaction((tx) =>
+        work({ ...database, db: tx as unknown as typeof database.db }),
+      );
+    // A file is written by one transaction at a time in this process, and here, in JavaScript, rather than by SQLite's lock: libSQL's driver
+    // waits for a lock synchronously, on the one thread, so a second transaction that waited for the first would stop the very work that
+    // lets the first finish. (Other processes sharing the file wait on the busy timeout, which is a different thread of theirs.) An sqld service
+    // takes its writers in turn itself.
+    return database.form === 'file' ? oneAtATime(database.db, run) : run();
   }
   return database.db.transaction((tx) =>
     work({ ...database, db: tx as unknown as typeof database.db }),

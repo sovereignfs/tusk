@@ -68,12 +68,17 @@ async function openSqld(config: SqldConfig, store: Store): Promise<SqliteDatabas
 async function openFile(config: FileConfig, store: Store): Promise<SqliteDatabase> {
   const { createClient } = await import('@libsql/client/node');
   const { drizzle } = await import('drizzle-orm/libsql/node');
-  const client = createClient({ url: `file:${store === 'auth' ? config.authPath : config.path}` });
+  // `timeout` is the busy timeout, and it is given here and not as a PRAGMA because the client keeps a pool of connections: a transaction takes
+  // one of its own, and a PRAGMA is per connection, so one set on the first would leave every other to fail at once when another holds the write
+  // lock. Two mutations of one account, or of two, are exactly that.
+  const client = createClient({
+    url: `file:${store === 'auth' ? config.authPath : config.path}`,
+    timeout: 5000,
+  });
   // Several processes (web and worker) may share the file on one host: WAL lets
   // readers and a writer overlap, and a busy timeout makes a second writer wait for
   // the first instead of failing. Foreign keys are off in SQLite until asked.
   await client.execute('PRAGMA journal_mode = WAL');
-  await client.execute('PRAGMA busy_timeout = 5000');
   await client.execute('PRAGMA foreign_keys = ON');
   return {
     dialect: 'sqlite',

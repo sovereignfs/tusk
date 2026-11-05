@@ -144,4 +144,39 @@ describe(`transactions (${leg})`, () => {
     });
     expect(await count('inside')).toBe(1);
   });
+
+  it('lets transactions that overlap each wait their turn and all finish, which a file does in JavaScript and not by its lock', async () => {
+    // Each one yields between its statements, as real work does while it waits for something: the first holds the write lock across those
+    // pauses, and a second that waited on SQLite's lock would stop the very thread the first needs to finish.
+    const pause = () => new Promise((resolve) => setTimeout(resolve, 5));
+    await Promise.all(
+      Array.from({ length: 8 }, (_, n) =>
+        transaction(database, async (tx) => {
+          await dbRun(
+            tx,
+            sql`INSERT INTO exec_probe (id, label, big) VALUES (${200 + n}, 'overlap', 1)`,
+          );
+          await pause();
+          await dbRun(
+            tx,
+            sql`INSERT INTO exec_probe (id, label, big) VALUES (${300 + n}, 'overlap', 2)`,
+          );
+        }),
+      ),
+    );
+    expect(await count('overlap')).toBe(16);
+  });
+
+  it('keeps going after a transaction that failed, for the ones queued behind it', async () => {
+    const results = await Promise.allSettled([
+      transaction(database, async () => {
+        throw new Error('first fails');
+      }),
+      transaction(database, async (tx) => {
+        await dbRun(tx, sql`INSERT INTO exec_probe (id, label, big) VALUES (400, 'after', 1)`);
+      }),
+    ]);
+    expect(results.map((r) => r.status)).toEqual(['rejected', 'fulfilled']);
+    expect(await count('after')).toBe(1);
+  });
 });
