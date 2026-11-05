@@ -29,7 +29,18 @@ describe('the browser’s transport', () => {
   it('says every way it can go wrong as a value', async () => {
     expect(await answering({ status: 401 })(request)).toEqual({ kind: 'signed-out' });
     expect(await answering({ status: 426 })(request)).toEqual({ kind: 'update-required' });
-    expect(await answering({ status: 410 })(request)).toEqual({ kind: 'account-deleted' });
+    expect(await answering({ status: 410, body: '{"code":"ACCOUNT_DELETED"}' })(request)).toEqual({
+      kind: 'account-deleted',
+    });
+    expect(await answering({ status: 410, body: '{"code":"SNAPSHOT_REQUIRED"}' })(request)).toEqual(
+      { kind: 'snapshot-required' },
+    );
+    // A 410 that says neither is not believed: the one that deletes the device's copy must say so.
+    expect(await answering({ status: 410 })(request)).toEqual({ kind: 'error', status: 410 });
+    expect(await answering({ status: 410, body: '{"code":"SOMETHING"}' })(request)).toEqual({
+      kind: 'error',
+      status: 410,
+    });
     expect(await answering({ status: 500 })(request)).toEqual({ kind: 'error', status: 500 });
     expect(await answering({ status: 413 })(request)).toEqual({ kind: 'error', status: 413 });
   });

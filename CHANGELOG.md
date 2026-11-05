@@ -31,6 +31,7 @@ Each release's section is also its GitHub release notes: the release workflow re
 - Subtasks: a checklist in a task's detail, one level deep, with a ring on the task's row showing how far through it is. Ticking a task ticks its open subtasks, and leaves the time of those already done; ticking the last subtask does not tick the task.
 - Tasks and subtasks are dragged into order, which changes one row, and by keyboard: Space lifts a row, the arrows move it, Space puts it down.
 - Deleting a task takes its subtasks with it, and Undo brings back exactly those, not one that was deleted before.
+- Deleted tasks and lists are removed for good after seven days, and a device that was away learns of it the next time it connects; one that was away for more than ninety days starts again from what the server holds, after sending what it had changed.
 
 ### Removed
 

@@ -11,6 +11,11 @@ export const accountSettings = sqliteTable('account_settings', {
   seq: counter('seq').notNull().default(0),
   /** An IANA zone, for the jobs; the browser reports it (§12). */
   timeZone: text('time_zone').notNull().default('UTC'),
+  /**
+   * The highest `seq` of any tombstone that was removed for being old (DESIGN.md §8.7). A device whose cursor is below it may have missed a purge whose
+   * tombstone is gone, and takes a fresh snapshot instead of a pull.
+   */
+  prunedThrough: counter('pruned_through').notNull().default(0),
   createdAt: epochMs('created_at').notNull(),
 });
 

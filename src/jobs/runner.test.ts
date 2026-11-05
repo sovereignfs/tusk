@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { startJobs } from './index';
+import { jobs, startJobs } from './index';
 import { JobRunner, kindOf, type JobContext, type RunnerDeps } from './runner';
 
 /** A world with no real time in it: timers fire when the test says so, and the clock is the test's. */
@@ -321,11 +321,16 @@ describe('starting the jobs', () => {
     await runner?.stop();
   });
 
-  it('starts with nothing to run when no task has a job yet', async () => {
+  it('starts with nothing to run when it is given no jobs', async () => {
     const w = world();
-    const runner = startJobs({ worker: true }, undefined, w.deps);
+    const runner = startJobs({ worker: true }, [], w.deps);
     expect(runner).toBeDefined();
     expect(w.lines.join('\n')).toContain('running 0 jobs');
     await runner?.stop();
+  });
+
+  it('has the jobs the app has: the purge, hourly, from the start', () => {
+    expect(jobs.map((job) => job.name)).toEqual(['purge']);
+    expect(jobs[0]).toMatchObject({ everyMs: 3_600_000, runAtStart: true });
   });
 });

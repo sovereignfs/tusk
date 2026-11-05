@@ -11,6 +11,7 @@ export type TransportResult =
   | { kind: 'signed-out' }
   | { kind: 'update-required' }
   | { kind: 'account-deleted' }
+  | { kind: 'snapshot-required' }
   | { kind: 'rate-limited'; retryAfterMs: number }
   | { kind: 'error'; status: number };
 
@@ -36,8 +37,20 @@ export function fetchTransport(
     }
     if (response.status === 401) return { kind: 'signed-out' };
     if (response.status === 426) return { kind: 'update-required' };
-    // The account this device holds the tasks of has been deleted (DESIGN.md §20): not a session that ended, which would be 401 and keeps the outbox.
-    if (response.status === 410) return { kind: 'account-deleted' };
+    // Gone, in one of two ways, told apart by what the body says: this device is too far behind for a pull and starts again from a snapshot (DESIGN.md
+    // §8.7), or the account it holds the tasks of was deleted (§20), which is not a session that ended (401) and does not keep the outbox. A 410 that
+    // says neither is the second, which is the one that deletes, so it is only believed when it says so.
+    if (response.status === 410) {
+      const code = await response.json().then(
+        (body: { code?: string }) => body.code,
+        () => undefined,
+      );
+      return code === 'SNAPSHOT_REQUIRED'
+        ? { kind: 'snapshot-required' }
+        : code === 'ACCOUNT_DELETED'
+          ? { kind: 'account-deleted' }
+          : { kind: 'error', status: 410 };
+    }
     if (response.status === 429) {
       const seconds = Number(response.headers.get('retry-after'));
       return {

@@ -1,4 +1,8 @@
+import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { dbRun } from '../db/exec';
+import * as postgresSchema from '../db/schema/postgres';
+import * as sqliteSchema from '../db/schema/sqlite';
 import { accountRoute } from '../access/route';
 import { type TwoAccounts, twoAccounts } from '../access/two-accounts';
 import { type Database, openDatabase } from '../db/client';
@@ -265,6 +269,44 @@ describe(`POST /api/sync (${leg})`, () => {
         );
       }
       expect(keys).toEqual([`sync:${t.ada.id}`, `sync:${t.grace.id}`]);
+    });
+  });
+
+  describe('a device too far behind for a pull', () => {
+    const floorOf = async (owner: string, to: number) => {
+      const settings =
+        database.dialect === 'postgres'
+          ? postgresSchema.accountSettings
+          : sqliteSchema.accountSettings;
+      await dbRun(
+        database,
+        sql`UPDATE ${settings} SET pruned_through = ${to} WHERE account_id = ${owner}`,
+      );
+    };
+
+    it('is told to start again with 410 when its cursor is below what the server still remembers, and nothing of its request is applied', async () => {
+      const first = await answer(await post(t.ada, body({ mutations: [mutation(list())] })));
+      const cursor = first.pull.cursor;
+      await floorOf(t.ada.id, cursor + 5);
+      const before = await accountSeq(database, t.ada.id);
+
+      const response = await post(t.ada, body({ cursor, mutations: [mutation(list())] }));
+      expect(response.status).toBe(410);
+      expect(await response.json()).toEqual({ code: 'SNAPSHOT_REQUIRED' });
+      expect(await accountSeq(database, t.ada.id)).toBe(before);
+    });
+
+    it('is let through from nothing, with its outbox, which is what it does next, and from a cursor at or past the floor', async () => {
+      const owner = t.grace;
+      const first = await answer(await post(owner, body({ mutations: [mutation(list())] })));
+      await floorOf(owner.id, first.pull.cursor + 3);
+      const m = mutation(list());
+      const fresh = await answer(await post(owner, body({ cursor: 0, mutations: [m] })));
+      expect(fresh.results).toEqual([
+        { mutationId: m.mutationId, status: 'applied', seq: expect.any(Number) },
+      ]);
+      expect((await post(owner, body({ cursor: first.pull.cursor + 3 }))).status).toBe(200);
+      expect((await post(owner, body({ cursor: first.pull.cursor + 1 }))).status).toBe(410);
     });
   });
 

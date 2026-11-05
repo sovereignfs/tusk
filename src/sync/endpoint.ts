@@ -1,6 +1,10 @@
 import type { Database } from '../db/client';
 import { uuid } from '../access/parse';
 import { type Limiter, type Rule } from '../limits/rate';
+import { sql } from 'drizzle-orm';
+import { dbGet } from '../db/exec';
+import * as postgresSchema from '../db/schema/postgres';
+import * as sqliteSchema from '../db/schema/sqlite';
 import { applyMutation } from './apply';
 import { LIMITS, type MutationResult, PROTOCOL_VERSION, type SyncResponse } from './format';
 import { pull } from './pull';
@@ -99,6 +103,13 @@ export async function handleSync(
     return json(400, { code: 'BAD_REQUEST' });
   }
 
+  // A device whose cursor is behind what the server still remembers of the past (tombstones older than ninety days are gone) may have missed a purge,
+  // and cannot be brought up to date by a pull. It is told so before anything else, and starts again from nothing: it keeps its outbox, and sends it with
+  // the snapshot's first request, which is from zero and is let through (DESIGN.md §8.7).
+  if (cursor > 0 && cursor < (await prunedThrough(deps.database, accountId))) {
+    return json(410, { code: 'SNAPSHOT_REQUIRED' });
+  }
+
   const results: MutationResult[] = [];
   for (const each of mutations as unknown[]) {
     const parsed = parseMutation(each, deps.plain ? { plain: deps.plain } : {});
@@ -138,4 +149,15 @@ export async function syncResponse(
   const body = await readCapped(request, LIMITS.bodyBytes);
   if (body === null) return json(413, { code: 'TOO_LARGE' });
   return handleSync(body, accountId, deps);
+}
+
+/** The highest `seq` of any tombstone this account has had removed for being old. Zero for an account that never has. */
+async function prunedThrough(database: SyncDeps['database'], accountId: string): Promise<number> {
+  const settings =
+    database.dialect === 'postgres' ? postgresSchema.accountSettings : sqliteSchema.accountSettings;
+  const row = await dbGet<{ floor: number | string }>(
+    database,
+    sql`SELECT pruned_through AS floor FROM ${settings} WHERE account_id = ${accountId}`,
+  );
+  return Number(row?.floor ?? 0);
 }

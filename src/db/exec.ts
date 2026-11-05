@@ -31,7 +31,7 @@ export async function dbGet<T>(database: Database, query: SQL): Promise<T | unde
 /** Every row. */
 export async function dbAll<T>(database: Database, query: SQL): Promise<T[]> {
   if (database.dialect === 'sqlite') {
-    return (await database.db.all(query)) as T[];
+    return (await queued(database, () => database.db.all(query))) as T[];
   }
   const result = await database.db.execute(query);
   return result.rows as T[];
@@ -40,10 +40,22 @@ export async function dbAll<T>(database: Database, query: SQL): Promise<T[]> {
 /** A statement run for its effect, with no rows wanted. */
 export async function dbRun(database: Database, query: SQL): Promise<void> {
   if (database.dialect === 'sqlite') {
-    await database.db.run(query);
+    await queued(database, () => database.db.run(query));
     return;
   }
   await database.db.execute(query);
+}
+
+/**
+ * On a file, a statement that is not part of a transaction waits its turn behind the transactions and the statements before it, as a transaction does
+ * (`transaction`, below): libSQL's driver waits for SQLite's write lock synchronously, on the one thread, so a write that waited for the lock while a
+ * transaction in the same process awaited something else would stop the thread the transaction needs to finish. Reads would not need the lock, but
+ * they cannot be told from writes by looking at them, and one small container does not need them to overlap. The statements of a transaction are not
+ * queued: they are the transaction.
+ */
+function queued<T>(database: Database & { dialect: 'sqlite' }, work: () => Promise<T>): Promise<T> {
+  if (database.form !== 'file' || database.inTransaction) return work();
+  return oneAtATime(database.db, work);
 }
 
 const queues = new WeakMap<object, Promise<unknown>>();
@@ -75,7 +87,7 @@ export async function transaction<T>(
   if (database.dialect === 'sqlite') {
     const run = () =>
       database.db.transaction((tx) =>
-        work({ ...database, db: tx as unknown as typeof database.db }),
+        work({ ...database, db: tx as unknown as typeof database.db, inTransaction: true }),
       );
     // A file is written by one transaction at a time in this process, and here, in JavaScript, rather than by SQLite's lock: libSQL's driver
     // waits for a lock synchronously, on the one thread, so a second transaction that waited for the first would stop the very work that

@@ -13,6 +13,7 @@ import {
   readCursor,
   readOutbox,
   settle,
+  startSnapshot,
   subtasksOf,
   tasksOf,
 } from './store';
@@ -413,6 +414,88 @@ describe('what a view across lists may show', () => {
     await commitMutation(db, mutation({ table: 'list', id: b.id, deleted: false }), 5);
     expect((await visibleTasks(db)).map((t) => t.id)).toContain(inDeletedList.id);
     expect((await visibleTasks(db)).map((t) => t.id)).not.toContain(deleted.id);
+  });
+});
+
+describe('starting again from a snapshot', () => {
+  it('shows what it has while the pages arrive, and removes what the server did not send only when the last page is in', async () => {
+    const { db } = await device();
+    const l = newList();
+    const [kept, purged] = [newTask(l.id), newTask(l.id)];
+    const first = mutation(l, kept, purged);
+    await commitMutation(db, first, 1);
+    await settle(
+      db,
+      await readOutbox(db, 10),
+      [answer(first, 1)],
+      pull(
+        [
+          taskRow(kept.id, l.id, 1, { title: { v: 'kept', s: 1 } }),
+          taskRow(purged.id, l.id, 1, { title: { v: 'purged', s: 1 } }),
+        ],
+        1,
+      ),
+      2,
+    );
+
+    await startSnapshot(db, 'one');
+    expect(await readCursor(db)).toBe(0);
+    // The first page has `kept` and says there is more: `purged` is still there, since it may be on the next page.
+    await settle(
+      db,
+      [],
+      [],
+      pull([taskRow(kept.id, l.id, 4, { title: { v: 'kept', s: 4 } })], 4, true),
+      3,
+    );
+    expect(await getRow(db, 'task', purged.id)).toBeDefined();
+    expect(await readCursor(db)).toBe(4);
+    // The last page does not: it was purged while the device was away.
+    await settle(db, [], [], pull([], 6, false), 4);
+    expect(await getRow(db, 'task', purged.id)).toBeUndefined();
+    expect(await getRow(db, 'task', kept.id)).toBeDefined();
+    expect(await db.get('meta', 'snapshot')).toBeUndefined();
+    // And the rows are as the server's rows are, with no trace of the tag.
+    expect(Object.keys((await getRow(db, 'task', kept.id)) ?? {}).sort()).toEqual(
+      [
+        'createdAt',
+        'deletedAt',
+        'fields',
+        'id',
+        'listId',
+        'parentId',
+        'position',
+        'seq',
+        'table',
+      ].sort(),
+    );
+  });
+
+  it('keeps a row that has an edit waiting, which the server will refuse if the row is truly gone', async () => {
+    const { db } = await device();
+    const l = newList();
+    const t = newTask(l.id);
+    const base = mutation(l, t);
+    await commitMutation(db, base, 1);
+    await settle(
+      db,
+      await readOutbox(db, 10),
+      [answer(base, 1)],
+      pull([taskRow(t.id, l.id, 1, { title: { v: 'x', s: 1 } })], 1),
+      2,
+    );
+    await commitMutation(
+      db,
+      mutation({ table: 'task', id: t.id, fields: { notes: { v: 'edited while away' } } }),
+      3,
+    );
+
+    await startSnapshot(db, 'two');
+    await settle(db, [], [], pull([], 5, false), 4);
+    expect(await getRow(db, 'task', t.id)).toMatchObject({
+      fields: { notes: { v: 'edited while away' } },
+    });
+    expect(await outboxSize(db)).toBe(1);
   });
 });
 

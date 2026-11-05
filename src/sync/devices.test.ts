@@ -7,7 +7,8 @@ import { getRow, listsOf, outboxSize, tasksOf } from '../local/store';
 import type { LocalRow } from '../local/rows';
 import { type SyncDeps, handleSync } from './endpoint';
 import { SyncClient } from './client';
-import type { Transport, TransportResult } from './transport';
+import { type Transport, fetchTransport } from './transport';
+import { purge } from './purge';
 import { account, id, makeStore } from './test-support';
 
 /**
@@ -48,18 +49,19 @@ function server(
     now: Date.now,
     ...overrides,
   };
+  // The browser's own transport, over a `fetch` that goes straight to the server's handler, so that every status the server gives is read as a device
+  // reads it.
   return (self) =>
-    async (request): Promise<TransportResult> => {
+    fetchTransport('/api/sync', async (_url, init) => {
       const device = self();
-      if (!device.online) return { kind: 'offline' };
-      const response = await handleSync(JSON.stringify(request), owner, deps);
+      if (!device.online) throw new TypeError('no network');
+      const response = await handleSync(String(init?.body), owner, deps);
       if (device.loseNextAnswer) {
         device.loseNextAnswer = false;
-        return { kind: 'offline' };
+        throw new TypeError('the answer was lost');
       }
-      if (response.status === 200) return { kind: 'ok', response: await response.json() };
-      return { kind: 'error', status: response.status };
-    };
+      return response;
+    });
 }
 
 async function device(owner: string, makeTransport = server(owner)): Promise<Device> {
@@ -304,6 +306,110 @@ describe(`devices of one account against the server (${leg})`, () => {
       expect(a.refusals.sort()).toEqual(['limit', 'unavailable']);
       expect((await listsOf(a.client.db)).length).toBe(1);
       expect((await a.client.db.getAll('task')).length).toBe(0);
+    });
+  });
+
+  describe('a device that was away while rows were purged', () => {
+    const DAY = 24 * 60 * 60 * 1000;
+    const T = 1_800_000_000_000;
+
+    it('offline for eight days: it learns of the purge from its next pull, and the row goes', async () => {
+      const owner = account();
+      const clock = { now: T };
+      const make = server(owner, { now: () => clock.now });
+      const [a, b] = [await device(owner, make), await device(owner, make)];
+      const l = newList();
+      const t = newTask(l.id);
+      await a.client.commit(mutation(l, t));
+      await settleAll(a, b);
+      expect((await tasksOf(a.client.db, l.id)).length).toBe(1);
+
+      a.online = false;
+      await b.client.commit(mutation({ table: 'task', id: t.id, deleted: true }));
+      await b.client.sync();
+      clock.now = T + 8 * DAY;
+      await purge(database, clock.now);
+
+      a.online = true;
+      await settleAll(a, b);
+      // The row is not only hidden but gone, on both devices, and they agree.
+      expect(await getRow(a.client.db, 'task', t.id)).toBeUndefined();
+      expect(await everything(a)).toEqual(await everything(b));
+    });
+
+    it('offline for ninety-one days: told to start again, it sends its edits first and takes a snapshot, and what was purged goes', async () => {
+      const owner = account();
+      const clock = { now: T };
+      const make = server(owner, { now: () => clock.now });
+      const [a, b] = [await device(owner, make), await device(owner, make)];
+      const l = newList();
+      const stays = newTask(l.id, 'stays');
+      const goes = newTask(l.id, 'goes');
+      await a.client.commit(mutation(l, stays, goes));
+      await settleAll(a, b);
+
+      a.online = false;
+      // While it is away: one task is deleted and purged, another is made, and the tombstone itself is forgotten.
+      await b.client.commit(mutation({ table: 'task', id: goes.id, deleted: true }));
+      const meanwhile = newTask(l.id, 'made while away');
+      await b.client.commit(mutation(meanwhile));
+      await b.client.sync();
+      clock.now = T + 8 * DAY;
+      await purge(database, clock.now);
+      clock.now = T + 8 * DAY + 91 * DAY;
+      const result = await purge(database, clock.now);
+      expect(result.tombstonesRemoved).toBeGreaterThanOrEqual(1);
+
+      // Its own edits, made offline: one to a task that survived, and a new task.
+      await a.client.commit(
+        mutation({ table: 'task', id: stays.id, fields: { notes: { v: 'edited offline' } } }),
+      );
+      const mine = newTask(l.id, 'made offline');
+      await a.client.commit(mutation(mine));
+      expect(await outboxSize(a.client.db)).toBe(2);
+
+      a.online = true;
+      const dbg = await a.client.sync();
+      console.log(
+        'DBG outcome',
+        JSON.stringify(dbg),
+        'cursor',
+        await a.client.db.get('meta', 'cursor'),
+        'snapshot',
+        await a.client.db.get('meta', 'snapshot'),
+        'outbox',
+        await outboxSize(a.client.db),
+        'refusals',
+        JSON.stringify(a.refusals),
+      );
+      await settleAll(a, b);
+      // Its edits were sent, and kept: nothing it did was lost to the snapshot.
+      expect(await outboxSize(a.client.db)).toBe(0);
+      expect(a.refusals).toEqual([]);
+      expect((await getRow(a.client.db, 'task', stays.id))?.fields.notes).toMatchObject({
+        v: 'edited offline',
+      });
+      expect(await getRow(a.client.db, 'task', mine.id)).toBeDefined();
+      // What it never heard was purged is gone, and what it never heard was made is there.
+      expect(await getRow(a.client.db, 'task', goes.id)).toBeUndefined();
+      expect(await getRow(a.client.db, 'task', meanwhile.id)).toBeDefined();
+      expect(await everything(a)).toEqual(await everything(b));
+    });
+
+    it('keeps showing what it has while the snapshot arrives: nothing is removed until the last page is in', async () => {
+      const owner = account();
+      const clock = { now: T };
+      const make = server(owner, { now: () => clock.now });
+      const a = await device(owner, make);
+      const l = newList();
+      const tasks = Array.from({ length: 5 }, (_, i) => newTask(l.id, `t${i}`));
+      await a.client.commit(mutation(l, ...tasks));
+      await a.client.sync();
+      // The server tells it to start again, and then answers one page at a time.
+      const { startSnapshot } = await import('../local/store');
+      await startSnapshot(a.client.db, 'token');
+      expect((await a.client.db.get('meta', 'cursor')) ?? 0).toBe(0);
+      expect((await tasksOf(a.client.db, l.id)).length).toBe(5);
     });
   });
 

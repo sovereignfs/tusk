@@ -179,4 +179,27 @@ describe(`transactions (${leg})`, () => {
     expect(results.map((r) => r.status)).toEqual(['rejected', 'fulfilled']);
     expect(await count('after')).toBe(1);
   });
+
+  it('lets a statement that is not in a transaction take its turn beside ones that are, which a file does in JavaScript too', async () => {
+    const pause = () => new Promise((resolve) => setTimeout(resolve, 5));
+    const work = [
+      ...Array.from({ length: 4 }, (_, n) =>
+        transaction(database, async (tx) => {
+          await dbRun(
+            tx,
+            sql`INSERT INTO exec_probe (id, label, big) VALUES (${500 + n}, 'mixed', 1)`,
+          );
+          await pause();
+        }),
+      ),
+      ...Array.from({ length: 4 }, (_, n) =>
+        dbRun(
+          database,
+          sql`INSERT INTO exec_probe (id, label, big) VALUES (${600 + n}, 'mixed', 2)`,
+        ),
+      ),
+    ];
+    await Promise.all(work);
+    expect(await count('mixed')).toBe(8);
+  });
 });

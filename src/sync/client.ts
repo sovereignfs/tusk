@@ -8,6 +8,7 @@ import {
   readCursor,
   readOutbox,
   settle,
+  startSnapshot,
 } from '../local/store';
 import { LIMITS, type Mutation, PROTOCOL_VERSION } from './format';
 import type { Transport } from './transport';
@@ -142,6 +143,11 @@ export class SyncClient {
       if (result.kind === 'signed-out') return { status: 'signed-out' };
       if (result.kind === 'update-required') return { status: 'update-required' };
       if (result.kind === 'account-deleted') return { status: 'account-deleted' };
+      if (result.kind === 'snapshot-required') {
+        // Too far behind for a pull: start again from nothing, keeping what is shown and the outbox, and ask again at once.
+        await startSnapshot(this.options.db, crypto.randomUUID());
+        continue;
+      }
       if (result.kind === 'rate-limited')
         return { status: 'rate-limited', retryAfterMs: result.retryAfterMs };
       if (result.kind === 'error') return { status: 'error' };

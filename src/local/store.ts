@@ -104,6 +104,19 @@ export async function lastSyncedAt(db: LocalDatabase): Promise<number | undefine
   return typeof at === 'number' ? at : undefined;
 }
 
+/**
+ * Starts again from nothing, as a device that has been away too long must (DESIGN.md §8.7): the cursor goes to zero and a token is remembered, and
+ * every row the server then sends is tagged with it. **Nothing is removed yet**, so the screen keeps showing what it had while the snapshot arrives; when
+ * the last page is in, whatever was not tagged was purged while the device was away, and goes (`settle`). The outbox is untouched and is sent with the
+ * first request of the snapshot.
+ */
+export async function startSnapshot(db: LocalDatabase, token: string): Promise<void> {
+  await inTransaction(db, async (tx) => {
+    await tx.objectStore('meta').put(0, 'cursor');
+    await tx.objectStore('meta').put(token, 'snapshot');
+  });
+}
+
 export interface Settled {
   refused: Refusal[];
   /** The server has more past the cursor. */
@@ -157,6 +170,12 @@ export async function settle(
       }
     }
 
+    // A snapshot is under way if the device was told to start again: what the server sends is tagged, and what is not tagged by the end is gone.
+    const snapshotMeta = await tx.objectStore('meta').get('snapshot');
+    const snapshot = typeof snapshotMeta === 'string' ? snapshotMeta : undefined;
+    const tag = (row: LocalRow): LocalRow =>
+      snapshot ? ({ ...row, snap: snapshot } as unknown as LocalRow) : row;
+
     // 2. What the server sent. A row with a shadow is merged into the shadow, and shown again with its waiting edits laid over; any other is merged
     //    into what the device shows.
     for (const incoming of pull.rows) {
@@ -170,7 +189,7 @@ export async function settle(
       } else {
         const have = (await tx.objectStore(incoming.table).get(incoming.id)) as
           LocalRow | undefined;
-        await tx.objectStore(incoming.table).put(mergePulled(have, incoming));
+        await tx.objectStore(incoming.table).put(tag(mergePulled(have, incoming)));
       }
     }
     for (const gone of pull.tombstones) {
@@ -181,6 +200,38 @@ export async function settle(
 
     // 3. Every row the answers or the pull touched is shown again: the server's version with whatever is still waiting laid over it.
     await reshow(tx, touched, undo, new Set(pull.rows.map((row) => keyOf(row.table, row.id))), now);
+
+    // A row the server sent in a snapshot is tagged whichever way it was shown: one with an edit waiting went through its shadow, and `reshow` wrote it.
+    if (snapshot) {
+      for (const incoming of pull.rows) {
+        const shown = (await tx.objectStore(incoming.table).get(incoming.id)) as
+          LocalRow | undefined;
+        if (shown) await tx.objectStore(incoming.table).put(tag(shown));
+      }
+    }
+
+    // The last page of a snapshot: a row that was not sent was purged while the device was away, unless it has an edit waiting, which is kept (the server
+    // will refuse it if the row is truly gone, and it is undone then).
+    if (snapshot && !pull.more) {
+      for (const name of ['list', 'task', 'series'] as const) {
+        let cursor = await tx.objectStore(name).openCursor();
+        while (cursor) {
+          const row = cursor.value as LocalRow & { snap?: string };
+          if (
+            row.snap !== snapshot &&
+            (await tx.objectStore('shadow').get([name, row.id])) === undefined
+          ) {
+            await cursor.delete();
+          } else if (row.snap !== undefined) {
+            // The tag was for this, and is no part of a row: the rows are as the server's are again.
+            const { snap: _snap, ...plain } = row;
+            await cursor.update(plain as LocalRow);
+          }
+          cursor = await cursor.continue();
+        }
+      }
+      await tx.objectStore('meta').delete('snapshot');
+    }
 
     const had = await tx.objectStore('meta').get('cursor');
     await tx

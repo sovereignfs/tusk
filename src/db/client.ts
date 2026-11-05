@@ -30,6 +30,8 @@ export interface SqliteDatabase {
   form: 'sqld' | 'file';
   store: Store;
   db: LibSQLDatabase;
+  /** Set on the handle a transaction's work is given: its statements are part of the transaction, and do not take a turn of their own (`exec.ts`). */
+  inTransaction?: true;
   close(): Promise<void>;
 }
 

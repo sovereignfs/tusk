@@ -1,0 +1,1 @@
+ALTER TABLE `account_settings` ADD `pruned_through` integer DEFAULT 0 NOT NULL;
