@@ -135,6 +135,16 @@ export const LIMITS = {
   notesChars: 20_000,
   /** A recurrence rule (RRULE), in characters (§13.2). */
   ruleChars: 200,
+  /** Mutations in one request, so that one request is one short piece of work. */
+  mutationsPerRequest: 20,
+  /** What an account may have (§7). A deleted row counts until it is removed for good. */
+  listsPerAccount: 200,
+  tasksPerAccount: 50_000,
+  /** A request body, in bytes: a mutation of a million characters is well within it, even if every character is escaped. */
+  bodyBytes: 8 * 1024 * 1024,
+  /** The rows a pull aims to return at once, and the most a device may ask for. */
+  pullDefault: 1000,
+  pullMax: 2000,
 } as const;
 
 /**
@@ -147,4 +157,74 @@ export type StoredFields = Readonly<Record<string, StoredField>>;
 /** The text of a `fields` column. Plain and ciphertext alike, and in the same form on all three databases (§22.2). */
 export function encodeFields(fields: StoredFields): string {
   return JSON.stringify(fields);
+}
+
+/**
+ * The request a device makes to `POST /api/sync` (DESIGN.md §8.3): the protocol it speaks, how far it has pulled, and the mutations it has not had
+ * answered. At most `LIMITS.mutationsPerRequest`, in the order they were made.
+ */
+export interface SyncRequest {
+  readonly protocol: number;
+  /** The `seq` the device has pulled to; zero for a device that has nothing, which is the snapshot (§8.5). */
+  readonly cursor: number;
+  readonly mutations: readonly unknown[];
+  /** How many rows the answer may carry, about; a page ends at a `seq`, so a page may carry a few more. */
+  readonly limit?: number;
+}
+
+/**
+ * Why a mutation was not applied. None says more than the device needs, and none says whether a row belongs to someone else.
+ *
+ * - `invalid`      it is not a mutation (`validate.ts`), or a value in it is not allowed.
+ * - `unavailable`  a row, or a list or parent it points at, is not there for this account: the same answer whether it does not exist or is another's.
+ * - `structure`    it would break the shape of the data: a subtask of a subtask, a parent in another list, a subtask left behind in a moved task's list.
+ * - `limit`        the account has as many lists or tasks as it may.
+ */
+export type RefusalCode = 'invalid' | 'unavailable' | 'structure' | 'limit';
+
+/** The answer to one mutation, in the order the request had them. `mutationId` is null when the mutation was too malformed to have one. */
+export type MutationResult =
+  | { readonly mutationId: string; readonly status: 'applied'; readonly seq: number }
+  | { readonly mutationId: string | null; readonly status: 'refused'; readonly code: RefusalCode };
+
+/** A row as a device is sent it. Mirrors and the owner are the server's and are not sent. */
+interface RowBase {
+  readonly id: string;
+  /** Null for a row that is not deleted. */
+  readonly deletedAt: number | null;
+  readonly seq: number;
+  readonly createdAt: number;
+  readonly fields: StoredFields;
+}
+export type PulledRow =
+  | (RowBase & { readonly table: 'list'; readonly position: string })
+  | (RowBase & {
+      readonly table: 'task';
+      readonly listId: string;
+      readonly parentId: string | null;
+      readonly position: string;
+    })
+  | (RowBase & { readonly table: 'series'; readonly listId: string });
+
+/** A row that was removed for good (§8.7). */
+export interface PulledTombstone {
+  readonly table: SyncTable;
+  readonly id: string;
+  readonly seq: number;
+}
+
+/** What changed since a cursor, up to a point that is the same for every table, so that a cursor never skips a row. */
+export interface Pull {
+  /** Where the device is up to now: the `seq` of the last thing in this page, or the cursor it sent if there was nothing. */
+  readonly cursor: number;
+  /** There may be more past `cursor`: ask again. */
+  readonly more: boolean;
+  readonly rows: readonly PulledRow[];
+  readonly tombstones: readonly PulledTombstone[];
+}
+
+export interface SyncResponse {
+  readonly protocol: number;
+  readonly results: readonly MutationResult[];
+  readonly pull: Pull;
 }

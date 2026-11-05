@@ -6,15 +6,9 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { type Database, openDatabase } from './client';
 import { dbAll, dbGet } from './exec';
 import { migrationsFolder, runMigrations } from './migrate';
-import { freshDatabase, testTarget } from './test-support';
+import { APP_TABLES, AUTH_TABLES, freshDatabase, testTarget } from './test-support';
 
 const { leg } = testTarget();
-
-/** What the app's migrations make. It grows with every task that adds a table. */
-const APP_TABLES = ['account_settings', 'list', 'series', 'task'];
-
-/** What the auth store's make: better-auth's tables for email and password, sessions and rate limits. Two-factor and passkeys add theirs (task 2.4). */
-const AUTH_TABLES = ['account', 'rate_limit', 'session', 'user', 'verification'];
 
 /** How many migrations the committed journal says there are. */
 function journalLength(database: Database): number {
@@ -69,7 +63,7 @@ describe(`migrations (${leg})`, () => {
 
     await runMigrations(database);
 
-    expect(await tableNames(database)).toEqual(APP_TABLES);
+    expect(await tableNames(database)).toEqual([...APP_TABLES]);
     expect(await appliedCount(database)).toBe(journalLength(database));
   });
 
@@ -77,7 +71,7 @@ describe(`migrations (${leg})`, () => {
     const { database } = await freshDatabase('auth');
     open.push(database);
     await runMigrations(database);
-    expect(await tableNames(database)).toEqual(AUTH_TABLES);
+    expect(await tableNames(database)).toEqual([...AUTH_TABLES]);
     expect(await appliedCount(database)).toBe(journalLength(database));
   });
 
@@ -106,7 +100,7 @@ describe(`migrations (${leg})`, () => {
     await Promise.all([runMigrations(database), runMigrations(second)]);
 
     expect(await appliedCount(database)).toBe(journalLength(database));
-    expect(await tableNames(database)).toEqual(APP_TABLES);
+    expect(await tableNames(database)).toEqual([...APP_TABLES]);
   });
 
   it('fail, and say so, when the migrations are missing', async () => {
@@ -122,7 +116,7 @@ describe(`migrations (${leg})`, () => {
     open.push(database);
     await expect(runMigrations(database, '/nonexistent/migrations')).rejects.toThrow();
     await runMigrations(database);
-    expect(await tableNames(database)).toEqual(APP_TABLES);
+    expect(await tableNames(database)).toEqual([...APP_TABLES]);
   });
 });
 

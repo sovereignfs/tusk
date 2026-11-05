@@ -15,6 +15,13 @@
       "when": 1793884328722,
       "tag": "0001_lists_tasks_series",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1793884782690,
+      "tag": "0002_sync_bookkeeping",
+      "breakpoints": true
     }
   ]
 }

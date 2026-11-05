@@ -1,4 +1,4 @@
-import { index, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { index, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { counter, epochMs, fields, hhmm, id, isoDate, position, ref } from './columns';
 
 /**
@@ -76,4 +76,54 @@ export const series = sqliteTable(
     fields: fields('fields').notNull().default('{}'),
   },
   (table) => [index('series_owner_seq_idx').on(table.ownerId, table.seq)],
+);
+
+/**
+ * A mutation that was applied, so that sending it again changes nothing and is answered as it was (DESIGN.md §8.2, §8.3). Kept by account: one
+ * account's mutation ids are nothing to another's, and a mutation id another account used is not an answer to anyone. Removed after 90 days (§8.7).
+ */
+export const appliedMutation = sqliteTable(
+  'applied_mutation',
+  {
+    accountId: ref('account_id').notNull(),
+    id: ref('id').notNull(),
+    /** The `seq` the mutation was applied at, which is what a repeat is told. */
+    seq: counter('seq').notNull(),
+    appliedAt: epochMs('applied_at').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.accountId, table.id] })],
+);
+
+/**
+ * What a row that was removed for good was, so that a device whose cursor is behind learns of it (§8.7). Written by the job that removes deleted
+ * rows after seven days (task 13.7) and read by pull. Removed after 90 days, when a device that old is sent a fresh
+ * snapshot instead.
+ */
+export const tombstone = sqliteTable(
+  'tombstone',
+  {
+    tableName: ref('table_name').notNull(),
+    id: ref('id').notNull(),
+    accountId: ref('account_id').notNull(),
+    seq: counter('seq').notNull(),
+    deletedAt: epochMs('deleted_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.tableName, table.id] }),
+    index('tombstone_account_seq_idx').on(table.accountId, table.seq),
+  ],
+);
+
+/**
+ * Counts for rate limits, in the database so that a limit holds across every process (§7): a key, when its window began, and how many have been
+ * counted in it (`src/limits/rate.ts`). Swept when a window is long over.
+ */
+export const rateBucket = sqliteTable(
+  'rate_bucket',
+  {
+    key: id('key'),
+    windowStart: epochMs('window_start').notNull(),
+    count: counter('count').notNull(),
+  },
+  (table) => [index('rate_bucket_window_idx').on(table.windowStart)],
 );

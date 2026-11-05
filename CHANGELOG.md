@@ -22,6 +22,7 @@ Each release's section is also its GitHub release notes: the release workflow re
 - Browser tests with Playwright, in Chromium and WebKit, on each database form.
 - One image on Debian, not root, with the three ways to run it (an sqld service, a file, PostgreSQL) and a README, and a check that brings each up from nothing, restarts it, and stops it on SIGTERM. Published images carry provenance.
 - Local sign-in: the first account is made with an email and password and signs the person in, and later sign-ups are refused by the server unless `TASKS_AUTH_SIGNUP=open`. Sign-in is limited per address, a request from another site is refused, and a wrong password reads the same as an address with no account. With `TASKS_AUTH_LOCAL` off, `/sign-in`, `/sign-up` and `/api/auth` answer 404. The header has a menu with Sign out.
+- The sync endpoint, `POST /api/sync`, which a device sends its changes to and pulls what changed from: a change is applied once however often it is sent, only to the signed-in person's own rows, in an order every device agrees on. Nothing in the app uses it yet.
 
 ### Removed
 

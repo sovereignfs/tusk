@@ -4,7 +4,7 @@ import { getDatabase, getStores } from './boot';
 import type { Database } from './client';
 import { dbAll, dbGet } from './exec';
 import { resolveDatabaseConfig } from './config';
-import { resetStores, settingsFor, testTarget } from './test-support';
+import { APP_TABLES, AUTH_TABLES, resetStores, settingsFor, testTarget } from './test-support';
 
 const { leg, config } = testTarget();
 const KEY = Symbol.for('tasks.database');
@@ -46,15 +46,9 @@ describe(`booting an instance (${leg})`, () => {
   it("keeps the app's tables and better-auth's in separate stores", async () => {
     await resetStores(config);
     const { app, auth } = await getStores(settingsFor(config));
-    expect(await tablesOf(app)).toEqual(['account_settings', 'list', 'series', 'task']);
+    expect(await tablesOf(app)).toEqual([...APP_TABLES]);
     // Nothing of the app's is in the auth store, and nothing of better-auth's in the app's: they are separate databases.
-    expect(await tablesOf(auth)).toEqual([
-      'account',
-      'rate_limit',
-      'session',
-      'user',
-      'verification',
-    ]);
+    expect(await tablesOf(auth)).toEqual([...AUTH_TABLES]);
   });
 
   it('is booted once: later callers get the same database', async () => {
@@ -70,7 +64,7 @@ describe(`booting an instance (${leg})`, () => {
     holder[KEY] = undefined;
     const again = await getStores(settingsFor(config));
     expect(await dbGet(again.app, sql`SELECT 1 AS ok`)).toMatchObject({ ok: 1 });
-    expect(await tablesOf(again.app)).toEqual(['account_settings', 'list', 'series', 'task']);
+    expect(await tablesOf(again.app)).toEqual([...APP_TABLES]);
   });
 
   it('fails when the database cannot be reached, says why, and tries again on the next call', async () => {

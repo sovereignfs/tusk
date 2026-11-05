@@ -2,7 +2,11 @@ import { mkdtempSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { is } from 'drizzle-orm';
+import { SQLiteTable, getTableConfig } from 'drizzle-orm/sqlite-core';
 import { type Env, processEnv } from '../config/env';
+import * as sqliteApp from './schema/sqlite/app';
+import * as sqliteAuth from './schema/sqlite/auth';
 import { type Database, openDatabase } from './client';
 import {
   APP_STORE,
@@ -141,3 +145,16 @@ export function envFor(config: DatabaseConfig): Env {
 export function settingsFor(config: DatabaseConfig): DatabaseSettings {
   return resolveDatabaseSettings(envFor(config));
 }
+
+/** The names of the tables of a schema module, sorted: what a store holds after its migrations, so that a test need not list them by hand. */
+const namesIn = (module: Record<string, unknown>): string[] =>
+  Object.values(module)
+    .filter((value): value is SQLiteTable => is(value, SQLiteTable))
+    .map((table) => getTableConfig(table).name)
+    .sort();
+
+/** What the app store holds once it is migrated. */
+export const APP_TABLES: readonly string[] = namesIn(sqliteApp);
+
+/** What the auth store holds once it is migrated. */
+export const AUTH_TABLES: readonly string[] = namesIn(sqliteAuth);

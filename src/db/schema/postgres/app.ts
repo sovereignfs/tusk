@@ -1,4 +1,4 @@
-import { index, pgSchema, text } from 'drizzle-orm/pg-core';
+import { index, pgSchema, primaryKey, text } from 'drizzle-orm/pg-core';
 import { APP_STORE } from '../../config';
 import { counter, epochMs, fields, hhmm, id, isoDate, position, ref } from './columns';
 
@@ -61,4 +61,43 @@ export const series = app.table(
     fields: fields('fields').notNull().default('{}'),
   },
   (table) => [index('series_owner_seq_idx').on(table.ownerId, table.seq)],
+);
+
+/** See `schema/sqlite/app.ts`. */
+export const appliedMutation = app.table(
+  'applied_mutation',
+  {
+    accountId: ref('account_id').notNull(),
+    id: ref('id').notNull(),
+    seq: counter('seq').notNull(),
+    appliedAt: epochMs('applied_at').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.accountId, table.id] })],
+);
+
+/** See `schema/sqlite/app.ts`. */
+export const tombstone = app.table(
+  'tombstone',
+  {
+    tableName: ref('table_name').notNull(),
+    id: ref('id').notNull(),
+    accountId: ref('account_id').notNull(),
+    seq: counter('seq').notNull(),
+    deletedAt: epochMs('deleted_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.tableName, table.id] }),
+    index('tombstone_account_seq_idx').on(table.accountId, table.seq),
+  ],
+);
+
+/** See `schema/sqlite/app.ts`. */
+export const rateBucket = app.table(
+  'rate_bucket',
+  {
+    key: id('key'),
+    windowStart: epochMs('window_start').notNull(),
+    count: counter('count').notNull(),
+  },
+  (table) => [index('rate_bucket_window_idx').on(table.windowStart)],
 );
