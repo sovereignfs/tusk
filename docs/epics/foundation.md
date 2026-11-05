@@ -6,11 +6,11 @@
 
 ## Overview
 
-Turns the scaffold into a repository that can hold Tasks as `DESIGN.md` designs it: an app that runs alone or hosted, on three forms of database. Nothing a person would notice, and everything else stands on it. Fjord Web (`clients/web` in `sovereignfs/fjord`) is the model throughout, and its code may be adapted where the licence allows, both being AGPL-3.0-or-later.
+Turns the scaffold into a repository that can hold Tasks as `DESIGN.md` designs it: an offline-first PWA that runs alone or hosted, on three forms of database. Nothing a person would notice, and everything else stands on it. Fjord Web (`clients/web` in `sovereignfs/fjord`) is the model throughout, and its code may be adapted where the licence allows, both being AGPL-3.0-or-later.
 
 ## Related
 
-[`DESIGN.md`](../../DESIGN.md) §5, §19, §20 · Fjord's `clients/web/DESIGN.md` §14, §17
+[`DESIGN.md`](../../DESIGN.md) §5, §22, §23 · Fjord's `clients/web/DESIGN.md` §14, §17
 
 ## Tasks
 
@@ -18,7 +18,7 @@ Turns the scaffold into a repository that can hold Tasks as `DESIGN.md` designs 
 
 **Goal:** the files a repository of the suite is expected to have, and dependencies on the terms `AGENTS.md` states.
 
-**Design:** §20, `AGENTS.md`. **Depends on:** nothing.
+**Design:** §23, `AGENTS.md`. **Depends on:** nothing.
 
 **Technical:**
 - Add `LICENSE` (AGPL-3.0-or-later), `CHANGELOG.md` (Keep a Changelog, with `[Unreleased]`), `CONTRIBUTING.md` (the people's version of `AGENTS.md`, as Fjord's), `.github/PULL_REQUEST_TEMPLATE.md`, `.github/dependabot.yml`.
@@ -33,7 +33,7 @@ Turns the scaffold into a repository that can hold Tasks as `DESIGN.md` designs 
 
 **Goal:** the checks every later task runs.
 
-**Design:** §20 Testing, `AGENTS.md`. **Depends on:** 1.1.
+**Design:** §23 Testing, `AGENTS.md`. **Depends on:** 1.1.
 
 **Technical:**
 - Prettier and ESLint with `sovereign`'s configuration: single quotes, semicolons, trailing commas, width 100; flat config, `typescript-eslint` recommended and strict, `eslint-config-prettier`. Reformat the repository in one commit of its own.
@@ -48,7 +48,7 @@ Turns the scaffold into a repository that can hold Tasks as `DESIGN.md` designs 
 
 **Goal:** CI that runs what a change can affect, and vouches for the commit that lands.
 
-**Design:** §20; Fjord's `web-ci.yml`, `scripts/ci-changes.sh`. **Depends on:** 1.2; gains its test legs with 1.5.
+**Design:** §23; Fjord's `web-ci.yml`, `scripts/ci-changes.sh`. **Depends on:** 1.2; gains its test legs with 1.5.
 
 **Technical:**
 - `.github/workflows/ci.yml`, on pull requests and on pushes to `main` (a rebase-and-merge makes new SHAs). Skipped on a draft or with the `skip-ci` label.
@@ -66,7 +66,7 @@ Turns the scaffold into a repository that can hold Tasks as `DESIGN.md` designs 
 **Technical:**
 - Remove `lib/`, `app/auth/`, `app/actions.ts`, `app/page.tsx`'s notes, `app/ui.tsx`, `migrations/001_init.sql`, `instrumentation.ts`'s old body, and `pg` use as it stands. Move to `src/`.
 - `src/config/env.ts`: reads a setting, and a secret in either form (`NAME`, or `NAME_FILE`, per `contracts/env.md`). `process.env` is read nowhere else.
-- `.env.example` rewritten for every setting of §6, §16 and §19, with comments, as Fjord's `deploy/.env.example`.
+- `.env.example` rewritten for every setting of §6, §19 and §22, with comments, as Fjord's `deploy/.env.example`.
 - `instrumentation.ts` hands to `instrumentation-node.ts` (Next compiles the first for Edge too). It validates settings and exits on one that is wrong: the standalone server would otherwise stay up.
 - `app/api/health/route.ts` answers 200; 1.5 makes it ask the database.
 - Keep `sovereign.manifest.json` valid while it moves; `pnpm manifest:check` stays green.
@@ -75,16 +75,16 @@ Turns the scaffold into a repository that can hold Tasks as `DESIGN.md` designs 
 
 #### 📋 1.5 — The database layer
 
-**Goal:** the three forms of §19, with two stores, migrations at start-up, and tests on each from here on.
+**Goal:** the three forms of §22, with two stores, migrations at start-up, and tests on each from here on.
 
-**Design:** §19. Fjord's §14 and `src/db/`. **Depends on:** 1.4.
+**Design:** §22. Fjord's §14 and `src/db/`. **Depends on:** 1.4.
 
 **Technical:**
 - Dependencies: `drizzle-orm`, `drizzle-kit`, `@libsql/client`, `pg`.
 - `src/db/config.ts` reads `TASKS_DB_DIALECT` (`sqld` default, `sqlite`, `postgres`), `TASKS_SQLD_URL`, `TASKS_SQLD_ADMIN_URL`, `TASKS_SQLITE_URL`, `TASKS_POSTGRES_URL`, `TASKS_POSTGRES_POOL_MAX`, `PGSSLROOTCERT`, `TASKS_DB_CONNECT_TIMEOUT_MS`, `TASKS_MIGRATIONS_DIR`. Nothing infers a dialect from a URL.
 - Two clients: `@libsql/client/web` for sqld, so no native addon loads on the common path, with an `x-namespace` header per store; the native client only for `file:`, in WAL mode with a busy timeout. `pg` with `int8` parsed to a number, past 2^53 an error.
 - Stores made if missing: sqld namespaces `tasks` and `tasks_auth`, the file's directory, PostgreSQL schema `tasks_auth` (and `tasks`).
-- `src/db/schema/{sqlite,postgres}/columns.ts`: the vocabulary of §19.2. `id`, `epochMs`, `bool`, `isoDate`, `hhmm`, and `position` (`COLLATE "C"` on PostgreSQL, through `customType`). A first table, `account_settings`, proves it.
+- `src/db/schema/{sqlite,postgres}/columns.ts`: the vocabulary of §22.2. `id`, `epochMs`, `bool`, `isoDate`, `hhmm`, `fields`, and `position` (`COLLATE "C"` on PostgreSQL, through `customType`). A first table, `account_settings`, proves it.
 - `pnpm db:generate <name>` for both dialects; `migrations/{sqlite,postgres,auth}`; applied at start-up, under an advisory lock on one pinned connection on PostgreSQL, with retry on SQLite.
 - `src/db/exec.ts` for what raw SQL there is, and one `transaction(fn)` across dialects.
 - `src/db/test-support.ts`: reads `TASKS_TEST_*` only, defaults to a temporary `file:`. `pnpm db:dev sqld|postgres` runs one in Docker. sqld pinned at v0.24.33.
@@ -96,7 +96,7 @@ Turns the scaffold into a repository that can hold Tasks as `DESIGN.md` designs 
 
 **Goal:** background work inside the web process, safe with several processes.
 
-**Design:** §5, §14.3. **Depends on:** 1.5.
+**Design:** §5, §17.3. **Depends on:** 1.5.
 
 **Technical:**
 - `src/jobs/runner.ts`: `register(name, intervalMs, fn)`; started from `instrumentation-node.ts` unless `TASKS_WORKER=off`; stopped on `SIGTERM`, waiting for what is in flight, within the stop grace period.
@@ -111,22 +111,22 @@ Turns the scaffold into a repository that can hold Tasks as `DESIGN.md` designs 
 
 **Goal:** every response carries the hardening headers, and pages a strict Content-Security-Policy.
 
-**Design:** §20 Security. **Depends on:** 1.4.
+**Design:** §23 Security. **Depends on:** 1.4.
 
-**Technical:** `proxy.ts` (Edge discipline: no Node built-ins, no database). A per-request nonce; `script-src 'nonce-…' 'strict-dynamic'`, never `'unsafe-inline'`; `default-src 'self'`; `frame-ancestors 'none'`; `base-uri 'self'`; `form-action 'self'`. HSTS over https only; `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`. Applied on every return path. Pages that need the nonce are dynamic.
+**Technical:** `proxy.ts` (Edge discipline: no Node built-ins, no database). A per-request nonce; `script-src 'nonce-…' 'strict-dynamic'`, never `'unsafe-inline'`; `default-src 'self'`; `frame-ancestors 'none'`; `base-uri 'self'`; `form-action 'self'`; `connect-src 'self'`; `worker-src 'self'`. HSTS over https only; `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`. Applied on every return path. Pages that need the nonce are dynamic, and the cached shell (1.11) has to work with this: settle how here, since a cached page cannot carry a fresh nonce.
 
 **Accepts when:** `proxy.test.ts` asserts the headers on each return path; a page loads in a browser with no CSP violation in its console; an inline script with no nonce is refused.
 
 #### 📋 1.8 — Design system boundary and shell
 
-**Goal:** the frame every signed-in page sits in, and the pages for what goes wrong.
+**Goal:** the header every signed-in page sits under, and the pages for what goes wrong.
 
-**Design:** §13.1, §13.2. Fjord's `src/ui`. **Depends on:** 1.2.
+**Design:** §15.1, §15.2. Fjord's `src/ui`. **Depends on:** 1.2.
 
 **Technical:**
 - `src/ui/index.ts`: a `'use client'` re-export of `@sovereignfs/ui`; `@dnd-kit/*` installed, since it imports them unconditionally.
 - `app/layout.tsx`: `@sovereignfs/ui/tokens.css`, Hanken Grotesk through `next/font/google` (self-hosted at build), the theme script that sets `data-theme` before first paint, with the CSP nonce.
-- `src/ui/AppShell.tsx`: the app's name, and the account's menu (filled by 2.1). A candidate for `@sovereignfs/ui`; check whether `Header` serves first and record the answer in the task's Done as.
+- `src/ui/AppShell.tsx`: the header row: logo and app name on the left, the bell (8.1) and avatar on the right, with `UserMenu` (filled by 2.1). The design system's `Header` requires a launcher slot an app has no use for: use it if that can be made optional in `sovereign`, otherwise this; record the answer in the task's Done as.
 - `app/not-found.tsx`, `app/error.tsx`, `app/loading.tsx`, each with a way back.
 
 **Accepts when:** a placeholder page renders inside the shell on the server, in light and dark, and at 375px; a literal colour fails `sovereign`'s token check, adopted here as a test.
@@ -135,9 +135,9 @@ Turns the scaffold into a repository that can hold Tasks as `DESIGN.md` designs 
 
 **Goal:** a way to test what only a browser can show.
 
-**Design:** §20 Testing. **Depends on:** 1.5.
+**Design:** §23 Testing. **Depends on:** 1.5.
 
-**Technical:** Playwright, Chromium and WebKit; `playwright.config.ts` runs a built server per database form; `e2e/` with one smoke test; `pnpm e2e`. WebKit runs what it can; the iOS Simulator remains the check for touch (§13.7), by hand, and says so in the PR. A CI job.
+**Technical:** Playwright, Chromium and WebKit; `playwright.config.ts` runs a built server per database form; `e2e/` with one smoke test; `pnpm e2e`. WebKit runs what it can; the iOS Simulator remains the check for touch (§15.8), by hand, and says so in the PR. A CI job.
 
 **Accepts when:** the smoke test passes on all three forms in CI, and fails when the page is broken.
 
@@ -145,7 +145,7 @@ Turns the scaffold into a repository that can hold Tasks as `DESIGN.md` designs 
 
 **Goal:** the three ways to run it, each brought up from nothing in CI.
 
-**Design:** §19, §20 Deployment. **Depends on:** 1.5, 1.6.
+**Design:** §22, §23 Deployment. **Depends on:** 1.5, 1.6.
 
 **Technical:**
 - `Dockerfile`: pnpm by corepack, `pnpm-workspace.yaml` copied, standalone output, not root, `ARG PORT`, migrations copied beside the server. **A glibc base for the `file:` form** (libSQL's native client has no musl build), or a check for the binary: the scaffold's Alpine is settled here, against Fjord's answer.
@@ -153,4 +153,14 @@ Turns the scaffold into a repository that can hold Tasks as `DESIGN.md` designs 
 - `scripts/deploy-check.sh`: brings each up from an empty volume, asks `/api/health`, restarts it to prove migrations are safe twice, and sends `SIGTERM`, expecting a stop in seconds.
 - `publish.yml` keeps its tag rule, and gains provenance. A CI `image` job runs the check.
 
-**Accepts when:** `deploy-check.sh` passes on all three on amd64 and arm64 in CI, and the one `docker run` of `DESIGN.md` §20 works as written.
+**Accepts when:** `deploy-check.sh` passes on all three on amd64 and arm64 in CI, and the one `docker run` of `DESIGN.md` §23 works as written.
+
+#### 📋 1.11 — The PWA
+
+**Goal:** installable on desktop and phone, and opening with no network.
+
+**Design:** §15.7. **Depends on:** 1.7, 1.8.
+
+**Technical:** Sovereign core is the model, since Fjord has neither (`apps/core/app/manifest.ts`, `src/pwa`, `src/sw/source.ts`, and its test). `app/manifest.ts`: name, icons with a maskable one, `display: standalone`, theme colours. `src/sw/source.ts`, served at `/sw.js`: an allow-list of built files, icons and the one shell page, in one versioned cache, with nothing else stored. Handlers for `push` and `notificationclick` arrive with 8.4, and `sync` with 13.6. A new version activates at the next load. An install line in Settings for iPhone.
+
+**Accepts when:** Lighthouse's installable checks pass; the app installs in Chromium and on the iOS Simulator; with the network off, it opens to its shell; a test evaluates the worker and fails if a page with a person's data, or any API answer, is cached; a browser test lists every cache after a signed-in tour.

@@ -13,12 +13,12 @@ which.
 
 **Tasks**, an app of the Sovereign suite exactly as Fjord is: a private task manager that a Sovereign instance can host and that also runs fully
 self-hosted, needing no instance. It is a rewrite of the Sovereign tasks plugin (`sovereignfs/sovereign-plugin-tasks`, the legacy plugin
-system). It is a Next.js app with its own database (sqld, a SQLite file or PostgreSQL), signing people in locally, through a Sovereign core, or
+system). It is an offline-first PWA on Next.js, with its own database (sqld, a SQLite file or PostgreSQL), signing people in locally, through a Sovereign core, or
 both, from one image. **`clients/web` in `sovereignfs/fjord` is the model:** its `DESIGN.md` §6 for authentication and §14 for the database, and its
 `CLAUDE.md` for how it is built. The repository still holds the scaffold of `npm create @sovereignfs app`, which `DESIGN.md` §5.2 says what happens to.
 
 The plugin's behaviour is the starting point, not a specification, and none of its code is carried over. `DESIGN.md` says what is kept, what
-changes and why; it is a draft with open questions (§21), and nothing in it is built yet.
+changes and why; it is a draft, and nothing in it is built yet.
 
 ## Source of truth
 
@@ -88,11 +88,16 @@ The ones most likely to be broken by accident. Each comes from `sovereign`'s con
   matched to an account by email at sign-in: it is linked only from a signed-in session, and only when the address is the account's own.
 - **Everything of a person is deleted by `People.deletePerson`** (`src/sovereign/people.ts`), which must be safe to run twice. **A new table that holds
   something of a person is deleted there in the same change**, with a test that seeds one of each.
-- **Server actions and routes authorize inside.** A `'use server'` function is a public POST endpoint whatever the page's guard says: each finds the
-  session first, and a row of a person is read and written with the owner in the same statement (`eq(task.id, id), eq(task.ownerId, accountId)`), never
-  checked beforehand and then touched. Another person's row is a 404, not a 403. A route that changes something checks `Origin`. A new endpoint is listed in
-  `src/access/routes.ts` and has a test of who may call it, or it is not done.
-- **The database has three forms and two dialects** (`DESIGN.md` §19): a schema and migrations per dialect, generated with `pnpm db:generate` and never written
+- **The UI reads and writes only the local store** (`DESIGN.md` §8). No screen waits on the network or calls the server for task data, and no server action changes one. A user action is a pure
+  function in `src/actions/` producing changes, which `commit` writes to IndexedDB and the outbox together. Nothing in the UI may depend on a sync having happened, and no conflict is ever shown to a person.
+- **The server trusts nothing a device says about ownership.** `POST /api/sync` is the door nearly every write comes through. A row of a person is written with the owner in the same statement
+  (`eq(task.id, id), eq(task.ownerId, accountId)`), never checked beforehand and then touched, and anything a change points at must be the account's too. A route finds the session first, and one that
+  changes something checks `Origin`. A new route is listed in `src/access/routes.ts` and has a test of who may call it, or it is not done.
+- **The server cannot assume it can read a field.** On a personal-key account all content is ciphertext, so server logic uses structural columns only, or says what it does when it can't read (`DESIGN.md` §9). Content rules
+  are validators shared with the browser. **A plain field never reaches the server for such an account, and a title never reaches a log for any.** Personal keys and the operator key are mutually exclusive.
+- **Task data is never in the service worker's cache.** The worker caches only the shell, by allow-list. Data is in IndexedDB, per account, deleted at sign-out.
+- **A new kind of change passes the convergence suite** (`src/sync/simulate.test.ts`), with several offline devices ending in one state.
+- **The database has three forms and two dialects** (`DESIGN.md` §22): a schema and migrations per dialect, generated with `pnpm db:generate` and never written
   by hand or `push`ed; one representation per type, through the column vocabulary; standard SQL, values bound and never interpolated; no `LISTEN/NOTIFY`, trigger,
   extension or foreign key; short transactions, nothing held across a call to GitHub or core. A data-layer test runs on sqld, a `file:` database and PostgreSQL, so
   one that passes on only one is not done. **Tests read `TASKS_TEST_*` and never the app's variables,** so `pnpm test` can never wipe a developer's data.
@@ -148,14 +153,14 @@ The repository today is the scaffold's. `DESIGN.md` §5.1 is where things go as 
 
 | Path | What |
 | --- | --- |
-| `app/` | Routes and layouts (App Router), and server actions |
+| `app/` | Routes and layouts (App Router) |
 | `lib/`, `migrations/` | The scaffold's sign-in and PostgreSQL code and its SQL, to be replaced (`DESIGN.md` §5.2) |
 | `sovereign.manifest.json` | What an instance reads to host the app |
 | `Dockerfile`, `.github/workflows/publish.yml` | One image, not root, on the manifest's port; built and published to `ghcr.io` on a `vX.Y.Z` tag |
 
 ## Not in place yet
 
-Each is a task in `ROADMAP.md`, not a thing to assume exists: `CHANGELOG.md`, `CONTRIBUTING.md`, a
+Each is a task in `ROADMAP.md`, not a thing to assume exists: everything in `src/`, `CHANGELOG.md`, `CONTRIBUTING.md`, a
 `LICENSE` (AGPL-3.0-or-later, as Fjord Web's), formatting and lint (Sovereign's Prettier and ESLint configuration), a test runner and
 tests (Vitest; sign-in is tested against a fake Sovereign, never a real instance, as Fjord Web does), the `deploy/` setups, a CI workflow with a
 changes-classifier job, a pull request template, and Dependabot. Add them in their own `chore/` PRs, and move the line out of this
