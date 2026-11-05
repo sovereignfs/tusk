@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { sql } from 'drizzle-orm';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -11,6 +12,9 @@ const { leg } = testTarget();
 
 /** What the app's migrations make. It grows with every task that adds a table. */
 const APP_TABLES = ['account_settings'];
+
+/** What the auth store's make: better-auth's tables for email and password, sessions and rate limits. Two-factor and passkeys add theirs (task 2.4). */
+const AUTH_TABLES = ['account', 'rate_limit', 'session', 'user', 'verification'];
 
 /** How many migrations the committed journal says there are. */
 function journalLength(database: Database): number {
@@ -69,15 +73,18 @@ describe(`migrations (${leg})`, () => {
     expect(await appliedCount(database)).toBe(journalLength(database));
   });
 
-  it('leave an auth store with no migrations alone when it is optional, and fail an app store with none', async () => {
-    // The auth store has no migrations until sign-in is built (task 2.1).
+  it("apply to an empty auth store and make better-auth's tables, not the app's", async () => {
     const { database } = await freshDatabase('auth');
     open.push(database);
-    await runMigrations(database, migrationsFolder(database.dialect, 'auth'), { optional: true });
-    expect(await tableNames(database)).toEqual([]);
-    await expect(
-      runMigrations(database, migrationsFolder(database.dialect, 'auth')),
-    ).rejects.toThrow();
+    await runMigrations(database);
+    expect(await tableNames(database)).toEqual(AUTH_TABLES);
+    expect(await appliedCount(database)).toBe(journalLength(database));
+  });
+
+  it('fail on a folder with no migrations, since an app with no tables is a mistake', async () => {
+    const { database } = await freshDatabase('auth');
+    open.push(database);
+    await expect(runMigrations(database, join(tmpdir(), 'tasks-no-migrations'))).rejects.toThrow();
   });
 
   it('do nothing the second time', async () => {

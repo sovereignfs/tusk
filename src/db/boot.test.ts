@@ -47,8 +47,14 @@ describe(`booting an instance (${leg})`, () => {
     await resetStores(config);
     const { app, auth } = await getStores(settingsFor(config));
     expect(await tablesOf(app)).toEqual(['account_settings']);
-    // Nothing of the app's is in the auth store: they are separate databases. (It holds better-auth's tables once sign-in is built, task 2.1.)
-    expect(await tablesOf(auth)).toEqual([]);
+    // Nothing of the app's is in the auth store, and nothing of better-auth's in the app's: they are separate databases.
+    expect(await tablesOf(auth)).toEqual([
+      'account',
+      'rate_limit',
+      'session',
+      'user',
+      'verification',
+    ]);
   });
 
   it('is booted once: later callers get the same database', async () => {

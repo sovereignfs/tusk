@@ -57,7 +57,7 @@ function shapeOf(
   return shape;
 }
 
-// The schema modules export tables, and for PostgreSQL the schema objects too, which are not tables. The auth store's tables join them with task 2.1.
+// The schema modules export tables (the app's and better-auth's), and for PostgreSQL the schema objects too, which are not tables.
 const sqliteShape = () =>
   shapeOf(
     Object.values(sqliteSchema).filter((v) => is(v, SQLiteTable)) as unknown as Table[],

@@ -16,7 +16,7 @@ if (!name || !/^[a-z][a-z0-9_]*$/.test(name)) {
 
 // The app's store and the auth store are separate databases with separate migrations, so
 // each is generated on its own; one with no change writes nothing.
-const configs = ['sqlite', 'postgres']; // the auth store's two arrive with sign-in (task 2.1)
+const configs = ['sqlite', 'postgres', 'auth.sqlite', 'auth.postgres'];
 for (const config of configs) {
   const result = spawnSync(
     'pnpm',

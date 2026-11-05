@@ -55,10 +55,7 @@ async function boot(settings: DatabaseSettings): Promise<Stores> {
   };
   try {
     await runMigrations(app, migrationsFolder(app.dialect, 'app', migrationsDir));
-    // The auth store has no migrations until sign-in is built (task 2.1); once it has, they are applied here.
-    await runMigrations(auth, migrationsFolder(auth.dialect, 'auth', migrationsDir), {
-      optional: true,
-    });
+    await runMigrations(auth, migrationsFolder(auth.dialect, 'auth', migrationsDir));
   } catch (error) {
     await close();
     throw error;

@@ -1,5 +1,4 @@
 import { join } from 'node:path';
-import { existsSync } from 'node:fs';
 import type { Database } from './client';
 import type { Store } from './config';
 import { sleep } from './retry';
@@ -45,18 +44,10 @@ const POSTGRES_LOCK_KEY = 4_270_117_001; // arbitrary, stable, and ours
 
 const SQLITE_ATTEMPTS = 4;
 
-/**
- * `optional` is for a store whose first migration has not been written yet: the auth store has none until sign-in is built (task 2.1). A store
- * that has migrations applies them; one that has none and is optional is skipped, and one that has none and is not optional is an error,
- * since an app with no tables is a mistake and not a state.
- */
 export async function runMigrations(
   database: Database,
   folder = migrationsFolder(database.dialect, database.store),
-  options: { optional?: boolean } = {},
 ): Promise<void> {
-  if (options.optional && !existsSync(join(folder, 'meta', '_journal.json'))) return;
-
   if (database.dialect === 'sqlite') {
     const { migrate } = await import('drizzle-orm/libsql/migrator');
     for (let attempt = 1; ; attempt++) {
