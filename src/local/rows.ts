@@ -1,3 +1,4 @@
+import { comparePositions } from '../position';
 import type { Change, PulledRow } from '../sync/format';
 
 /**
@@ -71,6 +72,7 @@ export function byPosition(
   a: { position: string; id: string },
   b: { position: string; id: string },
 ): number {
-  if (a.position !== b.position) return a.position < b.position ? -1 : 1;
+  const byKey = comparePositions(a.position, b.position);
+  if (byKey !== 0) return byKey;
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 }
