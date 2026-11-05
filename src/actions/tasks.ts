@@ -210,3 +210,57 @@ export function moveTask(
   if (!neighbours) return { ok: false, reason: 'nothing' };
   return mutationOf(ids, [{ table: 'task', id, position: positionBetween(neighbours) }]);
 }
+
+/** A task and its subtasks as they are to be acted on together (a parent and the subtasks it has). */
+export interface Group {
+  task: LocalRow;
+  subtasks: readonly LocalRow[];
+}
+
+export type ManyResult = { ok: true; mutations: Mutation[] } | { ok: false; reason: 'nothing' };
+
+/** Most changes in one mutation: well under the server's limit, so that a group, which is never split, has room. */
+const CHUNK = 400;
+
+function chunked(
+  ids: Ids,
+  groups: readonly (readonly Mutation['changes'][number][])[],
+): ManyResult {
+  const mutations: Mutation[] = [];
+  let current: Mutation['changes'][number][] = [];
+  for (const group of groups) {
+    if (current.length > 0 && current.length + group.length > CHUNK) {
+      mutations.push({ mutationId: ids.newId(), changes: current });
+      current = [];
+    }
+    current.push(...group);
+  }
+  if (current.length > 0) mutations.push({ mutationId: ids.newId(), changes: current });
+  return mutations.length === 0 ? { ok: false, reason: 'nothing' } : { ok: true, mutations };
+}
+
+/**
+ * Deletes several tasks, each with its live subtasks, as `deleteTask` does one: a list's completed tasks are one action (DESIGN.md §11.4). A long
+ * list's are more changes than one mutation holds, so they are **several mutations, none of which splits a parent from its subtasks**, and the
+ * undo is the same several.
+ */
+export function deleteMany(groups: readonly Group[], ids: Ids): ManyResult {
+  return chunked(
+    ids,
+    groups.map(({ task, subtasks }) => {
+      const result = deleteTask(task, ids, subtasks);
+      return result.ok ? result.mutation.changes : [];
+    }),
+  );
+}
+
+/** The undo of `deleteMany`: `groups` are the rows as they are by then, deleted, which is what says which subtasks went with each. */
+export function restoreMany(groups: readonly Group[], ids: Ids): ManyResult {
+  return chunked(
+    ids,
+    groups.map(({ task, subtasks }) => {
+      const result = restoreTask(task, ids, subtasks);
+      return result.ok ? result.mutation.changes : [];
+    }),
+  );
+}

@@ -62,7 +62,41 @@
 
 .completedHeading {
   padding: var(--sv-space-2);
+  border: 0;
+  background: transparent;
   color: var(--sv-color-text-muted);
+  font: inherit;
   font-size: var(--sv-font-size-sm);
   cursor: pointer;
+}
+
+.completedHeading:focus-visible {
+  outline: 2px solid var(--sv-color-focus-ring);
+  outline-offset: 2px;
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sv-space-3);
+  margin-bottom: var(--sv-space-4);
+}
+
+.header .title {
+  margin: 0;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: var(--sv-space-2);
+}
+
+.completedBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sv-space-2);
 }

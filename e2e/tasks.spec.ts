@@ -75,7 +75,7 @@ test('ticking moves a task to Completed, and un-ticking brings it back, and it d
   const box = page.getByRole('checkbox', { name: `Done: ${title}` });
   // A tick moves the row into Completed, which is closed, so the box is gone from the page a moment later: it is clicked, not checked.
   await box.click();
-  const completed = page.getByText(/^Completed \(1\)$/);
+  const completed = page.getByRole('button', { name: /Completed \(1\)/ });
   await expect(completed).toBeVisible();
   await completed.click();
   const done = page.getByRole('checkbox', { name: `Done: ${title}` });
@@ -101,7 +101,7 @@ test('ticking moves a task to Completed, and un-ticking brings it back, and it d
   expect(seen.every(Boolean)).toBe(true);
 
   await done.uncheck();
-  await expect(page.getByText(/^Completed/)).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Completed/ })).toHaveCount(0);
   await expect(page.getByRole('checkbox', { name: `Done: ${title}` })).not.toBeChecked();
 });
 
@@ -176,7 +176,7 @@ test('with the network off, adding and ticking show at once, and are sent when i
   await add(page, title);
   await expect(page.getByRole('link', { name: title })).toBeVisible();
   await page.getByRole('checkbox', { name: `Done: ${title}` }).click();
-  await expect(page.getByText(/^Completed \(1\)$/)).toBeVisible();
+  await expect(page.getByRole('button', { name: /Completed \(1\)/ })).toBeVisible();
 
   await context.setOffline(false);
   await page.evaluate(() => window.dispatchEvent(new Event('online')));
@@ -493,4 +493,116 @@ test('deleting a task with subtasks takes them with it, and Undo brings back tho
   await expect(again.getByRole('textbox', { name: 'Subtask: Later' })).toBeVisible();
   // The one that was deleted before is still deleted.
   await expect(again.getByRole('textbox', { name: 'Subtask: Earlier' })).toHaveCount(0);
+});
+
+test.describe('seeing a list the way one wants', () => {
+  const origin = (baseURL?: string) => new URL(baseURL ?? 'http://localhost').origin;
+
+  /** The list's fields as the server holds them, by its title. */
+  async function listFields(page: Page, baseURL: string | undefined, name: string) {
+    const reply = await page.request.post('/api/sync', {
+      headers: { origin: origin(baseURL) },
+      data: { protocol: 1, cursor: 0, mutations: [], limit: 2000 },
+    });
+    const rows = (await reply.json()).pull.rows as {
+      table: string;
+      fields: Record<string, { v: unknown }>;
+    }[];
+    return rows.find((r) => r.table === 'list' && r.fields.title?.v === name)?.fields;
+  }
+
+  test('a sort other than Custom orders the tasks, takes away the handle so a drag does nothing, and is the same after a reload and on the server', async ({
+    page,
+    baseURL,
+  }) => {
+    const { name } = await openNewList(page);
+    const [b, a, c] = [unique('B task'), unique('A task'), unique('C task')];
+    for (const title of [b, a, c]) await add(page, title);
+    await expect.poll(() => titles(page)).toEqual([c, a, b]);
+
+    await page.getByLabel('Sort by').selectOption('title');
+    await expect.poll(() => titles(page)).toEqual([a, b, c]);
+
+    // A drag under a sort does nothing: the third row is dragged to the top, and nothing moves.
+    const source = await page.getByRole('link', { name: c }).boundingBox();
+    const target = await page.getByRole('link', { name: a }).boundingBox();
+    if (!source || !target) throw new Error('rows are not on the page');
+    await page.mouse.move(source.x + source.width / 2, source.y + source.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(source.x + source.width / 2, source.y - 8, { steps: 4 });
+    await page.mouse.move(target.x + target.width / 2, target.y + 2, { steps: 12 });
+    await page.mouse.up();
+    await page.waitForTimeout(400);
+    expect(await titles(page)).toEqual([a, b, c]);
+
+    await expect.poll(async () => (await listFields(page, baseURL, name))?.sort?.v).toBe('title');
+    await page.reload();
+    await expect(page.getByLabel('Sort by')).toHaveValue('title');
+    await expect.poll(() => titles(page)).toEqual([a, b, c]);
+
+    // Back to Custom, and the order the person made is there, and can be dragged again.
+    await page.getByLabel('Sort by').selectOption('custom');
+    await expect.poll(() => titles(page)).toEqual([c, a, b]);
+  });
+
+  test('the Completed section is open or closed as it was left, per list, and Active hides it', async ({
+    page,
+    baseURL,
+  }) => {
+    const { name } = await openNewList(page);
+    const title = unique('Done thing');
+    await add(page, title);
+    await page.getByRole('checkbox', { name: `Done: ${title}` }).click();
+    const heading = page.getByRole('button', { name: /Completed \(1\)/ });
+    await expect(heading).toHaveAttribute('aria-expanded', 'false');
+    await heading.click();
+    await expect(heading).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.getByRole('checkbox', { name: `Done: ${title}` })).toBeChecked();
+    await expect
+      .poll(async () => (await listFields(page, baseURL, name))?.showCompleted?.v)
+      .toBe(true);
+
+    await page.reload();
+    await expect(page.getByRole('button', { name: /Completed \(1\)/ })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    await expect(page.getByRole('checkbox', { name: `Done: ${title}` })).toBeVisible();
+
+    // Another list has its own.
+    const other = unique('Another list');
+    await page.getByRole('button', { name: 'Add a list' }).click();
+    await page.getByLabel('New list name').fill(other);
+    await page.getByLabel('New list name').press('Enter');
+    await page
+      .getByRole('navigation', { name: 'Lists' })
+      .getByRole('link', { name: new RegExp(`^${other}`) })
+      .click();
+    await expect(page.getByRole('heading', { level: 1, name: other })).toBeVisible();
+    await add(page, unique('Another'));
+    await expect(page.getByRole('button', { name: /Completed/ })).toHaveCount(0);
+
+    // Active shows only what is still to do.
+    await page.getByRole('link', { name: new RegExp(`^${name}`) }).click();
+    await page.getByRole('radio', { name: 'Active' }).click();
+    await expect(page.getByRole('button', { name: /Completed/ })).toHaveCount(0);
+    await page.getByRole('radio', { name: 'All' }).click();
+    await expect(page.getByRole('button', { name: /Completed \(1\)/ })).toBeVisible();
+  });
+
+  test('Delete completed removes the done tasks, and Undo brings them back', async ({ page }) => {
+    await openNewList(page);
+    const [one, two, keep] = [unique('One'), unique('Two'), unique('Keep')];
+    for (const title of [keep, two, one]) await add(page, title);
+    for (const title of [one, two])
+      await page.getByRole('checkbox', { name: `Done: ${title}` }).click();
+    await page.getByRole('button', { name: /Completed \(2\)/ }).click();
+    await page.getByRole('button', { name: 'Delete completed' }).click();
+    await expect(page.getByRole('button', { name: /Completed/ })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: keep })).toBeVisible();
+
+    const bar = page.getByRole('status').filter({ hasText: '2 completed tasks deleted.' });
+    await bar.getByRole('button', { name: 'Undo' }).click();
+    await expect(page.getByRole('button', { name: /Completed \(2\)/ })).toBeVisible();
+  });
 });

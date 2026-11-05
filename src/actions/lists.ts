@@ -1,5 +1,6 @@
 import { text as textParser } from '../access/parse';
 import { DEFAULT_COLOR, type ListColor, isListColor } from '../lists/colors';
+import { isSort } from '../lists/sort';
 import type { LocalRow } from '../local/rows';
 import { after, first } from '../position';
 import { neighboursAfterMove, positionBetween } from './order';
@@ -65,6 +66,27 @@ export function renameList(list: LocalRow | undefined, title: string, ids: Ids):
   const current = list.fields.title;
   if (current && 'v' in current && current.v === trimmed) return { ok: false, reason: 'nothing' };
   return mutationOf(ids, [{ table: 'list', id: list.id, fields: { title: { v: trimmed } } }]);
+}
+
+/** A list's sort (DESIGN.md §11.4), a field of the list, so that it is remembered and reaches the person's other devices. */
+export function setSort(list: LocalRow | undefined, sort: string, ids: Ids): ActionResult {
+  if (!list) return { ok: false, reason: 'missing' };
+  if (!isSort(sort)) return { ok: false, reason: 'nothing' };
+  const current = list.fields.sort;
+  if (current && 'v' in current && current.v === sort) return { ok: false, reason: 'nothing' };
+  return mutationOf(ids, [{ table: 'list', id: list.id, fields: { sort: { v: sort } } }]);
+}
+
+/** Whether the Completed section of a list is open, remembered per list. */
+export function setShowCompleted(
+  list: LocalRow | undefined,
+  show: boolean,
+  ids: Ids,
+): ActionResult {
+  if (!list) return { ok: false, reason: 'missing' };
+  const current = list.fields.showCompleted;
+  if (current && 'v' in current && current.v === show) return { ok: false, reason: 'nothing' };
+  return mutationOf(ids, [{ table: 'list', id: list.id, fields: { showCompleted: { v: show } } }]);
 }
 
 export function setColor(list: LocalRow | undefined, color: string, ids: Ids): ActionResult {

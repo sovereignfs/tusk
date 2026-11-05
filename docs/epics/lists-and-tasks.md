@@ -121,7 +121,7 @@ The product: one person's lists and tasks. A user action here is a pure function
 
 **Accepts when:** the subtasks move with it; a destination of another account's is refused at the server, with nothing changed.
 
-#### 📋 3.9 — Filter, sort and completed
+#### ✅ 3.9 — Filter, sort and completed
 
 **Goal:** seeing a list the way one wants, remembered.
 
@@ -130,6 +130,8 @@ The product: one person's lists and tasks. A user action here is a pure function
 **Technical:** `sort` and `showCompleted` as list fields. Filters All, Active and Overdue (Overdue arrives with 4.3). A collapsible Completed section, newest first. Deleting a list's completed tasks from its menu, with Undo. `src/lists/sort.ts` is pure. Drag handles are hidden under any sort but Custom, and a drag no-ops there.
 
 **Accepts when:** sort and the section's state survive a reload, per list, and reach another device; a sort other than Custom cannot reorder.
+
+**Done as:** `src/lists/sort.ts` is pure: four sorts (`custom`, `created` newest first, `due` soonest first with a time breaking a tie and undated tasks last in their own order, and `title` as a person reads it, by letters and not by code, with digits by value: "task 2" before "task 10"), `sortOf(list)` reading the list's field (anything unknown or unreadable is `custom`) and `canReorder`, which is true for `custom` only; the server's validator for a list's `sort` takes exactly these. `setSort` and `setShowCompleted` are actions on the list's fields, so **both are remembered per list and reach the person's other devices**, and a browser test reads them back from the server. The list's header has the filter (_All_, _Active_) and _Sort by_; **under any sort but Custom a row has no handle and a drag does nothing** (the rows are plain, not sortable, and a test drags one and sees nothing move), and back on Custom the order the person made is there. _Active_ hides the Completed section, whose heading is now a button (`aria-expanded`) that opens and closes it, remembered as the list's `showCompleted`, newest finished first. **Delete completed** is by the heading when it is open: it deletes the done tasks with their live subtasks and offers Undo, and a long list is **several mutations that never split a parent from its subtasks** (`deleteMany`, tested at 900 changes against the 500 a mutation holds), the undo the same several. Tests: 11 for the sorts, 4 for acting on many, and in Chromium and WebKit a sort that orders, will not drag, and holds after a reload and on the server; the Completed section open on reload, per list, with Active hiding it; and Delete completed with its Undo. Not done: the filter **Overdue**, which arrives with 4.3 as the epic says, and the list's menu, which Settings (2.7) completes; the controls are in the header and not in a menu, since there is no menu component in the design system to put them in and a menu of two things is worse than two things. The filter is not remembered, and the epic does not ask for it.
 
 #### 📋 3.10 — Star
 

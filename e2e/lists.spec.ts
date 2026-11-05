@@ -11,6 +11,9 @@ async function signedIn(page: Page) {
   await trySignIn(page, EMAIL, PASSWORD);
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole('navigation', { name: 'Lists' })).toBeVisible();
+  // Ready when the working copy is open and has the first list in it: before that the page is still being put together, and a field typed into may be
+  // replaced under the keyboard.
+  await expect(page.getByRole('link', { name: /^My tasks/ })).toBeVisible();
 }
 
 const unique = (stem: string) => `${stem} ${crypto.randomUUID().slice(0, 8)}`;

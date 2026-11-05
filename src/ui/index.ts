@@ -27,6 +27,8 @@ export {
   FormField,
   Icon,
   Input,
+  SegmentedControl,
+  Select,
   Spinner,
   Textarea,
   ThreeColumnLayout,
