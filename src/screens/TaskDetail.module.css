@@ -78,3 +78,19 @@
   color: var(--sv-color-text-muted);
   text-decoration: line-through;
 }
+
+.handle {
+  flex-shrink: 0;
+  width: 20px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--sv-color-text-muted);
+  cursor: grab;
+  touch-action: none;
+}
+
+.handle:focus-visible {
+  outline: 2px solid var(--sv-color-focus-ring);
+  outline-offset: 1px;
+}

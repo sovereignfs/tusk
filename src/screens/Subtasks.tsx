@@ -1,11 +1,19 @@
 'use client';
 
+import { DndContext, closestCenter, type DragEndEvent } from '@dnd-kit/core';
+import {
+  SortableContext,
+  arrayMove,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
 import { type FormEvent, useRef } from 'react';
 import {
   completeTask,
   createSubtask,
   deleteTask,
   isCompleted,
+  moveTask,
   reopenTask,
   restoreTask,
   updateTask,
@@ -16,6 +24,12 @@ import { useLocal, useSync } from '../sync/react';
 import { Button, Checkbox, Input, useToast } from '../ui';
 import { text } from './fields';
 import styles from './TaskDetail.module.css';
+import {
+  VERTICAL_AUTOSCROLL,
+  useDragClickGuard,
+  useOptimisticOrder,
+  useReorderSensors,
+} from '../ui/dnd';
 import { useUndo } from './Undo';
 
 const ids = { newId: () => crypto.randomUUID() };
@@ -68,11 +82,7 @@ export function Subtasks({ parent }: { parent: LocalRow }) {
     <section className={styles.subtasks} aria-label="Subtasks">
       <h3 className={styles.heading}>Subtasks</h3>
       {subtasks !== undefined && subtasks.length > 0 ? (
-        <ul className={styles.checklist}>
-          {subtasks.map((sub) => (
-            <SubtaskRow key={sub.id} sub={sub} onDelete={() => remove(sub)} />
-          ))}
-        </ul>
+        <Checklist subtasks={subtasks} onDelete={remove} />
       ) : null}
       <form onSubmit={add}>
         <Input
@@ -89,6 +99,15 @@ export function Subtasks({ parent }: { parent: LocalRow }) {
 
 function SubtaskRow({ sub, onDelete }: { sub: LocalRow; onDelete: () => void }) {
   const client = useSync();
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: sub.id });
   const title = text(sub, 'title');
   const done = isCompleted(sub);
 
@@ -103,7 +122,25 @@ function SubtaskRow({ sub, onDelete }: { sub: LocalRow; onDelete: () => void }) 
   }
 
   return (
-    <li className={`${styles.subtask} ${done ? styles.subtaskDone : ''}`}>
+    <li
+      ref={setNodeRef}
+      className={`${styles.subtask} ${done ? styles.subtaskDone : ''}`}
+      style={{
+        transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+        transition,
+        opacity: isDragging ? 0.6 : 1,
+      }}
+    >
+      <button
+        type="button"
+        ref={setActivatorNodeRef}
+        className={styles.handle}
+        aria-label={`Move subtask: ${title}`}
+        {...attributes}
+        {...listeners}
+      >
+        ⠿
+      </button>
       <Checkbox
         id={`sub-${sub.id}`}
         label=""
@@ -129,5 +166,61 @@ function SubtaskRow({ sub, onDelete }: { sub: LocalRow; onDelete: () => void }) 
         ×
       </Button>
     </li>
+  );
+}
+
+/**
+ * The checklist, which can be dragged into order by the handle at the left of each row. The handle and not the whole row, because a row has a field
+ * in it, and a drag that began on the field would stop a person selecting its text. One row is written (`moveTask`).
+ */
+function Checklist({
+  subtasks,
+  onDelete,
+}: {
+  subtasks: readonly LocalRow[];
+  onDelete: (sub: LocalRow) => void;
+}) {
+  const client = useSync();
+  const { rendered, show } = useOptimisticOrder(subtasks);
+  const guard = useDragClickGuard();
+  const sensors = useReorderSensors();
+
+  function onDragEnd(event: DragEndEvent) {
+    guard.end();
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const from = rendered.findIndex((sub) => sub.id === active.id);
+    const to = rendered.findIndex((sub) => sub.id === over.id);
+    if (from === -1 || to === -1) return;
+    const result = moveTask(rendered, String(active.id), to, ids);
+    if (!result.ok) return;
+    show(
+      arrayMove(
+        rendered.map((sub) => sub.id),
+        from,
+        to,
+      ),
+    );
+    void client.commit(result.mutation);
+  }
+
+  return (
+    <DndContext
+      id="subtasks"
+      sensors={sensors}
+      autoScroll={VERTICAL_AUTOSCROLL}
+      collisionDetection={closestCenter}
+      onDragStart={guard.begin}
+      onDragEnd={onDragEnd}
+      onDragCancel={guard.end}
+    >
+      <SortableContext items={rendered.map((sub) => sub.id)} strategy={verticalListSortingStrategy}>
+        <ul className={styles.checklist}>
+          {rendered.map((sub) => (
+            <SubtaskRow key={sub.id} sub={sub} onDelete={() => onDelete(sub)} />
+          ))}
+        </ul>
+      </SortableContext>
+    </DndContext>
   );
 }

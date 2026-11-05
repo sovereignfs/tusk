@@ -332,3 +332,132 @@ test.describe('subtasks', () => {
     await expect(again).toHaveValue('Flights and trains');
   });
 });
+
+test.describe('putting tasks in order', () => {
+  /** What the server holds of this account's tasks, by title. */
+  async function positions(page: Page, origin: string, wanted: string[]) {
+    const reply = await page.request.post('/api/sync', {
+      headers: { origin },
+      data: { protocol: 1, cursor: 0, mutations: [], limit: 2000 },
+    });
+    const rows = (await reply.json()).pull.rows as {
+      table: string;
+      parentId?: string | null;
+      position: string;
+      fields: { title?: { v: string } };
+    }[];
+    return Object.fromEntries(
+      rows
+        .filter((r) => r.table === 'task' && wanted.includes(r.fields.title?.v ?? ''))
+        .map((r) => [r.fields.title?.v, r.position]),
+    );
+  }
+
+  async function threeTasks(page: Page) {
+    await openNewList(page);
+    const names = [unique('Alpha'), unique('Beta'), unique('Gamma')];
+    // Added in this order they are shown last first: Gamma, Beta, Alpha.
+    for (const name of names) await add(page, name);
+    await expect.poll(() => titles(page)).toEqual([...names].reverse());
+    return [...names].reverse();
+  }
+
+  async function drag(page: Page, from: string, to: string) {
+    const source = await page.getByRole('link', { name: from }).boundingBox();
+    const target = await page.getByRole('link', { name: to }).boundingBox();
+    if (!source || !target) throw new Error('rows are not on the page');
+    await page.mouse.move(source.x + source.width / 2, source.y + source.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(source.x + source.width / 2, source.y + source.height / 2 - 8, {
+      steps: 4,
+    });
+    await page.mouse.move(target.x + target.width / 2, target.y + 2, { steps: 12 });
+    await page.mouse.up();
+  }
+
+  test('a task is dragged into place at once, only that row is written, and the order is the same after a reload', async ({
+    page,
+    baseURL,
+  }) => {
+    const origin = new URL(baseURL ?? 'http://localhost').origin;
+    const [first, second, third] = await threeTasks(page);
+    await expect
+      .poll(
+        async () =>
+          Object.keys(await positions(page, origin, [first, second, third] as string[])).length,
+      )
+      .toBe(3);
+    const before = await positions(page, origin, [first, second, third] as string[]);
+
+    // The last is dragged to the top.
+    await drag(page, third as string, first as string);
+    await expect.poll(() => titles(page)).toEqual([third, first, second]);
+    // Nothing sprang back, and the page did not navigate to the task that was dragged.
+    await expect(page).not.toHaveURL(/\?task=/);
+    await expect
+      .poll(
+        async () =>
+          (await positions(page, origin, [first, second, third] as string[]))[third as string],
+      )
+      .not.toBe(before[third as string]);
+    const after = await positions(page, origin, [first, second, third] as string[]);
+    expect(after[first as string]).toBe(before[first as string]);
+    expect(after[second as string]).toBe(before[second as string]);
+
+    await page.reload();
+    await expect.poll(() => titles(page)).toEqual([third, first, second]);
+  });
+
+  test('the keyboard does it too: Space picks a task up, the arrows move it, Space puts it down', async ({
+    page,
+  }) => {
+    const [first, second, third] = await threeTasks(page);
+    await page.getByRole('link', { name: third as string }).focus();
+    // Each key is given a moment, as a person does: the drag measures the rows again after each move, and a second arrow pressed in the same
+    // instant is taken against the first measurement.
+    for (const key of ['Space', 'ArrowUp', 'ArrowUp', 'Space']) {
+      await page.keyboard.press(key);
+      await page.waitForTimeout(250);
+    }
+    await expect.poll(() => titles(page)).toEqual([third, first, second]);
+    // Enter was left to the link, which opens the task.
+    await page.getByRole('link', { name: first as string }).focus();
+    await page.keyboard.press('Enter');
+    await expect(page).toHaveURL(/\?task=/);
+  });
+
+  test('a subtask is dragged by its handle, and the order holds after a reload', async ({
+    page,
+  }) => {
+    await openNewList(page);
+    const title = unique('With parts');
+    await add(page, title);
+    await page.getByRole('link', { name: title }).click();
+    const detail = page.getByRole('region', { name: 'Task', exact: true });
+    for (const sub of ['One', 'Two', 'Three']) {
+      await detail.getByLabel('Add a subtask').fill(sub);
+      await detail.getByLabel('Add a subtask').press('Enter');
+    }
+    const order = async () =>
+      detail
+        .getByRole('region', { name: 'Subtasks' })
+        .getByRole('list')
+        .getByRole('textbox')
+        .evaluateAll((els) => els.map((el) => (el as HTMLInputElement).value));
+    await expect.poll(order).toEqual(['One', 'Two', 'Three']);
+
+    const handle = detail.getByRole('button', { name: 'Move subtask: Three' });
+    const target = detail.getByRole('textbox', { name: 'Subtask: One' });
+    const from = await handle.boundingBox();
+    const to = await target.boundingBox();
+    if (!from || !to) throw new Error('rows are not on the page');
+    await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(from.x + from.width / 2, from.y - 8, { steps: 4 });
+    await page.mouse.move(to.x + 10, to.y + 2, { steps: 12 });
+    await page.mouse.up();
+    await expect.poll(order).toEqual(['Three', 'One', 'Two']);
+    await page.reload();
+    await expect.poll(order).toEqual(['Three', 'One', 'Two']);
+  });
+});

@@ -13,6 +13,7 @@ import {
   createTask,
   deleteTask,
   isCompleted,
+  moveTask,
   reopenTask,
   restoreTask,
   updateTask,
@@ -329,6 +330,71 @@ describe('a subtask', () => {
       ok: false,
       reason: 'nothing',
     });
+  });
+});
+
+describe('moving a task', () => {
+  const ids3 = [
+    '50000000-0000-4000-8000-000000000001',
+    '50000000-0000-4000-8000-000000000002',
+    '50000000-0000-4000-8000-000000000003',
+    '50000000-0000-4000-8000-000000000004',
+  ];
+  const rows = ids3.map((id, i) => task(id, `a${i}`));
+  const positionOf = (result: ActionResult) =>
+    (mutationOf(result).changes[0] as { position: string }).position;
+
+  it('writes one change to one row, between the two it ends up between, and the server takes it', () => {
+    const result = moveTask(rows, ids3[3] as string, 1, counting());
+    accepted(result);
+    expect(mutationOf(result).changes).toHaveLength(1);
+    expect(mutationOf(result).changes[0]).toMatchObject({ table: 'task', id: ids3[3] });
+    expect(positionOf(result) > 'a0' && positionOf(result) < 'a1').toBe(true);
+  });
+
+  it('is against what is on the screen: under a filter it lands between the rows it was dropped between, whatever else there is', () => {
+    // The list has six tasks; the screen shows three of them, with others between that are not shown.
+    const all = ['a0', 'a1', 'a2', 'a3', 'a4', 'a5'].map((position, i) =>
+      task(`60000000-0000-4000-8000-00000000000${i}`, position),
+    );
+    const shown = [all[0], all[2], all[5]] as LocalRow[];
+    const result = moveTask(shown, (all[5] as LocalRow).id, 1, counting());
+    // Dropped between the first and the second shown: between 'a0' and 'a2', which is not between its old neighbours' neighbours.
+    expect(positionOf(result) > 'a0' && positionOf(result) < 'a2').toBe(true);
+    // And only that row is written: the three that are not shown are not in it.
+    expect(mutationOf(result).changes).toHaveLength(1);
+  });
+
+  it('gives the order that was asked for, for every task to every place', () => {
+    for (const mover of rows) {
+      for (let to = 0; to < rows.length; to++) {
+        const result = moveTask(rows, mover.id, to, counting());
+        if (!result.ok) {
+          expect(rows.findIndex((r) => r.id === mover.id)).toBe(to);
+          continue;
+        }
+        const moved = rows.map((r) =>
+          r.id === mover.id ? { ...r, position: positionOf(result) } : r,
+        ) as (LocalRow & { position: string })[];
+        moved.sort((a, b) => (a.position < b.position ? -1 : a.position > b.position ? 1 : 0));
+        const expected = rows.filter((r) => r.id !== mover.id).map((r) => r.id);
+        expected.splice(to, 0, mover.id);
+        expect(
+          moved.map((r) => r.id),
+          `${mover.id} to ${to}`,
+        ).toEqual(expected);
+      }
+    }
+  });
+
+  it('does nothing for a task already there, and says so for one that is not on the screen, and does not throw for a tie', () => {
+    expect(moveTask(rows, ids3[1] as string, 1, counting())).toEqual({
+      ok: false,
+      reason: 'nothing',
+    });
+    expect(moveTask(rows, 'not-shown', 0, counting())).toEqual({ ok: false, reason: 'missing' });
+    const tied = ids3.slice(0, 3).map((id) => task(id, 'a0'));
+    expect(() => moveTask(tied, ids3[2] as string, 1, counting())).not.toThrow();
   });
 });
 

@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { type HTMLAttributes, useEffect, useState } from 'react';
+import { useSortable } from '@dnd-kit/sortable';
 import { completeTask, isCompleted, reopenTask } from '../actions/tasks';
 import type { LocalRow } from '../local/rows';
 import { subtasksOf } from '../local/store';
@@ -23,11 +24,21 @@ export function TaskRow({
   task,
   open,
   progress,
+  rowProps,
+  linkProps,
 }: {
   task: LocalRow;
   open: boolean;
   /** How many subtasks it has and how many are done, if it has any. */
   progress?: { done: number; total: number } | undefined;
+  /** What the row needs to be dragged: set by `SortableTaskRow`, and none for a row that is not. */
+  rowProps?: Partial<HTMLAttributes<HTMLLIElement>> & {
+    ref?: (node: HTMLLIElement | null) => void;
+  };
+  /** What the link needs, since it is the handle and the one thing a keyboard focuses. */
+  linkProps?: Partial<HTMLAttributes<HTMLAnchorElement>> & {
+    ref?: (node: HTMLElement | null) => void;
+  };
 }) {
   const client = useSync();
   const pathname = usePathname();
@@ -50,6 +61,7 @@ export function TaskRow({
 
   return (
     <li
+      {...rowProps}
       className={`${styles.row} ${checked ? styles.done : ''}`}
       aria-current={open ? 'true' : undefined}
     >
@@ -60,12 +72,57 @@ export function TaskRow({
         checked={checked}
         onChange={(next) => void toggle(next)}
       />
-      <Link href={`${pathname}?task=${task.id}`} className={styles.name} scroll={false}>
+      <Link
+        {...linkProps}
+        href={`${pathname}?task=${task.id}`}
+        className={styles.name}
+        scroll={false}
+        // A link can be dragged by the browser too, and one dropped on the page is followed: that is a navigation in the middle of a reorder.
+        draggable={false}
+      >
         {title}
       </Link>
       {progress && progress.total > 0 ? (
         <ProgressRing done={progress.done} total={progress.total} />
       ) : null}
     </li>
+  );
+}
+
+/**
+ * A task that can be dragged into order (DESIGN.md §11.3). **The link is the handle**: it fills the row beside the box, a click on it opens the task
+ * and a drag has to start by moving it, and it is what a keyboard focuses, which dnd-kit insists on (a key pressed in a child of the handle does not
+ * pick the row up). dnd-kit's own `role="button"` is taken off, which would make each task a button to a screen reader; Space on the link lifts the
+ * row, and Enter is left to open it.
+ */
+export function SortableTaskRow(props: {
+  task: LocalRow;
+  open: boolean;
+  progress?: { done: number; total: number } | undefined;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: props.task.id,
+  });
+  return (
+    <TaskRow
+      {...props}
+      rowProps={{
+        ref: setNodeRef,
+        style: {
+          transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+          transition,
+          opacity: isDragging ? 0.6 : 1,
+        },
+      }}
+      linkProps={{ ref: setActivatorNodeRef, ...attributes, role: undefined, ...listeners }}
+    />
   );
 }

@@ -3,6 +3,7 @@ import type { LocalRow } from '../local/rows';
 import { after, before, first } from '../position';
 import { LIMITS, type Mutation } from '../sync/format';
 import type { ActionResult, Ids } from './lists';
+import { neighboursAfterMove, positionBetween } from './order';
 
 /**
  * What a person does to a task (DESIGN.md §11), as pure functions in the same way as the lists' (`lists.ts`): given what is on the screen and what was
@@ -163,4 +164,21 @@ export function createSubtask(
       fields: { title: { v: title } },
     },
   ]);
+}
+
+/**
+ * Moves a task to `toIndex` among `rendered`: the tasks of the list as they are on the screen (or, for a subtask, its parent's subtasks), in the order
+ * they are shown, which under a filter is not all of them. **One change to one row**, between the two it ends up between, so the rows that are not
+ * shown keep the order they had, and two devices that move different tasks never touch the same one (DESIGN.md §11.3).
+ */
+export function moveTask(
+  rendered: readonly LocalRow[],
+  id: string,
+  toIndex: number,
+  ids: Ids,
+): ActionResult {
+  if (!rendered.some((row) => row.id === id)) return { ok: false, reason: 'missing' };
+  const neighbours = neighboursAfterMove(rendered, id, toIndex);
+  if (!neighbours) return { ok: false, reason: 'nothing' };
+  return mutationOf(ids, [{ table: 'task', id, position: positionBetween(neighbours) }]);
 }

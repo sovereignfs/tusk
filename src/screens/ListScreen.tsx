@@ -8,8 +8,18 @@ import type { LocalRow } from '../local/rows';
 import { getRow, subtaskCounts, tasksOf } from '../local/store';
 import { useHasSynced, useLocal } from '../sync/react';
 import { EmptyState } from '../ui';
+import { DndContext, closestCenter, type DragEndEvent } from '@dnd-kit/core';
+import { SortableContext, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { moveTask } from '../actions/tasks';
+import { useSync } from '../sync/react';
+import {
+  VERTICAL_AUTOSCROLL,
+  useDragClickGuard,
+  useOptimisticOrder,
+  useReorderSensors,
+} from '../ui/dnd';
 import { AddTask } from './AddTask';
-import { TaskRow } from './TaskRow';
+import { SortableTaskRow, TaskRow } from './TaskRow';
 import { plain, text } from './fields';
 import styles from './ListScreen.module.css';
 
@@ -43,6 +53,72 @@ export function ListScreen({ listId }: { listId: string }) {
   return <ListTasks list={list} />;
 }
 
+/**
+ * The list's open tasks, which can be dragged into order. The drag is worked out against **the tasks as they are shown** (a filter, or a task
+ * pinned to the top, makes that fewer than the list has), one row is written, and the screen shows the new order at once (`src/ui/dnd.ts`).
+ */
+function OpenTasks({
+  open,
+  openId,
+  counts,
+}: {
+  open: readonly LocalRow[];
+  openId: string | null;
+  counts: Map<string, { done: number; total: number }> | undefined;
+}) {
+  const client = useSync();
+  const { rendered, show } = useOptimisticOrder(open);
+  const guard = useDragClickGuard();
+  const sensors = useReorderSensors();
+
+  function onDragEnd(event: DragEndEvent) {
+    guard.end();
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const from = rendered.findIndex((task) => task.id === active.id);
+    const to = rendered.findIndex((task) => task.id === over.id);
+    if (from === -1 || to === -1) return;
+    const result = moveTask(rendered, String(active.id), to, { newId: () => crypto.randomUUID() });
+    if (!result.ok) return;
+    show(
+      arrayMove(
+        rendered.map((task) => task.id),
+        from,
+        to,
+      ),
+    );
+    void client.commit(result.mutation);
+  }
+
+  return (
+    <DndContext
+      id="tasks"
+      sensors={sensors}
+      autoScroll={VERTICAL_AUTOSCROLL}
+      collisionDetection={closestCenter}
+      onDragStart={guard.begin}
+      onDragEnd={onDragEnd}
+      onDragCancel={guard.end}
+    >
+      <SortableContext
+        items={rendered.map((task) => task.id)}
+        strategy={verticalListSortingStrategy}
+      >
+        <ul className={styles.tasks}>
+          {rendered.map((task) => (
+            <SortableTaskRow
+              key={task.id}
+              task={task}
+              open={openId === task.id}
+              progress={counts?.get(task.id)}
+            />
+          ))}
+        </ul>
+      </SortableContext>
+    </DndContext>
+  );
+}
+
 /** The list's tasks, from the working copy: the open ones in order, then the ones that are done, under a heading that opens and closes. */
 function ListTasks({ list }: { list: LocalRow }) {
   const tasks = useLocal((db) => tasksOf(db, list.id), [list.id]);
@@ -62,16 +138,7 @@ function ListTasks({ list }: { list: LocalRow }) {
       {tasks !== undefined && all.length === 0 ? (
         <p className={styles.muted}>Nothing here yet.</p>
       ) : null}
-      <ul className={styles.tasks}>
-        {open.map((task) => (
-          <TaskRow
-            key={task.id}
-            task={task}
-            open={openId === task.id}
-            progress={counts?.get(task.id)}
-          />
-        ))}
-      </ul>
+      <OpenTasks open={open} openId={openId} counts={counts} />
       {done.length > 0 ? (
         <details className={styles.completed}>
           <summary className={styles.completedHeading}>Completed ({done.length})</summary>

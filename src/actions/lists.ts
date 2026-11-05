@@ -1,7 +1,8 @@
 import { text as textParser } from '../access/parse';
 import { DEFAULT_COLOR, type ListColor, isListColor } from '../lists/colors';
 import type { LocalRow } from '../local/rows';
-import { after, between, first } from '../position';
+import { after, first } from '../position';
+import { neighboursAfterMove, positionBetween } from './order';
 import { LIMITS, type Mutation } from '../sync/format';
 import { TASKS_NAMESPACE, uuid5 } from '../uuid5';
 
@@ -84,16 +85,10 @@ export function moveList(
   toIndex: number,
   ids: Ids,
 ): ActionResult {
-  const from = lists.findIndex((list) => list.id === id);
-  if (from === -1) return { ok: false, reason: 'missing' };
-  const index = Math.max(0, Math.min(toIndex, lists.length - 1));
-  if (index === from) return { ok: false, reason: 'nothing' };
-
-  const others = lists.filter((list) => list.id !== id);
-  const above = others[index - 1];
-  const below = others[index];
-  const key = (row: LocalRow | undefined) => (row && 'position' in row ? row.position : null);
-  return mutationOf(ids, [{ table: 'list', id, position: between(key(above), key(below)) }]);
+  if (!lists.some((list) => list.id === id)) return { ok: false, reason: 'missing' };
+  const neighbours = neighboursAfterMove(lists, id, toIndex);
+  if (!neighbours) return { ok: false, reason: 'nothing' };
+  return mutationOf(ids, [{ table: 'list', id, position: positionBetween(neighbours) }]);
 }
 
 /**
