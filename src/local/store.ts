@@ -276,3 +276,22 @@ export async function getRow(
 ): Promise<LocalRow | undefined> {
   return (await db.get(table, id)) as LocalRow | undefined;
 }
+
+/**
+ * How many open top-level tasks each list has, for the sidebar's count (DESIGN.md §10). "Open" is a task that is not deleted and has no completion
+ * time. A completion time that is ciphertext cannot be read here, so such a task counts as open until the keys are in place (task 14.3).
+ */
+export async function openCounts(db: LocalDatabase): Promise<Map<string, number>> {
+  const counts = new Map<string, number>();
+  let cursor = await db.transaction('task').store.openCursor();
+  while (cursor) {
+    const row = cursor.value;
+    if (row.table === 'task' && row.deletedAt === null && row.parentId === null) {
+      const done = row.fields.completedAt;
+      const completed = done !== undefined && 'v' in done && done.v !== null;
+      if (!completed) counts.set(row.listId, (counts.get(row.listId) ?? 0) + 1);
+    }
+    cursor = await cursor.continue();
+  }
+  return counts;
+}

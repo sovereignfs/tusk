@@ -7,6 +7,7 @@ import {
   getRow,
   isPending,
   listsOf,
+  openCounts,
   outboxSize,
   readCursor,
   readOutbox,
@@ -357,6 +358,30 @@ describe('settling what the server answered', () => {
   it('says there is more to pull when the server does', async () => {
     const { db } = await device();
     expect((await settle(db, [], [], pull([], 5, true), 1)).more).toBe(true);
+  });
+});
+
+describe('counts for the sidebar', () => {
+  it('are the open top-level tasks of each list: not deleted, not completed, not subtasks', async () => {
+    const { db } = await device();
+    const [a, b] = [newList('A'), newList('B')];
+    const open1 = newTask(a.id);
+    const open2 = newTask(a.id);
+    const done = newTask(a.id, {
+      fields: { title: { v: 'done' }, completedAt: { v: 1_793_000_000_000 } },
+    });
+    const reopened = newTask(a.id, { fields: { title: { v: 'again' }, completedAt: { v: null } } });
+    const gone = newTask(a.id);
+    const sub = newTask(a.id, { parentId: open1.id });
+    const sealed = newTask(b.id, { fields: { title: { c: 'YWdl' }, completedAt: { c: 'YWdl' } } });
+    await commitMutation(db, mutation(a, b, open1, open2, done, reopened, gone, sub, sealed), 1);
+    await commitMutation(db, mutation({ table: 'task', id: gone.id, deleted: true }), 2);
+
+    const counts = await openCounts(db);
+    expect(counts.get(a.id)).toBe(3);
+    // Ciphertext cannot be read, so it counts as open until the keys are in place.
+    expect(counts.get(b.id)).toBe(1);
+    expect(await openCounts((await device()).db)).toEqual(new Map());
   });
 });
 

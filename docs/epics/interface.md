@@ -14,7 +14,7 @@ The frame and how it behaves. One set of routes and one set of data, and what di
 
 ## Tasks
 
-#### 📋 7.1 — Desktop layout, over the local store
+#### ✅ 7.1 — Desktop layout, over the local store
 
 **Goal:** two rows and three columns, reading only from the local store.
 
@@ -28,6 +28,8 @@ The frame and how it behaves. One set of routes and one set of data, and what di
 - Closing the detail uses `router.replace` (§15.8).
 
 **Accepts when:** with the network slowed or off, add, tick and drag all show at once and never flicker back; the right sidebar is hidden until a task is opened; a layout screenshot compared with the reference matches on column widths.
+
+**Done as:** `app/(app)/layout.tsx` finds the session (`requireSession`, which `requireAccount` now calls), mounts `SyncProvider` for that account (13.3, 13.4), puts `AppShell` above the columns, and gives the account menu its Sign out; `app/(app)/home/page.tsx` is the first page in it, an account page in `routes.ts`. `/` sends someone who is signed in to `/home` until the landing page (2.2) makes `/` the first list by a rewrite. `src/screens/Frame.tsx` is the design system's `ThreeColumnLayout` with its defaults of 280 and 360 and about 24px of padding in the content: the right column is rendered only while `?task=` is set, so it is two columns at first. `Sidebar` reads `listsOf` and the new `openCounts` from the working copy through `useLocal`, shows each list with its colour dot (a token for each of the six, never a colour of its own) and its count of open top-level tasks, says "Loading your lists…" only on a device that has never synced and "No lists yet." after, and has an empty `PINNED` array that Today, Starred and Review add themselves to, since a link to a page that is not there is worse than none. `TaskDetail` reads the task from the copy and closes with `router.replace`, which a browser test shows adds no step to go back through. **A phone** gets the same routes and the same data with the sidebar and detail left out (`useIsMobile`), and nothing to scroll sideways; the mobile shell is 7.2. Measured in Chromium and WebKit at 1280px: the sidebar's column is 280px and the detail's 360px, there is no right column until a task is open, and the content starts past the sidebar's 24px padding; two screenshots (two columns, then three) were looked at and match the design. The shell and the layout were checked against the design's own numbers and not against the Shopper screenshot, which is not in this repository, so "matches the reference on column widths" is as far as the design records them. Browser tests (`e2e/layout.spec.ts`) seed a list and a task on the server as another device would, and a reload, which is a device starting, shows them with the colour and the count. Tests: store counts (deleted, completed, subtasks and ciphertext), field reading (a field that is ciphertext reads as nothing and never as ciphertext, each colour is a token). Not done: the acceptance's "with the network slowed or off, add, tick and drag all show at once and never flicker back", which needs tasks to add and tick and is checked by 3.4 and 3.6 where they are made; the notification bell in the header (8.1); and a screenshot comparison against the reference, for the reason above.
 
 #### 📋 7.2 — The mobile shell and carousel
 

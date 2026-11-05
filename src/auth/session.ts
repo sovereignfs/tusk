@@ -17,8 +17,13 @@ export async function getSession(): Promise<Session | null> {
  * owned by (AGENTS.md). Sends a visitor to sign in, and answers 404 where there is no sign-in at all.
  */
 export async function requireAccount(): Promise<string> {
+  return (await requireSession()).user.id;
+}
+
+/** As `requireAccount`, for a layout that also shows who the person is. */
+export async function requireSession(): Promise<Session> {
   if (!authSettings()) notFound();
   const session = await getSession();
   if (!session) redirect('/sign-in');
-  return session.user.id;
+  return session;
 }
