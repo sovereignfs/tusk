@@ -111,7 +111,7 @@ The product: one person's lists and tasks. A user action here is a pure function
 
 **Done as:** every delete offers ten seconds of Undo in the bar (`Undo.tsx`), which 3.4 made and 3.5 and this use for a task, a subtask and, once Settings has a way to delete one (2.7), a list. **Deleting a list marks only the list** (`deleteList`/`restoreList`, 3.3): a task of a deleted list is a live row that no screen shows, and Undo brings the list back with its tasks exactly as they were, including those that were already deleted, which stay so. **Deleting a parent marks its live subtasks in the same mutation**, which the server stamps with one time for every row in it (tested), so `restoreTask(parent, ids, allSubtasks)` brings back exactly the subtasks whose deletion time is the parent's and leaves one that was deleted before; deleting a subtask is only that subtask. `visibleTasks(db)` is the one way a view that looks across lists (Today, Starred, Search, export) reads tasks: not deleted, not under a deleted task, **not in a deleted list**; the seed's long list, the sidebar's counts (which are shown only for lists that are) and a list's own screen already agree. Tests: 5 for the actions (including the exact restore and the earlier-deleted subtask), `visibleTasks` against every kind of row it must leave out, and a list restored with its tasks; one at the server that a parent and the subtasks deleted with it carry one time and an earlier one an earlier time; and in Chromium and WebKit a task with three subtasks, one deleted before: deleting the parent removes it, Undo brings back the parent and the two and not the one. Not done: the purge of rows after seven days (13.7), and the screens that read across lists, which are to use `visibleTasks` (the tests of those tasks are to hold them to it).
 
-#### 📋 3.8 — Moving a task to another list
+#### ✅ 3.8 — Moving a task to another list
 
 **Goal:** a task and its subtasks move together.
 
@@ -120,6 +120,8 @@ The product: one person's lists and tasks. A user action here is a pure function
 **Technical:** `moveToList(id, toListId)`: one mutation of the task and its subtasks; the task takes a position at the top of the destination, and subtasks keep theirs. A control in the detail.
 
 **Accepts when:** the subtasks move with it; a destination of another account's is refused at the server, with nothing changed.
+
+**Done as:** `moveToList(task, subtasks, toListId, destination, ids)` is **one mutation**: the task takes the top of the destination (`before` its first task as shown, or the first position if it is empty) and **every subtask it has, deleted ones too**, gets the new list and keeps the position it has among its siblings. Deleted subtasks have to move as well, because the server refuses a task that leaves any of them behind, and a change to a deleted row that did not say so would **restore** it (an edit of a deleted row does), so a deleted subtask moves with `deleted: true`, which keeps the time it was deleted at; a test holds that. A subtask is not moved by itself, and moving to the list it is in does nothing. The detail has a _List_ picker of the person's own lists. Moving to another account's list is refused by the server (`unavailable`, as for a row that is not there) and **nothing is changed**, tested with the action's own mutation on all three databases. In Chromium and WebKit a task with a subtask moves, and on the server both are in the new list, the subtask still under its parent, and the destination shows the task and its subtask. Not done: moving a _repeating_ task, which is 5.5's, and the series that would have to go with it.
 
 #### ✅ 3.9 — Filter, sort and completed
 
@@ -133,7 +135,7 @@ The product: one person's lists and tasks. A user action here is a pure function
 
 **Done as:** `src/lists/sort.ts` is pure: four sorts (`custom`, `created` newest first, `due` soonest first with a time breaking a tie and undated tasks last in their own order, and `title` as a person reads it, by letters and not by code, with digits by value: "task 2" before "task 10"), `sortOf(list)` reading the list's field (anything unknown or unreadable is `custom`) and `canReorder`, which is true for `custom` only; the server's validator for a list's `sort` takes exactly these. `setSort` and `setShowCompleted` are actions on the list's fields, so **both are remembered per list and reach the person's other devices**, and a browser test reads them back from the server. The list's header has the filter (_All_, _Active_) and _Sort by_; **under any sort but Custom a row has no handle and a drag does nothing** (the rows are plain, not sortable, and a test drags one and sees nothing move), and back on Custom the order the person made is there. _Active_ hides the Completed section, whose heading is now a button (`aria-expanded`) that opens and closes it, remembered as the list's `showCompleted`, newest finished first. **Delete completed** is by the heading when it is open: it deletes the done tasks with their live subtasks and offers Undo, and a long list is **several mutations that never split a parent from its subtasks** (`deleteMany`, tested at 900 changes against the 500 a mutation holds), the undo the same several. Tests: 11 for the sorts, 4 for acting on many, and in Chromium and WebKit a sort that orders, will not drag, and holds after a reload and on the server; the Completed section open on reload, per list, with Active hiding it; and Delete completed with its Undo. Not done: the filter **Overdue**, which arrives with 4.3 as the epic says, and the list's menu, which Settings (2.7) completes; the controls are in the header and not in a menu, since there is no menu component in the design system to put them in and a menu of two things is worse than two things. The filter is not remembered, and the epic does not ask for it.
 
-#### 📋 3.10 — Star
+#### ✅ 3.10 — Star
 
 **Goal:** mark a task.
 
@@ -142,6 +144,8 @@ The product: one person's lists and tasks. A user action here is a pure function
 **Technical:** `setStarred`; a star on the row and in the detail, its own click target. Refused on a subtask.
 
 **Accepts when:** a star survives a reload; a subtask cannot be starred.
+
+**Done as:** `setStarred` (and `isStarred`) set the task's `starred` field; a subtask is refused here and by the server's validator (tested both ways). The star is `StarButton`, **its own click target**: a button, pressed or not (`aria-pressed`, named _Star_ or _Remove the star_), which opens nothing and does not start a drag of its row. It is on every row and in the detail, and a subtask has none. The design system has no star icon, so the glyph is text (`☆` and `★`) and a star icon is for `@sovereignfs/ui` to offer; nothing was forked. Tests: 2 for the action, one for the validator, and in Chromium and WebKit a star that does not open the task, is on the server, survives a reload and shows in the detail, and a subtask with none. Not done: the Starred view across lists, which is 6.1.
 
 #### 📋 3.11 — Bulk select
 

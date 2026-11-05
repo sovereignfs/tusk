@@ -264,3 +264,52 @@ export function restoreMany(groups: readonly Group[], ids: Ids): ManyResult {
     }),
   );
 }
+
+/**
+ * Moves a task to another list (DESIGN.md §11.1) with its subtasks, in **one mutation**: the task goes to the top of the destination, and its subtasks
+ * keep the positions they have among themselves. `subtasks` is **every subtask it has, deleted ones too**: the server refuses a task whose subtasks
+ * are left behind in another list, deleted ones included, and a deleted subtask is moved as deleted (a change that did not say so would restore it,
+ * as an edit of a deleted row does). `destination` is the destination's top-level tasks as rendered, for the position at the top.
+ *
+ * A subtask is not moved by itself: it is in its parent's list.
+ */
+export function moveToList(
+  task: LocalRow | undefined,
+  subtasks: readonly LocalRow[],
+  toListId: string,
+  destination: readonly LocalRow[],
+  ids: Ids,
+): ActionResult {
+  if (!task || task.table !== 'task') return { ok: false, reason: 'missing' };
+  if (task.parentId !== null) return { ok: false, reason: 'nothing' };
+  if (task.listId === toListId) return { ok: false, reason: 'nothing' };
+  const top = destination[0];
+  const changes: Mutation['changes'][number][] = [
+    {
+      table: 'task',
+      id: task.id,
+      listId: toListId,
+      position: top && 'position' in top ? before(top.position) : first(),
+    },
+    ...subtasks.map((sub) => ({
+      table: 'task' as const,
+      id: sub.id,
+      listId: toListId,
+      ...(sub.deletedAt !== null ? { deleted: true } : {}),
+    })),
+  ];
+  return mutationOf(ids, changes);
+}
+
+/** Stars a task, or takes the star off. **A subtask has none** (DESIGN.md §11.2): it is refused here, and by the server. */
+export function setStarred(task: LocalRow | undefined, starred: boolean, ids: Ids): ActionResult {
+  if (!task || task.table !== 'task') return { ok: false, reason: 'missing' };
+  if (task.parentId !== null) return { ok: false, reason: 'nothing' };
+  if ((plainOf(task, 'starred') === true) === starred) return { ok: false, reason: 'nothing' };
+  return mutationOf(ids, [{ table: 'task', id: task.id, fields: { starred: { v: starred } } }]);
+}
+
+/** Whether a task is starred. */
+export function isStarred(task: LocalRow): boolean {
+  return plainOf(task, 'starred') === true;
+}

@@ -33,6 +33,7 @@ Each release's section is also its GitHub release notes: the release workflow re
 - Deleting a task takes its subtasks with it, and Undo brings back exactly those, not one that was deleted before.
 - Deleted tasks and lists are removed for good after seven days, and a device that was away learns of it the next time it connects; one that was away for more than ninety days starts again from what the server holds, after sending what it had changed.
 - A list can be sorted by the order you made, date created, due date or title, and the choice is remembered for that list on every device; under any sort but your own order a task cannot be dragged. The Completed section opens and closes as you left it, can be hidden with _Active_, and has _Delete completed_, with Undo.
+- A task can be moved to another list, with its subtasks, from its detail, and starred with a star on its row or in the detail.
 
 ### Removed
 

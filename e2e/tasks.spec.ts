@@ -37,7 +37,9 @@ const add = async (page: Page, title: string) => {
   await page.getByLabel('Add a task').fill(title);
   await page.getByLabel('Add a task').press('Enter');
 };
-const titles = async (page: Page) => (await rows(page).allInnerTexts()).map((text) => text.trim());
+// The titles are the links: a row has a star as well, which is text.
+const titles = async (page: Page) =>
+  (await rows(page).getByRole('link').allInnerTexts()).map((text) => text.trim());
 
 test('Enter adds a task at the top, and the cursor stays for the next one', async ({ page }) => {
   await openNewList(page);
@@ -604,5 +606,116 @@ test.describe('seeing a list the way one wants', () => {
     const bar = page.getByRole('status').filter({ hasText: '2 completed tasks deleted.' });
     await bar.getByRole('button', { name: 'Undo' }).click();
     await expect(page.getByRole('button', { name: /Completed \(2\)/ })).toBeVisible();
+  });
+});
+
+test.describe('moving a task and starring it', () => {
+  const origin = (baseURL?: string) => new URL(baseURL ?? 'http://localhost').origin;
+
+  async function tasksOnServer(page: Page, baseURL: string | undefined, wanted: string[]) {
+    const reply = await page.request.post('/api/sync', {
+      headers: { origin: origin(baseURL) },
+      data: { protocol: 1, cursor: 0, mutations: [], limit: 2000 },
+    });
+    const rows = (await reply.json()).pull.rows as {
+      table: string;
+      id: string;
+      listId?: string;
+      parentId?: string | null;
+      fields: { title?: { v: string }; starred?: { v: boolean } };
+    }[];
+    return rows.filter((r) => r.table === 'task' && wanted.includes(r.fields.title?.v ?? ''));
+  }
+
+  test('a task moves to another list with its subtasks, at the top of it', async ({
+    page,
+    baseURL,
+  }) => {
+    const { name: from } = await openNewList(page);
+    const to = unique('Destination');
+    await page.getByRole('button', { name: 'Add a list' }).click();
+    await page.getByLabel('New list name').fill(to);
+    await page.getByLabel('New list name').press('Enter');
+    await page
+      .getByRole('navigation', { name: 'Lists' })
+      .getByRole('link', { name: new RegExp(`^${from}`) })
+      .click();
+    const title = unique('Mover');
+    const sub = unique('Part');
+    await add(page, title);
+    await page.getByRole('link', { name: title }).click();
+    const detail = page.getByRole('region', { name: 'Task', exact: true });
+    await detail.getByLabel('Add a subtask').fill(sub);
+    await detail.getByLabel('Add a subtask').press('Enter');
+    await expect(detail.getByRole('textbox', { name: `Subtask: ${sub}` })).toBeVisible();
+
+    await detail.getByLabel('List').selectOption({ label: to });
+    // It leaves this list, and is at the top of the other, subtask and all.
+    await expect(page.getByRole('link', { name: title })).toHaveCount(0);
+    await expect
+      .poll(async () => {
+        const rows = await tasksOnServer(page, baseURL, [title, sub]);
+        const parent = rows.find((r) => r.fields.title?.v === title);
+        const part = rows.find((r) => r.fields.title?.v === sub);
+        return (
+          parent?.listId !== undefined &&
+          parent.listId === part?.listId &&
+          part?.parentId === parent.id
+        );
+      })
+      .toBe(true);
+    await page
+      .getByRole('navigation', { name: 'Lists' })
+      .getByRole('link', { name: new RegExp(`^${to}`) })
+      .click();
+    await expect(page.getByRole('link', { name: title })).toBeVisible();
+    await page.getByRole('link', { name: title }).click();
+    await expect(
+      page
+        .getByRole('region', { name: 'Task', exact: true })
+        .getByRole('textbox', { name: `Subtask: ${sub}` }),
+    ).toBeVisible();
+  });
+
+  test('a star is its own click target, survives a reload, and a subtask has none', async ({
+    page,
+    baseURL,
+  }) => {
+    await openNewList(page);
+    const title = unique('Starry');
+    await add(page, title);
+    const row = page.getByRole('listitem').filter({ hasText: title });
+    const star = row.getByRole('button', { name: 'Star' });
+    await star.click();
+    await expect(row.getByRole('button', { name: 'Remove the star' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    // It did not open the task.
+    await expect(page).not.toHaveURL(/\\?task=/);
+    await expect
+      .poll(async () => (await tasksOnServer(page, baseURL, [title]))[0]?.fields.starred?.v)
+      .toBe(true);
+
+    await page.reload();
+    await expect(
+      page
+        .getByRole('listitem')
+        .filter({ hasText: title })
+        .getByRole('button', { name: 'Remove the star' }),
+    ).toBeVisible();
+
+    // In the detail too, and a subtask has no star there.
+    await page.getByRole('link', { name: title }).click();
+    const detail = page.getByRole('region', { name: 'Task', exact: true });
+    await expect(detail.getByRole('button', { name: 'Remove the star' }).first()).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await detail.getByLabel('Add a subtask').fill('A part');
+    await detail.getByLabel('Add a subtask').press('Enter');
+    const subtasks = detail.getByRole('region', { name: 'Subtasks' });
+    await expect(subtasks.getByRole('textbox', { name: 'Subtask: A part' })).toBeVisible();
+    await expect(subtasks.getByRole('button', { name: /star/i })).toHaveCount(0);
   });
 });

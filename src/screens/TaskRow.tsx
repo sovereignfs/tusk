@@ -11,6 +11,7 @@ import { useSync } from '../sync/react';
 import { Checkbox } from '../ui';
 import { text } from './fields';
 import { ProgressRing } from './ProgressRing';
+import { StarButton } from './StarButton';
 import styles from './ListScreen.module.css';
 
 const ids = { newId: () => crypto.randomUUID() };
@@ -85,6 +86,7 @@ export function TaskRow({
       {progress && progress.total > 0 ? (
         <ProgressRing done={progress.done} total={progress.total} />
       ) : null}
+      <StarButton task={task} />
     </li>
   );
 }

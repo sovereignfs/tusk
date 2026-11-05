@@ -13,9 +13,12 @@ import {
   createTask,
   deleteTask,
   isCompleted,
+  isStarred,
   moveTask,
+  moveToList,
   reopenTask,
   restoreTask,
+  setStarred,
   updateTask,
 } from './tasks';
 
@@ -467,6 +470,53 @@ describe(`the plugin's flaw is gone (${leg}): another account's task cannot be c
   });
   afterAll(async () => close());
 
+  it('moves nothing into another account’s list: the move is refused and everything stays where it was', async () => {
+    const [ada, grace] = [account(), account()];
+    const ids = counting();
+    let clock = 1_800_000_000_000;
+    const apply = (owner: string, m: Mutation) =>
+      applyMutation(database, owner, m, { now: (clock += 1000) });
+    const aList = '31000000-0000-4000-8000-000000000001';
+    const gList = '31000000-0000-4000-8000-000000000002';
+    const parentId = '31000000-0000-4000-8000-000000000003';
+    const subId = '31000000-0000-4000-8000-000000000004';
+    await apply(ada, {
+      mutationId: ids.newId(),
+      changes: [
+        { table: 'list', id: aList, position: 'a0', fields: { title: { v: 'Ada' } } },
+        {
+          table: 'task',
+          id: parentId,
+          listId: aList,
+          position: 'a0',
+          fields: { title: { v: 'Mine' } },
+        },
+        {
+          table: 'task',
+          id: subId,
+          listId: aList,
+          parentId,
+          position: 'a0',
+          fields: { title: { v: 'Part' } },
+        },
+      ],
+    });
+    await apply(grace, {
+      mutationId: ids.newId(),
+      changes: [{ table: 'list', id: gList, position: 'a0', fields: { title: { v: 'Grace' } } }],
+    });
+    const before = await snapshot(database, ada);
+
+    const parent = { ...task(parentId, 'a0'), listId: aList } as LocalRow;
+    const subtask = { ...task(subId, 'a0'), listId: aList, parentId } as LocalRow;
+    const result = moveToList(parent, [subtask], gList, [], ids);
+    expect(await apply(ada, mutationOf(result))).toEqual({
+      status: 'refused',
+      code: 'unavailable',
+    });
+    expect(await snapshot(database, ada)).toEqual(before);
+  });
+
   it('is refused, and changes nothing, for each thing a person does to a task', async () => {
     const [ada, grace] = [account(), account()];
     const ids = counting();
@@ -511,5 +561,98 @@ describe(`the plugin's flaw is gone (${leg}): another account's task cannot be c
     expect((await rowOf(database, 'task', taskId))?.deleted_at).toBeNull();
     // Her own list is hers: the last attempt is an ordinary one, and is let through.
     expect((await apply(grace, mutationOf(attempts[5] as ActionResult))).status).toBe('applied');
+  });
+});
+
+describe('moving a task to another list', () => {
+  const OTHER = '80000000-0000-4000-8000-000000000001';
+  const parent = task(T1, 'a5');
+
+  it('is one mutation: the task at the top of the destination and its subtasks, which keep their positions, and the server takes it', () => {
+    const subs = [sub(S1, 'a0', T1), sub(S2, 'a1', T1)];
+    const destination = [
+      { ...task('90000000-0000-4000-8000-000000000001', 'a3'), listId: OTHER } as LocalRow,
+    ];
+    const result = moveToList(parent, subs, OTHER, destination, counting());
+    accepted(result);
+    const changes = mutationOf(result).changes as unknown as {
+      id: string;
+      listId: string;
+      position?: string;
+    }[];
+    expect(changes.map((c) => c.id)).toEqual([T1, S1, S2]);
+    expect(changes.every((c) => c.listId === OTHER)).toBe(true);
+    expect((changes[0]?.position ?? '') < 'a3').toBe(true);
+    // The subtasks say nothing of position: theirs stay.
+    expect(changes.slice(1).every((c) => c.position === undefined)).toBe(true);
+  });
+
+  it('moves a deleted subtask as deleted, so that the move does not bring it back', () => {
+    const gone = { ...sub(S3, 'a2', T1), deletedAt: 5 } as LocalRow;
+    const changes = mutationOf(
+      moveToList(parent, [sub(S1, 'a0', T1), gone], OTHER, [], counting()),
+    ).changes;
+    expect(changes.find((c) => c.id === S3)).toEqual({
+      table: 'task',
+      id: S3,
+      listId: OTHER,
+      deleted: true,
+    });
+    expect(changes.find((c) => c.id === S1)).not.toHaveProperty('deleted');
+  });
+
+  it('is first in an empty destination, and does nothing for the list it is in, or for a subtask', () => {
+    expect(
+      (mutationOf(moveToList(parent, [], OTHER, [], counting())).changes[0] as { position: string })
+        .position,
+    ).toBe('a0');
+    expect(moveToList(parent, [], LIST, [], counting())).toEqual({ ok: false, reason: 'nothing' });
+    expect(moveToList(sub(S1, 'a0', T1), [], OTHER, [], counting())).toEqual({
+      ok: false,
+      reason: 'nothing',
+    });
+    expect(moveToList(undefined, [], OTHER, [], counting())).toEqual({
+      ok: false,
+      reason: 'missing',
+    });
+  });
+});
+
+describe('starring a task', () => {
+  it('stars it, takes the star off, and does nothing when nothing changes', () => {
+    const plain = task(T1, 'a0');
+    expect(mutationOf(setStarred(plain, true, counting())).changes).toEqual([
+      { table: 'task', id: T1, fields: { starred: { v: true } } },
+    ]);
+    accepted(setStarred(plain, true, counting()));
+    const starred = task(T1, 'a0', { starred: { v: true, s: 2 } });
+    expect(isStarred(starred)).toBe(true);
+    expect(mutationOf(setStarred(starred, false, counting())).changes).toEqual([
+      { table: 'task', id: T1, fields: { starred: { v: false } } },
+    ]);
+    expect(setStarred(starred, true, counting())).toEqual({ ok: false, reason: 'nothing' });
+    expect(setStarred(plain, false, counting())).toEqual({ ok: false, reason: 'nothing' });
+    expect(setStarred(undefined, true, counting())).toEqual({ ok: false, reason: 'missing' });
+  });
+
+  it('is refused on a subtask, here and at the server', () => {
+    expect(setStarred(sub(S1, 'a0', T1), true, counting())).toEqual({
+      ok: false,
+      reason: 'nothing',
+    });
+    const forced = {
+      mutationId: '00000000-0000-4000-8000-000000000009',
+      changes: [
+        {
+          table: 'task' as const,
+          id: S1,
+          parentId: T1,
+          listId: LIST,
+          position: 'a0',
+          fields: { title: { v: 'x' }, starred: { v: true } },
+        },
+      ],
+    };
+    expect(parseMutation(forced).ok).toBe(false);
   });
 });

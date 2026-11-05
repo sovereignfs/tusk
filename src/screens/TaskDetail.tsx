@@ -6,16 +6,18 @@ import {
   completeTask,
   deleteTask,
   isCompleted,
+  moveToList,
   reopenTask,
   restoreTask,
   updateTask,
 } from '../actions/tasks';
 import type { LocalRow } from '../local/rows';
-import { allSubtasksOf, getRow, subtasksOf } from '../local/store';
+import { allSubtasksOf, getRow, listsOf, subtasksOf, tasksOf } from '../local/store';
 import { useLocal, useSync } from '../sync/react';
-import { Button, Checkbox, FormField, Input, Textarea } from '../ui';
+import { Button, Checkbox, FormField, Input, Select, Textarea } from '../ui';
 import { text } from './fields';
 import styles from './TaskDetail.module.css';
+import { StarButton } from './StarButton';
 import { Subtasks } from './Subtasks';
 import { useUndo } from './Undo';
 
@@ -101,12 +103,15 @@ function Fields({ task, onDeleted }: { task: LocalRow; onDeleted: () => void }) 
 
   return (
     <>
-      <Checkbox
-        id={`detail-tick-${task.id}`}
-        label="Done"
-        checked={done}
-        onChange={(next) => void tick(next)}
-      />
+      <div className={styles.bar}>
+        <Checkbox
+          id={`detail-tick-${task.id}`}
+          label="Done"
+          checked={done}
+          onChange={(next) => void tick(next)}
+        />
+        <StarButton task={task} />
+      </div>
       <FormField label="Title">
         {(field) => (
           <Input
@@ -141,6 +146,7 @@ function Fields({ task, onDeleted }: { task: LocalRow; onDeleted: () => void }) 
           />
         )}
       </FormField>
+      {task.table === 'task' && task.parentId === null ? <ListPicker task={task} /> : null}
       {task.table === 'task' && task.parentId === null ? <Subtasks parent={task} /> : null}
       <div>
         <Button variant="secondary" onClick={() => void remove()}>
@@ -148,5 +154,40 @@ function Fields({ task, onDeleted }: { task: LocalRow; onDeleted: () => void }) 
         </Button>
       </div>
     </>
+  );
+}
+
+/**
+ * Which list the task is in, which can be changed (DESIGN.md §11.1). Moving takes its subtasks with it, in one mutation, and puts it at the top of
+ * the other list. The lists offered are the person's own, as they are in the sidebar; a list that is not theirs is not here, and the server refuses it
+ * all the same.
+ */
+function ListPicker({ task }: { task: LocalRow }) {
+  const client = useSync();
+  const lists = useLocal(listsOf);
+  if (task.table !== 'task' || lists === undefined || lists.length < 2) return null;
+
+  async function move(toListId: string) {
+    // Every subtask, deleted ones too: the server refuses a task that leaves any of them behind.
+    const { subtasks, destination } = await client.read(async (db) => ({
+      subtasks: await allSubtasksOf(db, task.id),
+      destination: await tasksOf(db, toListId),
+    }));
+    const result = moveToList(task, subtasks, toListId, destination, ids);
+    if (result.ok) void client.commit(result.mutation);
+  }
+
+  return (
+    <FormField label="List">
+      {(field) => (
+        <Select {...field} value={task.listId} onChange={(event) => void move(event.target.value)}>
+          {lists.map((list) => (
+            <option key={list.id} value={list.id}>
+              {text(list, 'title', 'Untitled list')}
+            </option>
+          ))}
+        </Select>
+      )}
+    </FormField>
   );
 }
