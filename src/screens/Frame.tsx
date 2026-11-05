@@ -3,6 +3,7 @@
 import { useSearchParams } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { ThreeColumnLayout, useIsMobile } from '../ui';
+import { FirstList } from './FirstList';
 import { Sidebar } from './Sidebar';
 import { TaskDetail } from './TaskDetail';
 
@@ -20,10 +21,15 @@ export function Frame({ children }: { children: ReactNode }) {
   const mobile = useIsMobile();
 
   return (
-    <ThreeColumnLayout sidebarHidden={mobile}>
-      <Sidebar />
-      <div style={{ padding: mobile ? 'var(--sv-space-4)' : 'var(--sv-space-6)' }}>{children}</div>
-      {task && !mobile ? <TaskDetail taskId={task} /> : null}
-    </ThreeColumnLayout>
+    <>
+      <FirstList />
+      <ThreeColumnLayout sidebarHidden={mobile}>
+        <Sidebar />
+        <div style={{ padding: mobile ? 'var(--sv-space-4)' : 'var(--sv-space-6)' }}>
+          {children}
+        </div>
+        {task && !mobile ? <TaskDetail taskId={task} /> : null}
+      </ThreeColumnLayout>
+    </>
   );
 }

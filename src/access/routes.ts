@@ -27,6 +27,7 @@ export const ROUTES: RouteRule[] = [
   { route: '/sign-up', page: { kind: 'public' } },
   // The app, for someone signed in: the layout around it (`app/(app)/layout.tsx`) finds who, and each page asks for itself as well.
   { route: '/home', page: { kind: 'account' } },
+  { route: '/lists/[id]', page: { kind: 'account' } },
 
   // APIs
   // The one door nearly every write comes through (DESIGN.md §8.3): the account is the session's, and the server applies what a device sends only to it.

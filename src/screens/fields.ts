@@ -1,3 +1,4 @@
+import { DEFAULT_COLOR, colorToken } from '../lists/colors';
 import type { LocalRow } from '../local/rows';
 
 /**
@@ -18,19 +19,7 @@ export function text(row: LocalRow | undefined, name: string, fallback = ''): st
   return typeof value === 'string' ? value : fallback;
 }
 
-/** The six colours a list can be (DESIGN.md §10), each mapped to a token, so that dark mode and theming keep working. */
-export const LIST_COLOURS = {
-  black: 'var(--sv-color-text-primary)',
-  grey: 'var(--sv-color-text-subtle)',
-  green: 'var(--sv-color-success-text)',
-  blue: 'var(--sv-color-info-text)',
-  amber: 'var(--sv-color-warning-text)',
-  red: 'var(--sv-color-error-solid)',
-} as const;
-
+/** The colour of a list's dot, as a token. */
 export function colourOf(row: LocalRow | undefined): string {
-  const name = text(row, 'color', 'black');
-  return Object.hasOwn(LIST_COLOURS, name)
-    ? LIST_COLOURS[name as keyof typeof LIST_COLOURS]
-    : LIST_COLOURS.black;
+  return colorToken(text(row, 'color', DEFAULT_COLOR));
 }

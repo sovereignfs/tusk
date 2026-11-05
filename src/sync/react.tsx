@@ -38,6 +38,11 @@ export function useSync(): SyncClient {
   return useContextValue().client;
 }
 
+/** The account this working copy is of: better-auth's user id, which every row's owner is. */
+export function useAccountId(): string {
+  return useContextValue().accountId;
+}
+
 export function useSyncStatus(): SyncStatus {
   return useContextValue().status;
 }

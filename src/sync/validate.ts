@@ -1,3 +1,4 @@
+import { LIST_COLORS } from '../lists/colors';
 import {
   type Parsed,
   type Parser,
@@ -46,8 +47,7 @@ const ok = <T>(value: T): Parsed<T> => ({ ok: true, value });
 const MAX_EPOCH_MS = 8_640_000_000_000_000;
 const epochMs = integer(0, MAX_EPOCH_MS);
 
-/** The six colours of a list (§10) and the four orders it can be shown in (§11.4). */
-const COLORS = ['black', 'grey', 'green', 'blue', 'amber', 'red'] as const;
+/** The four orders a list can be shown in (§11.4); its colours are `lists/colors.ts`'s. */
 const SORTS = ['custom', 'created', 'due', 'title'] as const;
 
 /**
@@ -75,7 +75,7 @@ const short = (plain: Parser<Scalar>): FieldSpec => ({ plain, chars: SHORT });
 const FIELDS: Record<SyncTable, Record<string, FieldSpec>> = {
   list: {
     title: TITLE,
-    color: short(oneOf(...COLORS)),
+    color: short(oneOf(...LIST_COLORS)),
     sort: short(oneOf(...SORTS)),
     showCompleted: short(bool),
   },

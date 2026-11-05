@@ -295,3 +295,8 @@ export async function openCounts(db: LocalDatabase): Promise<Map<string, number>
   }
   return counts;
 }
+
+/** Every list row the device has, deleted ones too, for deciding whether an account has ever had a list. */
+export async function allLists(db: LocalDatabase): Promise<LocalRow[]> {
+  return db.getAll('list');
+}

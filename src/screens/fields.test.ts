@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { LocalRow } from '../local/rows';
-import { LIST_COLOURS, colourOf, plain, text } from './fields';
+import { LIST_COLORS, colorToken } from '../lists/colors';
+import { colourOf, plain, text } from './fields';
 
 const list = (
   fields: Record<string, { v: unknown; s: number } | { c: string; s: number }>,
@@ -26,15 +27,11 @@ describe('reading fields for a screen', () => {
     expect(text(list({ title: { v: 5, s: 1 } }), 'title', 'not text')).toBe('not text');
   });
 
-  it('maps each of the six colours to a token, and anything else to black', () => {
-    expect(Object.keys(LIST_COLOURS)).toEqual(['black', 'grey', 'green', 'blue', 'amber', 'red']);
-    for (const [name, value] of Object.entries(LIST_COLOURS)) {
-      expect(colourOf(list({ color: { v: name, s: 1 } }))).toBe(value);
-      // A token and never a colour of its own, so that dark mode and theming keep working.
-      expect(value).toMatch(/^var\(--sv-color-[a-z-]+\)$/);
-    }
-    expect(colourOf(list({ color: { v: 'purple', s: 1 } }))).toBe(LIST_COLOURS.black);
-    expect(colourOf(list({ color: { v: 'toString', s: 1 } }))).toBe(LIST_COLOURS.black);
-    expect(colourOf(list({}))).toBe(LIST_COLOURS.black);
+  it("shows a list's colour as its token, and black for anything else", () => {
+    for (const name of LIST_COLORS)
+      expect(colourOf(list({ color: { v: name, s: 1 } }))).toBe(colorToken(name));
+    expect(colourOf(list({ color: { v: 'purple', s: 1 } }))).toBe(colorToken('black'));
+    expect(colourOf(list({ color: { c: 'YWdl', s: 1 } }))).toBe(colorToken('black'));
+    expect(colourOf(list({}))).toBe(colorToken('black'));
   });
 });
