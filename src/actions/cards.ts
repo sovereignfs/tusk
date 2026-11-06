@@ -4,6 +4,7 @@ import { before, first } from '../position';
 import { LIMITS, type Mutation } from '../sync/format';
 import type { ActionResult, Ids } from './lists';
 import { neighboursAfterMove, positionBetween } from './order';
+import { nextOccurrenceChanges } from './series';
 
 /**
  * What a person does to a card (DESIGN.md §10.2), as pure functions in the same way as the lists' (`lists.ts`): given what is on the screen and what was
@@ -112,6 +113,8 @@ export function completeCard(
   now: number,
   ids: Ids,
   items: readonly LocalRow[] = [],
+  /** The card's series and today, for a card that repeats: completing it then makes the next occurrence, in the same mutation (§12.1). */
+  repeat?: { series: LocalRow | undefined; today: string },
 ): ActionResult {
   if (!card || card.table !== 'desk_card') return { ok: false, reason: 'missing' };
   if (isCompleted(card)) return { ok: false, reason: 'nothing' };
@@ -122,6 +125,7 @@ export function completeCard(
     if (!isCompleted(item))
       changes.push({ table: 'desk_check', id: item.id, fields: { completedAt: { v: now } } });
   }
+  if (repeat) changes.push(...nextOccurrenceChanges(card, items, repeat.series, repeat.today));
   return mutationOf(ids, changes);
 }
 
@@ -174,10 +178,11 @@ export function setStatus(
   now: number,
   ids: Ids,
   items: readonly LocalRow[] = [],
+  repeat?: { series: LocalRow | undefined; today: string },
 ): ActionResult {
   if (!card || card.table !== 'desk_card') return { ok: false, reason: 'missing' };
   if (statusOf(card) === status) return { ok: false, reason: 'nothing' };
-  if (status === 'done') return completeCard(card, now, ids, items);
+  if (status === 'done') return completeCard(card, now, ids, items, repeat);
   if (status === 'in_progress') return startCard(card, now, ids);
   // Open: from done it is a reopening; from in progress only the start time goes.
   if (statusOf(card) === 'done') return reopenCard(card, ids);

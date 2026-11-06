@@ -21,7 +21,7 @@ const rule = (text: string): Rule => {
   return parsed.rule;
 };
 const next = (text: string, anchor: string, dueDate: string | null, today: string) =>
-  nextOccurrence({ rule: rule(text), anchor, dueDate, today });
+  nextOccurrence({ rule: rule(text), anchor, due: dueDate, today });
 
 /** A small deterministic generator, so that a failing case can be run again. */
 function random(seed: number) {

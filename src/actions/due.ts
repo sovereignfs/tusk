@@ -29,6 +29,12 @@ export function dueOf(card: LocalRow): Due {
   };
 }
 
+/** The fields that set a due date and time, the pair together: what a change that gives a card a date, or makes one that has it, carries. */
+export function dueFields(due: Due): Record<'dueDate' | 'dueTime', { v: string | null }> {
+  const date = due.date;
+  return { dueDate: { v: date }, dueTime: { v: date === null ? null : due.time } };
+}
+
 export function setDue(card: LocalRow | undefined, due: Due, ids: Ids): ActionResult {
   if (!card || card.table !== 'desk_card') return { ok: false, reason: 'missing' };
   // No time without a date.
@@ -43,7 +49,7 @@ export function setDue(card: LocalRow | undefined, due: Due, ids: Ids): ActionRe
         {
           table: 'desk_card',
           id: card.id,
-          fields: { dueDate: { v: next.date }, dueTime: { v: next.time } },
+          fields: dueFields(next),
         },
       ],
     },

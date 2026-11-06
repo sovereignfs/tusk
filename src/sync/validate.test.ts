@@ -108,6 +108,14 @@ describe('the fields', () => {
       ['desk_series', 'rule', ''],
       ['desk_series', 'rule', 'F'.repeat(LIMITS.ruleChars + 1)],
       ['desk_series', 'anchor', 'tomorrow'],
+      // A rule is held to the allow-list of §12.2, not only measured.
+      ['desk_series', 'rule', 'FREQ=HOURLY'],
+      ['desk_series', 'rule', 'FREQ=DAILY;BYHOUR=9'],
+      ['desk_series', 'rule', 'DTSTART=20261106;FREQ=DAILY'],
+      ['desk_series', 'rule', 'FREQ=MONTHLY;BYDAY=MO'],
+      ['desk_series', 'rule', 'RRULE:FREQ=DAILY'],
+      ['desk_series', 'rule', 'FREQ=DAILY;COUNT=3;UNTIL=20270101'],
+      ['desk_series', 'rule', 12],
     ];
     for (const [table, name, value] of wrong) {
       expect(

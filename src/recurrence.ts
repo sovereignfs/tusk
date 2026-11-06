@@ -240,19 +240,19 @@ function engine(rule: Rule, anchor: Date): RRule | undefined {
 
 /**
  * The next occurrence of a series (§12.3): **the first one, counted from the anchor, after whichever is later, the card's due date or today.** A card
- * done late does not leave a trail of missed ones; a card done early does not get the one it was done for again. `dueDate` is none for a card with no date.
+ * done late does not leave a trail of missed ones; a card done early does not get the one it was done for again. `due` is none for a card with no date.
  * Null when the rule has ended, or when the dates are not dates.
  */
 export function nextOccurrence(input: {
   rule: Rule;
   anchor: string;
-  dueDate: string | null;
+  due: string | null;
   today: string;
 }): string | null {
   const anchor = toUtc(input.anchor);
   const today = toUtc(input.today);
-  const due = input.dueDate === null ? undefined : toUtc(input.dueDate);
-  if (!anchor || !today || (input.dueDate !== null && !due)) return null;
+  const due = input.due === null ? undefined : toUtc(input.due);
+  if (!anchor || !today || (input.due !== null && !due)) return null;
   const after = due && due.getTime() > today.getTime() ? due : today;
   const next = engine(input.rule, anchor)?.after(after, false);
   return next ? fromUtc(next) : null;

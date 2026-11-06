@@ -94,3 +94,12 @@
   outline: 2px solid var(--sv-color-focus-ring);
   outline-offset: 1px;
 }
+
+/* What a card that repeats says of itself, beside its due date. */
+.repeats {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sv-space-1);
+  color: var(--sv-color-text-muted);
+  font-size: var(--sv-font-size-sm);
+}

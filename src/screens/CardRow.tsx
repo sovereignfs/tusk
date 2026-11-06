@@ -6,9 +6,10 @@ import { type HTMLAttributes, useEffect, useState } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { completeCard, isCompleted, reopenCard, statusOf } from '../actions/cards';
 import type { LocalRow } from '../local/rows';
-import { checksOf } from '../local/store';
+import { getRow, checksOf } from '../local/store';
+import { seriesIdOf } from '../actions/series';
 import { useSync } from '../sync/react';
-import { Checkbox } from '../ui';
+import { Checkbox, Icon } from '../ui';
 import { text } from './fields';
 import { InProgressMark } from './InProgressMark';
 import { ProgressRing } from './ProgressRing';
@@ -64,8 +65,17 @@ export function CardRow({
   async function toggle(next: boolean) {
     setAsked(next);
     // Ticking a card ticks its open checklist items in the same mutation, so they are read first; reopening reopens nothing else.
-    const items = next ? await client.read((db) => checksOf(db, card.id)) : [];
-    const result = next ? completeCard(card, Date.now(), ids, items) : reopenCard(card, ids);
+    // A card that repeats makes its next occurrence in the same mutation, so its series is read too.
+    const seriesId = seriesIdOf(card);
+    const { items, series } = next
+      ? await client.read(async (db) => ({
+          items: await checksOf(db, card.id),
+          series: seriesId ? await getRow(db, 'desk_series', seriesId) : undefined,
+        }))
+      : { items: [], series: undefined };
+    const result = next
+      ? completeCard(card, Date.now(), ids, items, { series, today: nowHere().date })
+      : reopenCard(card, ids);
     if (result.ok) void client.commit(result.mutation);
     else setAsked(null);
   }
@@ -103,6 +113,9 @@ export function CardRow({
       </Link>
       {due.date ? (
         <span className={`${styles.due} ${overdue ? styles.overdue : ''}`}>{dueText}</span>
+      ) : null}
+      {seriesIdOf(card) ? (
+        <Icon name="refresh-cw" className={styles.repeats} aria-label="Repeats" />
       ) : null}
       {statusOf(card) === 'in_progress' ? <InProgressMark className={styles.started} /> : null}
       {progress && progress.total > 0 ? (

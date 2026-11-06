@@ -159,6 +159,13 @@
   }
 }
 
+.repeats {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  color: var(--sv-color-text-muted);
+}
+
 .due {
   flex: none;
   color: var(--sv-color-text-muted);

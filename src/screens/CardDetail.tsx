@@ -14,10 +14,13 @@ import {
 import type { LocalRow } from '../local/rows';
 import { allChecksOf, cardsOf, checksOf, getRow, listsOf } from '../local/store';
 import { useLocal, useSync } from '../sync/react';
-import { Button, FormField, Input, SegmentedControl, Select, Textarea } from '../ui';
+import { Button, FormField, Icon, Input, SegmentedControl, Select, Textarea } from '../ui';
 import { text } from './fields';
 import styles from './CardDetail.module.css';
 import { dueOf, setDue } from '../actions/due';
+import { readSeries, seriesIdOf } from '../actions/series';
+import { describe as describeRule } from '../recurrence';
+import { nowHere } from '../time';
 import { DuePicker } from '../dates/DuePicker';
 import { StarButton } from './StarButton';
 import { Checklist } from './Checklist';
@@ -62,6 +65,13 @@ function Fields({ card, onDeleted }: { card: LocalRow; onDeleted: () => void }) 
   const [draftDescription, setDraftDescription] = useState(description);
   const [editing, setEditing] = useState<'title' | 'description' | null>(null);
   const status = statusOf(card);
+  // A card that repeats says so, in words; setting and changing it is the repeat picker's (task 5.3).
+  const seriesId = seriesIdOf(card);
+  const series = useLocal(
+    async (db) => ({ row: seriesId ? await getRow(db, 'desk_series', seriesId) : undefined }),
+    [seriesId],
+  );
+  const repeats = readSeries(series?.row);
 
   // What another device or a sync changed shows here, unless the person is in the middle of typing in that field.
   useEffect(() => {
@@ -80,8 +90,15 @@ function Fields({ card, onDeleted }: { card: LocalRow; onDeleted: () => void }) 
 
   async function choose(next: Status) {
     // Done takes the card's open checklist items with it, in one mutation, so they are read first; the others touch the card alone.
-    const items = next === 'done' ? await client.read((db) => checksOf(db, card.id)) : [];
-    const result = setStatus(card, next, Date.now(), ids, items);
+    const seriesId = seriesIdOf(card);
+    const { items, series } =
+      next === 'done'
+        ? await client.read(async (db) => ({
+            items: await checksOf(db, card.id),
+            series: seriesId ? await getRow(db, 'desk_series', seriesId) : undefined,
+          }))
+        : { items: [], series: undefined };
+    const result = setStatus(card, next, Date.now(), ids, items, { series, today: nowHere().date });
     if (result.ok) void client.commit(result.mutation);
   }
 
@@ -127,6 +144,11 @@ function Fields({ card, onDeleted }: { card: LocalRow; onDeleted: () => void }) 
             if (result.ok) void client.commit(result.mutation);
           }}
         />
+        {repeats ? (
+          <span className={styles.repeats}>
+            <Icon name="refresh-cw" aria-hidden /> Repeats {describeRule(repeats.rule)}
+          </span>
+        ) : null}
       </div>
       <FormField label="Title">
         {(field) => (

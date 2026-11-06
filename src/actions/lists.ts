@@ -25,7 +25,7 @@ export type ActionResult =
   /** Nothing to do: the list is where it was already, or is not there. */
   | { ok: false; reason: 'nothing' | 'missing' }
   /** What the person gave is not allowed, or the account is as full as it can be. */
-  | { ok: false; reason: 'title' | 'limit' };
+  | { ok: false; reason: 'title' | 'limit' | 'rule' };
 
 const TITLE = textParser(1, LIMITS.titleChars);
 

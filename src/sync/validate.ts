@@ -1,3 +1,4 @@
+import { isRule } from '../recurrence';
 import { HEX_COLOR } from '../lists/colors';
 import {
   type Parsed,
@@ -70,6 +71,10 @@ interface FieldSpec {
   readonly chars: number;
 }
 
+/** A plain rule is one `src/recurrence.ts` reads; one that is ciphertext cannot be checked, and is only measured. */
+const ruleText: Parser<Scalar> = (value) =>
+  typeof value === 'string' && isRule(value) ? ok(value) : no('not a repeat rule');
+
 const TITLE: FieldSpec = { plain: text(1, LIMITS.titleChars), chars: LIMITS.titleChars };
 /** A field whose value is short whatever it holds: a flag, a date, a time, an id, a word, a number. */
 const SHORT = 64;
@@ -97,9 +102,9 @@ const FIELDS: Record<SyncTable, Record<string, FieldSpec>> = {
     title: TITLE,
     completedAt: short(nullable(epochMs)),
   },
-  // A rule is an RRULE string; task 5.1 holds it to the allow-list of §12.2, which this only bounds.
+  // A rule is an RRULE string held to the allow-list of §12.2 (`src/recurrence.ts`), the one the browser reads it with.
   desk_series: {
-    rule: { plain: text(1, LIMITS.ruleChars), chars: LIMITS.ruleChars },
+    rule: { plain: ruleText, chars: LIMITS.ruleChars },
     anchor: short(isoDate),
   },
 };

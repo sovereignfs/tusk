@@ -1,7 +1,11 @@
+import { deleteCard } from '../actions/cards';
+import { duplicateOccurrences } from '../actions/series';
 import type { LocalDatabase } from '../local/db';
+import type { LocalRow } from '../local/rows';
 import {
   type Refusal,
   type Settled,
+  allChecksOf,
   commitMutation,
   lastSyncedAt,
   outboxSize,
@@ -161,6 +165,8 @@ export class SyncClient {
         this.now(),
       );
       this.announce('synced');
+      // What was pulled can hold two open occurrences of one series (§8.4); this device deletes the later, as every device does.
+      if (response.pull.rows.length > 0) await this.resolveOccurrences();
       if (settled.refused.length > 0)
         for (const listener of this.refusalListeners) listener(settled.refused);
 
@@ -170,6 +176,22 @@ export class SyncClient {
       if (settled.answered === 0 && !settled.more) return { status: 'synced' };
     }
     return { status: 'synced' };
+  }
+
+  /**
+   * **Two open occurrences of one series** arrive when two devices complete the same one on different days (DESIGN.md §8.4, §12.1). Whichever sees both
+   * deletes the later by the rule in `duplicateOccurrences`, which every device applies alike, so they end with the same one. A card deleted that way can be
+   * brought back like any other.
+   */
+  private async resolveOccurrences(): Promise<void> {
+    const db = this.options.db;
+    const cards = (await db.getAll('desk_card')) as LocalRow[];
+    const ids = { newId: () => crypto.randomUUID() };
+    for (const id of duplicateOccurrences(cards)) {
+      const card = cards.find((each) => each.id === id);
+      const result = deleteCard(card, ids, await allChecksOf(db, id));
+      if (result.ok) await this.commit(result.mutation);
+    }
   }
 
   /** Stops listening to other tabs. The working copy is left as it is. */
