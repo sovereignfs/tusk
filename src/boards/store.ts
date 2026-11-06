@@ -180,12 +180,15 @@ export function useBoard(
     document.addEventListener('visibilitychange', again);
     window.addEventListener('focus', again);
     window.addEventListener('online', again);
+    // The browser says the connection is gone: the board says so at once and is read-only, without waiting for a request to fail.
+    window.addEventListener('offline', again);
     return () => {
       stopped = true;
       clearInterval(timer);
       document.removeEventListener('visibilitychange', again);
       window.removeEventListener('focus', again);
       window.removeEventListener('online', again);
+      window.removeEventListener('offline', again);
     };
   }, [id, offline, reload]);
 

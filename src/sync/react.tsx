@@ -5,6 +5,7 @@ import { AuthShell } from '../auth/screens/AuthShell';
 import { type LocalDatabase, deleteLocal, openLocal } from '../local/db';
 import { requestPersistence } from '../local/persist';
 import { AuthLink, Button, useToast } from '../ui';
+import { onWake, registerBackgroundSync } from './background';
 import { SyncClient } from './client';
 import { browserEnvironment, startSyncLoop } from './loop';
 import { refusalMessage } from './messages';
@@ -97,7 +98,12 @@ export function SyncProvider({ accountId, children }: { accountId: string; child
           void deleteLocal(accountId).finally(() => window.location.assign('/'));
         },
       });
+      // With no network a write asks to be woken when it is back; the worker wakes this page, and the loop sends (src/sync/background.ts).
+      const stopWrites = made.onWrite(() => navigator.onLine === false && registerBackgroundSync());
+      const stopWake = onWake(() => loop.trigger());
       cleanup = () => {
+        stopWrites();
+        stopWake();
         loop.stop();
         stopRefusals();
         channel.removeEventListener('message', onChannel);

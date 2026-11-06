@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { type HTMLAttributes, useEffect, useState } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { completeCard, isCompleted, statusOf } from '../actions/cards';
@@ -18,6 +18,7 @@ import { dueOf } from '../actions/due';
 import { formatDue } from '../format-due';
 import { nowHere } from '../time';
 import { useSelection } from './selection';
+import { openCard } from './address';
 import { StarButton } from './StarButton';
 import styles from './ListScreen.module.css';
 
@@ -51,7 +52,6 @@ export function CardRow({
 }) {
   const client = useSync();
   const pathname = usePathname();
-  const router = useRouter();
   const selection = useSelection();
   const chosen = selection?.selected.has(card.id) ?? false;
   const done = isCompleted(card);
@@ -107,7 +107,7 @@ export function CardRow({
         }
         // The row's free space opens the card as the link does; the controls in it keep their own clicks.
         if (target.closest('a, button, input, label')) return;
-        router.push(`${pathname}?card=${card.id}`, { scroll: false });
+        openCard(card.id);
       }}
     >
       <Checkbox
@@ -126,8 +126,21 @@ export function CardRow({
         // Choosing a card is not opening it: the link does not go where it points while ctrl or cmd is held or any card is chosen. The row's own handler
         // does the choosing; this is what keeps the link from navigating first.
         onClick={(event) => {
-          if (selection && (event.ctrlKey || event.metaKey || selection.active))
+          if (selection && (event.ctrlKey || event.metaKey || selection.active)) {
             event.preventDefault();
+            return;
+          }
+          // A plain click opens the card by the address's query alone, which needs no page from the server; a modified click is the browser's own.
+          if (
+            !event.ctrlKey &&
+            !event.metaKey &&
+            !event.shiftKey &&
+            !event.altKey &&
+            event.button === 0
+          ) {
+            event.preventDefault();
+            openCard(card.id);
+          }
         }}
         // A link can be dragged by the browser too, and one dropped on the page is followed: that is a navigation in the middle of a reorder.
         draggable={false}

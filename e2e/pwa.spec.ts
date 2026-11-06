@@ -166,6 +166,17 @@ test('after a signed-in tour of the Desk, a board and the Inbox, the caches hold
   await page.getByRole('link', { name: 'Back to your Desk' }).click();
   await expect(page.getByRole('navigation', { name: 'Lists' })).toBeVisible();
   await context.setOffline(false);
+
+  // The workspace is deleted, so that the sidebar is as it was for the next test.
+  await page.goto('/boards');
+  await page.getByRole('link', { name: workspace, exact: true }).first().click();
+  await expect(page).toHaveURL(/\/w\/[0-9a-f-]{36}$/);
+  await page.getByRole('button', { name: 'Workspace settings' }).click();
+  await page.getByRole('button', { name: 'Delete workspace' }).click();
+  const confirm = page.getByRole('dialog', { name: 'Delete workspace' });
+  await confirm.getByLabel('Type the name to confirm').fill(workspace);
+  await confirm.getByRole('button', { name: 'Delete this workspace' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: workspace })).toHaveCount(0);
 });
 
 test('after signing out there is no one for the shell to open for', async ({ page, context }) => {

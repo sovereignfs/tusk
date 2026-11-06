@@ -168,11 +168,11 @@ test('offline, the board stays as it was, says it needs a connection and changes
   await signedIn(page);
   const { workspace } = await makeBoard(page);
   await context.setOffline(true);
-  await addListButton(page).click();
-  await page.getByLabel('Name of the new list').fill('Never made');
-  await page.getByRole('button', { name: 'Add list' }).click();
+  // The connection going is enough: the board says so and cannot be changed, with no request to fail first. (The event is sent by hand: not every
+  // engine sends it when the test switches the network off.)
+  await page.evaluate(() => window.dispatchEvent(new Event('offline')));
   await expect(page.getByText(/This board needs a connection/)).toBeVisible();
-  // It is put back as it was read, and cannot be changed until the connection is back.
+  // It stays as it was read, and cannot be changed until the connection is back.
   await expect.poll(() => lists(page)).toEqual(['Backlog']);
   await expect(addListButton(page)).toHaveCount(0);
   await context.setOffline(false);

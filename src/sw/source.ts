@@ -57,6 +57,17 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+// Background Sync: the browser wakes the worker when a connection is back after a write made without one. The worker has none of the working copy's code,
+// so it wakes the pages that are open, which sync through their own loop; with none open the changes wait for the next time Tusk is opened.
+self.addEventListener('sync', (event) => {
+  if (event.tag !== 'tusk-sync') return;
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((pages) => {
+      for (const page of pages) page.postMessage({ type: 'tusk-sync' });
+    }),
+  );
+});
+
 self.addEventListener('fetch', (event) => {
   const request = event.request;
   if (request.method !== 'GET') return;

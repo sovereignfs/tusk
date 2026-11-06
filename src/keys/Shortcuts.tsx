@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { closeCard } from '../screens/address';
 import { Dialog } from '../ui';
 import { SHORTCUT_HELP, type Shortcut, isTyping, shortcutOf } from './rules';
 import styles from './Shortcuts.module.css';
@@ -79,7 +80,7 @@ export function Shortcuts() {
           return;
         }
         if (help) setHelp(false);
-        else if (card && !heldEscape) router.replace(pathname);
+        else if (card && !heldEscape) closeCard();
         return;
       }
 

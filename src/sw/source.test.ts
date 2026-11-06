@@ -63,8 +63,13 @@ function load(version = 'v1', files: readonly string[] = FILES) {
     };
   };
   const listeners: Record<string, Listener> = {};
+  const woken: unknown[] = [];
+  const clients = {
+    matchAll: async () => [{ postMessage: (message: unknown) => void woken.push(message) }],
+  };
   const self = {
     location: { origin: ORIGIN },
+    clients,
     addEventListener: (type: string, fn: Listener) => void (listeners[type] = fn),
   };
   const context = vm.createContext({
@@ -75,6 +80,7 @@ function load(version = 'v1', files: readonly string[] = FILES) {
       delete: async (name: string) => stores.delete(name),
     },
     fetch: network,
+    clients,
     Request,
     Response,
     URL,
@@ -113,7 +119,7 @@ function load(version = 'v1', files: readonly string[] = FILES) {
     [...stores.entries()].flatMap(([name, store]) =>
       [...store.keys()].map((url) => `${name} ${new URL(url).pathname}`),
     );
-  return { dispatch, fetchEvent, kept, stores, state, requested, listeners };
+  return { dispatch, fetchEvent, kept, stores, state, requested, listeners, woken };
 }
 
 const allowed = (path: string) =>
@@ -273,5 +279,22 @@ describe('versions', () => {
     const text = workerSource('v1', ['/_next/static/x";alert(1);//.js']);
     expect(() => new vm.Script(text)).not.toThrow();
     expect(text).not.toContain('"; alert');
+  });
+});
+
+describe('Background Sync', () => {
+  it('wakes the pages that are open to sync when the browser says the connection is back, and answers no other tag', async () => {
+    const w = load();
+    await w.dispatch('sync', { tag: 'tusk-sync' });
+    expect(w.woken).toEqual([{ type: 'tusk-sync' }]);
+    await w.dispatch('sync', { tag: 'something-else' });
+    expect(w.woken).toHaveLength(1);
+  });
+
+  it('keeps nothing by waking: it reads no data and stores nothing', async () => {
+    const w = load();
+    await w.dispatch('sync', { tag: 'tusk-sync' });
+    expect(w.kept()).toEqual([]);
+    expect(w.requested).toEqual([]);
   });
 });

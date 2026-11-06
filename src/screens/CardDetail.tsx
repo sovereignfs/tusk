@@ -1,6 +1,5 @@
 'use client';
 
-import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
   deleteCard,
@@ -26,6 +25,7 @@ import { nowHere } from '../time';
 import { DuePicker } from '../dates/DuePicker';
 import { StarButton } from './StarButton';
 import { Checklist } from './Checklist';
+import { closeCard } from './address';
 import { useUndo } from './Undo';
 
 const ids = { newId: () => crypto.randomUUID() };
@@ -37,10 +37,8 @@ const ids = { newId: () => crypto.randomUUID() };
  * every card that was looked at. **A card that is not there (a stale link, one that was deleted) shows nothing and does not fail.**
  */
 export function CardDetail({ cardId }: { cardId: string }) {
-  const router = useRouter();
-  const pathname = usePathname();
   const row = useLocal(async (db) => ({ row: await getRow(db, 'desk_card', cardId) }), [cardId]);
-  const close = () => router.replace(pathname);
+  const close = closeCard;
 
   return (
     <section className={styles.detail} aria-label="Card">
