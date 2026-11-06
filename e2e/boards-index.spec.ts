@@ -154,6 +154,43 @@ test('the index and the settings are for the signed-in, and a setting is a sort 
     (await patch({ workspaceSort: 'name' }, { origin: 'https://evil.example.com' })).status(),
   ).toBe(403);
   expect((await patch({ workspaceSort: 'size' })).status()).toBe(400);
-  expect((await patch({ workspaceSort: 'name', timeZone: 'UTC' })).status()).toBe(400);
+  expect((await patch({ workspaceSort: 'name', seq: 1 })).status()).toBe(400);
   expect((await patch({ workspaceSort: 'name' })).status()).toBe(200);
+  // A zone is a zone this runtime knows, and a setting is at least one of them.
+  expect((await patch({ timeZone: 'Mars/Olympus' })).status()).toBe(400);
+  expect((await patch({})).status()).toBe(400);
+  expect((await patch({ timeZone: 'Europe/Berlin' })).status()).toBe(200);
+});
+
+test.describe('the browser’s time zone', () => {
+  test.use({ timezoneId: 'Pacific/Auckland' });
+
+  test('is reported to the account once, and not again while it is the same', async ({ page }) => {
+    await signedIn(page);
+    await page.evaluate(() => {
+      for (const key of Object.keys(window.localStorage))
+        if (key.startsWith('tusk.zone.')) window.localStorage.removeItem(key);
+    });
+    const report = page.waitForRequest(
+      (request) => request.method() === 'PATCH' && request.url().endsWith('/api/settings'),
+    );
+    await page.reload();
+    expect((await report).postDataJSON()).toEqual({ timeZone: 'Pacific/Auckland' });
+    // Kept, so the next load does not send it again.
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          Object.keys(window.localStorage).some((key) => key.startsWith('tusk.zone.')),
+        ),
+      )
+      .toBe(true);
+    let again = 0;
+    page.on('request', (request) => {
+      if (request.method() === 'PATCH' && request.url().endsWith('/api/settings')) again += 1;
+    });
+    await page.reload();
+    await expect(page.getByRole('heading', { level: 1, name: 'Boards' })).toBeVisible();
+    await page.waitForTimeout(500);
+    expect(again).toBe(0);
+  });
 });

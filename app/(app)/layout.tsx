@@ -4,6 +4,7 @@ import { requireSession } from '@/src/auth/session';
 import { AppFrame } from '@/src/screens/AppFrame';
 import { WorkspacesProvider } from '@/src/boards/workspaces';
 import { Frame } from '@/src/screens/Frame';
+import { ZoneReporter } from '@/src/screens/ZoneReporter';
 import { site } from '@/src/site';
 import { SyncProvider } from '@/src/sync/react';
 import { AppShell } from '@/src/ui/AppShell';
@@ -24,6 +25,7 @@ export default async function AppLayout({
   const session = await requireSession();
   return (
     <SyncProvider accountId={session.user.id}>
+      <ZoneReporter accountId={session.user.id} />
       <WorkspacesProvider>
         <AppShell
           name={site.name}

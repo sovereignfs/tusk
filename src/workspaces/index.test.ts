@@ -128,7 +128,27 @@ describe(`the sort kept with the account (${leg})`, () => {
     expect((await boardsIndex(database, directory, other)).sort).toBe('name');
   });
 
-  it('takes a sort and nothing else', () => {
+  it('keeps the zone the browser reported, beside the sort, each without touching the other', async () => {
+    const account = crypto.randomUUID();
+    const zoneOf = async () =>
+      (
+        await dbAll<{ zone: string; sort: string }>(
+          database,
+          sql`SELECT time_zone AS zone, workspace_sort AS sort FROM ${settingsTable()} WHERE account_id = ${account}`,
+        )
+      )[0];
+    await saveSettings(database, account, { timeZone: 'Pacific/Auckland' }, NOW);
+    expect(await zoneOf()).toEqual({ zone: 'Pacific/Auckland', sort: 'name' });
+    await saveSettings(database, account, { workspaceSort: 'updated' }, NOW + 1);
+    expect(await zoneOf()).toEqual({ zone: 'Pacific/Auckland', sort: 'updated' });
+    await saveSettings(database, account, { timeZone: 'America/Los_Angeles' }, NOW + 2);
+    expect(await zoneOf()).toEqual({ zone: 'America/Los_Angeles', sort: 'updated' });
+    expect(parseSettingsChange({ timeZone: 'Europe/Berlin', workspaceSort: 'created' }).ok).toBe(
+      true,
+    );
+  });
+
+  it('takes a sort or a zone and nothing else', () => {
     for (const sort of ['name', 'created', 'updated'])
       expect(parseSettingsChange({ workspaceSort: sort }).ok, sort).toBe(true);
     for (const bad of [
@@ -136,6 +156,8 @@ describe(`the sort kept with the account (${leg})`, () => {
       [],
       {},
       { workspaceSort: 'size' },
+      { timeZone: 'Mars/Olympus' },
+      { timeZone: 7 },
       { workspaceSort: 'name', seq: 1 },
       { seq: 1 },
       'name',

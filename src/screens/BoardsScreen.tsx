@@ -6,6 +6,7 @@ import { sections } from '../boards/sort';
 import { useWorkspaces } from '../boards/workspaces';
 import { deskSummary } from '../local/store';
 import { useLocal } from '../sync/react';
+import { browserZone, todayFor } from '../time';
 import { Alert, Avatar, Button, EmptyState, Icon, Select, useToast } from '../ui';
 import {
   type BoardsIndex,
@@ -26,13 +27,6 @@ const SORT_LABELS: Record<WorkspaceSort, string> = {
   updated: 'Recently updated',
 };
 
-/** The person's own date as `YYYY-MM-DD`, which is what a due date is. */
-function localToday(): string {
-  const now = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-}
-
 /**
  * The boards index (DESIGN.md §17.3), `/boards`: the Desk first, as a tile of its own, and then each workspace as a section, _My workspaces_ before
  * _Shared with me_. **The Desk is read from the working copy, so its tile is there offline;** everything else is read from the server and says it needs
@@ -48,7 +42,7 @@ export function BoardsScreen() {
   const [making, setMaking] = useState(false);
   const [settingsFor, setSettingsFor] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<WorkspaceRow | null>(null);
-  const [today] = useState(localToday);
+  const [today] = useState(() => todayFor(browserZone(), Date.now()));
   const desk = useLocal((db) => deskSummary(db, today), [today]);
 
   const read = useCallback(async () => {

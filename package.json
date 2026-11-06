@@ -19,6 +19,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "test": "vitest run",
+    "test:zones": "TZ=UTC vitest run src/time.test.ts && TZ=Pacific/Auckland vitest run src/time.test.ts && TZ=America/Los_Angeles vitest run src/time.test.ts",
     "manifest:check": "sovereign-manifest check",
     "db:generate": "node scripts/db-generate.mjs",
     "db:dev": "node scripts/dev-db.mjs",
