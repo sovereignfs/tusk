@@ -16,6 +16,11 @@ export const accountSettings = sqliteTable('account_settings', {
    * tombstone is gone, and takes a fresh snapshot instead of a pull.
    */
   prunedThrough: counter('pruned_through').notNull().default(0),
+  /**
+   * How the boards index sorts the person's own workspaces: `name`, `created` or `updated` (DESIGN.md §17.3). Saved with the account so that it is the same on
+   * every device (§19).
+   */
+  workspaceSort: text('workspace_sort').notNull().default('name'),
   createdAt: epochMs('created_at').notNull(),
 });
 

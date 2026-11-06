@@ -1,0 +1,1 @@
+ALTER TABLE "tusk"."account_settings" ADD COLUMN "workspace_sort" text DEFAULT 'name' NOT NULL;

@@ -11,8 +11,8 @@ import styles from './AppSidebar.module.css';
 
 /**
  * The app's sidebar (DESIGN.md §17.2), at the left of every signed-in page: the places, then the person's workspaces. **An entry is here only when its
- * page is**: a link to a page that is not there is worse than none. So today it holds the Desk; Boards (16.4), the Inbox (8.1) and the Planner (phase
- * 2) join as they are built, and the Desk's entry goes when Boards holds its tile. The workspaces come with 16.2.
+ * page is**: a link to a page that is not there is worse than none. So today it holds Boards, which has the Desk as a tile of its own (16.4); the
+ * Inbox (8.1) and the Planner (phase 2) join as they are built.
  */
 interface Entry {
   href: string;
@@ -24,10 +24,11 @@ interface Entry {
 
 export const ENTRIES: readonly Entry[] = [
   {
-    href: '/desk',
-    label: 'Desk',
-    icon: 'layout-dashboard',
-    under: ['/', '/desk'],
+    // The Desk is a tile on this page (§17.3), and is reached from there and from the mark in the header.
+    href: '/boards',
+    label: 'Boards',
+    icon: 'layout-grid',
+    under: ['/boards', '/b', '/w'],
   },
 ];
 
@@ -162,7 +163,7 @@ function Group({
 }
 
 /** The + beside _My workspaces_: a name, and Enter makes it. The person is taken to it once the server has said it is theirs. */
-function CreateDialog({ onClose }: { onClose: () => void }) {
+export function CreateDialog({ onClose }: { onClose: () => void }) {
   const { perform } = useWorkspaces();
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);

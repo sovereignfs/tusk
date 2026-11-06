@@ -186,3 +186,24 @@ export interface OpRows {
 export type OpResult =
   | { readonly status: 'applied'; readonly replay: boolean; readonly rows: OpRows }
   | { readonly status: 'refused'; readonly code: OpRefusal; readonly reason?: OpReason };
+
+/** How the boards index sorts a person's own workspaces (DESIGN.md §17.3): by name, newest created first, or most recently updated first. */
+export const WORKSPACE_SORTS = ['name', 'created', 'updated'] as const;
+export type WorkspaceSort = (typeof WORKSPACE_SORTS)[number];
+
+/** A workspace on the boards index: its visible boards, and a few of its people as avatars (names are read from the accounts, never copied). */
+export interface IndexWorkspace {
+  readonly id: string;
+  readonly boards: readonly BoardRow[];
+  readonly people: readonly { readonly accountId: string; readonly name: string }[];
+  readonly peopleCount: number;
+}
+
+export interface BoardsIndex {
+  /** The sort the person chose for their own workspaces, the same on every device. */
+  readonly sort: WorkspaceSort;
+  readonly workspaces: readonly IndexWorkspace[];
+}
+
+/** People shown as avatars on a workspace's header; the rest are a count. */
+export const INDEX_AVATARS = 5;

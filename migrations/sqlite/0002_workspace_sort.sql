@@ -1,0 +1,1 @@
+ALTER TABLE `account_settings` ADD `workspace_sort` text DEFAULT 'name' NOT NULL;

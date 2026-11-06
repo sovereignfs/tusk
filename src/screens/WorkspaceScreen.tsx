@@ -66,7 +66,7 @@ export function WorkspaceScreen({ workspace }: { workspace: WorkspaceRow }) {
   );
 }
 
-function DeleteDialog({
+export function DeleteDialog({
   workspace,
   onClose,
   onDeleted,

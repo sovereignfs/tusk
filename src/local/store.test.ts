@@ -7,6 +7,7 @@ import {
   getRow,
   isPending,
   listsOf,
+  deskSummary,
   openCounts,
   visibleCards,
   outboxSize,
@@ -426,6 +427,28 @@ describe('counts for the sidebar', () => {
     await commitMutation(db, mutation({ table: 'desk_check', id: three.id, deleted: true }), 2);
     expect((await checkCounts(db)).get(c.id)).toEqual({ done: 1, total: 2 });
     expect((await checkCounts((await device()).db)).size).toBe(0);
+  });
+});
+
+describe('the Desk’s summary for the boards index', () => {
+  it('counts the open cards and those of them due today, and not a deleted or completed one', async () => {
+    const { db } = await device();
+    const [a, gone] = [newList('A'), newList('Gone')];
+    const today = '2026-11-06';
+    const due = (date: string) => ({ title: { v: 'x' }, dueDate: { v: date } });
+    const cards = [
+      newCard(a.id, { fields: due(today) }),
+      newCard(a.id, { fields: due('2026-11-07') }),
+      newCard(a.id),
+      newCard(a.id, { fields: { ...due(today), completedAt: { v: 1_793_000_000_000 } } }),
+      newCard(a.id, { fields: { title: { c: 'YWdl' }, dueDate: { c: 'YWdl' } } }),
+      newCard(gone.id, { fields: due(today) }),
+    ];
+    await commitMutation(db, mutation(a, gone, ...cards), 1);
+    await commitMutation(db, mutation({ table: 'desk_list', id: gone.id, deleted: true }), 2);
+    // Open: the two dated, the plain one and the sealed one (counted as open, and not as due, until the keys are in place). One is due today.
+    expect(await deskSummary(db, today)).toEqual({ open: 4, dueToday: 1 });
+    expect(await deskSummary((await device()).db, today)).toEqual({ open: 0, dueToday: 0 });
   });
 });
 

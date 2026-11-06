@@ -80,7 +80,7 @@ export function WorkspaceBoards({ workspaceId }: { workspaceId: string }) {
   );
 }
 
-function Tile({ board }: { board: BoardRow }) {
+export function Tile({ board }: { board: BoardRow }) {
   return (
     <Link href={`/b/${board.id}`} className={styles.tile}>
       {/* The colour is the board's own and is data: a band, with the name in the page's text colour on the page's own background. */}
@@ -95,7 +95,13 @@ function Tile({ board }: { board: BoardRow }) {
   );
 }
 
-function CreateBoardDialog({ workspaceId, onClose }: { workspaceId: string; onClose: () => void }) {
+export function CreateBoardDialog({
+  workspaceId,
+  onClose,
+}: {
+  workspaceId: string;
+  onClose: () => void;
+}) {
   const { perform } = useWorkspaces();
   const router = useRouter();
   const [name, setName] = useState('');

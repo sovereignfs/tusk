@@ -905,6 +905,9 @@ by name.
 **A workspace's settings** are a dialog from its gear: its name; its people, their roles, adding by email, removing, leaving; and Delete. A member sees
 the people and Leave.
 
+**As built (task 16.4):** the index reads in one statement for each kind of thing (boards, a few people of each, how many there are, the sort), never one for each workspace. The sort is
+`account_settings.workspace_sort` and is written by `PATCH /api/settings`. The Desk's entry in the sidebar is replaced by _Boards_, so the Desk is reached from its tile and the header's mark.
+
 ### 17.4 The Desk
 
 `/desk`, and `/desk/<listId>` for a list. The look of the Sovereign Tasks screenshot: with the app's sidebar as a rail, three columns, the Desk's lists,

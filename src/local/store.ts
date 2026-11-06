@@ -404,3 +404,25 @@ export async function visibleCards(db: LocalDatabase): Promise<LocalRow[]> {
     (card) => card.table === 'desk_card' && card.deletedAt === null && lists.has(card.listId),
   );
 }
+
+/**
+ * What the boards index shows of the Desk (DESIGN.md §17.3): how many cards are open, and how many of those are due today. "Open" is the sidebar's: not
+ * deleted and not completed. A due date that is ciphertext cannot be read here, so such a card counts as open and not as due (task 14.3). Read from the
+ * working copy, so it is there offline. `today` is the person's own date as `YYYY-MM-DD`, given and not read, so that a test controls it.
+ */
+export async function deskSummary(
+  db: LocalDatabase,
+  today: string,
+): Promise<{ open: number; dueToday: number }> {
+  let open = 0;
+  let dueToday = 0;
+  for (const card of await visibleCards(db)) {
+    if (card.table !== 'desk_card') continue;
+    const done = card.fields.completedAt;
+    if (done !== undefined && 'v' in done && done.v !== null) continue;
+    open += 1;
+    const due = card.fields.dueDate;
+    if (due !== undefined && 'v' in due && due.v === today) dueToday += 1;
+  }
+  return { open, dueToday };
+}

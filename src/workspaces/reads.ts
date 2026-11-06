@@ -1,10 +1,17 @@
 import { sql } from 'drizzle-orm';
 import type { Database } from '../db/client';
 import { dbAll, dbGet } from '../db/exec';
+import * as postgresApp from '../db/schema/postgres/app';
+import * as sqliteApp from '../db/schema/sqlite/app';
 import type { Directory } from '../auth/directory';
 import { boardsEditableBy, boardsAdministeredBy, boardsVisibleTo, workspacesOf } from './can';
 import {
   type BoardRow,
+  type BoardsIndex,
+  type IndexWorkspace,
+  INDEX_AVATARS,
+  WORKSPACE_SORTS,
+  type WorkspaceSort,
   type BoardView,
   type ListRow,
   type Person,
@@ -206,4 +213,74 @@ export async function boardsOfWorkspace(
         ORDER BY b.name, b.id LIMIT ${WORKSPACE_LIMITS.boardsPerWorkspace}`,
   );
   return rows.map(toBoard);
+}
+
+const toSort = (value: unknown): WorkspaceSort =>
+  (WORKSPACE_SORTS as readonly unknown[]).includes(value) ? (value as WorkspaceSort) : 'name';
+
+/**
+ * The boards index (DESIGN.md §17.3): for every workspace the asker is in, the boards they can see and a few of its people, and the sort they chose.
+ * **Light, and one statement for each kind of thing** (boards, a few people each, how many people, the sort), whatever the number of workspaces; every one
+ * names the asker, so that nothing of a workspace that is not theirs, nor a private board that is not, can be in it.
+ */
+export async function boardsIndex(
+  database: Database,
+  directory: Pick<Directory, 'profiles'>,
+  accountId: string,
+): Promise<BoardsIndex> {
+  const t = tablesOf(database);
+  const mine = workspacesOf(database, accountId);
+  const [setting, boards, people, counts] = await Promise.all([
+    dbGet<{ sort: string }>(
+      database,
+      sql`SELECT workspace_sort AS sort FROM ${database.dialect === 'postgres' ? postgresApp.accountSettings : sqliteApp.accountSettings} WHERE account_id = ${accountId}`,
+    ),
+    dbAll<RawBoard>(
+      database,
+      sql`SELECT ${sql.raw(BOARD_COLUMNS)} FROM ${t.board} b
+          WHERE b.workspace_id IN ${mine} AND b.id IN ${boardsVisibleTo(database, accountId)}
+          ORDER BY b.name, b.id`,
+    ),
+    dbAll<{ workspaceId: string; accountId: string }>(
+      database,
+      sql`SELECT x.workspace_id AS "workspaceId", x.account_id AS "accountId" FROM (
+            SELECT m.workspace_id, m.account_id, ROW_NUMBER() OVER (
+              PARTITION BY m.workspace_id
+              ORDER BY CASE WHEN m.role = 'owner' THEN 0 ELSE 1 END, m.created_at, m.account_id
+            ) AS rn
+            FROM ${t.workspaceMember} m WHERE m.workspace_id IN ${mine}
+          ) x WHERE x.rn <= ${INDEX_AVATARS} ORDER BY x.workspace_id, x.rn`,
+    ),
+    dbAll<{ workspaceId: string; n: number | string }>(
+      database,
+      sql`SELECT workspace_id AS "workspaceId", COUNT(*) AS n FROM ${t.workspaceMember}
+          WHERE workspace_id IN ${mine} GROUP BY workspace_id`,
+    ),
+  ]);
+  const profiles = await directory.profiles(people.map((row) => row.accountId));
+  const workspaces = new Map<
+    string,
+    { boards: BoardRow[]; people: IndexWorkspace['people'][number][]; count: number }
+  >();
+  const entry = (id: string) => {
+    let found = workspaces.get(id);
+    if (!found) workspaces.set(id, (found = { boards: [], people: [], count: 0 }));
+    return found;
+  };
+  for (const row of counts) entry(row.workspaceId).count = Number(row.n);
+  for (const row of boards) entry(row.workspaceId).boards.push(toBoard(row));
+  for (const row of people)
+    entry(row.workspaceId).people.push({
+      accountId: row.accountId,
+      name: profiles.get(row.accountId)?.name ?? 'Someone',
+    });
+  return {
+    sort: toSort(setting?.sort),
+    workspaces: [...workspaces].map(([id, found]) => ({
+      id,
+      boards: found.boards,
+      people: found.people,
+      peopleCount: found.count,
+    })),
+  };
 }

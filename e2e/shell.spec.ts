@@ -25,10 +25,11 @@ test('the Desk opens with a rail, which names each entry for a screen reader and
   await signedIn(page);
   await expect(sidebar(page)).toHaveAttribute('data-sidebar', 'rail');
   expect(await widthOf(page)).toBe(56);
-  const desk = sidebar(page).getByRole('link', { name: 'Desk' });
-  await expect(desk).toBeVisible();
-  await expect(desk).toHaveAttribute('title', 'Desk');
-  await expect(desk).toHaveAttribute('aria-current', 'page');
+  // The Desk is a tile on the boards page and not an entry of its own; Boards is the entry, and the Desk is not it.
+  const boards = sidebar(page).getByRole('link', { name: 'Boards' });
+  await expect(boards).toBeVisible();
+  await expect(boards).toHaveAttribute('title', 'Boards');
+  await expect(boards).not.toHaveAttribute('aria-current', 'page');
 });
 
 test('the sidebar’s own button widens a rail and narrows it again, and it is remembered after a reload', async ({
@@ -38,7 +39,7 @@ test('the sidebar’s own button widens a rail and narrows it again, and it is r
   await page.getByRole('button', { name: 'Widen the sidebar' }).click();
   await expect(sidebar(page)).toHaveAttribute('data-sidebar', 'full');
   expect(await widthOf(page)).toBe(220);
-  await expect(sidebar(page).getByText('Desk')).toBeVisible();
+  await expect(sidebar(page).getByText('Boards')).toBeVisible();
 
   await page.reload();
   await expect(sidebar(page)).toHaveAttribute('data-sidebar', 'full');
