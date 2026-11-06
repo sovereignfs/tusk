@@ -1,4 +1,13 @@
-import { type Parsed, type Parser, oneOf, text, uuid } from '../access/parse';
+import {
+  type Parsed,
+  type Parser,
+  hhmm,
+  isoDate,
+  nullable,
+  oneOf,
+  text,
+  uuid,
+} from '../access/parse';
 import { HEX_COLOR } from '../lists/colors';
 import { isPosition } from '../position';
 import { OPS, type OpName, type OpRequest, WORKSPACE_LIMITS } from './format';
@@ -44,6 +53,7 @@ const ARGUMENTS: Record<OpName, readonly string[]> = {
   'boardMember.remove': ['boardId', 'accountId'],
   'board.join': ['id'],
   'board.leave': ['id'],
+  'card.setDue': ['id', 'dueDate', 'dueTime'],
 };
 
 const VISIBILITY = oneOf('public', 'private');
@@ -347,6 +357,27 @@ export function parseOp(value: unknown): Parsed<OpRequest> {
       const id = uuid(value.id);
       if (!id.ok) return no('id: not an id');
       return { ok: true, value: { opId: opId.value, op: kind, id: id.value } };
+    }
+    case 'card.setDue': {
+      const id = uuid(value.id);
+      if (!id.ok) return no('id: not an id');
+      const dueDate = nullable(isoDate)(value.dueDate);
+      if (!dueDate.ok) return no('dueDate: not a date');
+      const dueTime = nullable(hhmm)(value.dueTime);
+      if (!dueTime.ok) return no('dueTime: not a time');
+      // There is no time without a date (DESIGN.md §11).
+      if (dueDate.value === null && dueTime.value !== null)
+        return no('dueTime: a time needs a date');
+      return {
+        ok: true,
+        value: {
+          opId: opId.value,
+          op: kind,
+          id: id.value,
+          dueDate: dueDate.value,
+          dueTime: dueTime.value,
+        },
+      };
     }
   }
 }

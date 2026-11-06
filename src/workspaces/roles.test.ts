@@ -314,6 +314,17 @@ const OPERATIONS: Row[] = [
     otherwise: 'not_found',
   },
   {
+    op: 'card.setDue',
+    build: (w) => ({
+      op: 'card.setDue',
+      id: w.cards.open,
+      dueDate: '2026-11-07',
+      dueTime: '09:30',
+    }),
+    may: ['boardOwner', 'boardMember'],
+    otherwise: 'not_found',
+  },
+  {
     // Anyone in it may leave (there is another owner in this world); an outsider has nothing to leave.
     op: 'member.leave',
     build: (w) => ({ op: 'member.leave', workspaceId: w.workspace }),
@@ -1294,6 +1305,55 @@ describe(`the roles (${leg})`, () => {
         title: 'Secret',
       });
       expect(await cardDetail(database, w.accounts.member, secret)).toBeUndefined();
+    });
+
+    it('sets a due date and time together, and clears the time with the date', async () => {
+      const w = await seedWorld(database);
+      expect(
+        await apply(w, 'boardMember', {
+          op: 'card.setDue',
+          id: w.cards.open,
+          dueDate: '2026-11-07',
+          dueTime: '09:30',
+        }),
+      ).toMatchObject({
+        status: 'applied',
+        rows: { card: { dueDate: '2026-11-07', dueTime: '09:30' } },
+      });
+      const read = await cardDetail(database, w.accounts.member, w.cards.open);
+      expect(read).toMatchObject({ dueDate: '2026-11-07', dueTime: '09:30' });
+      // A date alone, then none: whatever time is sent with no date is not kept.
+      await apply(w, 'boardMember', {
+        op: 'card.setDue',
+        id: w.cards.open,
+        dueDate: '2026-12-01',
+        dueTime: null,
+      });
+      expect(await cardDetail(database, w.accounts.member, w.cards.open)).toMatchObject({
+        dueDate: '2026-12-01',
+        dueTime: null,
+      });
+      await apply(w, 'boardMember', {
+        op: 'card.setDue',
+        id: w.cards.open,
+        dueDate: null,
+        dueTime: '10:00',
+      });
+      expect(await cardDetail(database, w.accounts.member, w.cards.open)).toMatchObject({
+        dueDate: null,
+        dueTime: null,
+      });
+      // The board carries it on the tile.
+      await apply(w, 'boardMember', {
+        op: 'card.setDue',
+        id: w.cards.open,
+        dueDate: '2026-11-08',
+        dueTime: null,
+      });
+      const tile = (await readBoard(database, w.accounts.member, w.boards.publicBoard))?.cards.find(
+        (c) => c.id === w.cards.open,
+      );
+      expect(tile).toMatchObject({ dueDate: '2026-11-08', dueTime: null });
     });
 
     it('reads archived cards for whoever can see the board, and for nobody else', async () => {

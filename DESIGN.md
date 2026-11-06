@@ -610,6 +610,9 @@ One function, `todayFor(zone, now)` in `src/time.ts`, is the idea of "today" eve
 
 The due date picker offers Today, Tomorrow and Next week, then the design system's `DatePicker`, and a time once a date is set.
 
+**As built (task 4.2):** the Desk's `setDue` writes `dueDate` and `dueTime` in one change and no other action names them; the validator refuses a time with no date; on a board `card.setDue`
+does the same through the door.
+
 ## 12. Recurrence (the Desk)
 
 A Desk card can repeat. A board card does not in phase 1: a card on a shared board is a piece of work, not a habit.

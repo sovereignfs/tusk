@@ -3,6 +3,8 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { useState } from 'react';
 import type { CardTile } from '../workspaces/format';
+import { formatDue } from '../format-due';
+import { browserZone, todayFor } from '../time';
 import { Icon, Menu } from '../ui';
 import styles from './BoardScreen.module.css';
 
@@ -87,15 +89,18 @@ export function CardTileView({
 
 /** What a tile shows, also drawn in the overlay that follows the pointer. */
 export function TileBody({ card }: { card: CardTile }) {
+  // A due date is floating, shown as written; today is the browser's own (DESIGN.md §11), and overdue is the danger colour.
+  const due = card.dueDate
+    ? formatDue(card.dueDate, card.dueTime, todayFor(browserZone(), Date.now()))
+    : null;
   return (
     <>
       <span className={styles.cardTitle}>{card.title}</span>
       {card.dueDate || card.hasDescription ? (
         <span className={styles.badges}>
-          {card.dueDate ? (
-            <span className={styles.badge}>
-              <Icon name="calendar" aria-hidden /> {card.dueDate}
-              {card.dueTime ? ` ${card.dueTime}` : ''}
+          {due ? (
+            <span className={`${styles.badge} ${due.overdue ? styles.overdue : ''}`}>
+              <Icon name="calendar" aria-hidden /> {due.text}
             </span>
           ) : null}
           {card.hasDescription ? (

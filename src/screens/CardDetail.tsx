@@ -17,6 +17,8 @@ import { useLocal, useSync } from '../sync/react';
 import { Button, FormField, Input, SegmentedControl, Select, Textarea } from '../ui';
 import { text } from './fields';
 import styles from './CardDetail.module.css';
+import { dueOf, setDue } from '../actions/due';
+import { DuePicker } from '../dates/DuePicker';
 import { StarButton } from './StarButton';
 import { Checklist } from './Checklist';
 import { useUndo } from './Undo';
@@ -116,6 +118,15 @@ function Fields({ card, onDeleted }: { card: LocalRow; onDeleted: () => void }) 
           ]}
         />
         <StarButton card={card} />
+      </div>
+      <div className={styles.bar}>
+        <DuePicker
+          value={dueOf(card)}
+          onChange={(due) => {
+            const result = setDue(card, due, ids);
+            if (result.ok) void client.commit(result.mutation);
+          }}
+        />
       </div>
       <FormField label="Title">
         {(field) => (

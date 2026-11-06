@@ -540,6 +540,18 @@ async function run(
       await takeOffBoard(tx, request.id, accountId, 'not_found');
       return { removedBoardMember: { boardId: request.id, accountId }, version };
     }
+    case 'card.setDue': {
+      const changed = await dbAll<{ boardId: string }>(
+        tx,
+        sql`UPDATE ${t.card} SET due_date = ${request.dueDate}, due_time = ${request.dueDate === null ? null : request.dueTime}, updated_at = ${now}
+            WHERE id = ${request.id} AND board_id IN ${boardsEditableBy(tx, accountId)}
+            RETURNING board_id AS "boardId"`,
+      );
+      const boardId = changed[0]?.boardId;
+      if (!boardId) throw new Refused('not_found');
+      const version = await touchBoard(tx, boardId, boardsEditableBy(tx, accountId), now);
+      return { card: await cardTile(tx, request.id), version };
+    }
     case 'workspace.rename': {
       // The permission is in the statement: only an owner's workspace is a row it can reach.
       const changed = await dbAll<{ createdAt: number | string }>(

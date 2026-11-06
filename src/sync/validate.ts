@@ -243,6 +243,17 @@ export function parseStructure(value: unknown, options: ChangeOptions = {}): Par
     if (Object.keys(fields).length > 0) out.fields = fields;
   }
 
+  // There is no time without a date (DESIGN.md §11). A change says both together (`actions/due.ts`), so a time given with no date, or with a date that is
+  // none, is not one an action made. A date that is ciphertext cannot be read, and is taken to be there.
+  if (kind === 'desk_card') {
+    const time = fields.dueTime;
+    const date = fields.dueDate;
+    if (time && 'v' in time && time.v !== null) {
+      const dated = date !== undefined && ('c' in date || date.v !== null);
+      if (!dated) return no('dueTime: a time needs a date');
+    }
+  }
+
   if (creating) {
     for (const key of REQUIRED_ON_CREATE[kind])
       if (!Object.hasOwn(out, key)) return no(`${key}: a new row needs it`);

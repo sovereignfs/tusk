@@ -40,6 +40,7 @@ export const OPS = [
   'boardMember.remove',
   'board.join',
   'board.leave',
+  'card.setDue',
 ] as const;
 export type OpName = (typeof OPS)[number];
 
@@ -128,7 +129,14 @@ export type Op =
   /** The asker becomes a member: anyone in the workspace on a public board, and a workspace owner on any (§7.2). */
   | { readonly op: 'board.join'; readonly id: string }
   /** The asker leaves it, and is unassigned from its cards. */
-  | { readonly op: 'board.leave'; readonly id: string };
+  | { readonly op: 'board.leave'; readonly id: string }
+  /** A date as written on a calendar, and a time with it if wanted: floating, in no zone (DESIGN.md §11). No time without a date. Both together, so that they cannot disagree. */
+  | {
+      readonly op: 'card.setDue';
+      readonly id: string;
+      readonly dueDate: string | null;
+      readonly dueTime: string | null;
+    };
 
 export type Visibility = 'public' | 'private';
 

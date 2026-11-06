@@ -3,6 +3,9 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useBoardStore } from '../boards/context';
+import { DuePicker } from '../dates/DuePicker';
+import { formatDue } from '../format-due';
+import { browserZone, todayFor } from '../time';
 import { Button, Dialog, FormField, Input, Textarea } from '../ui';
 import { type CardDetail, WORKSPACE_LIMITS } from '../workspaces/format';
 import styles from './CardDialog.module.css';
@@ -19,6 +22,8 @@ export function CardDialog({ detail: first }: { detail: CardDetail }) {
   const store = useBoardStore();
   const router = useRouter();
   const editable = store.editable;
+  // The card as the board holds it, which is what changes at once when its due date is set.
+  const tile = store.view.cards.find((each) => each.id === first.id);
   const [detail, setDetail] = useState(first);
   const [title, setTitle] = useState(first.title);
   const [description, setDescription] = useState(first.description ?? '');
@@ -29,16 +34,24 @@ export function CardDialog({ detail: first }: { detail: CardDetail }) {
 
   // Another person may have changed the card: when the board is read again with a new version, so is the card, unless it is being typed in.
   const version = store.view.board.version;
+  // Counts every change to what is typed, so that a read that began before a keystroke is not allowed to put the old text back over it.
+  const touched = useRef(0);
+  useEffect(() => {
+    touched.current += 1;
+  }, [title, description]);
   useEffect(() => {
     const untouched = title === saved.current.title && description === saved.current.description;
     if (!untouched) return;
     let alive = true;
+    const started = touched.current;
     void (async () => {
       try {
         const reply = await fetch(`/api/cards/${detail.id}`, { cache: 'no-store' });
         if (reply.status === 404) return close();
         if (!reply.ok || !alive) return;
         const next = ((await reply.json()) as { card: CardDetail }).card;
+        // Typed in since the read began: what is on the screen is newer than what was read.
+        if (touched.current !== started) return;
         saved.current = { title: next.title, description: next.description ?? '' };
         setDetail(next);
         setTitle(next.title);
@@ -107,7 +120,27 @@ export function CardDialog({ detail: first }: { detail: CardDetail }) {
             {detail.archived ? ' · archived' : ''}
           </p>
 
-          {/* The chips (labels, assignees, due date) go here, with 18.2's successors. */}
+          {/* The chips: the due date now, labels and assignees with their tasks. */}
+          <div className={styles.chips}>
+            {editable ? (
+              <DuePicker
+                value={{ date: tile?.dueDate ?? null, time: tile?.dueTime ?? null }}
+                onChange={(due) =>
+                  void store.perform({
+                    op: 'card.setDue',
+                    id: detail.id,
+                    dueDate: due.date,
+                    dueTime: due.date === null ? null : due.time,
+                  })
+                }
+              />
+            ) : tile?.dueDate ? (
+              <span className={styles.chip}>
+                Due{' '}
+                {formatDue(tile.dueDate, tile.dueTime, todayFor(browserZone(), Date.now())).text}
+              </span>
+            ) : null}
+          </div>
 
           {editable ? (
             <FormField label="Description">

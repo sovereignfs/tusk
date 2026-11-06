@@ -179,6 +179,27 @@ describe('cards on a board', () => {
     ).toBe(false);
   });
 
+  it('shows a due date and time on the tile, and no time without a date', () => {
+    const v = base();
+    const due = showingBoard(v, {
+      op: 'card.setDue',
+      id: 'x',
+      dueDate: '2026-11-07',
+      dueTime: '09:30',
+    });
+    expect(due.cards.find((c) => c.id === 'x')).toMatchObject({
+      dueDate: '2026-11-07',
+      dueTime: '09:30',
+    });
+    const cleared = showingBoard(due, {
+      op: 'card.setDue',
+      id: 'x',
+      dueDate: null,
+      dueTime: '10:00',
+    });
+    expect(cleared.cards.find((c) => c.id === 'x')).toMatchObject({ dueDate: null, dueTime: null });
+  });
+
   it('finds the position among what is shown: the top, between two, and the end, in this list or another', () => {
     const v = base();
     expect(comparePositions(cardPositionFor(v.cards, 'y', 'a', 0), 'a0')).toBe(-1);

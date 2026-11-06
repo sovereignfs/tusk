@@ -24,6 +24,7 @@ export {
   ButtonLink,
   Checkbox,
   ColorPicker,
+  DatePicker,
   ConfirmDialog,
   Dialog,
   EmptyState,

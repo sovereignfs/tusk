@@ -91,6 +91,15 @@ export function showingBoard(view: BoardView, op: Op): BoardView {
         ...view,
         cards: view.cards.map((each) => (each.id === op.id ? { ...each, title: op.title } : each)),
       };
+    case 'card.setDue':
+      return {
+        ...view,
+        cards: view.cards.map((each) =>
+          each.id === op.id
+            ? { ...each, dueDate: op.dueDate, dueTime: op.dueDate === null ? null : op.dueTime }
+            : each,
+        ),
+      };
     case 'card.describe':
       return {
         ...view,

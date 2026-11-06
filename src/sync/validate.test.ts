@@ -556,3 +556,25 @@ describe('the fields of a row, as stored', () => {
     }
   });
 });
+
+describe('a due time', () => {
+  const card = (fields: Record<string, unknown>) => ({
+    table: 'desk_card',
+    id: crypto.randomUUID(),
+    fields,
+  });
+
+  it('comes with a date, in the same change: no time without a date', () => {
+    expect(parseStructure(card({ dueDate: { v: '2026-11-07' }, dueTime: { v: '09:30' } })).ok).toBe(
+      true,
+    );
+    expect(parseStructure(card({ dueDate: { v: null }, dueTime: { v: null } })).ok).toBe(true);
+    expect(parseStructure(card({ dueDate: { v: '2026-11-07' } })).ok).toBe(true);
+    // A date cleared with a time left, a time with no date said, and a time alone.
+    expect(parseStructure(card({ dueDate: { v: null }, dueTime: { v: '09:30' } })).ok).toBe(false);
+    expect(parseStructure(card({ dueTime: { v: '09:30' } })).ok).toBe(false);
+    // A time that is cleared needs no date, and a sealed date is taken to be there.
+    expect(parseStructure(card({ dueTime: { v: null } })).ok).toBe(true);
+    expect(parseStructure(card({ dueDate: { c: 'YWdl' }, dueTime: { v: '09:30' } })).ok).toBe(true);
+  });
+});

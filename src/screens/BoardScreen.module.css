@@ -317,3 +317,8 @@
   align-items: center;
   gap: var(--sv-space-2);
 }
+
+/* Overdue is shown in the danger colour (DESIGN.md §11). */
+.overdue {
+  color: var(--sv-color-error-text);
+}

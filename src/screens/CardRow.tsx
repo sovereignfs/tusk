@@ -12,6 +12,9 @@ import { Checkbox } from '../ui';
 import { text } from './fields';
 import { InProgressMark } from './InProgressMark';
 import { ProgressRing } from './ProgressRing';
+import { dueOf } from '../actions/due';
+import { formatDue } from '../format-due';
+import { browserZone, todayFor } from '../time';
 import { StarButton } from './StarButton';
 import styles from './ListScreen.module.css';
 
@@ -50,6 +53,12 @@ export function CardRow({
   const [asked, setAsked] = useState<boolean | null>(null);
   const checked = asked ?? done;
   const title = text(card, 'title', 'Untitled card');
+  const due = dueOf(card);
+  const shown = due.date
+    ? formatDue(due.date, due.time, todayFor(browserZone(), Date.now()))
+    : null;
+  const dueText = shown?.text ?? '';
+  const overdue = shown?.overdue ?? false;
 
   // The copy has caught up with what was asked (or something else changed it): the box goes back to showing the copy.
   useEffect(() => setAsked(null), [done]);
@@ -94,6 +103,9 @@ export function CardRow({
       >
         {title}
       </Link>
+      {due.date ? (
+        <span className={`${styles.due} ${overdue ? styles.overdue : ''}`}>{dueText}</span>
+      ) : null}
       {statusOf(card) === 'in_progress' ? <InProgressMark className={styles.started} /> : null}
       {progress && progress.total > 0 ? (
         <ProgressRing done={progress.done} total={progress.total} />

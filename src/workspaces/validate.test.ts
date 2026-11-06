@@ -42,6 +42,7 @@ describe('an operation', () => {
       'boardMember.remove',
       'board.join',
       'board.leave',
+      'card.setDue',
     ]);
   });
 
@@ -180,6 +181,32 @@ describe('an operation', () => {
       { op: 'board.leave', id: 'x' },
     ])
       expect(parseOp({ opId: ID(), ...bad }).ok, JSON.stringify(bad)).toBe(false);
+  });
+
+  it('takes a due date and time together, and no time without a date, and nothing that is not a date or a time', () => {
+    const a = ID();
+    for (const good of [
+      { dueDate: '2026-11-07', dueTime: '09:30' },
+      { dueDate: '2026-11-07', dueTime: null },
+      { dueDate: null, dueTime: null },
+    ])
+      expect(
+        parseOp({ opId: ID(), op: 'card.setDue', id: a, ...good }).ok,
+        JSON.stringify(good),
+      ).toBe(true);
+    for (const bad of [
+      { dueDate: null, dueTime: '09:30' },
+      { dueDate: '2026-02-30', dueTime: null },
+      { dueDate: '2026-11-07', dueTime: '24:00' },
+      { dueDate: '2026-11-07', dueTime: '9:30' },
+      { dueDate: '2026-11-07' },
+      { dueTime: null },
+      { dueDate: 20261107, dueTime: null },
+    ])
+      expect(
+        parseOp({ opId: ID(), op: 'card.setDue', id: a, ...bad }).ok,
+        JSON.stringify(bad),
+      ).toBe(false);
   });
 
   it('refuses a colour that is not #rrggbb, a position that is not one, a blank name and a key it does not take', () => {
