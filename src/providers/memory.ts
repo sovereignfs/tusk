@@ -52,15 +52,28 @@ export class MemoryProvider implements Provider {
    * sees what the host has and may not write.
    */
   constructor(
-    private readonly options: { token?: string; presented?: string; readOnly?: boolean } = {},
+    private readonly options: {
+      token?: string;
+      presented?: string;
+      readOnly?: boolean;
+      only?: ReadonlySet<string>;
+    } = {},
     repositories: Map<string, StoredRepository> = new Map(),
   ) {
     this.repositories = repositories;
   }
 
   /** The same host, reached with another credential: for the tests of one that is not accepted and one that may only read. */
-  view(options: { presented?: string; readOnly?: boolean }): MemoryProvider {
-    return new MemoryProvider({ ...this.options, ...options }, this.repositories);
+  view(options: {
+    presented?: string;
+    readOnly?: boolean;
+    only?: readonly RepositoryRef[];
+  }): MemoryProvider {
+    const { only, ...rest } = options;
+    return new MemoryProvider(
+      { ...this.options, ...rest, ...(only ? { only: new Set(only.map(key)) } : {}) },
+      this.repositories,
+    );
   }
 
   /** The messages of a branch's commits, newest first, for a test to look at. */
@@ -136,7 +149,9 @@ export class MemoryProvider implements Provider {
 
   private must(ref: RepositoryRef): StoredRepository {
     const repository = this.repositories.get(key(ref));
-    if (!repository) throw new ProviderError('not_found');
+    // A repository this credential was not made for is not there, as a host says it.
+    if (!repository || (this.options.only && !this.options.only.has(key(ref))))
+      throw new ProviderError('not_found');
     return repository;
   }
 
@@ -160,6 +175,15 @@ export class MemoryProvider implements Provider {
     checkRepository(ref);
     checkBranch(branch);
     return this.must(ref).writable && this.options.readOnly !== true;
+  }
+
+  async reachable(): Promise<number> {
+    this.enter('reachable');
+    const only = this.options.only;
+    return Math.min(
+      100,
+      [...this.repositories.keys()].filter((name) => only === undefined || only.has(name)).length,
+    );
   }
 
   async getHead(ref: RepositoryRef, branch: string): Promise<string> {

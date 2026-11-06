@@ -143,7 +143,7 @@ A person's data can come in and go out, keeps itself safe in their own repositor
 | 71  | [9.2](docs/epics/portability.md) | Import                              | P1       | 5.2, 9.1                   | ✅     |
 | 72  | [10.1](docs/epics/backup.md)     | Credentials at rest                 | P1       | 1.5                        | ✅     |
 | 73  | [10.2](docs/epics/backup.md)     | The provider, and GitHub            | P1       | 1.2                        | ✅     |
-| 74  | [10.3](docs/epics/backup.md)     | Connecting with a token             | P1       | 2.7, 10.1, 10.2            | 📋     |
+| 74  | [10.3](docs/epics/backup.md)     | Connecting with a token             | P1       | 2.7, 10.1, 10.2            | ✅     |
 | 75  | [10.4](docs/epics/backup.md)     | Making a backup                     | P1       | 9.1, 10.3, 13.2            | 📋     |
 | 76  | [10.5](docs/epics/backup.md)     | Modes, and the auto job             | P1       | 1.6, 10.4                  | 📋     |
 | 77  | [14.1](docs/epics/encryption.md) | Keys and the field cipher           | P1       | 13.1                       | 📋     |

@@ -20,6 +20,8 @@ export interface Harness {
   readonly unauthorized: Provider;
   /** One whose credential is accepted and may only read. */
   readonly readOnly: Provider;
+  /** One whose credential was made for this repository alone: it can see no other. */
+  only(ref: RepositoryRef): Provider;
   /** What the credential is: it must be in no error. */
   readonly secret: string;
   repository(options?: {
@@ -90,6 +92,21 @@ export function describeProviderContract(name: string, harness: () => Harness): 
       expect(await h.readOnly.canWrite(ref, 'main')).toBe(false);
       const archived = await h.repository({ archived: true });
       expect(await h.provider.canWrite(archived, 'main')).toBe(false);
+    });
+
+    it('says how many repositories the credential can reach: one that was made for a repository reaches that one', async () => {
+      const h = harness();
+      const first = await h.repository();
+      const before = await h.provider.reachable();
+      expect(before).toBeGreaterThanOrEqual(1);
+      await h.repository();
+      expect(await h.provider.reachable()).toBe(Math.min(100, before + 1));
+      const narrow = h.only(first);
+      expect(await narrow.reachable()).toBe(1);
+      expect((await narrow.getRepository(first)).name).toBe(first.name);
+      const other = await h.repository();
+      await failsWith(narrow.getRepository(other), 'not_found');
+      await failsWith(h.unauthorized.reachable(), 'unauthorized');
     });
 
     it('tells where a branch is, that a branch is not there, and that a repository with nothing in it has no head', async () => {

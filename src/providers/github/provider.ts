@@ -186,6 +186,12 @@ export class GitHubProvider implements Provider {
     return asRecord(data.permissions).push === true && data.archived !== true;
   }
 
+  async reachable(): Promise<number> {
+    const { body } = await this.read('/user/repos?per_page=100');
+    if (!Array.isArray(body)) throw new ProviderError('unavailable');
+    return body.length;
+  }
+
   async getHead(ref: RepositoryRef, branch: string): Promise<string> {
     checkRepository(ref);
     checkBranch(branch);

@@ -66,7 +66,10 @@ interface Failure {
 
 export class FakeGitHub {
   readonly requests: { method: string; path: string }[] = [];
-  private readonly tokens = new Map<string, { write: boolean }>();
+  private readonly tokens = new Map<
+    string,
+    { write: boolean; only: ReadonlySet<string> | undefined }
+  >();
   private readonly repositories = new Map<
     string,
     { gitDir: string; private: boolean; defaultBranch: string; archived: boolean }
@@ -81,11 +84,12 @@ export class FakeGitHub {
     readonly url: string,
   ) {}
 
-  static async start(): Promise<FakeGitHub> {
+  /** Listens on `wanted`, or on any free one: a browser test names it, since the app under test is told the address before the test runs. */
+  static async start(wanted = 0): Promise<FakeGitHub> {
     const directory = await mkdtemp(join(tmpdir(), 'fake-github-'));
     const holder: { fake?: FakeGitHub } = {};
     const server = createServer((request, response) => void holder.fake?.handle(request, response));
-    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    await new Promise<void>((resolve) => server.listen(wanted, '127.0.0.1', resolve));
     const { port } = server.address() as AddressInfo;
     holder.fake = new FakeGitHub(server, directory, `http://127.0.0.1:${port}`);
     return holder.fake;
@@ -97,9 +101,18 @@ export class FakeGitHub {
     await rm(this.directory, { recursive: true, force: true });
   }
 
-  /** A token the server accepts, and whether it may write. */
-  addToken(token: string, options: { write?: boolean } = {}): void {
-    this.tokens.set(token, { write: options.write ?? true });
+  /**
+   * A token the server accepts, whether it may write, and which repositories it can see: all of them, or only these (what a fine-grained token limited to a
+   * repository is). A repository it cannot see is a 404, as GitHub answers it.
+   */
+  addToken(
+    token: string,
+    options: { write?: boolean; only?: readonly RepositoryRef[] } = {},
+  ): void {
+    this.tokens.set(token, {
+      write: options.write ?? true,
+      only: options.only ? new Set(options.only.map(key)) : undefined,
+    });
   }
 
   /** A repository, with an initial commit of `files` on its default branch, or empty with `files: null`. */
@@ -289,16 +302,29 @@ export class FakeGitHub {
     const grant = token ? this.tokens.get(token) : undefined;
     if (!grant) return this.send(response, 401, { message: 'Bad credentials' });
 
+    // The repositories the token can reach, as `GET /user/repos` lists them (one page of a hundred).
+    if (path === '/user/repos' && method === 'GET') {
+      const reachable = [...this.repositories.entries()]
+        .filter(([name]) => grant.only === undefined || grant.only.has(name))
+        .slice(0, 100)
+        .map(([name, each]) => ({
+          full_name: name,
+          name: name.split('/')[1],
+          private: each.private,
+        }));
+      return this.send(response, 200, reachable);
+    }
+
     const match = /^\/repos\/([^/]+)\/([^/]+)(\/.*)?$/.exec(path);
-    const repository = match
-      ? this.repositories.get(
-          key({
-            owner: decodeURIComponent(match[1] as string),
-            name: decodeURIComponent(match[2] as string),
-          }),
-        )
+    const asked = match
+      ? {
+          owner: decodeURIComponent(match[1] as string),
+          name: decodeURIComponent(match[2] as string),
+        }
       : undefined;
-    if (!match || !repository) return this.send(response, 404, { message: 'Not Found' });
+    const repository = asked ? this.repositories.get(key(asked)) : undefined;
+    if (!match || !asked || !repository || (grant.only && !grant.only.has(key(asked))))
+      return this.send(response, 404, { message: 'Not Found' });
     const rest = match[3] ?? '';
     const { gitDir } = repository;
 

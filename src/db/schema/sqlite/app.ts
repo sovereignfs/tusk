@@ -183,3 +183,18 @@ export const credential = sqliteTable(
     index('credential_key_idx').on(table.keyFingerprint),
   ],
 );
+
+/**
+ * The repository an account backs up to (DESIGN.md §21), one per account. **The credential is not here:** `credential_id` names the sealed token in
+ * `credential` (`src/crypto/`), so this row can be read, logged and exported by the same code that touches nothing secret. `kind` is how it was connected
+ * (`token`; `app` with task 10.7); `repository` is `owner/name` and `branch` the default branch it was found to have. The columns for the backups themselves
+ * (mode, times, failures) are added by the tasks that make them.
+ */
+export const backupConnection = sqliteTable('backup_connection', {
+  accountId: ref('account_id').primaryKey(),
+  kind: text('kind').notNull(),
+  repository: text('repository').notNull(),
+  branch: text('branch').notNull(),
+  credentialId: ref('credential_id').notNull(),
+  createdAt: epochMs('created_at').notNull(),
+});

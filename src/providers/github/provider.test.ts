@@ -40,6 +40,11 @@ function harness(): Harness {
     provider: make(WRITE),
     unauthorized: make(BAD),
     readOnly: make(READ),
+    only: (ref) => {
+      const token = `ghp_PLANTED_only_${(counter += 1)}_0123456789`;
+      fake.addToken(token, { write: true, only: [ref] });
+      return make(token);
+    },
     secret: WRITE,
     repository: (options) => newRef(options),
     files: (ref, branch) => fake.files(ref, branch),

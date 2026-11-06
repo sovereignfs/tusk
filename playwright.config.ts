@@ -17,6 +17,8 @@ import { defineConfig, devices } from '@playwright/test';
  * The secret below is for this throwaway instance only.
  */
 const PORT = 3999;
+/** Where the fake GitHub of `e2e/backup.spec.ts` listens: the app under test is told this before the test starts it. */
+const GITHUB_PORT = 3998;
 const SECRET = 'e2e-only-secret-not-for-anything-real-0123456789';
 const directory = mkdtempSync(join(tmpdir(), 'tusk-e2e-'));
 
@@ -66,6 +68,9 @@ export default defineConfig({
       TUSK_AUTH_LOCAL: '1',
       TUSK_AUTH_SECRET: SECRET,
       TUSK_AUTH_SIGNUP: 'closed',
+      // A key, so that a repository can be connected, and a GitHub that is on this machine: for this throwaway instance only.
+      TUSK_ENCRYPTION_KEY: 'e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0',
+      TUSK_GITHUB_API_URL: `http://127.0.0.1:${GITHUB_PORT}`,
     } as Record<string, string>,
   },
 });

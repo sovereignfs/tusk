@@ -5,6 +5,7 @@ import { lastSyncedAt } from '../local/store';
 import { addressOf } from '../screens/PublishingSection';
 import { deskFile, everythingFile, save } from '../portability/client';
 import { useLocal, useSync } from '../sync/react';
+import { BackupSection } from './BackupSection';
 import { ImportSection } from './ImportSection';
 import { Button } from '../ui';
 import type { Publication } from '../workspaces/format';
@@ -12,8 +13,8 @@ import styles from './Account.module.css';
 
 /**
  * Settings, Data (DESIGN.md §19): when this device last heard from the server, read from the device; and the boards of the person that are published
- * (§14.6), so that they can see what of theirs is public and take it back. Export, backup, encryption and deleting the account join with the tasks that
- * build them (9.1, 10.3, 14.2, 2.8).
+ * (§14.6), so that they can see what of theirs is public and take it back. Encryption and deleting the account join with the tasks that build them
+ * (14.2, 2.8); backing up to git is `BackupSection`.
  */
 export function DataSection() {
   const client = useSync();
@@ -109,6 +110,7 @@ export function DataSection() {
         ) : null}
       </div>
       <ImportSection />
+      <BackupSection />
       <div className={styles.group}>
         <h2>Published boards</h2>
         {failed ? <p className={styles.muted}>This needs a connection.</p> : null}

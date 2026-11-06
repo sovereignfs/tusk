@@ -76,6 +76,11 @@ export interface Provider {
   canWrite(ref: RepositoryRef, branch: string): Promise<boolean>;
   /** The commit a branch is at. `empty_repository` if there is none, `not_found` if the branch is not there. */
   getHead(ref: RepositoryRef, branch: string): Promise<string>;
+  /**
+   * How many repositories the credential can reach, up to a hundred: a token that was made for one repository reaches one, and a person is told when it
+   * reaches more than they meant to give (DESIGN.md §21.2).
+   */
+  reachable(): Promise<number>;
   /** Puts the files on the branch in one commit on top of `expectedHead`. `head_moved` and nothing written if the branch is elsewhere. */
   commit(ref: RepositoryRef, request: CommitRequest): Promise<Commit>;
 }

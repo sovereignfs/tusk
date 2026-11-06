@@ -13,6 +13,7 @@ function harness(): Harness {
     provider: host,
     unauthorized: host.view({ presented: 'not-the-token' }),
     readOnly: host.view({ readOnly: true }),
+    only: (ref) => host.view({ only: [ref] }),
     secret: SECRET,
     async repository(options = {}) {
       const ref = { owner: 'ada', name: `repo-${(counter += 1)}` };
