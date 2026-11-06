@@ -203,6 +203,15 @@ async function applyChange(
     await insertRow(tx, accountId, change, seq, options.now);
     touched.created[table] += 1;
   } else {
+    // A list's key is set once (DESIGN.md §9.2): everything sealed under it depends on it, so a change that would put another there is refused whole, and
+    // two devices that both start to seal a list leave it with the first one's, and the second's work is undone with it.
+    if (change.table === 'desk_list' && change.fields && Object.hasOwn(change.fields, 'key')) {
+      const have = decodeFields(existing.fields);
+      const old = have.ok ? have.value.key : undefined;
+      const sent = change.fields.key;
+      if (old && 'v' in old && !(sent && 'v' in sent && sent.v === old.v))
+        throw new Refused('invalid');
+    }
     await updateRow(
       tx,
       accountId,

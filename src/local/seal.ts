@@ -59,6 +59,20 @@ const keyOfRow = (row: LocalRow | undefined): string | undefined => {
   return field && 'v' in field && typeof field.v === 'string' ? field.v : undefined;
 };
 
+/** The names of a row's fields that are content in the clear: what a Desk with a key of its own must not have. */
+export const plainContentOf = (row: LocalRow): string[] =>
+  Object.entries(row.fields)
+    .filter(([name, field]) => 'v' in field && !isStructural(row.table, name))
+    .map(([name]) => name);
+
+/** Whether a mutation carries content in the clear. */
+export const hasPlainContent = (mutation: Mutation): boolean =>
+  mutation.changes.some((change) =>
+    Object.entries(change.fields ?? {}).some(
+      ([name, field]) => 'v' in field && !isStructural(change.table, name),
+    ),
+  );
+
 export class DeskCipher {
   /** Rows with a field that could not be opened, as `table\0id`: for a person to be told of, never for what they say. */
   readonly unreadable = new Set<string>();
@@ -196,12 +210,19 @@ export class DeskCipher {
    * list with all its fields, and its checklist, sealed again under that list's key. **A mutation that cannot be sealed throws, and nothing is written.**
    * Over the limit of changes in a mutation, it comes back as several, in order.
    */
-  async seal(db: LocalDatabase, mutation: Mutation): Promise<Mutation[]> {
-    // A list made by this mutation gets its key now, so that the cards put in it by the same mutation can be sealed.
+  async seal(
+    db: LocalDatabase,
+    mutation: Mutation,
+    options: { adopt?: boolean } = {},
+  ): Promise<Mutation[]> {
+    // A list made by this mutation gets its key now, so that the cards put in it by the same mutation can be sealed. With `adopt`, so does a list that exists
+    // and has none because it was made before there was a key (moving a Desk to one, §9.3); the server keeps the first key a list is given and refuses
+    // another, so two devices that both do this leave one key and the other's work is undone whole.
     const made = new Map<string, { wrapped: string; key: CryptoKey }>();
     for (const change of mutation.changes) {
       if (change.table !== 'desk_list' || made.has(change.id)) continue;
-      if (await db.get('desk_list', change.id)) continue;
+      const have = (await db.get('desk_list', change.id)) as LocalRow | undefined;
+      if (have && !(options.adopt && keyOfRow(have) === undefined)) continue;
       const raw = newListKey();
       const wrapped = await wrapListKey(raw, this.recipient);
       made.set(change.id, { wrapped, key: await importListKey(raw) });

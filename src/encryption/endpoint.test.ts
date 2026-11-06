@@ -10,8 +10,25 @@ import * as sqliteApp from '../db/schema/sqlite/app';
 import { testTarget } from '../db/test-support';
 import { RateLimiter } from '../limits/rate';
 import { makeStore } from '../sync/test-support';
-import { type EncryptionDeps, encryptionSetup, encryptionSkip, encryptionStatus } from './endpoint';
-import { plainFor, readEncryption, setUpPersonalKey, skipKeyOffer } from './state';
+import {
+  type EncryptionDeps,
+  encryptionBegin,
+  encryptionFinish,
+  encryptionSetup,
+  encryptionSkip,
+  encryptionStatus,
+} from './endpoint';
+import {
+  beginMove,
+  finishMove,
+  plainFor,
+  plainRemaining,
+  readEncryption,
+  setUpPersonalKey,
+  skipKeyOffer,
+} from './state';
+import { applyMutation } from '../sync/apply';
+import { card, list, mutation } from '../sync/test-support';
 
 /**
  * `/api/encryption` (DESIGN.md §9.1) with two real accounts: who may call it, that a key is set up once and one way, that the server holds a public key and
@@ -44,6 +61,11 @@ const routes = (extra: Partial<EncryptionDeps> = {}) => ({
     t.deps,
   ),
   skip: accountRoute(({ accountId }) => encryptionSkip(accountId, deps(extra)), t.deps),
+  begin: accountRoute(
+    ({ request, accountId }) => encryptionBegin(request, accountId, deps(extra)),
+    t.deps,
+  ),
+  finish: accountRoute(({ accountId }) => encryptionFinish(accountId, deps(extra)), t.deps),
 });
 const post = (who: typeof t.ada | null, path: string, body?: unknown, headers = {}) =>
   t.request(who, path, { method: 'POST', ...(body === undefined ? {} : { body }), headers });
@@ -201,5 +223,82 @@ describe(`the Desk’s key (${leg})`, () => {
     expect(plainFor('none')).toBe('check');
     expect(plainFor('moving')).toBe('check');
     expect(plainFor('personal')).toBe('refuse');
+  });
+
+  describe('moving a Desk with things in it', () => {
+    it('is for someone signed in and from the app, and refused in the operator’s mode', async () => {
+      const r = routes();
+      expect((await r.begin(post(null, '/api/encryption/begin', {}))).status).toBe(401);
+      expect((await r.finish(post(null, '/api/encryption/finish'))).status).toBe(401);
+      const foreign = { origin: 'https://evil.example' };
+      expect((await r.begin(post(t.ada, '/api/encryption/begin', {}, foreign))).status).toBe(403);
+      const { recipient } = await createIdentity();
+      const operator = routes({ operatorEncryption: true });
+      expect(
+        (await operator.begin(post(t.ada, '/api/encryption/begin', { recipient }))).status,
+      ).toBe(403);
+      expect((await operator.finish(post(t.ada, '/api/encryption/finish'))).status).toBe(403);
+    });
+
+    it('goes from none to moving to personal, once, on the same key, and a move that was not begun cannot be finished', async () => {
+      const owner = crypto.randomUUID();
+      const { recipient } = await createIdentity();
+      expect(await finishMove(database, owner)).toEqual({ ok: false, reason: 'not_moving' });
+      expect((await beginMove(database, owner, 'age1nope', 1)).ok).toBe(false);
+      const begun = await beginMove(database, owner, recipient, 1);
+      expect(begun).toMatchObject({ ok: true, state: { mode: 'moving', recipient } });
+      // The same key again is the same success, another is refused, and the key is not changed.
+      expect((await beginMove(database, owner, recipient, 2)).ok).toBe(true);
+      const other = (await createIdentity()).recipient;
+      expect(await beginMove(database, owner, other, 3)).toEqual({ ok: false, reason: 'already' });
+      expect((await readEncryption(database, owner)).recipient).toBe(recipient);
+      expect(await finishMove(database, owner)).toMatchObject({
+        ok: true,
+        state: { mode: 'personal' },
+      });
+      // Finished, it is finished: the same answer, and it does not go back.
+      expect(await finishMove(database, owner)).toMatchObject({
+        ok: true,
+        state: { mode: 'personal' },
+      });
+      expect(await beginMove(database, owner, other, 4)).toEqual({ ok: false, reason: 'already' });
+    });
+
+    it('does not finish while something is in the clear, and counts what is', async () => {
+      const owner = crypto.randomUUID();
+      const { recipient } = await createIdentity();
+      const l = list({ title: 'In the clear' });
+      await applyMutation(database, owner, mutation(l, card(l.id)), { now: 1_800_000_000_000 });
+      expect(await plainRemaining(database, owner)).toBe(2);
+      await beginMove(database, owner, recipient, 1);
+      expect(await finishMove(database, owner)).toEqual({
+        ok: false,
+        reason: 'plain_remains',
+        remaining: 2,
+      });
+      expect((await readEncryption(database, owner)).mode).toBe('moving');
+      // A list's key is plain, and is not content.
+      const sealed = {
+        table: 'desk_list' as const,
+        id: crypto.randomUUID(),
+        position: 'a0',
+        fields: { title: { c: 'A'.repeat(40) }, key: { v: 'K'.repeat(330) } },
+      };
+      const other = crypto.randomUUID();
+      await applyMutation(database, other, mutation(sealed), { now: 1_800_000_000_000 });
+      expect(await plainRemaining(database, other)).toBe(0);
+    });
+
+    it('through the routes: a Desk that is finished stays finished, another key is 409, and what is not a request is 400', async () => {
+      const r = routes();
+      // Ada’s Desk was set up earlier in this file: finishing it again is the same success, and it cannot be begun with another key.
+      expect((await r.finish(post(t.ada, '/api/encryption/finish'))).status).toBe(200);
+      const other = (await createIdentity()).recipient;
+      expect(
+        (await r.begin(post(t.ada, '/api/encryption/begin', { recipient: other }))).status,
+      ).toBe(409);
+      for (const body of [{}, { recipient: 5 }, { recipient: 'age1nope' }])
+        expect((await r.begin(post(t.ada, '/api/encryption/begin', body))).status).toBe(400);
+    });
   });
 });

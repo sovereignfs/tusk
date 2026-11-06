@@ -5,6 +5,7 @@ import {
   type ReactNode,
   createContext,
   useCallback,
+  useRef,
   useContext,
   useEffect,
   useMemo,
@@ -12,7 +13,8 @@ import {
 } from 'react';
 import { parseIdentity } from '../cipher/identity';
 import { forgetKey, keepIdentity, loadIdentity } from '../cipher/vault';
-import { DeskCipher } from '../local/seal';
+import { type Progress, moveToKey } from '../local/migrate';
+import { DeskCipher, cipherOf } from '../local/seal';
 import { useSync } from '../sync/react';
 
 /**
@@ -34,6 +36,10 @@ export interface KeyApi {
   readonly recipient: string | null;
   /** Whether the Desk is sealed to a key (set up, or being moved to one), whether or not this device has it yet: what hides the Desk meanwhile. */
   readonly sealed: boolean;
+  /** Whether the Desk is being moved to its key: the key is set up, and some of the Desk may still be in the clear until this device has sealed it. */
+  readonly moving: boolean;
+  /** How far this device has got in sealing the Desk, while it is doing it. */
+  readonly progress: Progress | null;
   /** Whether this server offers personal keys at all (not in the operator's mode). */
   readonly available: boolean;
   /** The key, as the thing that opens list keys, while unlocked. */
@@ -79,6 +85,8 @@ const Context = createContext<KeyApi | null>(null);
 const NONE: KeyApi = {
   status: 'plain',
   sealed: false,
+  moving: false,
+  progress: null,
   recipient: null,
   available: false,
   identity: undefined,
@@ -97,10 +105,16 @@ export function KeyProvider({ accountId, children }: { accountId: string; childr
   const [server, setServer] = useState<Server | undefined>(() => undefined);
   const [identity, setIdentity] = useState<string | CryptoKey | undefined>(undefined);
   const [loaded, setLoaded] = useState(false);
+  const [progress, setProgress] = useState<Progress | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  const serverRef = useRef<Server | undefined>(undefined);
+  const lastAsked = useRef(0);
 
   /** Takes the device's key, if it has one and it is the one the Desk was set up with. */
   const settle = useCallback(
     async (known: Server) => {
+      serverRef.current = known;
+      lastAsked.current = Date.now();
       setServer(known);
       if (known.mode === 'none' || known.recipient === null) {
         client.setCipher(undefined);
@@ -145,6 +159,63 @@ export function KeyProvider({ accountId, children }: { accountId: string; childr
     void refresh();
   }, [refresh]);
 
+  // A device that has the key seals what is still in the clear while the Desk is moving, and asks the server to finish when nothing is (DESIGN.md §9.3).
+  // It is read from the working copy each time, so closing the tab or losing the network only stops it, and the next start picks it up.
+  const moving = loaded && server?.mode === 'moving' && identity !== undefined;
+  useEffect(() => {
+    if (!moving) return undefined;
+    let stop = false;
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    setProgress({ done: 0, total: 0 });
+    moveToKey(client, {
+      onProgress: (each) => !stop && setProgress(each),
+      stopped: () => stop,
+      finish: async () => {
+        const reply = await fetch('/api/encryption/finish', { method: 'POST' });
+        if (reply.ok) return 'done';
+        const body = (await reply.json().catch(() => ({}))) as {
+          code?: string;
+          remaining?: number;
+        };
+        return body.code === 'PLAIN_REMAINS' ? { plainRemains: body.remaining ?? 0 } : 'not_moving';
+      },
+    })
+      .then(async (result) => {
+        if (stop) return;
+        if (result === 'done') await refresh();
+        else retry = setTimeout(() => setAttempt((n) => n + 1), 15_000);
+        setProgress(null);
+      })
+      .catch(() => {
+        // No network, most likely: what is sealed is kept, and it is tried again.
+        if (!stop) retry = setTimeout(() => setAttempt((n) => n + 1), 15_000);
+        setProgress(null);
+      });
+    return () => {
+      stop = true;
+      if (retry) clearTimeout(retry);
+    };
+  }, [attempt, client, moving, refresh]);
+
+  // Before a sync sends anything, this device finds out whether the Desk got a key while it was away. With the key it seals what it had made in the clear;
+  // without it, it holds that back, and the Desk shows the unlock screen, so that nothing is lost and nothing is sent in the clear to a Desk that takes none.
+  useEffect(() => {
+    client.setGate(async () => {
+      if (Date.now() - lastAsked.current > 20_000) await refresh();
+      const mode = serverRef.current?.mode;
+      if (mode === undefined || mode === 'none') return true;
+      if (cipherOf(client.db)) {
+        // The lists' keys are learned first, without sending anything; then what was made in the clear is sealed. What cannot be is not sent.
+        if (await client.hasPlainWaiting()) {
+          await client.sync({ pullOnly: true });
+          await client.resealOutbox();
+        }
+      }
+      return mode !== 'personal' || !(await client.hasPlainWaiting());
+    });
+    return () => client.setGate(undefined);
+  }, [client, refresh]);
+
   const api = useMemo<KeyApi>(() => {
     const status: KeyStatus = !loaded
       ? 'loading'
@@ -158,21 +229,26 @@ export function KeyProvider({ accountId, children }: { accountId: string; childr
     return {
       status,
       sealed: server !== undefined && server.mode !== 'none',
+      moving: server?.mode === 'moving',
+      progress,
       recipient: server?.recipient ?? null,
       available: server?.available ?? false,
       identity,
       async setUp(secret) {
         try {
           const recipient = await age.identityToRecipient(secret);
-          const reply = await fetch('/api/encryption/setup', {
+          // The secret is on this device before the server hears that there is a key, so that a failure between the two leaves a key with nothing sealed to it
+          // and never a Desk sealed to a key nobody has.
+          await keepIdentity(accountId, secret);
+          const reply = await fetch('/api/encryption/begin', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ recipient }),
           });
-          if (reply.status === 409) return 'conflict';
-          if (!reply.ok) return 'failed';
-          // The secret is kept on this device before anything shows that the Desk is sealed to it.
-          await keepIdentity(accountId, secret);
+          if (!reply.ok) {
+            await forgetKey(accountId);
+            return reply.status === 409 ? 'conflict' : 'failed';
+          }
           await refresh();
           return 'ok';
         } catch {
@@ -208,7 +284,7 @@ export function KeyProvider({ accountId, children }: { accountId: string; childr
         setIdentity(undefined);
       },
     };
-  }, [accountId, client, identity, loaded, refresh, server]);
+  }, [accountId, client, identity, loaded, progress, refresh, server]);
 
   return <Context.Provider value={api}>{children}</Context.Provider>;
 }

@@ -36,6 +36,15 @@ export function Frame({ children }: { children: ReactNode }) {
         {locked ? <div /> : <Sidebar />}
         <div style={{ padding: mobile ? 'var(--sv-space-4)' : 'var(--sv-space-6)' }}>
           {onDesk ? <KeyOffer /> : null}
+          {onDesk && key.progress ? (
+            <p role="status" aria-label="Sealing the Desk">
+              Sealing your Desk with your key
+              {key.progress.total > 0
+                ? `: ${Math.min(key.progress.done, key.progress.total)} of ${key.progress.total}`
+                : ''}
+              . You can go on using it.
+            </p>
+          ) : null}
           {locked && onDesk ? <UnlockKey /> : children}
         </div>
         {card && !mobile && !locked ? <CardDetail cardId={card} /> : null}

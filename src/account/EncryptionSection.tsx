@@ -1,6 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import { Button } from '../ui';
+import { KeyOffer } from '../screens/KeyOffer';
 import { useKey } from '../screens/KeyContext';
 import styles from './Account.module.css';
 
@@ -11,6 +13,7 @@ import styles from './Account.module.css';
  */
 export function EncryptionSection() {
   const key = useKey();
+  const [turningOn, setTurningOn] = useState(false);
   return (
     <div className={styles.group}>
       <h2>Encryption</h2>
@@ -23,10 +26,22 @@ export function EncryptionSection() {
         </p>
       ) : null}
       {key.status === 'plain' && key.available ? (
-        <p className={styles.muted}>
-          Your Desk is stored as plain text on the server, as you chose. A key of your own can be
-          turned on later.
-        </p>
+        <>
+          <p className={styles.muted}>
+            Your Desk is stored as plain text on the server. You can seal it with a key of your own
+            at any time; your Desk is sealed on this device and sent in the background, and you can
+            go on using it. It cannot be turned back off: to go back, export and start again.
+          </p>
+          {turningOn ? (
+            <KeyOffer force />
+          ) : (
+            <div className={styles.row}>
+              <Button variant="secondary" onClick={() => setTurningOn(true)}>
+                Turn on a key of my own
+              </Button>
+            </div>
+          )}
+        </>
       ) : null}
       {key.status === 'offer' ? (
         <p className={styles.muted}>
@@ -41,7 +56,20 @@ export function EncryptionSection() {
       ) : null}
       {key.status === 'unlocked' ? (
         <>
-          <p role="status">Your Desk is sealed with a key of your own, and this device has it.</p>
+          <p role="status">
+            {key.moving
+              ? 'Your Desk is being sealed with a key of your own, and this device has it.'
+              : 'Your Desk is sealed with a key of your own, and this device has it.'}
+          </p>
+          {key.progress ? (
+            <p role="status" aria-label="Sealing the Desk">
+              Sealing:{' '}
+              {key.progress.total > 0
+                ? `${Math.min(key.progress.done, key.progress.total)} of ${key.progress.total}`
+                : 'starting'}
+              . It carries on if you close this page or lose the connection.
+            </p>
+          ) : null}
           <p className={styles.hint}>
             It stays on this device until you sign out. Nobody can recover it for you: keep the file
             you saved.

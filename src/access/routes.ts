@@ -66,6 +66,9 @@ export const ROUTES: RouteRule[] = [
   { route: '/api/encryption', methods: { GET: { kind: 'account' } } },
   { route: '/api/encryption/setup', methods: { POST: { kind: 'account' } } },
   { route: '/api/encryption/skip', methods: { POST: { kind: 'account' } } },
+  // Moving a Desk with things in it to a key of its own (DESIGN.md §9.3).
+  { route: '/api/encryption/begin', methods: { POST: { kind: 'account' } } },
+  { route: '/api/encryption/finish', methods: { POST: { kind: 'account' } } },
   { route: '/api/inbox', methods: { GET: { kind: 'account' } } },
   { route: '/api/inbox/seen', methods: { POST: { kind: 'account' } } },
   { route: '/api/inbox/unread', methods: { GET: { kind: 'account' } } },

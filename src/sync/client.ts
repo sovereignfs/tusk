@@ -1,7 +1,7 @@
 import { deleteCard } from '../actions/cards';
 import { duplicateOccurrences } from '../actions/series';
 import type { LocalDatabase } from '../local/db';
-import { type DeskCipher, attachCipher, cipherOf } from '../local/seal';
+import { type DeskCipher, attachCipher, cipherOf, hasPlainContent } from '../local/seal';
 import {
   type Refusal,
   type Settled,
@@ -40,6 +40,8 @@ export class InvalidMutation extends Error {
 export type SyncOutcome =
   | { status: 'synced' }
   | { status: 'offline' }
+  /** The Desk has a key this device does not, so what it has to send is held (DESIGN.md §9.3) until it is given the key. */
+  | { status: 'held' }
   | { status: 'signed-out' }
   | { status: 'update-required' }
   | { status: 'account-deleted' }
@@ -97,6 +99,65 @@ export class SyncClient {
     this.announce('write');
   }
 
+  private gate: (() => Promise<boolean>) | undefined;
+
+  /**
+   * A question asked before each sync, answered true to go on. The key context uses it to learn whether the Desk has a key before a device that was away
+   * sends changes made in the clear: it seals what is waiting if it has the key, and holds it if it has not (DESIGN.md §9.3).
+   */
+  setGate(gate: (() => Promise<boolean>) | undefined): void {
+    this.gate = gate;
+  }
+
+  /**
+   * Seals what is waiting to be sent, where it is in the clear: edits made before the Desk had a key, or on a device that had not heard that it did. The
+   * waiting changes keep their place in the order. Returns how many entries were sealed.
+   */
+  async resealOutbox(): Promise<number> {
+    const db = this.options.db;
+    const cipher = cipherOf(db);
+    if (!cipher) return 0;
+    let sealed = 0;
+    for (const entry of await readOutbox(db, Number.MAX_SAFE_INTEGER)) {
+      if (!hasPlainContent(entry.mutation)) continue;
+      let parts: Mutation[];
+      try {
+        parts = await cipher.seal(db, entry.mutation);
+      } catch {
+        // A list this device has not heard the key of yet: it stays as it is, and is not sent.
+        continue;
+      }
+      const [first, ...rest] = parts;
+      if (!first) continue;
+      await db.put('outbox', { n: entry.n, mutation: first, queuedAt: entry.queuedAt });
+      for (const extra of rest)
+        await db.add('outbox', { mutation: extra, queuedAt: entry.queuedAt });
+      sealed += 1;
+    }
+    return sealed;
+  }
+
+  /** Whether anything waiting to be sent has content in the clear. */
+  async hasPlainWaiting(): Promise<boolean> {
+    return (await readOutbox(this.options.db, Number.MAX_SAFE_INTEGER)).some((entry) =>
+      hasPlainContent(entry.mutation),
+    );
+  }
+
+  /** Commits a mutation of the move to a key (§9.3): like `commit`, and a list with no key is given one. */
+  async commitMigration(mutation: unknown): Promise<void> {
+    const parsed = parseMutation(mutation);
+    if (!parsed.ok) throw new InvalidMutation(parsed.reason);
+    const cipher = cipherOf(this.options.db);
+    if (!cipher) throw new InvalidMutation('the move needs the key');
+    for (const part of await cipher.seal(this.options.db, parsed.value, { adopt: true })) {
+      const sealed = parseMutation(part);
+      if (!sealed.ok) throw new InvalidMutation(sealed.reason);
+      await commitMutation(this.options.db, part, this.now());
+    }
+    this.announce('write');
+  }
+
   /**
    * Gives this working copy the key to seal and open with, or takes it away. What is shown is read again: the same rows that were blank ciphertext a
    * moment ago are the Desk.
@@ -149,10 +210,15 @@ export class SyncClient {
    * Sends the outbox and takes the answer, and again while there is more to send or to take, up to `maxRounds`. **Never throws for the network**:
    * what went wrong is the outcome, and the outbox is left as it was, so that the next try sends the same.
    */
-  async sync(): Promise<SyncOutcome> {
+  async sync(options: { pullOnly?: boolean } = {}): Promise<SyncOutcome> {
+    // Whether this device may send what it has is asked first (see `setGate`): a Desk that got a key while it was away must not be sent to in the clear.
+    // `pullOnly` sends nothing, so it asks nothing: it is how a device with a key finds out what it needs before it seals what it holds.
+    if (!options.pullOnly && this.gate && !(await this.gate())) return { status: 'held' };
     const rounds = this.options.maxRounds ?? 200;
     for (let round = 0; round < rounds; round++) {
-      const sent = await readOutbox(this.options.db, LIMITS.mutationsPerRequest);
+      const sent = options.pullOnly
+        ? []
+        : await readOutbox(this.options.db, LIMITS.mutationsPerRequest);
       const cursor = await readCursor(this.options.db);
       const result = await this.options.transport({
         protocol: PROTOCOL_VERSION,

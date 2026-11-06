@@ -1,6 +1,9 @@
 import { sql } from 'drizzle-orm';
 import type { Database } from '../db/client';
 import { dbAll, dbGet } from '../db/exec';
+import { TABLES } from '../sync/format';
+import { tableOf } from '../sync/tables';
+import { STRUCTURAL_FIELDS, decodeFields } from '../sync/validate';
 import * as postgresApp from '../db/schema/postgres/app';
 import * as sqliteApp from '../db/schema/sqlite/app';
 
@@ -104,3 +107,98 @@ export async function skipKeyOffer(
 /** What the sync endpoint takes of an account in this mode (DESIGN.md §9.4): an account with a key of its own sends no plain content, and one being moved to it sends both. */
 export const plainFor = (mode: EncryptionMode): 'check' | 'refuse' =>
   mode === 'personal' ? 'refuse' : 'check';
+
+export type MoveResult =
+  | { readonly ok: true; readonly state: EncryptionState }
+  | { readonly ok: false; readonly reason: 'invalid' | 'already' };
+
+/**
+ * A Desk that has things in it starts to move to a key of its own (DESIGN.md §9.3): `none` to `moving`, by a conditional update, with the public key. From
+ * then until it is finished the server takes plain content and ciphertext alike, so that a device that has not heard can still be heard; the browser that has
+ * the key seals everything it finds in the clear. The same key again is the same success, so that a request repeated, or a device that came back, is no error.
+ */
+export async function beginMove(
+  database: Database,
+  accountId: string,
+  recipient: string,
+  now: number,
+): Promise<MoveResult> {
+  if (!RECIPIENT.test(recipient)) return { ok: false, reason: 'invalid' };
+  await ensureRow(database, accountId, now);
+  const won = await dbAll<{ id: string }>(
+    database,
+    sql`UPDATE ${table(database)} SET encryption = 'moving', recipient = ${recipient}, key_offered_at = ${now}
+        WHERE account_id = ${accountId} AND encryption = 'none' RETURNING account_id AS id`,
+  );
+  const state = await readEncryption(database, accountId);
+  if (won.length > 0 || (state.mode !== 'none' && state.recipient === recipient))
+    return { ok: true, state };
+  return { ok: false, reason: 'already' };
+}
+
+/** Whether a field is content (and so is sealed) rather than structure the server reads. */
+const isContent = (name: string, tableName: (typeof TABLES)[number]) =>
+  !(STRUCTURAL_FIELDS[tableName] ?? []).includes(name);
+
+/**
+ * How many rows of the account still have a field in the clear. **This is what lets a move finish:** the server cannot read the fields, but it can see which
+ * are ciphertext, and a Desk with a plain one left is not yet the person's alone.
+ */
+export async function plainRemaining(database: Database, accountId: string): Promise<number> {
+  let count = 0;
+  for (const name of TABLES) {
+    const rows = await dbAll<{ fields: string }>(
+      database,
+      sql`SELECT fields FROM ${tableOf(database, name)} WHERE owner_id = ${accountId} AND fields LIKE '%"v"%'`,
+    );
+    for (const row of rows) {
+      const decoded = decodeFields(row.fields);
+      if (
+        decoded.ok &&
+        Object.entries(decoded.value).some(
+          ([field, value]) => 'v' in value && isContent(field, name),
+        )
+      )
+        count += 1;
+    }
+  }
+  return count;
+}
+
+export type FinishResult =
+  | { readonly ok: true; readonly state: EncryptionState }
+  | {
+      readonly ok: false;
+      readonly reason: 'not_moving' | 'plain_remains';
+      readonly remaining?: number;
+    };
+
+/**
+ * `moving` to `personal`, once nothing of the Desk is left in the clear, and not before (the conditional update holds only while it is still `moving`).
+ * After it the server refuses plain content for the account (§9.4). Asked again when it is done, it is the same success.
+ */
+export async function finishMove(database: Database, accountId: string): Promise<FinishResult> {
+  const before = await readEncryption(database, accountId);
+  if (before.mode === 'personal') return { ok: true, state: before };
+  if (before.mode !== 'moving') return { ok: false, reason: 'not_moving' };
+  const remaining = await plainRemaining(database, accountId);
+  if (remaining > 0) return { ok: false, reason: 'plain_remains', remaining };
+  await dbAll(
+    database,
+    sql`UPDATE ${table(database)} SET encryption = 'personal'
+        WHERE account_id = ${accountId} AND encryption = 'moving' RETURNING account_id`,
+  );
+  // A device that had not heard could write in the clear between the count and the switch. From the switch the server refuses that, so a second count is
+  // final: if something got in, the move goes back to moving and the browser seals it.
+  const late = await plainRemaining(database, accountId);
+  if (late > 0) {
+    await dbAll(
+      database,
+      sql`UPDATE ${table(database)} SET encryption = 'moving'
+          WHERE account_id = ${accountId} AND encryption = 'personal' RETURNING account_id`,
+    );
+    return { ok: false, reason: 'plain_remains', remaining: late };
+  }
+  const state = await readEncryption(database, accountId);
+  return state.mode === 'personal' ? { ok: true, state } : { ok: false, reason: 'not_moving' };
+}

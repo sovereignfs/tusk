@@ -32,9 +32,29 @@ test('a key is made here, saved and said to be saved, and turns on a Desk that w
   await expect(page.getByRole('button', { name: 'User menu' })).toBeVisible();
   await page.goto('/desk');
 
-  // Offered once, on the Desk, with what it does and does not cover.
+  // Offered once, on the Desk, with what it does and does not cover; the person says Skip, and goes on with a Desk in the clear, as most people will.
   const offer = page.getByRole('region', { name: 'A key for your Desk' });
   await expect(offer).toContainText('Boards are shared, and the server can read them');
+  await offer.getByRole('button', { name: 'Skip' }).click();
+  await expect(offer).toHaveCount(0);
+  await expect(page.getByRole('link', { name: /^Backlog/ })).toBeVisible();
+  await page.getByLabel('Add a card').fill(secret);
+  await page.getByLabel('Add a card').press('Enter');
+  await expect(page.getByRole('link', { name: secret, exact: true })).toBeVisible();
+  const serverView = async () => {
+    const reply = await page.request.post('/api/sync', {
+      headers: { origin: 'http://localhost:3997' },
+      data: { protocol: PROTOCOL_VERSION, cursor: 0, mutations: [] },
+    });
+    const text = await reply.text();
+    const rows = (JSON.parse(text) as { pull: { rows: unknown[] } }).pull.rows.length;
+    return text.includes('Secret plan') ? 'in the clear' : rows >= 2 ? 'sealed' : 'not yet';
+  };
+  await expect.poll(serverView).toBe('in the clear');
+
+  // Later, from Settings, the Desk with things in it is moved to a key of its own, which has to be saved first.
+  await page.goto('/account?section=data');
+  await page.getByRole('button', { name: 'Turn on a key of my own' }).click();
   await offer.getByRole('button', { name: 'Create a key' }).click();
   await expect(offer).toContainText('Nobody can recover this key');
   const shown = (await offer.getByLabel('Your key').innerText()).trim();
@@ -58,26 +78,22 @@ test('a key is made here, saved and said to be saved, and turns on a Desk that w
   await turnOn.click();
   await expect(offer).toHaveCount(0);
 
-  // The Desk works as it always did, and a card is kept.
-  await expect(page.getByRole('link', { name: /^Backlog/ })).toBeVisible();
-  await page.getByLabel('Add a card').fill(secret);
-  await page.getByLabel('Add a card').press('Enter');
-  await expect(page.getByRole('link', { name: secret, exact: true })).toBeVisible();
-
-  // What the server holds is sealed: it is asked for everything of the account, as a new device would, and neither the card nor the list is in it.
+  // The Desk goes on working while it is sealed, and when it is done the server holds nothing of it in the clear, the card and the first list included.
+  await expect(page.getByText('this device has it')).toBeVisible();
+  await expect.poll(serverView, { timeout: 30_000 }).toBe('sealed');
   await expect
-    .poll(async () => {
-      const reply = await page.request.post('/api/sync', {
-        headers: { origin: 'http://localhost:3997' },
-        data: { protocol: PROTOCOL_VERSION, cursor: 0, mutations: [] },
-      });
-      const text = await reply.text();
-      if (text.includes('Secret plan') || text.includes('Backlog')) return 'in the clear';
-      return (JSON.parse(text) as { pull: { rows: unknown[] } }).pull.rows.length >= 2
-        ? 'sealed'
-        : 'not yet';
+    .poll(async () => (await (await page.request.get('/api/encryption')).json()).mode)
+    .toBe('personal');
+  const everything = await (
+    await page.request.post('/api/sync', {
+      headers: { origin: 'http://localhost:3997' },
+      data: { protocol: PROTOCOL_VERSION, cursor: 0, mutations: [] },
     })
-    .toBe('sealed');
+  ).text();
+  expect(everything).not.toContain('Secret plan');
+  expect(everything).not.toContain('Backlog');
+  await page.goto('/desk');
+  await expect(page.getByRole('link', { name: secret, exact: true })).toBeVisible();
 
   // Settings says so.
   await page.goto('/account?section=data');

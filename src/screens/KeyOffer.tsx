@@ -2,8 +2,6 @@
 
 import { useState } from 'react';
 import { createIdentity, keyFile, parseIdentity, type Identity } from '../cipher/identity';
-import { allLists, cardCount } from '../local/store';
-import { useLocal } from '../sync/react';
 import { Alert, Button, Checkbox, Textarea } from '../ui';
 import { useKey } from './KeyContext';
 import styles from './KeyOffer.module.css';
@@ -38,13 +36,8 @@ function download(text: string) {
  * key they already have, from a file or a paste, the same key they may use elsewhere. **Skip** keeps the Desk plain; Settings can turn a key on later.
  * Boards are shared and the server reads them, and the offer says so.
  */
-export function KeyOffer() {
+export function KeyOffer({ force = false }: { force?: boolean }) {
   const key = useKey();
-  // A Desk that already has things in it is moved to a key of its own by Settings (task 14.4), not made over by this offer.
-  const content = useLocal(async (db) => ({
-    lists: (await allLists(db)).length,
-    cards: await cardCount(db),
-  }));
   const [step, setStep] = useState<'ask' | 'create' | 'upload'>('ask');
   const [made, setMade] = useState<Identity | undefined>(undefined);
   const [saved, setSaved] = useState(false);
@@ -53,8 +46,7 @@ export function KeyOffer() {
   const [problem, setProblem] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
 
-  if (key.status !== 'offer' || content === undefined) return null;
-  const empty = content.lists === 0 && content.cards === 0;
+  if (key.status !== 'offer' && !force) return null;
 
   async function begin() {
     setMade(await createIdentity());
@@ -86,31 +78,21 @@ export function KeyOffer() {
       <p>
         Your Desk can be yours alone: sealed with a key that only your devices have, so that the
         server, and whoever runs it, cannot read your lists and cards. Boards are shared, and the
-        server can read them.
+        server can read them. What was written before stays as it was: earlier backups of the
+        database, and files already committed to a backup repository, remain readable.
       </p>
       {problem ? <Alert variant="error">{problem}</Alert> : null}
-      {step === 'ask' && !empty ? (
-        <>
-          <p>
-            Your Desk already has things in it, and it stays plain text for now. Moving it to a key
-            of your own is done from Settings, in a later update.
-          </p>
-          <div className={styles.row}>
-            <Button variant="secondary" onClick={() => void key.skip()}>
-              Skip
-            </Button>
-          </div>
-        </>
-      ) : null}
-      {step === 'ask' && empty ? (
+      {step === 'ask' ? (
         <div className={styles.row}>
           <Button onClick={() => void begin()}>Create a key</Button>
           <Button variant="secondary" onClick={() => setStep('upload')}>
             Use a key I have
           </Button>
-          <Button variant="secondary" onClick={() => void key.skip()}>
-            Skip
-          </Button>
+          {force ? null : (
+            <Button variant="secondary" onClick={() => void key.skip()}>
+              Skip
+            </Button>
+          )}
         </div>
       ) : null}
       {step === 'create' && made ? (

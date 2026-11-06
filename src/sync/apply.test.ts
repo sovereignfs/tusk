@@ -845,4 +845,39 @@ describe(`applying a mutation (${leg})`, () => {
     const rows = (await snapshot(database, ada)).desk_card as { fields: string }[];
     expect(rows[0]?.fields).not.toContain('"v"');
   });
+
+  it('keeps the first key a list is given and refuses a change that would put another there, whole', async () => {
+    const owner = account();
+    const [one, two] = ['K'.repeat(330), 'J'.repeat(330)];
+    const l = list({ fields: { title: { c: CIPHER } } });
+    applied(await apply(owner, mutation(l)));
+    // A list that has none takes one, and the same one again is nothing.
+    applied(
+      await apply(owner, mutation({ table: 'desk_list', id: l.id, fields: { key: { v: one } } })),
+    );
+    applied(
+      await apply(owner, mutation({ table: 'desk_list', id: l.id, fields: { key: { v: one } } })),
+    );
+    // Another is refused, and the rest of that mutation with it: a card sealed under the other key is not kept.
+    const c = card(l.id, { fields: { title: { c: CIPHER } } });
+    const refused = await apply(
+      owner,
+      mutation(c, { table: 'desk_list', id: l.id, fields: { key: { v: two } } }),
+    );
+    expect(refused).toMatchObject({ status: 'refused' });
+    expect(((await snapshot(database, owner)).desk_card as unknown[]) ?? []).toHaveLength(0);
+    const kept = ((await snapshot(database, owner)).desk_list as { fields: string }[])[0]?.fields;
+    expect(kept).toContain(one);
+    expect(kept).not.toContain(two);
+    // Changing the rest of the list does not touch the key.
+    applied(
+      await apply(
+        owner,
+        mutation({ table: 'desk_list', id: l.id, fields: { title: { c: `${CIPHER}x` } } }),
+      ),
+    );
+    expect(
+      ((await snapshot(database, owner)).desk_list as { fields: string }[])[0]?.fields,
+    ).toContain(one);
+  });
 });
