@@ -8,10 +8,22 @@ import { useState } from 'react';
 import { uuid } from '../access/parse';
 import { setShowCompleted, setSort } from '../actions/lists';
 import { deleteMany, isCompleted, moveCard, restoreMany, type Group } from '../actions/cards';
-import { SORTS, SORT_LABELS, canReorder, isSort, sortOf, sortCards } from '../lists/sort';
+import { isOverdue } from '../dates/overdue';
+import {
+  SORTS,
+  SORT_LABELS,
+  canReorder,
+  dropWithinGroup,
+  dueAt,
+  isSort,
+  pinFirst,
+  sortOf,
+  sortCards,
+} from '../lists/sort';
 import type { LocalRow } from '../local/rows';
 import { allChecksOf, cardsOf, checkCounts, getRow } from '../local/store';
 import { useHasSynced, useLocal, useSync } from '../sync/react';
+import { type LocalNow, nowHere } from '../time';
 import { Button, EmptyState, SegmentedControl, Select } from '../ui';
 import {
   VERTICAL_AUTOSCROLL,
@@ -65,12 +77,15 @@ function OpenCards({
   openId,
   counts,
   reorderable,
+  pinNow,
 }: {
   open: readonly LocalRow[];
   openId: string | null;
   counts: Map<string, { done: number; total: number }> | undefined;
   /** Only under the order the person made: under a sort, a row has no handle and a drag does nothing. */
   reorderable: boolean;
+  /** Now, when what is overdue or due today is pinned to the top: where a drag lands is then worked out with that partition in mind. */
+  pinNow: LocalNow | null;
 }) {
   const client = useSync();
   const { rendered, show } = useOptimisticOrder(open);
@@ -84,15 +99,23 @@ function OpenCards({
     const from = rendered.findIndex((card) => card.id === active.id);
     const to = rendered.findIndex((card) => card.id === over.id);
     if (from === -1 || to === -1) return;
-    const result = moveCard(rendered, String(active.id), to, { newId: () => crypto.randomUUID() });
+    // With the pinned cards on top, a drop is worked out among the cards of the group the dragged one is in, since the positions of the two groups do not run on.
+    const within = pinNow ? dropWithinGroup(rendered, String(active.id), to, pinNow) : undefined;
+    const result = within
+      ? moveCard(within.group, String(active.id), within.toIndex, ids)
+      : moveCard(rendered, String(active.id), to, ids);
     if (!result.ok) return;
-    show(
-      arrayMove(
-        rendered.map((card) => card.id),
-        from,
-        to,
-      ),
+    // What the screen will show once the write has landed: the card at its new position, and the pinned ones still first. A card dropped among the pinned
+    // ones that is not pinned goes back to its group, but with a position that is valid and between the neighbours it was dropped between.
+    const change = result.mutation.changes[0];
+    const position = change && 'position' in change ? change.position : undefined;
+    const moved = rendered.map((card) =>
+      card.id === active.id && position !== undefined ? ({ ...card, position } as LocalRow) : card,
     );
+    const expected = pinNow
+      ? pinFirst(sortCards(moved, 'custom'), pinNow)
+      : arrayMove(moved, from, to);
+    show(expected.map((card) => card.id));
     void client.commit(result.mutation);
   }
 
@@ -140,7 +163,7 @@ function OpenCards({
   );
 }
 
-type Filter = 'all' | 'active';
+type Filter = 'all' | 'active' | 'overdue';
 
 const ids = { newId: () => crypto.randomUUID() };
 
@@ -164,10 +187,15 @@ function ListCards({ list }: { list: LocalRow }) {
   })();
 
   const all = cards ?? [];
-  const open = sortCards(
+  const now = nowHere();
+  const sorted = sortCards(
     all.filter((card) => !isCompleted(card)),
     sort,
   );
+  // Under the order the person made, what is overdue or due today floats to the top; a partition, so no position changes. Under a sort it is the sort's.
+  const ordered = sort === 'custom' ? pinFirst(sorted, now) : sorted;
+  const open =
+    filter === 'overdue' ? ordered.filter((card) => isOverdue(dueAt(card), now)) : ordered;
   // Most recently finished first, whatever the sort: it is a record of what was done.
   const done = all
     .filter(isCompleted)
@@ -226,6 +254,7 @@ function ListCards({ list }: { list: LocalRow }) {
             options={[
               { label: 'All', value: 'all' },
               { label: 'Active', value: 'active' },
+              { label: 'Overdue', value: 'overdue' },
             ]}
           />
           <Select
@@ -246,7 +275,13 @@ function ListCards({ list }: { list: LocalRow }) {
       {cards !== undefined && all.length === 0 ? (
         <p className={styles.muted}>Nothing here yet.</p>
       ) : null}
-      <OpenCards open={open} openId={openId} counts={counts} reorderable={canReorder(sort)} />
+      <OpenCards
+        open={open}
+        openId={openId}
+        counts={counts}
+        reorderable={canReorder(sort)}
+        pinNow={sort === 'custom' ? now : null}
+      />
       {done.length > 0 && filter === 'all' ? (
         <div className={styles.completed}>
           <div className={styles.completedBar}>

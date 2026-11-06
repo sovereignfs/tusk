@@ -27,6 +27,14 @@ describe('a due date as shown', () => {
     expect(formatTime('13:45', 'en-US')).toBe('1:45 PM');
   });
 
+  it('is overdue from its time today when it is given the time as well as the day', () => {
+    const at = (time: string) => ({ date: today, time });
+    expect(formatDue(today, '09:00', at('09:01'), 'en-US').overdue).toBe(true);
+    expect(formatDue(today, '09:00', at('09:00'), 'en-US').overdue).toBe(false);
+    expect(formatDue(today, null, at('23:59'), 'en-US').overdue).toBe(false);
+    expect(formatDue('2026-11-05', null, at('00:00'), 'en-US').overdue).toBe(true);
+  });
+
   it('is overdue before today, and not today or after', () => {
     expect(formatDue('2026-11-05', null, today, 'en-US').overdue).toBe(true);
     expect(formatDue('2025-12-31', null, today, 'en-US').overdue).toBe(true);

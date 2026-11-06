@@ -573,7 +573,7 @@ Order is a **position**: a string that sorts between its neighbours (fractional 
 One row per move is what makes order survive two offline devices at all.
 
 Under "Custom" order, cards that are overdue or due today float to the top of the list (a partition, not a change to their position). Dragging is
-computed against what is on the screen, then translated to a position between the visible neighbours (§17.10).
+computed against what is on the screen, then translated to a position between the visible neighbours (§17.10). A drop is worked out among the cards of the dragged card's own group (pinned or not), since the positions of the two groups do not run on from one to the other.
 
 ### 10.5 Seeing a list
 

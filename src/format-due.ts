@@ -1,4 +1,5 @@
-import { addDays } from './time';
+import { isOverdue } from './dates/overdue';
+import { type LocalNow, addDays } from './time';
 
 /**
  * How a due date is shown (DESIGN.md §11): "Today", "Tomorrow", "Mar 5", and the time in the locale's 12- or 24-hour form. Pure: today is given. A date is
@@ -30,12 +31,17 @@ export function formatTime(time: string, locale?: string): string {
   }).format(new Date(Date.UTC(1970, 0, 1, h ?? 0, m ?? 0)));
 }
 
+/**
+ * `now` is today's date, or the date and time both. With the time, a card due today at a time that has gone is overdue; with the date alone, a card is
+ * overdue from the day after (it is due all day).
+ */
 export function formatDue(
   date: string,
   time: string | null,
-  today: string,
+  now: string | LocalNow,
   locale?: string,
 ): DueText {
+  const today = typeof now === 'string' ? now : now.date;
   let day: string;
   if (date === today) day = 'Today';
   else if (date === addDays(today, 1)) day = 'Tomorrow';
@@ -49,5 +55,11 @@ export function formatDue(
       ...(sameYear ? {} : { year: 'numeric' }),
     }).format(new Date(Date.UTC(y, m - 1, d)));
   }
-  return { text: time ? `${day}, ${formatTime(time, locale)}` : day, overdue: date < today };
+  return {
+    text: time ? `${day}, ${formatTime(time, locale)}` : day,
+    overdue: isOverdue(
+      { date, time },
+      typeof now === 'string' ? { date: now, time: '00:00' } : now,
+    ),
+  };
 }

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { formatDue } from '../format-due';
 import { groupByDay, noticeHref, noticeText } from '../inbox/group';
-import { browserZone, todayFor } from '../time';
+import { type LocalNow, browserZone, localNow } from '../time';
 import { Alert, Button } from '../ui';
 import type { AssignedCard, Inbox, NoticeRow } from '../workspaces/format';
 import styles from './InboxScreen.module.css';
@@ -66,7 +66,7 @@ export function InboxScreen() {
   const notices = [...(inbox?.notices ?? []), ...older];
   const zone = browserZone();
   const groups = groupByDay(notices, now, zone);
-  const today = todayFor(zone, now);
+  const today = localNow(zone, now);
 
   return (
     <div className={styles.page}>
@@ -125,7 +125,7 @@ export function InboxScreen() {
   );
 }
 
-function AssignedRow({ card, today }: { card: AssignedCard; today: string }) {
+function AssignedRow({ card, today }: { card: AssignedCard; today: LocalNow }) {
   const due = card.dueDate ? formatDue(card.dueDate, card.dueTime, today) : null;
   return (
     <li className={styles.assigned}>

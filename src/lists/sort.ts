@@ -1,5 +1,7 @@
 import type { LocalRow } from '../local/rows';
 import { byPosition } from '../local/rows';
+import { isDueTodayOrOverdue } from '../dates/overdue';
+import type { LocalNow } from '../time';
 
 /**
  * How a list's cards are ordered on the screen (DESIGN.md §10.5), **remembered per list** as a field of the list, so that it survives a reload and
@@ -77,3 +79,52 @@ function dueOf(card: LocalRow): string | undefined {
 
 /** Whether cards can be dragged into order under this sort. */
 export const canReorder = (sort: Sort): boolean => sort === 'custom';
+
+/** A card's due date and time as the pair the date rules take; a date that is ciphertext, or none, is none. */
+export function dueAt(card: LocalRow): { date: string | null; time: string | null } {
+  const date = plainText(card, 'dueDate');
+  return {
+    date: date === '' ? null : date,
+    time: date === '' ? null : plainText(card, 'dueTime') || null,
+  };
+}
+
+/**
+ * Under Custom order, the cards that are overdue or due today float to the top (DESIGN.md §10.4): **a partition, not a change to any position.** The
+ * pinned ones come first and the rest after, each group in the order it was given, so nothing moves that does not have to and no row is written. Pure,
+ * given now. Under any other sort the order is the sort's and nothing is pinned.
+ */
+export function pinFirst(cards: readonly LocalRow[], now: LocalNow): LocalRow[] {
+  const pinned: LocalRow[] = [];
+  const rest: LocalRow[] = [];
+  for (const card of cards) (isDueTodayOrOverdue(dueAt(card), now) ? pinned : rest).push(card);
+  return [...pinned, ...rest];
+}
+
+/**
+ * Where a drag lands once the pinned cards are on top (DESIGN.md §10.4). The screen shows two groups in one column, and the positions of the two do not
+ * run on from one to the other, so the neighbours of a drop at the edge between them would be out of order. **A drop is worked out inside the group of
+ * the card that was dragged:** the cards of its group as they are shown, and the index it has among them once it has been put where it was dropped. A card
+ * dropped in the other group lands at the edge of its own, nearest where it was let go; one that does not move within its group is undefined, nothing to
+ * write. Positions of the cards of the other group are never read.
+ */
+export function dropWithinGroup(
+  rendered: readonly LocalRow[],
+  id: string,
+  to: number,
+  now: LocalNow,
+): { group: LocalRow[]; toIndex: number } | undefined {
+  const from = rendered.findIndex((card) => card.id === id);
+  const target = Math.max(0, Math.min(to, rendered.length - 1));
+  const dragged = rendered[from];
+  if (!dragged) return undefined;
+  const pinned = isDueTodayOrOverdue(dueAt(dragged), now);
+  const moved = [...rendered];
+  moved.splice(from, 1);
+  moved.splice(target, 0, dragged);
+  const inGroup = (card: LocalRow) => isDueTodayOrOverdue(dueAt(card), now) === pinned;
+  return {
+    group: rendered.filter(inGroup),
+    toIndex: moved.filter(inGroup).findIndex((card) => card.id === id),
+  };
+}

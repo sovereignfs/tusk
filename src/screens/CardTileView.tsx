@@ -5,7 +5,7 @@ import { useState } from 'react';
 import type { CardTile, LabelRow } from '../workspaces/format';
 import { useBoardPeople } from '../boards/context';
 import { formatDue } from '../format-due';
-import { browserZone, todayFor } from '../time';
+import { nowHere } from '../time';
 import { Avatar, Icon, Menu } from '../ui';
 import styles from './BoardScreen.module.css';
 
@@ -110,9 +110,7 @@ export function TileBody({ card, labels }: { card: CardTile; labels: readonly La
     .map((id) => labels.find((each) => each.id === id))
     .filter((each): each is LabelRow => each !== undefined);
   // A due date is floating, shown as written; today is the browser's own (DESIGN.md §11), and overdue is the danger colour.
-  const due = card.dueDate
-    ? formatDue(card.dueDate, card.dueTime, todayFor(browserZone(), Date.now()))
-    : null;
+  const due = card.dueDate ? formatDue(card.dueDate, card.dueTime, nowHere()) : null;
   return (
     <>
       {carried.length > 0 ? (

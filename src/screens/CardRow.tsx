@@ -14,7 +14,7 @@ import { InProgressMark } from './InProgressMark';
 import { ProgressRing } from './ProgressRing';
 import { dueOf } from '../actions/due';
 import { formatDue } from '../format-due';
-import { browserZone, todayFor } from '../time';
+import { nowHere } from '../time';
 import { StarButton } from './StarButton';
 import styles from './ListScreen.module.css';
 
@@ -54,9 +54,7 @@ export function CardRow({
   const checked = asked ?? done;
   const title = text(card, 'title', 'Untitled card');
   const due = dueOf(card);
-  const shown = due.date
-    ? formatDue(due.date, due.time, todayFor(browserZone(), Date.now()))
-    : null;
+  const shown = due.date ? formatDue(due.date, due.time, nowHere()) : null;
   const dueText = shown?.text ?? '';
   const overdue = shown?.overdue ?? false;
 

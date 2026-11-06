@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { formatDue } from '../format-due';
-import { browserZone, addDays, todayFor } from '../time';
+import { addDays, nowHere } from '../time';
 import { Button, DatePicker, Icon, Input, Popover } from '../ui';
 import styles from './DuePicker.module.css';
 
@@ -37,8 +37,9 @@ export function DuePicker({
 }) {
   const [open, setOpen] = useState(false);
   // Today as the person's own clock has it, read when the picker is shown, so that a screen left open overnight is not a day behind.
-  const today = todayFor(browserZone(), Date.now());
-  const due = value.date ? formatDue(value.date, value.time, today) : null;
+  const now = nowHere();
+  const today = now.date;
+  const due = value.date ? formatDue(value.date, value.time, now) : null;
   const choose = (date: string | null) =>
     onChange({ date, time: date === null ? null : value.time });
 

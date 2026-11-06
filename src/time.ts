@@ -73,3 +73,6 @@ export function browserZone(): string {
     return FALLBACK_ZONE;
   }
 }
+
+/** The date and time it is now in the browser's own zone: what "today" and "overdue" are measured against on a screen. Browser only. */
+export const nowHere = (): LocalNow => localNow(browserZone(), Date.now());

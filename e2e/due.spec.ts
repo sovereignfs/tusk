@@ -150,3 +150,69 @@ test('a card on a board gets a date from the dialog, shows it on its tile, shows
   await wd.getByLabel('Type the name to confirm').fill(workspace);
   await wd.getByRole('button', { name: 'Delete this workspace' }).click();
 });
+
+test('on the Desk, what is due today floats to the top under Custom, a card turns overdue at its time, and the Overdue filter shows only that', async ({
+  page,
+}) => {
+  await signedIn(page);
+  await expect(page.getByRole('link', { name: /^Backlog/ })).toBeVisible();
+  // It is 08:00 in Berlin: a card due today at 09:00 is not yet overdue.
+  await page.clock.setFixedTime(new Date('2026-11-06T08:00:00+01:00'));
+  const name = unique('Pinned');
+  await page.getByRole('button', { name: 'Add a list' }).click();
+  await page.getByLabel('New list name').fill(name);
+  await page.getByLabel('New list name').press('Enter');
+  await page
+    .getByRole('navigation', { name: 'Lists' })
+    .getByRole('link', { name: new RegExp(`^${name}`) })
+    .click();
+  await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
+  for (const title of ['Plain one', 'Late one', 'Soon one']) {
+    await page.getByLabel('Add a card').fill(title);
+    await page.getByLabel('Add a card').press('Enter');
+    await expect(page.getByRole('link', { name: title })).toBeVisible();
+  }
+
+  async function setDue(title: string, choice: 'Today' | 'Tomorrow', time?: string) {
+    await page.getByRole('link', { name: title }).click();
+    const detail = page.getByRole('region', { name: 'Card' });
+    await detail.getByRole('button', { name: 'Set a due date' }).click();
+    await page.getByRole('button', { name: choice, exact: true }).click();
+    if (time) await page.getByLabel('Time', { exact: true }).fill(time);
+    await page.keyboard.press('Escape');
+    await expect(detail.getByRole('button', { name: new RegExp(`^Due ${choice}`) })).toBeVisible();
+  }
+  await setDue('Late one', 'Today', '09:00');
+  await setDue('Soon one', 'Tomorrow');
+
+  const titles = async () =>
+    (
+      await page
+        .locator('ul li')
+        .filter({ has: page.getByRole('link') })
+        .allInnerTexts()
+    )
+      .map((text) => text.split('\n')[0] ?? '')
+      .filter((text) => ['Plain one', 'Late one', 'Soon one'].includes(text));
+
+  // A new card goes to the top, so the order made is Soon, Late, Plain; due today goes first, and nothing else moved.
+  await expect.poll(titles).toEqual(['Late one', 'Soon one', 'Plain one']);
+
+  // Not overdue at 08:00, so the filter shows nothing.
+  const show = page.getByRole('radiogroup', { name: 'Show' });
+  await show.getByRole('radio', { name: 'Overdue' }).click();
+  await expect(page.getByRole('link', { name: 'Late one' })).toHaveCount(0);
+
+  // At 10:00 it is; the filter is read again when the screen is.
+  await page.clock.setFixedTime(new Date('2026-11-06T10:00:00+01:00'));
+  await show.getByRole('radio', { name: 'All' }).click();
+  await show.getByRole('radio', { name: 'Overdue' }).click();
+  await expect(page.getByRole('link', { name: 'Late one' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Plain one' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Soon one' })).toHaveCount(0);
+
+  // Under another sort nothing is pinned: it is the sort's order (by title here; with the clock fixed every card has one creation time).
+  await show.getByRole('radio', { name: 'All' }).click();
+  await page.getByLabel('Sort by').selectOption({ label: 'Title' });
+  await expect.poll(titles).toEqual(['Late one', 'Plain one', 'Soon one']);
+});

@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useBoardPeople, useBoardStore } from '../boards/context';
 import { DuePicker } from '../dates/DuePicker';
 import { formatDue } from '../format-due';
-import { browserZone, todayFor } from '../time';
+import { nowHere } from '../time';
 import {
   Avatar,
   Button,
@@ -258,8 +258,7 @@ export function CardDialog({ detail: first }: { detail: CardDetail }) {
               />
             ) : tile?.dueDate ? (
               <span className={styles.chip}>
-                Due{' '}
-                {formatDue(tile.dueDate, tile.dueTime, todayFor(browserZone(), Date.now())).text}
+                Due {formatDue(tile.dueDate, tile.dueTime, nowHere()).text}
               </span>
             ) : null}
           </div>
