@@ -638,7 +638,7 @@ A validator parses a rule against an allow-list: `FREQ` (daily to yearly), `INTE
 The picker offers: Daily, Weekdays, Weekly, Monthly, Yearly, and Custom (every N units, on chosen weekdays, ending on a date or after N). A card shows a
 short form ("Weekly", "Every 2 weeks") and the detail the full one ("every week on Monday, Wednesday").
 
-`rrule` works in UTC, so a date crossing into it must go through `Date.UTC` and come back through `getUTC*`. Doing otherwise moves `BYDAY` matches by a
+A monthly or yearly rule on a day that some months lack (the 31st, 29 February) takes only the months that have it, as RFC 5545 says. `rrule` works in UTC, so a date crossing into it must go through `Date.UTC` and come back through `getUTC*`. Doing otherwise moves `BYDAY` matches by a
 day east of Greenwich, as the tasks plugin learned. Tests run under more than one `TZ`.
 
 ### 12.3 What the next date is

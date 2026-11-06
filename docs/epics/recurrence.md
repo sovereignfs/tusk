@@ -2,7 +2,7 @@
 
 ## Status
 
-📋 Planned
+⏳ In progress: 5.1 is done.
 
 ## Overview
 
@@ -15,7 +15,7 @@ no new row. Board cards do not repeat in phase 1.
 
 ## Tasks
 
-#### 📋 5.1 — The rule module
+#### ✅ 5.1 — The rule module
 
 **Goal:** everything about a rule, in one tested file.
 
@@ -35,6 +35,8 @@ Dates cross into `rrule` only through `Date.UTC` and back through `getUTC*`.
 **Accepts when:** property tests under the three `TZ`s of 4.1: results land on the rule's weekday; never on or before the input; monthly from the 31st;
 `COUNT` and `UNTIL` end it; a planted local-`Date` conversion fails them. `parseRule` refuses `BYHOUR`, `DTSTART`, `BYDAY` on a monthly rule and a
 201-character string.
+
+**Done as:** `src/recurrence.ts`, the only file that imports `rrule` (2.8.1, exact; a test reads `src/`, `app/` and `scripts/` and fails if another does). A rule is a structured `Rule` (`freq`, `interval`, `byDay`, `end`), and `parseRule` reads the allow-list of §12.2 or refuses with a reason (`empty`, `too_long`, `syntax`, `unknown_key`, `duplicate_key`, `freq`, `interval`, `byday`, `byday_not_weekly`, `end_both`, `count`, `until`): capitals only, no `RRULE:` prefix, `INTERVAL` and `COUNT` 1 to 999 with no leading zero, `UNTIL` as `YYYYMMDD` and a real date, `BYDAY` plain and weekly only, and what is refused is refused whole. `formatRule` writes the one canonical text (`INTERVAL=1` left out, days Monday first), so two devices that mean one rule store one string; `isRule` is the single predicate the browser's and the server's validators will share. `summary` ("Daily", "Weekdays", "Every 2 weeks") and `describe` ("every week on Monday, Wednesday", "every 3 months, until Dec 31, 2027", "every day, 5 times") are English and take no locale. `nextOccurrence`, `firstOnOrAfter` and `reanchor` are as the epic says; a date or a rule that cannot be used gives null, not a guess. **Decisions the epic left open:** the anchor is the series' first occurrence and counts toward `COUNT`; `UNTIL` is inclusive; **a monthly or yearly rule on a day some months lack (the 31st, 29 February) takes only the months that have it,** as RFC 5545 says, rather than moving to the month's last day (the design's §12.2 is silent; a person who wants the last day is not offered it by the picker, and `BYMONTHDAY` is not on the allow-list). Tests: the allow-list and what it refuses; canonical round trips; both forms of words; the next date done on time, late and early, from no due date, every N, from an anchor three decades back; monthly from the 31st and yearly from 29 February; both ends; 400 generated rules (a fixed seed) checked for landing on the rule's weekday or day of month, never on or before the later of the due date and today, and being the first such one; and a weekly run of 60 Mondays. They run under `TZ=UTC`, `Pacific/Auckland` and `America/Los_Angeles` (`pnpm test:zones` now runs this file too). **The planted fault was tried:** with the conversion changed to a local `Date`, 9 tests fail under Auckland and 5 under Los Angeles, and none under UTC, which is why the zones matter.
 
 #### 📋 5.2 — Series and completing
 

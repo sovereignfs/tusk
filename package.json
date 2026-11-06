@@ -19,7 +19,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "test": "vitest run",
-    "test:zones": "TZ=UTC vitest run src/time.test.ts && TZ=Pacific/Auckland vitest run src/time.test.ts && TZ=America/Los_Angeles vitest run src/time.test.ts",
+    "test:zones": "TZ=UTC vitest run src/time.test.ts src/recurrence.test.ts && TZ=Pacific/Auckland vitest run src/time.test.ts src/recurrence.test.ts && TZ=America/Los_Angeles vitest run src/time.test.ts src/recurrence.test.ts",
     "manifest:check": "sovereign-manifest check",
     "db:generate": "node scripts/db-generate.mjs",
     "db:dev": "node scripts/dev-db.mjs",
@@ -41,7 +41,8 @@
     "next": "^16.4.3",
     "pg": "^8.23.1",
     "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "react-dom": "^19.3.1",
+    "rrule": "2.8.1"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
