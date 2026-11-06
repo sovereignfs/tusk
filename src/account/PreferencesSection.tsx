@@ -47,6 +47,12 @@ export function PreferencesSection() {
         />
       </div>
       <p className={styles.hint}>Applies at once, on this device.</p>
+      <h2>Install</h2>
+      <p>
+        Tusk can be installed as an app, and then your Desk opens with no connection. In Chrome or
+        Edge, use the install button in the address bar. On an iPhone or iPad, open Tusk in Safari,
+        tap Share, then Add to Home Screen.
+      </p>
     </div>
   );
 }

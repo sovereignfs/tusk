@@ -1,3 +1,4 @@
+import { forgetIdentity } from '../identity';
 import { deleteLocal } from '../local/db';
 import type { SyncClient } from './client';
 
@@ -57,5 +58,7 @@ export async function leaveDevice(options: LeaveOptions): Promise<Left> {
   client?.close();
   client?.db.close();
   await (options.deleteDatabase ?? (() => deleteLocal(accountId)))();
+  // The shell offline opens for whoever is remembered here, so no one is, once they have left.
+  forgetIdentity();
   return { status: 'left' };
 }

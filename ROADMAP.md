@@ -130,7 +130,7 @@ Everything that makes the Desk worth opening each day. **Done when** the Desk ca
 | 65  | [6.2](docs/epics/views.md)       | Search                                     | P1       | 3.12           | ✅     |
 | 66  | [3.11](docs/epics/desk.md)       | Bulk select                                | P2       | 3.7, 3.8, 3.12 | ✅     |
 | 67  | [7.6](docs/epics/interface.md)   | Keyboard                                   | P2       | 3.12, 18.1     | ✅     |
-| 68  | [1.11](docs/epics/foundation.md) | The PWA                                    | P1       | 1.7, 1.8, 3.12 | 📋     |
+| 68  | [1.11](docs/epics/foundation.md) | The PWA                                    | P1       | 1.7, 1.8, 3.12 | ✅     |
 | 69  | [13.6](docs/epics/sync.md)       | Working offline                            | P1       | 1.11, 13.4     | 📋     |
 
 ### Milestone G — Data is safe

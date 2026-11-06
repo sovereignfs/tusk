@@ -56,6 +56,12 @@ export function Shortcuts() {
   const [help, setHelp] = useState(false);
 
   useEffect(() => {
+    // Whether something with its own Escape was open when the key went down: asked first, in the capture phase, because by the time this hears the key
+    // that thing has heard it too and closed, and would then look as if nothing was open.
+    let heldEscape = false;
+    const onCapture = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') heldEscape = holdsEscape();
+    };
     const onKey = (event: KeyboardEvent) => {
       const target = event.target instanceof HTMLElement ? event.target : null;
       const active = document.activeElement;
@@ -73,7 +79,7 @@ export function Shortcuts() {
           return;
         }
         if (help) setHelp(false);
-        else if (card && !holdsEscape()) router.replace(pathname);
+        else if (card && !heldEscape) router.replace(pathname);
         return;
       }
 
@@ -113,8 +119,12 @@ export function Shortcuts() {
           return;
       }
     };
+    window.addEventListener('keydown', onCapture, true);
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onCapture, true);
+      window.removeEventListener('keydown', onKey);
+    };
   }, [router, pathname, card, help]);
 
   if (!help) return null;

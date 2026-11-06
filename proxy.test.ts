@@ -144,10 +144,18 @@ describe('what the proxy looks at', () => {
   const matches = (path: string) => new RegExp(`^${matcher?.source}$`).test(path);
 
   it('is every request but the build’s static files and the icon, which cannot carry a nonce', () => {
-    for (const path of ['/', '/desk/1', '/api/health', '/sign-in', '/sw.js']) {
+    for (const path of ['/', '/desk/1', '/api/health', '/sign-in', '/shell']) {
       expect(matches(path), path).toBe(true);
     }
-    for (const path of ['/_next/static/chunks/a.js', '/_next/image', '/favicon.ico', '/icon.svg']) {
+    // The worker and the manifest are files, not pages, and carry no policy of a page.
+    for (const path of [
+      '/_next/static/chunks/a.js',
+      '/_next/image',
+      '/favicon.ico',
+      '/icon.svg',
+      '/sw.js',
+      '/manifest.webmanifest',
+    ]) {
       expect(matches(path), path).toBe(false);
     }
   });

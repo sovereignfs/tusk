@@ -13,10 +13,23 @@ import { ToastProvider } from '@/src/ui';
 export const metadata: Metadata = {
   title: { default: site.title, template: `%s · ${site.name}` },
   description: site.description,
+  icons: {
+    icon: [
+      { url: '/icons/icon.svg', type: 'image/svg+xml' },
+      { url: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+    ],
+    apple: [{ url: '/icons/apple-touch-icon.png', sizes: '180x180' }],
+  },
+  // Installed on an iPhone from Safari's share sheet, it opens as an app (DESIGN.md §17.9).
+  appleWebApp: { capable: true, title: site.name, statusBarStyle: 'default' },
 };
 
 export const viewport: Viewport = {
   colorScheme: 'light dark',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+    { media: '(prefers-color-scheme: dark)', color: '#09090b' },
+  ],
 };
 
 export default async function RootLayout({ children }: { children: ReactNode }) {

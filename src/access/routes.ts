@@ -25,6 +25,8 @@ export const ROUTES: RouteRule[] = [
   { route: '/', page: { kind: 'public' } },
   { route: '/sign-in', page: { kind: 'public' } },
   { route: '/sign-up', page: { kind: 'public' } },
+  // The page the service worker keeps (DESIGN.md §17.9): the same for everyone, with nothing of an account in it. Who is signed in is read on the device.
+  { route: '/shell', page: { kind: 'public' } },
   // The app, for someone signed in: the layout around it (`app/(app)/layout.tsx`) finds who, and each page asks for itself as well.
   // Settings (DESIGN.md §19): a page of its own, and a dialog over another page by an intercepting route at the same address.
   { route: '/account', page: { kind: 'account' } },
@@ -64,6 +66,8 @@ export const ROUTES: RouteRule[] = [
   { route: '/api/boards/[id]/archived', methods: { GET: { kind: 'account' } } },
   { route: '/api/boards/[id]/version', methods: { GET: { kind: 'account' } } },
   { route: '/api/health', methods: { GET: { kind: 'public' } } },
+  // The service worker's text (DESIGN.md §17.9): the same for everyone, the build's version and the names of its files, and nothing of an account.
+  { route: '/sw.js', methods: { GET: { kind: 'public' } } },
   // better-auth's own: it checks `Origin` and the session cookie itself, and rate-limits sign-in (src/auth/auth.ts). Absent, with a 404, when sign-in is off.
   {
     route: '/api/auth/[...all]',

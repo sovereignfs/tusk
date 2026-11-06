@@ -12,7 +12,9 @@ import { HSTS, contentSecurityPolicy, newNonce } from './src/security/csp';
  * It keeps the Edge discipline: no Node built-ins and no database. It only looks at the request, so a session is for the page to check, and a
  * proxy is never the only thing standing in the way (DESIGN.md §7).
  *
- * The service worker's cached shell (task 1.11) cannot carry a fresh nonce, so the worker builds that page itself, with a policy of its own.
+ * The service worker keeps one page, `/shell` (task 1.11), and answers a Desk address with it when there is no network. It is kept with the headers it was
+ * sent with, so the nonce in its policy is the nonce on its scripts: it needs no fresh one. A page the worker builds itself ("needs a connection") carries a
+ * policy of its own, which allows no script.
  */
 const SIGN_IN_PAGES = new Set(['/sign-in', '/sign-up']);
 
@@ -49,7 +51,7 @@ export function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     {
-      source: '/((?!_next/static|_next/image|favicon.ico|icon.svg).*)',
+      source: '/((?!_next/static|_next/image|favicon.ico|icon.svg|sw.js|manifest.webmanifest).*)',
       missing: [
         { type: 'header', key: 'next-router-prefetch' },
         { type: 'header', key: 'purpose', value: 'prefetch' },

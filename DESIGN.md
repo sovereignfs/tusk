@@ -1014,6 +1014,17 @@ Fully installable, on desktop and phone, modelled on Sovereign core (`apps/core/
 - **The service worker** caches only **the app shell, by allow-list:** a versioned set of built files and icons, and the one shell page, which holds
   nothing of a person. **No data is ever in a cache:** the Desk is in IndexedDB, named per account and deleted at sign-out, and boards are in memory.
   A test evaluates the worker and fails if anything else gets in.
+- **How the Desk opens with no network.** The page is `/shell` (`app/shell`), public and the same for everyone. With the network off, a Desk address (`/`,
+  `/desk`, `/desk/<list>`) is answered with the kept copy of it, **headers and all**: a cache keeps a response's headers with its body, so the policy and
+  the nonce on its scripts agree, and the page needs no fresh nonce. (The nonce is one that a person's browser has seen before; the page holds nothing
+  to steal, and what people write is rendered as text, never as HTML.) The page finds who is signed in **on the device** (`src/identity.ts`, kept by every
+  signed-in page and removed at sign-out), makes the same composition the server's layout makes (`SignedInArea`), and chooses the screen from the address,
+  since its own tree is not the address's. The Desk's screens read the working copy, so they need nothing more.
+- **Every other address with no network** is answered with a page the worker builds itself, saying that it needs a connection, with a link back to the
+  Desk and a policy that allows no script. **Nothing else is kept:** not a board, the Inbox, Settings, an API's answer or a page with a person's data.
+- **The worker keeps the build's own files** (the allow-list is `.next/static`, listed when `/sw.js` is served) as it installs, so that the shell can start
+  with nothing fetched. The cache is named for the build, a new build is a new worker, and the old cache is removed when the new one activates; it does not
+  take over the pages that are open.
 - **It also handles** Background Sync for the Desk (§8.3), and Push in phase 2. A new version activates at the next load, keeping the outbox.
 
 ### 17.10 What the plugins paid to learn
