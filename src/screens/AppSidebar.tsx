@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { type FormEvent, useState } from 'react';
+import { type FormEvent, useCallback, useEffect, useState } from 'react';
+import { unreadLabel } from '../inbox/group';
 import { failureMessage, useWorkspaces } from '../boards/workspaces';
 import { WORKSPACE_LIMITS, type WorkspaceRow } from '../workspaces/format';
 import { Alert, Button, Dialog, FormField, Icon, type IconName, Input } from '../ui';
@@ -30,7 +31,43 @@ export const ENTRIES: readonly Entry[] = [
     icon: 'layout-grid',
     under: ['/boards', '/b', '/w'],
   },
+  {
+    href: '/inbox',
+    label: 'Inbox',
+    icon: 'inbox',
+    under: ['/inbox'],
+  },
 ];
+
+/**
+ * How many notices are unread (DESIGN.md §16), fetched with the shell and again when the person comes back to the window, and set to nothing the moment
+ * the Inbox has marked them read. The same on every device, since it is a time kept with the account.
+ */
+function useUnread(): number {
+  const [unread, setUnread] = useState(0);
+  const read = useCallback(async () => {
+    try {
+      const reply = await fetch('/api/inbox/unread', { cache: 'no-store' });
+      if (reply.ok) setUnread(((await reply.json()) as { unread: number }).unread);
+    } catch {
+      // Offline: the count that was read stays.
+    }
+  }, []);
+  useEffect(() => {
+    void read();
+    const again = () => document.visibilityState === 'visible' && void read();
+    const seen = () => setUnread(0);
+    document.addEventListener('visibilitychange', again);
+    window.addEventListener('focus', again);
+    window.addEventListener('tusk:inbox-seen', seen);
+    return () => {
+      document.removeEventListener('visibilitychange', again);
+      window.removeEventListener('focus', again);
+      window.removeEventListener('tusk:inbox-seen', seen);
+    };
+  }, [read]);
+  return unread;
+}
 
 const isUnder = (pathname: string, prefixes: readonly string[]) =>
   prefixes.some(
@@ -40,6 +77,7 @@ const isUnder = (pathname: string, prefixes: readonly string[]) =>
 export function AppSidebar() {
   const pathname = usePathname();
   const sidebar = useSidebar();
+  const unread = useUnread();
   if (!sidebar.available || sidebar.state === 'hidden') return null;
   const rail = sidebar.state === 'rail';
 
@@ -57,11 +95,22 @@ export function AppSidebar() {
               className={styles.row}
               aria-current={isUnder(pathname, entry.under) ? 'page' : undefined}
               // A rail shows the icon alone, so the name is the label and the tooltip, and a full sidebar says it in words.
-              aria-label={rail ? entry.label : undefined}
+              aria-label={
+                entry.href === '/inbox' && unreadLabel(unread)
+                  ? `${entry.label}, ${unreadLabel(unread)} unread`
+                  : rail
+                    ? entry.label
+                    : undefined
+              }
               title={rail ? entry.label : undefined}
             >
               <Icon name={entry.icon} aria-hidden />
               {rail ? null : <span className={styles.label}>{entry.label}</span>}
+              {entry.href === '/inbox' && unreadLabel(unread) ? (
+                <span className={styles.unread} aria-hidden>
+                  {unreadLabel(unread)}
+                </span>
+              ) : null}
             </Link>
           </li>
         ))}

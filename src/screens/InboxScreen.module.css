@@ -1,0 +1,83 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sv-space-5);
+  max-width: 720px;
+  padding: var(--sv-space-6);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--sv-font-size-2xl);
+  font-weight: var(--sv-font-weight-semibold);
+}
+
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sv-space-3);
+}
+
+.bone {
+  height: 48px;
+  border-radius: var(--sv-radius-md);
+  background: var(--sv-color-surface-sunken);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sv-space-3);
+}
+
+.heading {
+  margin: 0;
+  font-size: var(--sv-font-size-lg);
+  font-weight: var(--sv-font-weight-semibold);
+}
+
+.day {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sv-space-2);
+}
+
+.dayLabel {
+  margin: 0;
+  color: var(--sv-color-text-muted);
+  font-size: var(--sv-font-size-sm);
+  font-weight: var(--sv-font-weight-semibold);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sv-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.notice {
+  color: var(--sv-color-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.assigned {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sv-space-3);
+}
+
+.muted {
+  margin: 0;
+  color: var(--sv-color-text-muted);
+  font-size: var(--sv-font-size-sm);
+}
+
+/* Overdue is shown in the danger colour (DESIGN.md §11). */
+.overdue {
+  color: var(--sv-color-error-text);
+  font-size: var(--sv-font-size-sm);
+}

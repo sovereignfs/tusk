@@ -13,6 +13,7 @@ import {
   workspacesOf,
   workspacesOwnedBy,
 } from './can';
+import { raise } from './notices';
 import { boardRowOf } from './reads';
 import {
   type OpReason,
@@ -157,6 +158,21 @@ async function run(
             ON CONFLICT (workspace_id, account_id) DO NOTHING RETURNING account_id AS id`,
       );
       if (added.length === 0) throw new Refused('invalid', 'already_in');
+      const named = await dbGet<{ name: string }>(
+        tx,
+        sql`SELECT name FROM ${t.workspace} WHERE id = ${request.workspaceId}`,
+      );
+      await raise(
+        tx,
+        {
+          recipient: target,
+          kind: 'added_to_workspace',
+          actor: accountId,
+          workspaceId: request.workspaceId,
+          subject: named?.name ?? '',
+        },
+        now,
+      );
       return {
         member: { workspaceId: request.workspaceId, accountId: target, role: 'member' as Role },
       };
@@ -477,6 +493,23 @@ async function run(
               ON CONFLICT (board_id, account_id) DO NOTHING RETURNING account_id AS id`,
         );
         if (added.length === 0) throw new Refused('invalid', 'already_in');
+        const board = await dbGet<{ name: string; workspaceId: string }>(
+          tx,
+          sql`SELECT name, workspace_id AS "workspaceId" FROM ${t.board} WHERE id = ${request.boardId}`,
+        );
+        if (board)
+          await raise(
+            tx,
+            {
+              recipient: request.accountId,
+              kind: 'added_to_board',
+              actor: accountId,
+              workspaceId: board.workspaceId,
+              boardId: request.boardId,
+              subject: board.name,
+            },
+            now,
+          );
         return {
           boardMember: {
             boardId: request.boardId,
@@ -677,13 +710,19 @@ async function run(
             ON CONFLICT (card_id, account_id) DO NOTHING RETURNING account_id AS id`,
       );
       // Written in the operation's transaction, once, for someone who is not the one who did it (DESIGN.md §16). Assigning oneself tells nobody.
-      if (added.length > 0 && request.accountId !== accountId)
-        await dbAll(
+      if (added.length > 0)
+        await raise(
           tx,
-          sql`INSERT INTO ${t.notice} (id, account_id, kind, actor_id, workspace_id, board_id, card_id, details, created_at)
-              VALUES (${crypto.randomUUID()}, ${request.accountId}, 'assigned', ${accountId}, ${card.workspaceId}, ${card.boardId}, ${request.cardId},
-                      ${JSON.stringify({ title: card.title })}, ${now})
-              RETURNING id`,
+          {
+            recipient: request.accountId,
+            kind: 'assigned',
+            actor: accountId,
+            workspaceId: card.workspaceId,
+            boardId: card.boardId,
+            cardId: request.cardId,
+            subject: card.title,
+          },
+          now,
         );
       return { card: await cardTile(tx, request.cardId), version };
     }
@@ -783,16 +822,20 @@ async function run(
             UNION SELECT account_id AS id FROM ${t.workspaceMember}
                   WHERE workspace_id = ${card.workspaceId} AND account_id = ${card.createdBy}`,
       );
-      for (const each of told) {
-        if (each.id === accountId) continue;
-        await dbAll(
+      for (const each of told)
+        await raise(
           tx,
-          sql`INSERT INTO ${t.notice} (id, account_id, kind, actor_id, workspace_id, board_id, card_id, details, created_at)
-              VALUES (${crypto.randomUUID()}, ${each.id}, 'comment', ${accountId}, ${card.workspaceId}, ${card.boardId}, ${request.cardId},
-                      ${JSON.stringify({ title: card.title })}, ${now})
-              RETURNING id`,
+          {
+            recipient: each.id,
+            kind: 'comment',
+            actor: accountId,
+            workspaceId: card.workspaceId,
+            boardId: card.boardId,
+            cardId: request.cardId,
+            subject: card.title,
+          },
+          now,
         );
-      }
       return { card: await cardTile(tx, request.cardId), version };
     }
     case 'comment.edit':

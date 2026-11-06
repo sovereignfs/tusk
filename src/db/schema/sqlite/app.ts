@@ -21,6 +21,12 @@ export const accountSettings = sqliteTable('account_settings', {
    * every device (§19).
    */
   workspaceSort: text('workspace_sort').notNull().default('name'),
+  /**
+   * When the person last opened their Inbox (DESIGN.md §16): the notices newer than this are unread, on every device. Zero until they have.
+   */
+  inboxSeenAt: epochMs('inbox_seen_at').notNull().default(0),
+  /** The kinds of notice the person has turned off (§19), comma-separated; a kind turned off is not written. Empty: none. */
+  noticesOff: text('notices_off').notNull().default(''),
   createdAt: epochMs('created_at').notNull(),
 });
 

@@ -873,6 +873,9 @@ Basic notifications for phase 1: what a person needs to know about the boards th
   it.
 - **Kept** 90 days, and at most the latest 500 a person.
 
+**As built (task 8.1):** `raise` is the one way a notice is written (`src/workspaces/notices.ts`), and it honours the kinds a person has turned off (`account_settings.notices_off`). The Inbox holds every
+notice to what the person can still see in the statement that reads it. `workspace_passed` joins with 2.8.
+
 ## 17. Interface (the web)
 
 ### 17.1 Principles

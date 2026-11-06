@@ -487,3 +487,51 @@ export interface BoardPeople {
   readonly members: readonly BoardPerson[];
   readonly candidates: readonly { readonly accountId: string; readonly name: string }[];
 }
+
+/** The kinds of notice there are (DESIGN.md §16): being assigned a card, a comment on a card one is assigned to or made, being added to a workspace, being added to a board. */
+export const NOTICE_KINDS = [
+  'assigned',
+  'comment',
+  'added_to_workspace',
+  'added_to_board',
+] as const;
+export type NoticeKind = (typeof NOTICE_KINDS)[number];
+
+/** A notice, as the Inbox shows it. The actor's name is read from the account when it is shown; the names of the card and board are as they were then. */
+export interface NoticeRow {
+  readonly id: string;
+  readonly kind: NoticeKind;
+  readonly actorName: string | null;
+  readonly workspaceId: string | null;
+  readonly boardId: string | null;
+  readonly cardId: string | null;
+  /** What the notice is about, by name: a card's title, a board's or a workspace's name. */
+  readonly subject: string;
+  readonly createdAt: number;
+}
+
+/** An open card assigned to the person, for _Assigned to me_. */
+export interface AssignedCard {
+  readonly cardId: string;
+  readonly boardId: string;
+  readonly boardName: string;
+  readonly title: string;
+  readonly dueDate: string | null;
+  readonly dueTime: string | null;
+}
+
+export interface Inbox {
+  readonly notices: readonly NoticeRow[];
+  readonly more: boolean;
+  /** Notices newer than the person last opened the Inbox, up to 100 (the screen says "99+"). */
+  readonly unread: number;
+  readonly assigned: readonly AssignedCard[];
+}
+
+/** The most notices one request carries, and the most a person keeps; how long they are kept, in milliseconds (DESIGN.md §16). */
+export const NOTICE_LIMITS = {
+  page: 50,
+  perPerson: 500,
+  keptMs: 90 * 24 * 60 * 60 * 1000,
+  assignedListed: 200,
+} as const;

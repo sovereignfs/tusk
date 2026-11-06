@@ -1,0 +1,2 @@
+ALTER TABLE "tusk"."account_settings" ADD COLUMN "inbox_seen_at" bigint DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE "tusk"."account_settings" ADD COLUMN "notices_off" text DEFAULT '' NOT NULL;

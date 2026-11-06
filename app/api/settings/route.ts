@@ -2,7 +2,7 @@ import { accountRoute } from '@/src/access/route';
 import { getDatabase } from '@/src/db/boot';
 import { RateLimiter } from '@/src/limits/rate';
 import { readCapped } from '@/src/sync/endpoint';
-import { parseSettingsChange, saveSettings } from '@/src/settings/account-settings';
+import { parseSettingsChange, readSettings, saveSettings } from '@/src/settings/account-settings';
 
 // What the account keeps with the account (DESIGN.md §19). The account is the session's; a body names a setting that exists or is refused, and it is limited.
 export const dynamic = 'force-dynamic';
@@ -32,4 +32,9 @@ export const PATCH = accountRoute(async ({ request, accountId }) => {
   if (!change.ok) return json(400, { code: 'BAD_REQUEST' });
   await saveSettings(database, accountId, change.value, Date.now());
   return json(200, change.value);
+});
+
+// What the account keeps, with the defaults for what it has not set.
+export const GET = accountRoute(async ({ accountId }) => {
+  return json(200, await readSettings(await getDatabase(), accountId));
 });

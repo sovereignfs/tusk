@@ -2,7 +2,7 @@
 
 ## Status
 
-📋 Planned. The Inbox (8.1) is phase 1; reminders, Push and email (8.2 to 8.6) are phase 2.
+✅ The Inbox (8.1) is done and is phase 1; reminders, Push and email (8.2 to 8.6) are phase 2.
 
 ## Overview
 
@@ -17,7 +17,7 @@ legacy's `runtime/src/push.ts` · the kanban plugin's `app/_lib/inbox.ts`
 
 ## Tasks
 
-#### 📋 8.1 — The Inbox
+#### ✅ 8.1 — The Inbox
 
 **Goal:** a person sees what they were assigned, what was said on their cards, and where they were added, and what is assigned to them.
 
@@ -39,6 +39,8 @@ legacy's `runtime/src/push.ts` · the kanban plugin's `app/_lib/inbox.ts`
 **Accepts when:** assigning someone shows a notice in their Inbox and not the actor's; a comment notifies the assignees and the creator and not the
 author; a notice about a board the person was removed from is not shown; the unread count goes to nothing on opening the Inbox, on every device; the
 wrong account cannot read or mark one; day grouping is tested with no clock.
+
+**Done as:** `src/workspaces/notices.ts` has `raise(tx, notice, now)`, **the one way an operation tells a person something,** called inside the operation's transaction: it writes nothing for the one who did it and nothing for a kind the person has turned off, and its `details` hold the name of what it is about as it was then (a card's title, a board's or a workspace's name). `assigned` and `comment` now go through it, and `member.add` and `boardMember.add` raise `added_to_workspace` and `added_to_board`. `GET /api/inbox` (`inboxOf`) reads a page of 50 newest first after a cursor of time and id (so a page never skips or repeats), **holding every notice to what the person can still see** in its statement (`board_id IN boardsVisibleTo` and `workspace_id IN workspacesOf`: a notice about a board they were taken off, that was made private to them, or that was deleted, or about a workspace they have left, is not shown, and comes back if they can see it again), with the actors' names read from the accounts; the first page also carries the open cards assigned to them on boards they can see, by due date with undated last, and the count unread. **Unread** is one time per person, `account_settings.inbox_seen_at` (migration `0003_inbox`), moved on by `POST /api/inbox/seen` (never back, the app's own address required) and counted up to 100 by `GET /api/inbox/unread`, so it is the same on every device. `/inbox` shows a skeleton until read, then Notifications grouped by day (`groupByDay`, pure: Today, Yesterday or the date in the person's own zone, given the time and the zone and reading no clock), each saying who did what and opening the card, board or workspace, with _Older notifications_ for the next page, and Assigned to me; opening it marks everything before now read and the sidebar's count goes to nothing at once. The sidebar has an **Inbox** entry whose count ("99+" at a hundred) is fetched with the shell and when the person comes back. **Settings > Notifications** (a section of the Settings dialog and page) turns each kind on or off, saved with the account through `PATCH /api/settings` (`noticesOff`, a list of the four kinds; `GET /api/settings` reads it); a kind turned off is not written at all, and those already in the Inbox stay. A job, `trim-notices` (hourly, from the start), removes notices older than 90 days and keeps each person's latest 500. Tests: the data layer on every leg (an assignment shown to the one assigned and not to the maker, who is told of a comment and not its author, being added to a board and to a workspace, **a notice hidden when the board is made private to the person and they are taken off it, or when they leave the workspace, and back when they can see it again**, a kind turned off not written, unread counted from the last opening, never back, to 100 and for one account only, the assigned cards by due date without archived ones or those of a board they were taken off, paging with no skip or repeat, and the trim of age and of count); the pure grouping under several zones, the notice text and links, and the "99+" label; the settings record; and in Chromium and WebKit the Inbox with an assigned card and the sidebar's entry, Settings > Notifications kept on the account and after a reload, and `401`, `400`, `403` and `204` for the routes. The visibility of notices, the actor, the turned-off kinds, and the trim were each removed in turn and the tests failed. **Not as the epic said:** `workspace_passed` is 2.8's and is not a kind yet; the instance has one account, and a notice is never for the one who did it, so who is told what is shown by the data layer and not by a browser.
 
 #### 📋 8.2 — Notification settings for reminders (phase 2)
 

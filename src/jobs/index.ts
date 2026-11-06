@@ -1,6 +1,7 @@
 import type { Config } from '../config';
 import { getDatabase } from '../db/boot';
 import { purge } from '../sync/purge';
+import { trimNotices } from '../workspaces/inbox';
 import { JobRunner, realDeps, type JobDefinition, type RunnerDeps } from './runner';
 
 /**
@@ -15,6 +16,15 @@ export const jobs: readonly JobDefinition[] = [
     runAtStart: true,
     run: async ({ now }) => {
       await purge(await getDatabase(), now.getTime());
+    },
+  },
+  {
+    // Notices older than 90 days go, and each person keeps the latest 500 (DESIGN.md §16). Safe to run from any process at any time.
+    name: 'trim-notices',
+    everyMs: 60 * 60 * 1000,
+    runAtStart: true,
+    run: async ({ now }) => {
+      await trimNotices(await getDatabase(), now.getTime());
     },
   },
 ];
