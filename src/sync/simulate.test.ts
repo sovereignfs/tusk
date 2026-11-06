@@ -5,8 +5,6 @@ import {
   createCard,
   deleteCard,
   moveCard,
-  moveToList,
-  reopenCard,
   restoreCard,
   setStarred,
   setStatus,
@@ -23,12 +21,13 @@ import {
   untickItem,
 } from '../actions/checks';
 import { createList, deleteList, moveList, renameList, restoreList } from '../actions/lists';
+import { moveOccurrence, reopenOccurrence } from '../actions/occurrences';
 import { seriesIdOf, setDueInSeries, setRepeat, stopRepeat } from '../actions/series';
 import type { Database } from '../db/client';
 import { testTarget } from '../db/test-support';
 import type { LocalRow } from '../local/rows';
 import { byPosition } from '../local/rows';
-import { getRow, outboxSize } from '../local/store';
+import { getRow, occurrencesOf, outboxSize } from '../local/store';
 import { addDays } from '../time';
 import { type Device, type Harness, everything, harness, settleAll } from './sim-support';
 import { account, makeStore } from './test-support';
@@ -165,7 +164,16 @@ async function act(d: Device, r: Random): Promise<string> {
     }
   } else if (roll < 45) {
     name = 'reopen';
-    result = reopenCard(card, ids);
+    if (card) {
+      const sid = seriesIdOf(card);
+      result = reopenOccurrence(
+        card,
+        sid ? await getRow(db, 'desk_series', sid) : undefined,
+        itemsOf(card),
+        sid ? await occurrencesOf(db, sid) : [],
+        ids,
+      );
+    }
   } else if (roll < 49) {
     name = 'start';
     result = startCard(card, Date.now(), ids);
@@ -194,10 +202,16 @@ async function act(d: Device, r: Random): Promise<string> {
   } else if (roll < 71) {
     name = 'moveToList';
     const to = r.pick(liveLists);
-    result =
-      card && to
-        ? moveToList(card, to.id, ordered(live(cards).filter((c) => c.listId === to.id)), ids)
-        : undefined;
+    if (card && to) {
+      const sid = seriesIdOf(card);
+      result = moveOccurrence(
+        card,
+        sid ? await getRow(db, 'desk_series', sid) : undefined,
+        to.id,
+        ordered(live(cards).filter((c) => c.listId === to.id)),
+        ids,
+      );
+    }
   } else if (roll < 77) {
     name = 'addItem';
     result = addItem(card, itemsOf(card), { title }, ids);

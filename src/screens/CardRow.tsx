@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { type HTMLAttributes, useEffect, useState } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
-import { completeCard, isCompleted, reopenCard, statusOf } from '../actions/cards';
+import { completeCard, isCompleted, statusOf } from '../actions/cards';
+import { reopenFor } from './reopen';
 import type { LocalRow } from '../local/rows';
 import { getRow, checksOf } from '../local/store';
 import { seriesIdOf } from '../actions/series';
@@ -75,7 +76,7 @@ export function CardRow({
       : { items: [], series: undefined };
     const result = next
       ? completeCard(card, Date.now(), ids, items, { series, today: nowHere().date })
-      : reopenCard(card, ids);
+      : await reopenFor(client, card);
     if (result.ok) void client.commit(result.mutation);
     else setAsked(null);
   }

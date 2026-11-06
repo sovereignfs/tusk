@@ -14,7 +14,10 @@ import { tableOf } from './tables';
  * What goes with a deleted row:
  *  - a deleted **list** takes its cards, their checklist items and its series, since deleting a list marks only the list (task 3.3);
  *  - a deleted **card** takes its checklist items;
- *  - a deleted **series** goes alone: a repeating card's occurrences are ordinary cards, which are deleted or not on their own.
+ *  - a deleted **series** goes alone: a repeating card's occurrences are ordinary cards, which are deleted or not on their own;
+ *  - a **series nothing points at** goes too, once it is a week old (DESIGN.md §12.5): when the card that repeated has been made a one-off, or the
+ *    cards that were its occurrences are gone, no card has its id, and it is of no use. A card keeps a series alive by its `seriesId`, deleted or not,
+ *    so a card brought back by Undo still has its series, and the server never finds a card pointing at one that is gone.
  *
  * It is safe to run from any process at any time, and twice: each account's purge is one transaction that takes the account's counter first, as a
  * mutation does (`apply.ts`), so two runs take turns, and the second finds nothing left. A run does at most `BATCH` rows of an account, and the next
@@ -55,7 +58,18 @@ export async function purge(database: Database, now: number): Promise<PurgeResul
       sql` UNION `,
     ),
   );
-  for (const { owner } of due) {
+  // And any account with a series that nothing points at.
+  const lonely = await dbAll<{ owner: string }>(
+    database,
+    sql`SELECT DISTINCT s.owner_id AS owner FROM ${tableOf(database, 'desk_series')} s
+        WHERE s.created_at < ${cutoff}
+          AND NOT EXISTS (
+            SELECT 1 FROM ${tableOf(database, 'desk_card')} c
+            WHERE c.owner_id = s.owner_id AND c.fields LIKE '%' || s.id || '%'
+          )`,
+  );
+  const owners = new Set([...due, ...lonely].map((row) => row.owner));
+  for (const owner of owners) {
     const done = await purgeAccount(database, owner, cutoff, now);
     if (TABLES.some((name) => done[name] > 0)) result.accounts += 1;
     for (const name of TABLES) result.purged[name] += done[name];
@@ -131,6 +145,11 @@ async function purgeAccount(
     };
     // Children first, so that a run that stopped never leaves an item whose card is gone.
     for (const table of ['desk_check', 'desk_card', 'desk_series', 'desk_list'] as const) {
+      // Once the cards that go are gone, a series nothing names goes too.
+      if (table === 'desk_series') {
+        for (const id of await orphans(tx, owner, cutoff)) seriesIds.add(id);
+        removed.desk_series = [...seriesIds];
+      }
       for (const id of removed[table]) {
         await dbRun(
           tx,
@@ -150,6 +169,23 @@ async function purgeAccount(
     };
   });
 }
+
+/**
+ * The series of an account that no card names, and that are old enough not to be one being made. A card names its series in its `seriesId` field, which
+ * is text in a column, so the card is looked for by the series' id appearing in its fields: an id is 36 characters of a kind that nothing else a person
+ * writes is likely to hold, and a card that has it by chance only keeps a useless series a while longer.
+ */
+const orphans = (database: Database, owner: string, cutoff: number) =>
+  ids(
+    database,
+    sql`SELECT s.id AS id FROM ${tableOf(database, 'desk_series')} s
+        WHERE s.owner_id = ${owner} AND s.created_at < ${cutoff}
+          AND NOT EXISTS (
+            SELECT 1 FROM ${tableOf(database, 'desk_card')} c
+            WHERE c.owner_id = s.owner_id AND c.fields LIKE '%' || s.id || '%'
+          )
+        LIMIT ${BATCH}`,
+  );
 
 async function ids(database: Database, query: ReturnType<typeof sql>): Promise<string[]> {
   return (await dbAll<{ id: string }>(database, query)).map((row) => row.id);

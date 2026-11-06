@@ -660,9 +660,9 @@ today. Setting a repeat on a card with no due date gives it one: the first date 
 ### 12.5 Reopening, moving, deleting
 
 - **Reopening** a completed occurrence when the next is untouched removes that next occurrence, so Undo after a tick leaves things as they were. If the
-  next has been changed, the reopened card leaves the series and becomes a one-off, and nothing is lost.
+  next has been changed, the reopened card leaves the series and becomes a one-off, and nothing is lost. The next is untouched if it is as completing made it: the same title, description, star, time, list and place, the date it was made for, not started, and the same checklist, unticked. The items the tick ticked are unticked with it.
 - **Moving** an occurrence to another list moves the series with it.
-- **Deleting** ends the series, and Undo brings it back. A job removes a series with no occurrence left.
+- **Deleting** ends the series, and Undo brings it back. The purge removes a series that no card names, once it is a week old.
 
 ## 13. Workspaces
 

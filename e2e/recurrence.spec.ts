@@ -298,3 +298,113 @@ test('editing a card that repeats: a rename and a new date apply from there on w
   // Only the occurrence done before still has the mark: it is history, and was never written.
   await expect(cards('Water everything').getByLabel('Repeats')).toHaveCount(1);
 });
+
+test('reopening takes away an untouched next, a changed next stays and the reopened card leaves, Undo of a delete keeps repeating, and a move takes the series along', async ({
+  page,
+  baseURL,
+}) => {
+  await signedIn(page);
+  // It is Friday 6 November in Berlin.
+  await page.clock.setFixedTime(new Date('2026-11-06T09:00:00+01:00'));
+  const origin = new URL(baseURL ?? 'http://localhost').origin;
+  const [nameA, nameB] = [unique('Here'), unique('There')];
+  const [listA, listB, cardId, seriesId] = [1, 2, 3, 4].map(() => crypto.randomUUID()) as [
+    string,
+    string,
+    string,
+    string,
+  ];
+  const sent = await page.request.post('/api/sync', {
+    headers: { origin },
+    data: {
+      protocol: 2,
+      cursor: 0,
+      mutations: [
+        {
+          mutationId: crypto.randomUUID(),
+          changes: [
+            { table: 'desk_list', id: listA, position: 'a0', fields: { title: { v: nameA } } },
+            { table: 'desk_list', id: listB, position: 'a1', fields: { title: { v: nameB } } },
+            {
+              table: 'desk_series',
+              id: seriesId,
+              listId: listA,
+              fields: { rule: { v: 'FREQ=DAILY' }, anchor: { v: '2026-11-06' } },
+            },
+            {
+              table: 'desk_card',
+              id: cardId,
+              listId: listA,
+              position: 'a0',
+              fields: {
+                title: { v: 'Water' },
+                dueDate: { v: '2026-11-06' },
+                seriesId: { v: seriesId },
+              },
+            },
+            {
+              table: 'desk_check',
+              id: crypto.randomUUID(),
+              cardId,
+              position: 'a0',
+              fields: { title: { v: 'Fill the can' } },
+            },
+          ],
+        },
+      ],
+    },
+  });
+  expect(sent.status()).toBe(200);
+  await page.reload();
+  const sidebar = page.getByRole('navigation', { name: 'Lists' });
+  await sidebar.getByRole('link', { name: new RegExp(`^${nameA}`) }).click();
+  await expect(page.getByRole('heading', { level: 1, name: nameA })).toBeVisible();
+  const row = (title: string) =>
+    page
+      .getByRole('listitem')
+      .filter({ has: page.getByRole('link', { name: title, exact: true }) });
+  const tickBox = (title: string, checked: boolean) =>
+    page.getByRole('checkbox', { name: `Done: ${title}`, checked });
+
+  // A tick, and the undo of it: the starting rows, and nothing else.
+  await tickBox('Water', false).click();
+  await expect(row('Water').filter({ hasText: 'Tomorrow' })).toHaveCount(1);
+  await page.getByRole('button', { name: /Completed \(1\)/ }).click();
+  await tickBox('Water', true).click();
+  await expect(row('Water')).toHaveCount(1);
+  await expect(row('Water').filter({ hasText: 'Today' })).toHaveCount(1);
+  await expect(page.getByRole('button', { name: /Completed/ })).toHaveCount(0);
+  await expect(row('Water').getByLabel('Repeats')).toBeVisible();
+
+  // A tick, the next renamed, and the first reopened: two open cards, and only the next repeats.
+  await tickBox('Water', false).click();
+  await row('Water').filter({ hasText: 'Tomorrow' }).getByRole('link').click();
+  const detail = page.getByRole('region', { name: 'Card' });
+  await detail.getByLabel('Title').fill('Water more');
+  await detail.getByLabel('Title').press('Enter');
+  await expect(row('Water more')).toHaveCount(1);
+  // The list remembers that Completed is open.
+  await expect(page.getByRole('button', { name: /Completed \(1\)/ })).toBeVisible();
+  await tickBox('Water', true).click();
+  await expect(row('Water')).toHaveCount(1);
+  await expect(row('Water').getByLabel('Repeats')).toHaveCount(0);
+  await expect(row('Water more').getByLabel('Repeats')).toBeVisible();
+
+  // Delete, and Undo: it repeats still.
+  await row('Water more').getByRole('link').click();
+  await detail.getByRole('button', { name: 'Delete', exact: true }).click();
+  await expect(row('Water more')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(row('Water more').getByLabel('Repeats')).toBeVisible();
+
+  // A move takes the series with it: ticked in the other list, the next is made there.
+  await row('Water more').getByRole('link').click();
+  await detail.getByLabel('List', { exact: true }).selectOption({ label: nameB });
+  await expect(row('Water more')).toHaveCount(0);
+  await sidebar.getByRole('link', { name: new RegExp(`^${nameB}`) }).click();
+  await expect(page.getByRole('heading', { level: 1, name: nameB })).toBeVisible();
+  await tickBox('Water more', false).click();
+  await expect(row('Water more').filter({ hasText: 'Nov 8' })).toHaveCount(1);
+  await sidebar.getByRole('link', { name: new RegExp(`^${nameA}`) }).click();
+  await expect(row('Water more')).toHaveCount(0);
+});

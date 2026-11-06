@@ -251,4 +251,64 @@ describe(`the purge (${leg})`, () => {
       expect(await recorded()).toEqual([]);
     });
   });
+
+  describe('a series nothing points at', () => {
+    const ids = async (owner: string) =>
+      ((await snapshot(database, owner)).desk_series as { id: string }[]).map((r) => r.id).sort();
+    const pointing = (listId: string, seriesId: string) =>
+      card(listId, { fields: { title: { v: 'x' }, seriesId: { v: seriesId } } });
+
+    it('goes once it is a week old, with a tombstone, and a series a card names stays, whatever state the card is in', async () => {
+      const owner = account();
+      const l = list();
+      const named = series(l.id);
+      const orphan = series(l.id);
+      const keeperOfDeleted = series(l.id);
+      const live = pointing(l.id, named.id);
+      const deleted = pointing(l.id, keeperOfDeleted.id);
+      await apply(owner, mutation(l, named, orphan, keeperOfDeleted, live, deleted));
+      await apply(
+        owner,
+        mutation({ table: 'desk_card', id: deleted.id, deleted: true }),
+        T0 + 6 * DAY,
+      );
+
+      // Less than a week: nothing is old enough to go.
+      await purge(database, T0 + 6 * DAY);
+      expect(await ids(owner)).toEqual([named.id, orphan.id, keeperOfDeleted.id].sort());
+
+      const result = await purge(database, T0 + 8 * DAY);
+      // The orphan goes; the deleted card is not yet a week deleted, so it still names its series (Undo can still bring it back).
+      expect(await ids(owner)).toEqual([named.id, keeperOfDeleted.id].sort());
+      expect(result.purged.desk_series).toBe(1);
+      expect((await tombstones(owner)).map((t) => t.id)).toContain(orphan.id);
+
+      // A week after the card was deleted it goes, and its series with it.
+      await purge(database, T0 + 14 * DAY);
+      expect(await ids(owner)).toEqual([named.id]);
+    });
+
+    it('is not taken while a card of the same account still has it, and another account’s are not looked at', async () => {
+      const [ada, grace] = [account(), account()];
+      const [la, lg] = [list(), list()];
+      const [sa, sg] = [series(la.id), series(lg.id)];
+      await apply(ada, mutation(la, sa, pointing(la.id, sa.id)));
+      await apply(grace, mutation(lg, sg));
+      await purge(database, T0 + 30 * DAY);
+      expect(await ids(ada)).toEqual([sa.id]);
+      // Grace's has no card, so it goes: her series is not kept alive by Ada's card, and Ada's is not taken by Grace's having none.
+      expect(await ids(grace)).toEqual([]);
+    });
+
+    it('can be run twice, and leaves the account’s counter moving on', async () => {
+      const owner = account();
+      const l = list();
+      const orphan = series(l.id);
+      await apply(owner, mutation(l, orphan));
+      await purge(database, T0 + 8 * DAY);
+      const again = await purge(database, T0 + 8 * DAY);
+      expect(again.purged.desk_series).toBe(0);
+      expect(await ids(owner)).toEqual([]);
+    });
+  });
 });

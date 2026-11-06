@@ -391,6 +391,21 @@ export async function allChecksOf(db: LocalDatabase, cardId: string): Promise<Lo
 }
 
 /**
+ * The live occurrences of a series with their live checklist items (DESIGN.md §12.5): what reopening one needs to know whether the next is untouched.
+ * A card names its series in a field, which has no index, so this reads the cards once; a Desk is a few thousand at most.
+ */
+export async function occurrencesOf(
+  db: LocalDatabase,
+  seriesId: string,
+): Promise<{ card: LocalRow; items: LocalRow[] }[]> {
+  const cards = ((await db.getAll('desk_card')) as LocalRow[]).filter((card) => {
+    const field = card.fields.seriesId;
+    return card.deletedAt === null && field !== undefined && 'v' in field && field.v === seriesId;
+  });
+  return Promise.all(cards.map(async (card) => ({ card, items: await checksOf(db, card.id) })));
+}
+
+/**
  * Every card a screen that looks across lists may show (search, export, the Planner of phase 2): **not deleted, and not of a deleted list**
  * (DESIGN.md §10.6). Deleting a list marks only the list, so its cards are still live rows; this is where they stop being shown. A query across lists
  * goes through here and never through the store directly.

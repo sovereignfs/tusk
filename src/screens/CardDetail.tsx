@@ -4,7 +4,6 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
   deleteCard,
-  moveToList,
   restoreCard,
   setStatus,
   statusOf,
@@ -20,6 +19,8 @@ import styles from './CardDetail.module.css';
 import { dueOf } from '../actions/due';
 import { readSeries, seriesIdOf, setDueInSeries, setRepeat, stopRepeat } from '../actions/series';
 import { RepeatPicker } from '../dates/RepeatPicker';
+import { reopenFor } from './reopen';
+import { moveOccurrence } from '../actions/occurrences';
 import { describe as describeRule } from '../recurrence';
 import { nowHere } from '../time';
 import { DuePicker } from '../dates/DuePicker';
@@ -99,7 +100,11 @@ function Fields({ card, onDeleted }: { card: LocalRow; onDeleted: () => void }) 
             series: seriesId ? await getRow(db, 'desk_series', seriesId) : undefined,
           }))
         : { items: [], series: undefined };
-    const result = setStatus(card, next, Date.now(), ids, items, { series, today: nowHere().date });
+    // Reopening a done card is the occurrence's: the next is taken away if untouched, and the card leaves the series if not (§12.5).
+    const result =
+      next === 'open' && status === 'done'
+        ? await reopenFor(client, card)
+        : setStatus(card, next, Date.now(), ids, items, { series, today: nowHere().date });
     if (result.ok) void client.commit(result.mutation);
   }
 
@@ -216,8 +221,13 @@ function ListPicker({ card }: { card: LocalRow }) {
   if (card.table !== 'desk_card' || lists === undefined || lists.length < 2) return null;
 
   async function move(toListId: string) {
-    const destination = await client.read((db) => cardsOf(db, toListId));
-    const result = moveToList(card, toListId, destination, ids);
+    // A card that repeats takes its series with it (§12.5), so the series is read too.
+    const seriesId = seriesIdOf(card);
+    const { destination, series } = await client.read(async (db) => ({
+      destination: await cardsOf(db, toListId),
+      series: seriesId ? await getRow(db, 'desk_series', seriesId) : undefined,
+    }));
+    const result = moveOccurrence(card, series, toListId, destination, ids);
     if (result.ok) void client.commit(result.mutation);
   }
 
