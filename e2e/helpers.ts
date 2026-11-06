@@ -7,7 +7,7 @@ import { expect, type Page } from '@playwright/test';
 export const EMAIL = 'owner@example.com';
 export const PASSWORD = 'correct horse battery';
 
-export async function ensureAccount(page: Page) {
+export async function ensureAccount(page: Page, options: { skipKeyOffer?: boolean } = {}) {
   await page.goto('/sign-up');
   const create = page.getByRole('heading', { name: 'Create your account' });
   if (!(await create.isVisible())) return;
@@ -16,6 +16,15 @@ export async function ensureAccount(page: Page) {
   await page.getByLabel('Password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Create account' }).click();
   await expect(page.getByRole('button', { name: 'User menu' })).toBeVisible();
+  // The Desk offers a key of its own once (DESIGN.md §9.1). The tests that share this account keep the Desk plain, as most people will, by pressing Skip.
+  if (options.skipKeyOffer !== false) {
+    await page.goto('/desk');
+    await page
+      .getByRole('region', { name: 'A key for your Desk' })
+      .getByRole('button', { name: 'Skip' })
+      .click();
+    await expect(page.getByRole('region', { name: 'A key for your Desk' })).toHaveCount(0);
+  }
   await signOut(page);
 }
 

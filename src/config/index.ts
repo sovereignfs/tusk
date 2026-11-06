@@ -19,6 +19,8 @@ export interface Config {
   readonly encryption: KeyRing | undefined;
   /** Where GitHub's API is: `https://api.github.com`, or an Enterprise Server's. https, or http on this machine alone (DESIGN.md §21.5). */
   readonly githubApiUrl: string;
+  /** `TUSK_DB_ENCRYPTION=on` (DESIGN.md §9.5): the server seals content with the instance key, and personal keys are not offered to anyone. */
+  readonly operatorEncryption: boolean;
 }
 
 /** One thing that is wrong, in words that name the setting and never its value. */
@@ -165,6 +167,14 @@ export function loadConfig(env: Env, readFile?: ReadFile): LoadResult {
     problems,
   );
 
+  // The operator's own encryption (§9.5): on or off, and on needs the instance key it seals with. Which fields it covers is task 14.7's.
+  const rawOperator = read('TUSK_DB_ENCRYPTION');
+  if (rawOperator !== undefined && rawOperator !== 'on' && rawOperator !== 'off') {
+    problems.push('TUSK_DB_ENCRYPTION is on or off.');
+  } else if (rawOperator === 'on' && encryption === undefined) {
+    problems.push('TUSK_DB_ENCRYPTION=on needs TUSK_ENCRYPTION_KEY to seal with.');
+  }
+
   // The address of GitHub's API: an address that would send a token over plain http to another machine stops the server, naming the setting.
   let githubApiUrl = DEFAULT_API_URL;
   const rawGithubApi = read('TUSK_GITHUB_API_URL');
@@ -200,6 +210,14 @@ export function loadConfig(env: Env, readFile?: ReadFile): LoadResult {
   if (problems.length > 0 || database === undefined) return { ok: false, problems };
   return {
     ok: true,
-    config: { url, auth, worker: rawWorker !== 'off', database, encryption, githubApiUrl },
+    config: {
+      url,
+      auth,
+      worker: rawWorker !== 'off',
+      database,
+      encryption,
+      githubApiUrl,
+      operatorEncryption: rawOperator === 'on',
+    },
   };
 }

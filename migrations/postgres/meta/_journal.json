@@ -57,6 +57,13 @@
       "when": 1794001982059,
       "tag": "0007_backup_schedule",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794003355100,
+      "tag": "0008_account_encryption",
+      "breakpoints": true
     }
   ]
 }

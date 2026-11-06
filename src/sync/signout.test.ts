@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { type LocalDatabase, deleteLocal, openLocal } from '../local/db';
 import { listsOf } from '../local/store';
 import { SyncClient } from './client';
+import { createIdentity } from '../cipher/identity';
+import { keepIdentity, loadIdentity } from '../cipher/vault';
 import { PROTOCOL_VERSION } from './format';
 import { leaveDevice } from './signout';
 import type { Transport, TransportResult } from './transport';
@@ -70,6 +72,33 @@ describe('leaving a device', () => {
     // Everything was sent, so nobody had to be asked.
     expect(order).toEqual(['session ended', 'announced']);
     expect(await databases()).not.toContain(`tusk-desk-${account}`);
+  });
+
+  it('forgets the account’s key on the device with its copy, and keeps another account’s, and not when it stays', async () => {
+    const { account } = await device(accepting);
+    const other = ID();
+    const [mine, theirs] = [await createIdentity(), await createIdentity()];
+    await keepIdentity(account, mine.identity);
+    await keepIdentity(other, theirs.identity);
+    // A sign-out that cannot end the session changes nothing, the key included.
+    const stayed = await leaveDevice({
+      accountId: account,
+      confirmLosing: async () => true,
+      endSession: async () => {
+        throw new Error('offline');
+      },
+    });
+    expect(stayed).toEqual({ status: 'offline' });
+    expect(await loadIdentity(account)).toBeDefined();
+    expect(
+      await leaveDevice({
+        accountId: account,
+        confirmLosing: async () => true,
+        endSession: async () => undefined,
+      }),
+    ).toEqual({ status: 'left' });
+    expect(await loadIdentity(account)).toBeUndefined();
+    expect(await loadIdentity(other)).toBeDefined();
   });
 
   it('asks before it throws away changes it could not send, with how many, and stays if the person says so', async () => {

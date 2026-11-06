@@ -147,7 +147,7 @@ A person's data can come in and go out, keeps itself safe in their own repositor
 | 75  | [10.4](docs/epics/backup.md)     | Making a backup                     | P1       | 9.1, 10.3, 13.2            | ✅     |
 | 76  | [10.5](docs/epics/backup.md)     | Modes, and the auto job             | P1       | 1.6, 10.4                  | ✅     |
 | 77  | [14.1](docs/epics/encryption.md) | Keys and the field cipher           | P1       | 13.1                       | ✅     |
-| 78  | [14.2](docs/epics/encryption.md) | Setting up a key                    | P1       | 2.1, 14.1                  | 📋     |
+| 78  | [14.2](docs/epics/encryption.md) | Setting up a key                    | P1       | 2.1, 14.1                  | ✅     |
 | 79  | [14.3](docs/epics/encryption.md) | Encrypting through the sync path    | P1       | 13.3, 14.2                 | 📋     |
 | 80  | [14.4](docs/epics/encryption.md) | Turning it on later                 | P1       | 14.3                       | 📋     |
 | 81  | [14.5](docs/epics/encryption.md) | Encrypted export, import and backup | P1       | 9.2, 10.4, 14.3            | 📋     |

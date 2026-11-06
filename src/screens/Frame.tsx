@@ -1,11 +1,14 @@
 'use client';
 
-import { useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { ThreeColumnLayout, useIsMobile } from '../ui';
 import { FirstList } from './FirstList';
 import { Sidebar } from './Sidebar';
 import { CardDetail } from './CardDetail';
+import { KeyOffer } from './KeyOffer';
+import { useKey } from './KeyContext';
+import { UnlockKey } from './UnlockKey';
 import { UndoProvider } from './Undo';
 
 /**
@@ -20,16 +23,21 @@ import { UndoProvider } from './Undo';
 export function Frame({ children }: { children: ReactNode }) {
   const card = useSearchParams().get('card');
   const mobile = useIsMobile();
+  const key = useKey();
+  const onDesk = usePathname().startsWith('/desk');
+  // A Desk that is sealed to a key this device does not have shows nothing of itself (DESIGN.md §9.1): not its lists, not its cards, not a first list.
+  const locked = key.status === 'locked';
 
   return (
     <UndoProvider>
-      <FirstList />
+      {locked ? null : <FirstList />}
       <ThreeColumnLayout sidebarHidden={mobile}>
-        <Sidebar />
+        {locked ? <div /> : <Sidebar />}
         <div style={{ padding: mobile ? 'var(--sv-space-4)' : 'var(--sv-space-6)' }}>
-          {children}
+          {onDesk ? <KeyOffer /> : null}
+          {locked && onDesk ? <UnlockKey /> : children}
         </div>
-        {card && !mobile ? <CardDetail cardId={card} /> : null}
+        {card && !mobile && !locked ? <CardDetail cardId={card} /> : null}
       </ThreeColumnLayout>
     </UndoProvider>
   );

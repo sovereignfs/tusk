@@ -19,8 +19,16 @@ import { defineConfig, devices } from '@playwright/test';
 const PORT = 3999;
 /** Where the fake GitHub of `e2e/backup.spec.ts` listens: the app under test is told this before the test starts it. */
 const GITHUB_PORT = 3998;
+/**
+ * A second instance, for the journeys that change an account for good (a key of one's own is one way, DESIGN.md §9.1): its own SQLite file whatever the
+ * first instance runs on, and its own first account, so that nothing the first instance's tests share is touched. `e2e/key.spec.ts` is the one that uses it.
+ */
+const KEYS_PORT = 3997;
 const SECRET = 'e2e-only-secret-not-for-anything-real-0123456789';
-const directory = mkdtempSync(join(tmpdir(), 'tusk-e2e-'));
+// Playwright loads this file again in every worker: the first load makes the directory and the others, which inherit the variable, use it.
+const directory = process.env.TUSK_E2E_DIR ?? mkdtempSync(join(tmpdir(), 'tusk-e2e-'));
+// The tests are told where this run keeps its files: a key one test saves is opened by the same test in the other browser (`e2e/key.spec.ts`).
+process.env.TUSK_E2E_DIR = directory;
 
 // Next reads `.env.local` and does not override what is already set, so a developer's own settings there would reach this instance. Setting a
 // name, even to nothing, keeps it out: an empty value is "not set" to the app.
@@ -56,21 +64,38 @@ export default defineConfig({
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
     { name: 'webkit', use: { ...devices['Desktop Safari'] } },
   ],
-  webServer: {
-    command: `node scripts/serve-standalone.mjs ${PORT}`,
-    url: `http://localhost:${PORT}/api/health`,
-    timeout: 90_000,
-    reuseExistingServer: false,
-    env: {
-      ...BLANK,
-      ...database,
-      TUSK_URL: `http://localhost:${PORT}`,
-      TUSK_AUTH_LOCAL: '1',
-      TUSK_AUTH_SECRET: SECRET,
-      TUSK_AUTH_SIGNUP: 'closed',
-      // A key, so that a repository can be connected, and a GitHub that is on this machine: for this throwaway instance only.
-      TUSK_ENCRYPTION_KEY: 'e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0',
-      TUSK_GITHUB_API_URL: `http://127.0.0.1:${GITHUB_PORT}`,
-    } as Record<string, string>,
-  },
+  webServer: [
+    {
+      command: `node scripts/serve-standalone.mjs ${PORT}`,
+      url: `http://localhost:${PORT}/api/health`,
+      timeout: 90_000,
+      reuseExistingServer: false,
+      env: {
+        ...BLANK,
+        ...database,
+        TUSK_URL: `http://localhost:${PORT}`,
+        TUSK_AUTH_LOCAL: '1',
+        TUSK_AUTH_SECRET: SECRET,
+        TUSK_AUTH_SIGNUP: 'closed',
+        // A key, so that a repository can be connected, and a GitHub that is on this machine: for this throwaway instance only.
+        TUSK_ENCRYPTION_KEY: 'e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0',
+        TUSK_GITHUB_API_URL: `http://127.0.0.1:${GITHUB_PORT}`,
+      } as Record<string, string>,
+    },
+    {
+      command: `node scripts/serve-standalone.mjs ${KEYS_PORT}`,
+      url: `http://localhost:${KEYS_PORT}/api/health`,
+      timeout: 90_000,
+      reuseExistingServer: false,
+      env: {
+        ...BLANK,
+        TUSK_DB_DIALECT: 'sqlite',
+        TUSK_SQLITE_URL: `file:${join(directory, 'tusk-keys.db')}`,
+        TUSK_URL: `http://localhost:${KEYS_PORT}`,
+        TUSK_AUTH_LOCAL: '1',
+        TUSK_AUTH_SECRET: SECRET,
+        TUSK_AUTH_SIGNUP: 'closed',
+      } as Record<string, string>,
+    },
+  ],
 });

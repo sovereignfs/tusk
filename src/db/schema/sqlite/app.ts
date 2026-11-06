@@ -27,6 +27,15 @@ export const accountSettings = sqliteTable('account_settings', {
   inboxSeenAt: epochMs('inbox_seen_at').notNull().default(0),
   /** The kinds of notice the person has turned off (§19), comma-separated; a kind turned off is not written. Empty: none. */
   noticesOff: text('notices_off').notNull().default(''),
+  /**
+   * How the Desk is stored (DESIGN.md §9): `none` (plain), `moving` (being re-sealed in the browser, §9.3) or `personal` (sealed under the person's own key,
+   * which the server never has). One way: it does not go back.
+   */
+  encryption: text('encryption').notNull().default('none'),
+  /** The age public key (`age1…`) the Desk's list keys are wrapped to; null unless `encryption` is not `none`. The secret is never here. */
+  recipient: text('recipient'),
+  /** When the person was offered a key and chose (made one, brought one or skipped), so that the offer is made once. Null until they have. */
+  keyOfferedAt: epochMs('key_offered_at'),
   createdAt: epochMs('created_at').notNull(),
 });
 

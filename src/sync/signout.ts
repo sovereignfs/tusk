@@ -1,3 +1,4 @@
+import { forgetKey } from '../cipher/vault';
 import { forgetIdentity } from '../identity';
 import { deleteLocal } from '../local/db';
 import type { SyncClient } from './client';
@@ -27,6 +28,8 @@ export interface LeaveOptions {
   endSession(): Promise<void>;
   /** Tells other tabs of this account that the person has left. */
   announce?(): void;
+  /** Forgets the account's key on this device (DESIGN.md §9.2); by default the vault's. A test names its own. */
+  forgetKey?(): Promise<void>;
   /** Deletes the account's database; by default the one `openLocal` opens for it. A test names its own. */
   deleteDatabase?(): Promise<void>;
 }
@@ -58,6 +61,8 @@ export async function leaveDevice(options: LeaveOptions): Promise<Left> {
   client?.close();
   client?.db.close();
   await (options.deleteDatabase ?? (() => deleteLocal(accountId)))();
+  // The key goes with the copy: a shared computer holds neither of a person who has left.
+  await (options.forgetKey ?? (() => forgetKey(accountId)))().catch(() => undefined);
   // The shell offline opens for whoever is remembered here, so no one is, once they have left.
   forgetIdentity();
   return { status: 'left' };

@@ -85,6 +85,25 @@ describe('loadConfig', () => {
     });
   });
 
+  describe('TUSK_DB_ENCRYPTION', () => {
+    const KEY = 'a'.repeat(64);
+    it('is off unless it says on, and on needs the instance key', () => {
+      expect(loadConfig({})).toMatchObject({ config: { operatorEncryption: false } });
+      expect(loadConfig({ TUSK_DB_ENCRYPTION: 'off' })).toMatchObject({
+        config: { operatorEncryption: false },
+      });
+      expect(loadConfig({ TUSK_DB_ENCRYPTION: 'on', TUSK_ENCRYPTION_KEY: KEY })).toMatchObject({
+        config: { operatorEncryption: true },
+      });
+      expect(problems(loadConfig({ TUSK_DB_ENCRYPTION: 'on' })).join(' ')).toContain(
+        'TUSK_ENCRYPTION_KEY',
+      );
+      expect(problems(loadConfig({ TUSK_DB_ENCRYPTION: 'yes' }))[0]).toContain(
+        'TUSK_DB_ENCRYPTION',
+      );
+    });
+  });
+
   describe('TUSK_GITHUB_API_URL', () => {
     it('is GitHub itself unless it names another, and keeps the path of an Enterprise Server', () => {
       expect(loadConfig({})).toMatchObject({ config: { githubApiUrl: 'https://api.github.com' } });

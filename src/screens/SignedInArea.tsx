@@ -10,6 +10,7 @@ import { AppShell } from '../ui/AppShell';
 import { SidebarToggle } from '../ui/SidebarToggle';
 import { AppFrame } from './AppFrame';
 import { Frame } from './Frame';
+import { KeyProvider } from './KeyContext';
 import { RegisterWorker } from './RegisterWorker';
 import { ZoneReporter } from './ZoneReporter';
 
@@ -36,21 +37,23 @@ export function SignedInArea({
   useEffect(() => rememberIdentity({ id: accountId, name, email }), [accountId, name, email]);
   return (
     <SyncProvider accountId={accountId}>
-      <ZoneReporter accountId={accountId} />
-      <RegisterWorker />
-      <WorkspacesProvider>
-        <AppShell
-          name={site.name}
-          toolbar={<SidebarToggle />}
-          account={<AccountMenu accountId={accountId} name={name} email={email} />}
-        >
-          <AppFrame>
-            {/* The Desk's own columns. */}
-            <Frame>{children}</Frame>
-          </AppFrame>
-          {modal}
-        </AppShell>
-      </WorkspacesProvider>
+      <KeyProvider accountId={accountId}>
+        <ZoneReporter accountId={accountId} />
+        <RegisterWorker />
+        <WorkspacesProvider>
+          <AppShell
+            name={site.name}
+            toolbar={<SidebarToggle />}
+            account={<AccountMenu accountId={accountId} name={name} email={email} />}
+          >
+            <AppFrame>
+              {/* The Desk's own columns. */}
+              <Frame>{children}</Frame>
+            </AppFrame>
+            {modal}
+          </AppShell>
+        </WorkspacesProvider>
+      </KeyProvider>
     </SyncProvider>
   );
 }

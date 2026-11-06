@@ -6,6 +6,7 @@ import { addressOf } from '../screens/PublishingSection';
 import { deskFile, everythingFile, save } from '../portability/client';
 import { useLocal, useSync } from '../sync/react';
 import { BackupSection } from './BackupSection';
+import { EncryptionSection } from './EncryptionSection';
 import { ImportSection } from './ImportSection';
 import { Button } from '../ui';
 import type { Publication } from '../workspaces/format';
@@ -111,6 +112,7 @@ export function DataSection() {
       </div>
       <ImportSection />
       <BackupSection />
+      <EncryptionSection />
       <div className={styles.group}>
         <h2>Published boards</h2>
         {failed ? <p className={styles.muted}>This needs a connection.</p> : null}
