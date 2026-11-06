@@ -497,6 +497,27 @@ test.describe('putting tasks in order', () => {
     await page.mouse.move(to.x + 10, to.y + 2, { steps: 12 });
     await page.mouse.up();
     await expect.poll(order).toEqual(['Three', 'One', 'Two']);
+    // The move has to be written before the page goes: a reload straight after the drop can beat the write to the device. Here it is waited for on the
+    // server, in this card's own checklist (the account has many checklists with the same three titles).
+    const cardId = new URL(page.url()).searchParams.get('card');
+    await expect
+      .poll(async () => {
+        const reply = await page.request.post('/api/sync', {
+          headers: { origin: new URL(page.url()).origin },
+          data: { protocol: 2, cursor: 0, mutations: [], limit: 2000 },
+        });
+        const rows = (await reply.json()).pull.rows as {
+          table: string;
+          cardId?: string;
+          position: string;
+          fields: Record<string, { v: unknown }>;
+        }[];
+        return rows
+          .filter((r) => r.table === 'desk_check' && r.cardId === cardId)
+          .sort((x, y) => (x.position < y.position ? -1 : 1))
+          .map((r) => String(r.fields.title?.v));
+      })
+      .toEqual(['Three', 'One', 'Two']);
     await page.reload();
     await expect.poll(order).toEqual(['Three', 'One', 'Two']);
   });

@@ -12,7 +12,14 @@ import { SidebarToggle } from '@/src/ui/SidebarToggle';
 // component over the working copy (`useLocal`), and writes through `commit`; nothing in here waits for the network.
 export const dynamic = 'force-dynamic';
 
-export default async function AppLayout({ children }: { children: ReactNode }) {
+export default async function AppLayout({
+  children,
+  modal,
+}: {
+  children: ReactNode;
+  /** The dialog slot (`app/(app)/@modal`): empty, unless a page opened Settings as one. */
+  modal: ReactNode;
+}) {
   const session = await requireSession();
   return (
     <SyncProvider accountId={session.user.id}>
@@ -31,6 +38,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           {/* The Desk's own columns; they move into the Desk's pages with task 3.12. */}
           <Frame>{children}</Frame>
         </AppFrame>
+        {modal}
       </AppShell>
     </SyncProvider>
   );

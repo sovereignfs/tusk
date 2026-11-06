@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
 import { leaveDevice } from '../../sync/signout';
 import { useOptionalSync } from '../../sync/react';
@@ -21,6 +22,7 @@ export function AccountMenu({
   email: string;
 }) {
   const client = useOptionalSync();
+  const router = useRouter();
   // The dialog is a promise the flow awaits: it resolves true to leave anyway and false to stay.
   const [unsent, setUnsent] = useState<number | null>(null);
   const answer = useRef<(leave: boolean) => void>(() => undefined);
@@ -61,6 +63,8 @@ export function AccountMenu({
         size="sm"
         aria-label="User menu"
         items={[
+          // A soft navigation, so that Settings is a dialog over this page and not a page that replaces it (`app/(app)/@modal/(.)account`).
+          { label: 'Settings', icon: 'settings', onSelect: () => router.push('/account') },
           {
             label: leaving ? 'Signing out…' : 'Sign out',
             icon: 'log-out',

@@ -10,6 +10,7 @@
  * package's types (`IconName`; an `Icon` needs `aria-hidden` or `aria-label`), not its README.
  */
 export {
+  Alert,
   AuthButton,
   AuthCard,
   AuthError,
@@ -24,6 +25,7 @@ export {
   Checkbox,
   ColorPicker,
   ConfirmDialog,
+  Dialog,
   EmptyState,
   FormField,
   Icon,

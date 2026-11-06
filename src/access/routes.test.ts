@@ -56,7 +56,9 @@ export function findRoutes(appDir: string): Found[] {
       // A route group `(name)` and a parallel slot `@name` are not in the address.
       const segments = relative(appDir, dir)
         .split(sep)
-        .filter((s) => s !== '' && !/^\(.*\)$/.test(s) && !s.startsWith('@'));
+        .filter((s) => s !== '' && !/^\(.*\)$/.test(s) && !s.startsWith('@'))
+        // An intercepting route, `(.)account`, is the address after its marker.
+        .map((s) => s.replace(/^\(\.{1,3}\)/, ''));
       const source = readFileSync(path, 'utf8');
       out.push({
         route: `/${segments.join('/')}`,

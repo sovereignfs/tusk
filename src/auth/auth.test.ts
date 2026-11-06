@@ -134,6 +134,49 @@ describe(`local sign-in, first account only (${leg})`, () => {
       expect(client.has('session_token')).toBe(false);
     });
 
+    it('changes the password only for the one who knows the old one, ends every other session, and keeps this one', async () => {
+      const email = await firstEmail(t);
+      const here = visitor(t);
+      const elsewhere = visitor(t);
+      for (const client of [here, elsewhere])
+        await client.post('/api/auth/sign-in/email', { email, password: PASSWORD });
+      expect((await elsewhere.get('/api/auth/get-session')).body.user).toBeTruthy();
+
+      const wrong = await here.post('/api/auth/change-password', {
+        currentPassword: 'not the password',
+        newPassword: 'a new long password',
+        revokeOtherSessions: true,
+      });
+      expect(wrong.status).toBeGreaterThanOrEqual(400);
+      // Nothing happened: the old password still signs in and the other session is still there.
+      expect((await elsewhere.get('/api/auth/get-session')).body.user).toBeTruthy();
+
+      const changed = await here.post('/api/auth/change-password', {
+        currentPassword: PASSWORD,
+        newPassword: 'a new long password',
+        revokeOtherSessions: true,
+      });
+      expect(changed.status).toBe(200);
+      expect((await here.get('/api/auth/get-session')).body.user).toBeTruthy();
+      expect((await elsewhere.get('/api/auth/get-session')).body).toBeNull();
+
+      const old = visitor(t);
+      const withOld = await old.post('/api/auth/sign-in/email', { email, password: PASSWORD });
+      expect(withOld.status).toBe(401);
+      const fresh = visitor(t);
+      expect(
+        (await fresh.post('/api/auth/sign-in/email', { email, password: 'a new long password' }))
+          .status,
+      ).toBe(200);
+
+      // The account is shared by the tests that follow: it is put back.
+      const back = await fresh.post('/api/auth/change-password', {
+        currentPassword: 'a new long password',
+        newPassword: PASSWORD,
+      });
+      expect(back.status).toBe(200);
+    });
+
     it('ends with sign-out, after which the session is gone for good', async () => {
       const client = visitor(t);
       await client.post('/api/auth/sign-in/email', {

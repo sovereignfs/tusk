@@ -26,6 +26,8 @@ export const ROUTES: RouteRule[] = [
   { route: '/sign-in', page: { kind: 'public' } },
   { route: '/sign-up', page: { kind: 'public' } },
   // The app, for someone signed in: the layout around it (`app/(app)/layout.tsx`) finds who, and each page asks for itself as well.
+  // Settings (DESIGN.md §19): a page of its own, and a dialog over another page by an intercepting route at the same address.
+  { route: '/account', page: { kind: 'account' } },
   { route: '/desk', page: { kind: 'account' } },
   { route: '/desk/[id]', page: { kind: 'account' } },
 

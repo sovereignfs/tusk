@@ -2,7 +2,7 @@
 
 ## Status
 
-⏳ In progress: 2.1 and 2.2 are done, under the name Tasks.
+⏳ In progress: 2.1, 2.2 and 2.7 are done.
 
 ## Overview
 
@@ -104,7 +104,7 @@ address later becomes. Fjord's `web-1a.md` 1a.4 is the list of tests. In Setting
 
 **Accepts when:** each rule has a test seen to fail with it switched off, on all three databases.
 
-#### 📋 2.7 — Settings
+#### ✅ 2.7 — Settings
 
 **Goal:** one dialog, from the avatar menu, with Profile, Security, Preferences, Notifications, Data and Activity, each filled as far as what exists.
 
@@ -120,6 +120,8 @@ section says when it needs a network. `account_settings` gains `first_day_of_wee
 
 **Accepts when:** a local and a Sovereign-only account each see the right parts, and the routes behind them refuse the other kind; the dialog opens over
 the Desk and over a board and closes back to them; an address with a section opens it there; a preference saved here holds on a second device.
+
+**Done as:** Settings is at `/account?section=` in `src/account/`, and from the avatar menu's _Settings_ it is a `Dialog` over the page it was opened from, by an intercepting route (`app/(app)/@modal/(.)account`, with the `modal` slot in the app's layout and a `default.tsx` that is empty) and a page of its own when the address is typed or reloaded; closing the dialog goes back (`router.back()`). The menu item is a soft navigation (`router.push`), since the design system's `href` item is a plain link that would load the page and not intercept it. `query.ts` is the pure rule for which section an address names (only four exist, and anything else, including what an object inherits, is Profile). The shell shows one section and keeps the others mounted, so a half-typed password is not lost by looking at another. **Profile:** the initials, the name (saved through `authClient.updateUser`, and the menu follows through `router.refresh()`), and the address, shown and not changed. **Security:** the password, asking for the old one and ending every other session (`changePassword` with `revokeOtherSessions`), the new one held to the instance's minimum and to being typed twice; and the devices this account is signed in on, each of which can be signed out, with _Sign out everywhere else_. A device is named from its browser's words (`deviceName`, tested), never the raw string. **Preferences:** the theme, applied at once and kept on the device (`tusk.theme`). **Data:** when this device last heard from the server. Anything that needs a connection says so when there is none. The access table has `/account` and the route scanner reads `(.)account` as that address. Tests: the section rule, `deviceName`, a change of password over real requests (a wrong old one changes nothing, the right one ends the other session, keeps this one, the old password stops working), and 9 browser tests in Chromium and WebKit (the dialog over the Desk and back, an address with a section, the sections keeping what was typed, a name changed and put back, a wrong password, a short or mismatched one, the devices, the theme, Data). **Not as the epic said:** there are no Sovereign-only accounts to tell apart yet (2.5 and 2.6), so every account sees the password; the avatar is the initials, since nothing here uploads a picture; the first day of the week and the workspaces' sort are not here, since nothing reads them (4.2, 16.4); and Notifications, Activity, and what fills Data (export, backup, encryption, deleting the account) join with 8.1, 17.6, 9.1, 10.3, 14.2 and 2.8.
 
 #### 📋 2.8 — People, and deleting an account
 
