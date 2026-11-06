@@ -92,11 +92,11 @@ export function useBoard(
         } else {
           const result = (await reply.json()) as OpResult;
           if (result.status === 'applied') {
-            confirmed.current = settled(showingBoard(confirmed.current, op), result.rows);
+            confirmed.current = settled(showingBoard(confirmed.current, op), op, result.rows);
             pending.current -= 1;
             // Nothing else waits: the screen is the server's, with the row it sent in place of the guess.
             if (pending.current === 0) setView(confirmed.current);
-            else setView((now) => settled(now, result.rows));
+            else setView((now) => settled(now, op, result.rows));
             return true;
           }
           failure = result.code;

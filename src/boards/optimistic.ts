@@ -32,6 +32,11 @@ export function showing(
     case 'list.rename':
     case 'list.move':
     case 'list.delete':
+    case 'card.create':
+    case 'card.move':
+    case 'card.archive':
+    case 'card.restore':
+    case 'card.delete':
     case 'member.add':
     case 'member.setRole':
     case 'member.remove':

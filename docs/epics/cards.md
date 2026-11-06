@@ -2,7 +2,7 @@
 
 ## Status
 
-📋 Planned
+✅ Done: 18.1.
 
 ## Overview
 
@@ -15,7 +15,7 @@ their checklist, discussed, moved and cloned, archived and restored.
 
 ## Tasks
 
-#### 📋 18.1 — Cards in lists
+#### ✅ 18.1 — Cards in lists
 
 **Goal:** add cards, see them as tiles, drag them within and between lists, archive and restore them.
 
@@ -30,6 +30,8 @@ archived cards, with Restore and Delete.
 
 **Accepts when:** a drag between lists writes one row and shows at once; a click opens the card and a drag does not; a card moved by keyboard alone
 lands where announced; an archived card restored returns to its place; a deleted card's activity remains.
+
+**Done as:** five operations through the door: `card.create` (a title and a position the device chose, at the top of a list; 5,000 cards a board; an id in use is `not_found`), `card.move` (a list and a position: **one `UPDATE` of one row**, and the list must be of the card's own board and its card not archived), `card.archive`, `card.restore` (the list and position archiving did not touch) and `card.delete` (**only an archived card**, with its comments, checklist, assignees and labels carried; its activity stays). The list is taken first in a statement that carries the board's permission (`board_id IN boardsEditableBy`), then the board's version is moved on (`touchBoard`), so a card can only be put in, or moved to, a list of a board its maker may change; each card statement also names the state it must be in (open to archive, archived to restore or delete). The board read now carries every open card as a tile (`CardTile`: title, list, position, due date and time, whether it has a description), and `GET /api/boards/<id>/archived` lists the archived ones, with the same 404 as the board for what is not theirs. On the screen a list's header has _Add a card_ at the top of its column and in its menu (the field stays open, so a run of cards can be typed; a new card goes to the top), a tile shows its title and the badges it has, and **a tile is dragged by its whole surface**: a press that does not move is a click, a focused card is picked up with Space, moved with the arrows and put down with Space, and the position is computed against what is rendered (`cardPositionFor`, the cards of the target list without the one moving). One drag context holds lists and cards, each with its own collisions (lists among lists; a card among cards and the empty part of every list), a drag overlay follows the pointer, and a card dropped on the empty part of a list goes to its end. A tile's menu archives it, and _Archived cards_ in the board's header opens the archived ones with Restore and Delete for someone who may change the board. Deleting a list takes its cards from the screen at once. Tests: the matrix has the five operations; data-layer tests for the create (with its tile and version), the id taken, a list of a board one cannot change and the 5,000 limit, a move that writes one row and none to another board's list or of an archived card, archive and restore to the same list and position and the states they refuse, a delete that takes what is on the card and leaves its activity, and the archived read by role; the validators; the pure rules (a new card at the top, a move to another list, the position among what is shown, what the server's answer keeps); and in Chromium and WebKit cards added to the top, moved one step by the keyboard alone and to another list by the pointer, all of it after a reload, and a card archived from its menu, listed, restored to its place and deleted for good. The delete and move conditions and the card limit were each removed in turn and the tests failed. **Not as the epic said:** a click on a tile opens nothing yet (the card dialog is 18.2); the archived cards are behind a link in the board's header and not its menu, since the menu is 17.2; a card moved to another list by the keyboard alone is not tested in a browser (the pointer and the within-list keyboard are), and no activity is written (17.6).
 
 #### 📋 18.2 — The card dialog
 

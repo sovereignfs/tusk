@@ -27,7 +27,14 @@ const ARGUMENTS: Record<OpName, readonly string[]> = {
   'list.rename': ['id', 'name'],
   'list.move': ['id', 'position'],
   'list.delete': ['id'],
+  'card.create': ['id', 'listId', 'title', 'position'],
+  'card.move': ['id', 'listId', 'position'],
+  'card.archive': ['id'],
+  'card.restore': ['id'],
+  'card.delete': ['id'],
 };
+
+const TITLE = text(1, WORKSPACE_LIMITS.cardTitleChars);
 
 const POSITION: Parser<string> = (value) =>
   typeof value === 'string' && value.length <= WORKSPACE_LIMITS.positionChars && isPosition(value)
@@ -178,6 +185,50 @@ export function parseOp(value: unknown): Parsed<OpRequest> {
       };
     }
     case 'list.delete': {
+      const id = uuid(value.id);
+      if (!id.ok) return no('id: not an id');
+      return { ok: true, value: { opId: opId.value, op: kind, id: id.value } };
+    }
+    case 'card.create': {
+      const id = uuid(value.id);
+      const listId = uuid(value.listId);
+      if (!id.ok || !listId.ok) return no('not an id');
+      const title = TITLE(typeof value.title === 'string' ? value.title.trim() : value.title);
+      if (!title.ok) return no(`title: ${title.reason}`);
+      const position = POSITION(value.position);
+      if (!position.ok) return no('position: not a position');
+      return {
+        ok: true,
+        value: {
+          opId: opId.value,
+          op: kind,
+          id: id.value,
+          listId: listId.value,
+          title: title.value,
+          position: position.value,
+        },
+      };
+    }
+    case 'card.move': {
+      const id = uuid(value.id);
+      const listId = uuid(value.listId);
+      if (!id.ok || !listId.ok) return no('not an id');
+      const position = POSITION(value.position);
+      if (!position.ok) return no('position: not a position');
+      return {
+        ok: true,
+        value: {
+          opId: opId.value,
+          op: kind,
+          id: id.value,
+          listId: listId.value,
+          position: position.value,
+        },
+      };
+    }
+    case 'card.archive':
+    case 'card.restore':
+    case 'card.delete': {
       const id = uuid(value.id);
       if (!id.ok) return no('id: not an id');
       return { ok: true, value: { opId: opId.value, op: kind, id: id.value } };

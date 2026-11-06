@@ -8,6 +8,7 @@ import { applyOp } from './apply';
 import { boardsAdministeredBy, boardsEditableBy, boardsVisibleTo } from './can';
 import { type Op, OPS, type OpRefusal, type OpRequest, WORKSPACE_LIMITS } from './format';
 import {
+  archivedCards,
   boardVersion,
   boardsOfWorkspace,
   listWorkspaces,
@@ -163,6 +164,47 @@ const OPERATIONS: Row[] = [
     otherwise: 'not_found',
   },
   {
+    op: 'card.create',
+    build: (w) => ({
+      op: 'card.create',
+      id: id(),
+      listId: w.lists.publicBoard,
+      title: 'New card',
+      position: 'Zz',
+    }),
+    may: ['boardOwner', 'boardMember'],
+    otherwise: 'not_found',
+  },
+  {
+    op: 'card.move',
+    build: (w) => ({
+      op: 'card.move',
+      id: w.cards.open,
+      listId: w.lists.publicBoard,
+      position: 'a5',
+    }),
+    may: ['boardOwner', 'boardMember'],
+    otherwise: 'not_found',
+  },
+  {
+    op: 'card.archive',
+    build: (w) => ({ op: 'card.archive', id: w.cards.open }),
+    may: ['boardOwner', 'boardMember'],
+    otherwise: 'not_found',
+  },
+  {
+    op: 'card.restore',
+    build: (w) => ({ op: 'card.restore', id: w.cards.archived }),
+    may: ['boardOwner', 'boardMember'],
+    otherwise: 'not_found',
+  },
+  {
+    op: 'card.delete',
+    build: (w) => ({ op: 'card.delete', id: w.cards.archived }),
+    may: ['boardOwner', 'boardMember'],
+    otherwise: 'not_found',
+  },
+  {
     // Anyone in it may leave (there is another owner in this world); an outsider has nothing to leave.
     op: 'member.leave',
     build: (w) => ({ op: 'member.leave', workspaceId: w.workspace }),
@@ -297,8 +339,9 @@ describe(`the roles (${leg})`, () => {
       expect(gone('board_member')).toBe(4);
       // One list of each of the three boards.
       expect(gone('board_list')).toBe(3);
+      // The world's two cards and the one the contents add.
+      expect(gone('card')).toBe(3);
       for (const name of [
-        'card',
         'label',
         'card_label',
         'card_assignee',
@@ -794,7 +837,6 @@ describe(`the roles (${leg})`, () => {
       const gone = (name: string) => (before[name] ?? 0) - (after[name] ?? 0);
       for (const name of [
         'board_list',
-        'card',
         'card_label',
         'card_assignee',
         'checklist_item',
@@ -802,6 +844,8 @@ describe(`the roles (${leg})`, () => {
         'activity',
       ])
         expect(gone(name), name).toBe(1);
+      // The world's two cards and the one with contents were on it.
+      expect(gone('card')).toBe(3);
       // The board's own labels stay, and so does the other list with its card.
       expect(gone('label')).toBe(0);
       expect(gone('board')).toBe(0);
@@ -827,7 +871,7 @@ describe(`the roles (${leg})`, () => {
       });
       expect(await seen('boardOwner', w.boards.publicBoard)).toMatchObject({
         can: { edit: true, admin: true },
-        lists: [{ id: w.lists.publicBoard, name: 'Backlog', cards: 1 }],
+        lists: [{ id: w.lists.publicBoard, name: 'Backlog', cards: 2 }],
       });
       expect(await seen('member', w.boards.publicBoard)).toMatchObject({
         can: { edit: false, admin: false },
@@ -857,6 +901,243 @@ describe(`the roles (${leg})`, () => {
       expect(await names('member')).toEqual(['Last year', 'Roadmap']);
       expect(await names('boardMember')).toEqual(['Hiring', 'Last year', 'Roadmap']);
       expect(await names('outsider')).toBeUndefined();
+    });
+  });
+
+  describe('cards in lists', () => {
+    const apply = (w: World, role: Role, op: Op) =>
+      applyOp(database, w.accounts[role], { opId: id(), ...op } as OpRequest, OPTIONS);
+    const t = () => tablesOf(database);
+    const cardRow = async (cardId: string) =>
+      (
+        await dbAll<{
+          listId: string;
+          position: string;
+          archivedAt: number | string | null;
+          updatedAt: number | string;
+        }>(
+          database,
+          sql`SELECT list_id AS "listId", position, archived_at AS "archivedAt", updated_at AS "updatedAt" FROM ${t().card} WHERE id = ${cardId}`,
+        )
+      )[0];
+    const versionOf = async (boardId: string) =>
+      Number(
+        (
+          await dbAll<{ v: number | string }>(
+            database,
+            sql`SELECT version AS v FROM ${t().board} WHERE id = ${boardId}`,
+          )
+        )[0]?.v,
+      );
+
+    it('adds a card to a list with the title it was given, and moves the board on', async () => {
+      const w = await seedWorld(database);
+      const start = await versionOf(w.boards.publicBoard);
+      const made = id();
+      expect(
+        await apply(w, 'boardMember', {
+          op: 'card.create',
+          id: made,
+          listId: w.lists.publicBoard,
+          title: 'Write it',
+          position: 'Zy',
+        }),
+      ).toMatchObject({
+        status: 'applied',
+        rows: {
+          card: {
+            id: made,
+            title: 'Write it',
+            listId: w.lists.publicBoard,
+            position: 'Zy',
+            hasDescription: false,
+          },
+          version: start + 1,
+        },
+      });
+      expect(
+        (await readBoard(database, w.accounts.boardMember, w.boards.publicBoard))?.cards.map(
+          (c) => c.id,
+        ),
+      ).toContain(made);
+    });
+
+    it('takes no id another card has, no list of a board one cannot change, and holds 5,000 cards', async () => {
+      const w = await seedWorld(database);
+      const create = (listId: string, cardId = id()): Op => ({
+        op: 'card.create',
+        id: cardId,
+        listId,
+        title: 'x',
+        position: 'a9',
+      });
+      expect(await apply(w, 'boardMember', create(w.lists.publicBoard, w.cards.open))).toEqual({
+        status: 'refused',
+        code: 'not_found',
+      });
+      // The private board's list is its member's; the archived board's is nobody's.
+      expect((await apply(w, 'boardMember', create(w.lists.privateBoard))).status).toBe('applied');
+      expect(await apply(w, 'boardOwner', create(w.lists.privateBoard))).toEqual({
+        status: 'refused',
+        code: 'not_found',
+      });
+      expect(await apply(w, 'boardOwner', create(w.lists.archivedBoard))).toEqual({
+        status: 'refused',
+        code: 'not_found',
+      });
+      const count = async () =>
+        Number(
+          (
+            await dbAll<{ n: number | string }>(
+              database,
+              sql`SELECT COUNT(*) AS n FROM ${t().card} WHERE board_id = ${w.boards.publicBoard}`,
+            )
+          )[0]?.n,
+        );
+      for (let i = await count(); i < WORKSPACE_LIMITS.cardsPerBoard; i++)
+        await dbAll(
+          database,
+          sql`INSERT INTO ${t().card} (id, board_id, list_id, title, position, created_by, created_at, updated_at) VALUES (${id()}, ${w.boards.publicBoard}, ${w.lists.publicBoard}, 'c', ${`b${i}`}, ${w.accounts.boardOwner}, ${NOW}, ${NOW}) RETURNING id`,
+        );
+      expect(await apply(w, 'boardMember', create(w.lists.publicBoard))).toEqual({
+        status: 'refused',
+        code: 'limit',
+      });
+    });
+
+    it('moves a card to a list of its own board by writing its one row, and to no other board’s list', async () => {
+      const w = await seedWorld(database);
+      const other = id();
+      await apply(w, 'boardOwner', {
+        op: 'list.create',
+        id: other,
+        boardId: w.boards.publicBoard,
+        name: 'Doing',
+        position: 'a1',
+      });
+      const neighbour = await cardRow(w.cards.archived);
+      const moved = await apply(w, 'boardMember', {
+        op: 'card.move',
+        id: w.cards.open,
+        listId: other,
+        position: 'a3',
+      });
+      expect(moved).toMatchObject({
+        status: 'applied',
+        rows: { card: { listId: other, position: 'a3' } },
+      });
+      expect(await cardRow(w.cards.open)).toMatchObject({ listId: other, position: 'a3' });
+      // No other card was written.
+      expect(await cardRow(w.cards.archived)).toEqual(neighbour);
+      // Not to a list of another board, not by someone who may change the target's board but not the card's own, and not an archived card.
+      const before = await cardRow(w.cards.open);
+      expect(
+        await apply(w, 'boardMember', {
+          op: 'card.move',
+          id: w.cards.open,
+          listId: w.lists.privateBoard,
+          position: 'a1',
+        }),
+      ).toEqual({ status: 'refused', code: 'not_found' });
+      expect(
+        await apply(w, 'boardMember', {
+          op: 'card.move',
+          id: w.cards.archived,
+          listId: other,
+          position: 'a1',
+        }),
+      ).toEqual({ status: 'refused', code: 'not_found' });
+      expect(
+        await apply(w, 'boardMember', {
+          op: 'card.move',
+          id: w.cards.open,
+          listId: id(),
+          position: 'a1',
+        }),
+      ).toEqual({ status: 'refused', code: 'not_found' });
+      expect(await cardRow(w.cards.open)).toEqual(before);
+    });
+
+    it('archives a card out of the board and restores it to the list and position it had', async () => {
+      const w = await seedWorld(database);
+      const open = async () =>
+        (await readBoard(database, w.accounts.boardMember, w.boards.publicBoard))?.cards.map(
+          (c) => c.id,
+        ) ?? [];
+      expect(await open()).toEqual([w.cards.open]);
+      expect((await apply(w, 'boardMember', { op: 'card.archive', id: w.cards.open })).status).toBe(
+        'applied',
+      );
+      expect(await open()).toEqual([]);
+      expect(
+        (await archivedCards(database, w.accounts.member, w.boards.publicBoard))
+          ?.map((c) => c.id)
+          .sort(),
+      ).toEqual([w.cards.archived, w.cards.open].sort());
+      // Twice is not a card that can be archived.
+      expect(await apply(w, 'boardMember', { op: 'card.archive', id: w.cards.open })).toEqual({
+        status: 'refused',
+        code: 'not_found',
+      });
+      expect(await apply(w, 'boardMember', { op: 'card.restore', id: w.cards.open })).toMatchObject(
+        {
+          status: 'applied',
+          rows: { card: { id: w.cards.open, listId: w.lists.publicBoard, position: 'a0' } },
+        },
+      );
+      expect(await open()).toEqual([w.cards.open]);
+      // An open card cannot be restored.
+      expect(await apply(w, 'boardMember', { op: 'card.restore', id: w.cards.open })).toEqual({
+        status: 'refused',
+        code: 'not_found',
+      });
+    });
+
+    it('deletes only an archived card, with what is on it, and leaves its activity', async () => {
+      const w = await seedWorld(database);
+      await seedBoardContents(database, w);
+      const contentsCard =
+        (
+          await dbAll<{ id: string }>(
+            database,
+            sql`SELECT id FROM ${t().card} WHERE board_id = ${w.boards.publicBoard} AND title = 'First'`,
+          )
+        )[0]?.id ?? '';
+      // An open card is not deleted.
+      expect(await apply(w, 'boardMember', { op: 'card.delete', id: contentsCard })).toEqual({
+        status: 'refused',
+        code: 'not_found',
+      });
+      await apply(w, 'boardMember', { op: 'card.archive', id: contentsCard });
+      const before = await countAll(database);
+      expect(await apply(w, 'boardMember', { op: 'card.delete', id: contentsCard })).toMatchObject({
+        status: 'applied',
+        rows: { deletedCard: contentsCard },
+      });
+      const after = await countAll(database);
+      const gone = (name: string) => (before[name] ?? 0) - (after[name] ?? 0);
+      for (const name of ['card', 'card_label', 'card_assignee', 'checklist_item', 'comment'])
+        expect(gone(name), name).toBe(1);
+      // The history of the work stays, and so do the board's labels and the other cards.
+      expect(gone('activity')).toBe(0);
+      expect(gone('label')).toBe(0);
+      expect(await cardRow(w.cards.open)).toBeDefined();
+    });
+
+    it('reads archived cards for whoever can see the board, and for nobody else', async () => {
+      const w = await seedWorld(database);
+      expect(
+        (await archivedCards(database, w.accounts.member, w.boards.publicBoard))?.map(
+          (c) => c.title,
+        ),
+      ).toEqual(['Old one']);
+      expect(
+        await archivedCards(database, w.accounts.outsider, w.boards.publicBoard),
+      ).toBeUndefined();
+      expect(
+        await archivedCards(database, w.accounts.member, w.boards.privateBoard),
+      ).toBeUndefined();
+      expect(await archivedCards(database, w.accounts.member, id())).toBeUndefined();
     });
   });
 

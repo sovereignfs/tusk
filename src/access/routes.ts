@@ -45,6 +45,7 @@ export const ROUTES: RouteRule[] = [
   { route: '/api/boards', methods: { GET: { kind: 'account' } } },
   { route: '/api/settings', methods: { PATCH: { kind: 'account' } } },
   { route: '/api/boards/[id]', methods: { GET: { kind: 'account' } } },
+  { route: '/api/boards/[id]/archived', methods: { GET: { kind: 'account' } } },
   { route: '/api/boards/[id]/version', methods: { GET: { kind: 'account' } } },
   { route: '/api/health', methods: { GET: { kind: 'public' } } },
   // better-auth's own: it checks `Origin` and the session cookie itself, and rate-limits sign-in (src/auth/auth.ts). Absent, with a 404, when sign-in is off.

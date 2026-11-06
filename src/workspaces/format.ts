@@ -23,6 +23,11 @@ export const OPS = [
   'list.rename',
   'list.move',
   'list.delete',
+  'card.create',
+  'card.move',
+  'card.archive',
+  'card.restore',
+  'card.delete',
 ] as const;
 export type OpName = (typeof OPS)[number];
 
@@ -61,7 +66,27 @@ export type Op =
   /** A list is named by its id alone: the board it is on is the row's, and the permission is the board's. */
   | { readonly op: 'list.rename'; readonly id: string; readonly name: string }
   | { readonly op: 'list.move'; readonly id: string; readonly position: string }
-  | { readonly op: 'list.delete'; readonly id: string };
+  | { readonly op: 'list.delete'; readonly id: string }
+  /** A card with only its title, put by the device between the cards it sees (DESIGN.md §15.1): a new one goes at the top of its list. */
+  | {
+      readonly op: 'card.create';
+      readonly id: string;
+      readonly listId: string;
+      readonly title: string;
+      readonly position: string;
+    }
+  /** To a list of the card's own board and a position among its cards: one row, whatever the distance. */
+  | {
+      readonly op: 'card.move';
+      readonly id: string;
+      readonly listId: string;
+      readonly position: string;
+    }
+  | { readonly op: 'card.archive'; readonly id: string }
+  /** Back to its list and its position, which archiving did not touch. */
+  | { readonly op: 'card.restore'; readonly id: string }
+  /** Only an archived card is deleted (§15.8), with its labels, assignees, checklist and comments; its activity stays. */
+  | { readonly op: 'card.delete'; readonly id: string };
 
 /** A person's role in a workspace (DESIGN.md §7.2). */
 export type Role = 'owner' | 'member';
@@ -82,6 +107,9 @@ export const WORKSPACE_LIMITS = {
   /** Boards in a workspace, lists on a board (DESIGN.md §7.4). */
   boardsPerWorkspace: 500,
   listsPerBoard: 100,
+  cardsPerBoard: 5000,
+  /** A card's title, in characters (DESIGN.md §15.1). */
+  cardTitleChars: 500,
   /** A position key, in characters. */
   positionChars: 64,
   /** A request body, in bytes: an operation is small. */
@@ -159,11 +187,33 @@ export interface ListRow {
   readonly cards: number;
 }
 
+/** A card as its tile shows it (DESIGN.md §15.1): what the board is sent of every open card. The badges of later tasks join it as they are built. */
+export interface CardTile {
+  readonly id: string;
+  readonly boardId: string;
+  readonly listId: string;
+  readonly title: string;
+  readonly position: string;
+  readonly dueDate: string | null;
+  readonly dueTime: string | null;
+  readonly hasDescription: boolean;
+}
+
+/** An archived card, for the list of them (DESIGN.md §15.8). */
+export interface ArchivedCard {
+  readonly id: string;
+  readonly listId: string;
+  readonly title: string;
+  readonly archivedAt: number;
+}
+
 /** A board whole and light (DESIGN.md §14.7): what a person who opens it is sent. Lists now; labels, people and cards arrive with the tasks that make them. */
 export interface BoardView {
   readonly board: BoardRow;
   readonly workspace: { readonly id: string; readonly name: string };
   readonly lists: readonly ListRow[];
+  /** Every open card, with what its tile shows. */
+  readonly cards: readonly CardTile[];
   /** What the one asking may do here: only a member changes the board, and an archived one is read-only (§7.2). */
   readonly can: { readonly edit: boolean; readonly admin: boolean };
 }
@@ -172,6 +222,9 @@ export interface OpRows {
   readonly workspace?: WorkspaceRow;
   readonly board?: BoardRow;
   readonly list?: ListRow;
+  readonly card?: CardTile;
+  /** The id of a card that is gone for good. */
+  readonly deletedCard?: string;
   /** The id of a list that is gone, with the cards that were on it. */
   readonly deletedList?: string;
   /** The board's version after the operation, so that its own change is not mistaken for someone else's. */

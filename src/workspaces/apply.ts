@@ -11,6 +11,7 @@ import {
   type OpRefusal,
   type OpRequest,
   type OpResult,
+  type CardTile,
   type ListRow,
   type Role,
   WORKSPACE_LIMITS,
@@ -290,6 +291,75 @@ async function run(
       const version = await touchBoard(tx, boardId, boardsEditableBy(tx, accountId), now);
       return { deletedList: request.id, version };
     }
+    case 'card.create':
+    case 'card.move': {
+      // The list is taken first, with the permission in its statement, and the board is the list's: a card can only be put in a list of a board its
+      // maker may change, and can only be moved to a list of its own board.
+      const taken = await dbAll<{ boardId: string }>(
+        tx,
+        sql`UPDATE ${t.boardList} SET updated_at = ${now}
+            WHERE id = ${request.listId} AND board_id IN ${boardsEditableBy(tx, accountId)}
+            RETURNING board_id AS "boardId"`,
+      );
+      const boardId = taken[0]?.boardId;
+      if (!boardId) throw new Refused('not_found');
+      const version = await touchBoard(tx, boardId, boardsEditableBy(tx, accountId), now);
+      if (request.op === 'card.create') {
+        const count = await dbGet<{ n: number | string }>(
+          tx,
+          sql`SELECT COUNT(*) AS n FROM ${t.card} WHERE board_id = ${boardId}`,
+        );
+        if (Number(count?.n ?? 0) >= WORKSPACE_LIMITS.cardsPerBoard) throw new Refused('limit');
+        const made = await dbAll<{ id: string }>(
+          tx,
+          sql`INSERT INTO ${t.card} (id, board_id, list_id, title, position, created_by, created_at, updated_at)
+              VALUES (${request.id}, ${boardId}, ${request.listId}, ${request.title}, ${request.position}, ${accountId}, ${now}, ${now})
+              ON CONFLICT (id) DO NOTHING RETURNING id`,
+        );
+        if (made.length === 0) throw new Refused('not_found');
+      } else {
+        const moved = await dbAll<{ id: string }>(
+          tx,
+          sql`UPDATE ${t.card} SET list_id = ${request.listId}, position = ${request.position}, updated_at = ${now}
+              WHERE id = ${request.id} AND board_id = ${boardId} AND archived_at IS NULL RETURNING id`,
+        );
+        if (moved.length === 0) throw new Refused('not_found');
+      }
+      return { card: await cardTile(tx, request.id), version };
+    }
+    case 'card.archive':
+    case 'card.restore':
+    case 'card.delete': {
+      // The card's own statement carries the permission; the state it must be in is part of it (only an archived card is deleted).
+      const changed = await dbAll<{ boardId: string }>(
+        tx,
+        request.op === 'card.archive'
+          ? sql`UPDATE ${t.card} SET archived_at = ${now}, updated_at = ${now}
+                WHERE id = ${request.id} AND board_id IN ${boardsEditableBy(tx, accountId)} AND archived_at IS NULL
+                RETURNING board_id AS "boardId"`
+          : request.op === 'card.restore'
+            ? sql`UPDATE ${t.card} SET archived_at = NULL, updated_at = ${now}
+                  WHERE id = ${request.id} AND board_id IN ${boardsEditableBy(tx, accountId)} AND archived_at IS NOT NULL
+                  RETURNING board_id AS "boardId"`
+            : sql`DELETE FROM ${t.card}
+                  WHERE id = ${request.id} AND board_id IN ${boardsEditableBy(tx, accountId)} AND archived_at IS NOT NULL
+                  RETURNING board_id AS "boardId"`,
+      );
+      const boardId = changed[0]?.boardId;
+      if (!boardId) throw new Refused('not_found');
+      if (request.op === 'card.delete') {
+        // Its labels, assignees, checklist and comments go with it; its activity stays (DESIGN.md §15.8).
+        for (const table of [t.comment, t.checklistItem, t.cardAssignee, t.cardLabel])
+          await dbAll(
+            tx,
+            sql`DELETE FROM ${table} WHERE board_id = ${boardId} AND card_id = ${request.id} RETURNING 1 AS one`,
+          );
+      }
+      const version = await touchBoard(tx, boardId, boardsEditableBy(tx, accountId), now);
+      return request.op === 'card.delete'
+        ? { deletedCard: request.id, version }
+        : { card: await cardTile(tx, request.id), version };
+    }
     case 'workspace.rename': {
       // The permission is in the statement: only an owner's workspace is a row it can reach.
       const changed = await dbAll<{ createdAt: number | string }>(
@@ -338,6 +408,31 @@ async function touchBoard(
     sql`UPDATE ${t.workspace} SET updated_at = ${now} WHERE id = ${row.workspaceId} RETURNING id`,
   );
   return Number(row.version);
+}
+
+/** A card as its tile shows it, as the transaction now has it. */
+async function cardTile(tx: Database, id: string): Promise<CardTile> {
+  const t = tablesOf(tx);
+  const row = await dbGet<{
+    id: string;
+    boardId: string;
+    listId: string;
+    title: string;
+    position: string;
+    dueDate: string | null;
+    dueTime: string | null;
+    hasDescription: number | boolean | string;
+  }>(
+    tx,
+    sql`SELECT id, board_id AS "boardId", list_id AS "listId", title, position, due_date AS "dueDate", due_time AS "dueTime",
+          (description IS NOT NULL AND description <> '') AS "hasDescription"
+        FROM ${t.card} WHERE id = ${id}`,
+  );
+  if (!row) throw new Refused('not_found');
+  return {
+    ...row,
+    hasDescription: row.hasDescription === true || Number(row.hasDescription) === 1,
+  };
 }
 
 async function openCards(tx: Database, listId: string): Promise<number> {

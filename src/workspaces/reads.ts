@@ -6,6 +6,8 @@ import * as sqliteApp from '../db/schema/sqlite/app';
 import type { Directory } from '../auth/directory';
 import { boardsEditableBy, boardsAdministeredBy, boardsVisibleTo, workspacesOf } from './can';
 import {
+  type ArchivedCard,
+  type CardTile,
   type BoardRow,
   type BoardsIndex,
   type IndexWorkspace,
@@ -172,9 +174,20 @@ export async function readBoard(
           (SELECT COUNT(*) FROM ${t.card} c WHERE c.list_id = l.id AND c.archived_at IS NULL) AS cards
         FROM ${t.boardList} l WHERE l.board_id = ${boardId} ORDER BY l.position, l.id LIMIT ${WORKSPACE_LIMITS.listsPerBoard}`,
   );
+  const cards = await dbAll<Omit<CardTile, 'hasDescription'> & { hasDescription: unknown }>(
+    database,
+    sql`SELECT id, board_id AS "boardId", list_id AS "listId", title, position, due_date AS "dueDate", due_time AS "dueTime",
+          (description IS NOT NULL AND description <> '') AS "hasDescription"
+        FROM ${t.card} WHERE board_id = ${boardId} AND archived_at IS NULL
+        ORDER BY list_id, position, id LIMIT ${WORKSPACE_LIMITS.cardsPerBoard}`,
+  );
   const board = toBoard(raw);
   return {
     board,
+    cards: cards.map((card) => ({
+      ...card,
+      hasDescription: card.hasDescription === true || Number(card.hasDescription) === 1,
+    })),
     workspace: { id: raw.workspaceId, name: raw.workspaceName },
     lists: lists.map((list) => ({ ...list, cards: Number(list.cards) })),
     can: {
@@ -283,4 +296,26 @@ export async function boardsIndex(
       peopleCount: found.count,
     })),
   };
+}
+
+/** A board's archived cards, newest archived first, for someone who can see the board (DESIGN.md §15.8); `undefined` for a board that is not theirs. */
+export async function archivedCards(
+  database: Database,
+  accountId: string,
+  boardId: string,
+): Promise<ArchivedCard[] | undefined> {
+  const t = tablesOf(database);
+  if (!(await boardVersion(database, accountId, boardId))) return undefined;
+  const rows = await dbAll<{
+    id: string;
+    listId: string;
+    title: string;
+    archivedAt: number | string;
+  }>(
+    database,
+    sql`SELECT id, list_id AS "listId", title, archived_at AS "archivedAt" FROM ${t.card}
+        WHERE board_id = ${boardId} AND board_id IN ${boardsVisibleTo(database, accountId)} AND archived_at IS NOT NULL
+        ORDER BY archived_at DESC, id LIMIT ${WORKSPACE_LIMITS.cardsPerBoard}`,
+  );
+  return rows.map((row) => ({ ...row, archivedAt: Number(row.archivedAt) }));
 }

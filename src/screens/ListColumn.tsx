@@ -1,8 +1,10 @@
 'use client';
 
-import { useSortable } from '@dnd-kit/sortable';
-import { type FormEvent, useState } from 'react';
-import { WORKSPACE_LIMITS, type ListRow } from '../workspaces/format';
+import { useDroppable } from '@dnd-kit/core';
+import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { type FormEvent, useEffect, useRef, useState } from 'react';
+import { WORKSPACE_LIMITS, type CardTile, type ListRow } from '../workspaces/format';
+import { CardTileView } from './CardTileView';
 import { Button, ConfirmDialog, Dialog, FormField, Icon, Input, Menu } from '../ui';
 import styles from './BoardScreen.module.css';
 
@@ -13,14 +15,19 @@ import styles from './BoardScreen.module.css';
  */
 export function ListColumn({
   list,
+  cards,
   index,
   count,
   editable,
   onRename,
   onMove,
   onDelete,
+  onAddCard,
+  onArchiveCard,
 }: {
   list: ListRow;
+  /** Its open cards, top to bottom. */
+  cards: readonly CardTile[];
   /** Where it is now, from 0, and how many lists there are. */
   index: number;
   count: number;
@@ -29,10 +36,28 @@ export function ListColumn({
   /** To this place among the others, from 0. */
   onMove(index: number): void;
   onDelete(): void;
+  /** A card with this title at the top of the list. */
+  onAddCard(title: string): void;
+  onArchiveCard(card: CardTile): void;
 }) {
-  const sortable = useSortable({ id: list.id, disabled: !editable });
+  const sortable = useSortable({ id: list.id, data: { type: 'list' }, disabled: !editable });
   const [menu, setMenu] = useState(false);
   const [dialog, setDialog] = useState<'configure' | 'position' | 'delete' | null>(null);
+  const [adding, setAdding] = useState(false);
+  const addField = useRef<HTMLFormElement>(null);
+  const [title, setTitle] = useState('');
+  // The cards' area takes a card dropped on an empty list, or below the last one.
+  const drop = useDroppable({ id: `column:${list.id}`, data: { type: 'column', listId: list.id } });
+  useEffect(() => {
+    if (adding) addField.current?.querySelector('input')?.focus();
+  }, [adding]);
+  const submitCard = (event: FormEvent) => {
+    event.preventDefault();
+    const next = title.trim();
+    if (next === '') return;
+    onAddCard(next);
+    setTitle('');
+  };
 
   const style = {
     transform: sortable.transform
@@ -43,8 +68,8 @@ export function ListColumn({
   const heading = (
     <>
       <h2 className={styles.listName}>{list.name}</h2>
-      <span className={styles.count} aria-label={`${list.cards} open cards`}>
-        {list.cards}
+      <span className={styles.count} aria-label={`${cards.length} open cards`}>
+        {cards.length}
       </span>
     </>
   );
@@ -90,6 +115,7 @@ export function ListColumn({
               </button>
             }
             items={[
+              { label: 'Add card', icon: 'plus', onSelect: () => setAdding(true) },
               { label: 'Configure', icon: 'pencil', onSelect: () => setDialog('configure') },
               { type: 'separator' },
               {
@@ -114,7 +140,47 @@ export function ListColumn({
           />
         ) : null}
       </div>
-      <div className={styles.cards}>{/* The cards of the list: task 18.1. */}</div>
+      {editable ? (
+        adding ? (
+          <form ref={addField} onSubmit={submitCard} className={styles.addCard}>
+            <Input
+              aria-label={`Title of a new card in ${list.name}`}
+              value={title}
+              maxLength={WORKSPACE_LIMITS.cardTitleChars}
+              placeholder="Add a card…"
+              onChange={(event) => setTitle(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') {
+                  setAdding(false);
+                  setTitle('');
+                }
+              }}
+              onBlur={() => {
+                if (title.trim() === '') setAdding(false);
+              }}
+            />
+          </form>
+        ) : (
+          <button type="button" className={styles.addCardButton} onClick={() => setAdding(true)}>
+            <Icon name="plus" aria-hidden /> Add a card
+          </button>
+        )
+      ) : null}
+      <div ref={drop.setNodeRef} className={styles.cards}>
+        <SortableContext
+          items={cards.map((each) => each.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          {cards.map((card) => (
+            <CardTileView
+              key={card.id}
+              card={card}
+              editable={editable}
+              onArchive={() => onArchiveCard(card)}
+            />
+          ))}
+        </SortableContext>
+      </div>
 
       {dialog === 'configure' ? (
         <ConfigureDialog

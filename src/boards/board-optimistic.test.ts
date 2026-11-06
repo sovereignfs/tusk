@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { comparePositions } from '../position';
-import type { BoardView, ListRow } from '../workspaces/format';
-import { endPosition, positionFor, settled, showingBoard, sortLists } from './board-optimistic';
+import type { BoardView, CardTile, ListRow } from '../workspaces/format';
+import {
+  cardPositionFor,
+  cardsIn,
+  endPosition,
+  positionFor,
+  settled,
+  showingBoard,
+  sortLists,
+  topPosition,
+} from './board-optimistic';
 
 const list = (id: string, position: string, name = id): ListRow => ({
   id,
@@ -25,6 +34,7 @@ const view = (lists: ListRow[]): BoardView => ({
   },
   workspace: { id: 'w', name: 'Acme' },
   lists,
+  cards: [],
   can: { edit: true, admin: true },
 });
 const names = (v: BoardView) => v.lists.map((each) => each.id);
@@ -71,10 +81,16 @@ describe('what a board shows of a list operation', () => {
 
   it('keeps the server’s row and version once it has answered', () => {
     const guess = showingBoard(base, { op: 'list.rename', id: 'b', name: 'Doing' });
-    const kept = settled(guess, { list: list('b', 'a1', 'Doing!'), version: 9 });
+    const kept = settled(
+      guess,
+      { op: 'list.rename', id: 'b', name: 'Doing!' },
+      { list: list('b', 'a1', 'Doing!'), version: 9 },
+    );
     expect(kept.lists[1]?.name).toBe('Doing!');
     expect(kept.board.version).toBe(9);
-    expect(names(settled(kept, { deletedList: 'a', version: 10 }))).toEqual(['b', 'c']);
+    expect(
+      names(settled(kept, { op: 'list.delete', id: 'a' }, { deletedList: 'a', version: 10 })),
+    ).toEqual(['b', 'c']);
   });
 });
 
@@ -97,5 +113,87 @@ describe('where a list goes', () => {
       lists.map((each) => (each.id === 'c' ? { ...each, position: toMiddle } : each)),
     );
     expect(moved.map((each) => each.id)).toEqual(['a', 'c', 'b']);
+  });
+});
+
+describe('cards on a board', () => {
+  const card = (id: string, listId: string, position: string): CardTile => ({
+    id,
+    boardId: 'b',
+    listId,
+    title: id,
+    position,
+    dueDate: null,
+    dueTime: null,
+    hasDescription: false,
+  });
+  const base = (): BoardView => ({
+    ...view([list('a', 'a0'), list('b', 'a1')]),
+    cards: [card('x', 'a', 'a0'), card('y', 'a', 'a1'), card('z', 'b', 'a0')],
+  });
+  const ids = (v: BoardView, listId: string) => cardsIn(v.cards, listId).map((each) => each.id);
+
+  it('shows a new card at the top, a move to another list, an archive and a list’s deletion', () => {
+    const v = base();
+    const added = showingBoard(v, {
+      op: 'card.create',
+      id: 'n',
+      listId: 'a',
+      title: 'New',
+      position: topPosition(v.cards, 'a'),
+    });
+    expect(ids(added, 'a')).toEqual(['n', 'x', 'y']);
+    const moved = showingBoard(v, {
+      op: 'card.move',
+      id: 'x',
+      listId: 'b',
+      position: cardPositionFor(v.cards, 'x', 'b', 1),
+    });
+    expect(ids(moved, 'a')).toEqual(['y']);
+    expect(ids(moved, 'b')).toEqual(['z', 'x']);
+    expect(showingBoard(v, { op: 'card.archive', id: 'y' }).cards.map((each) => each.id)).toEqual([
+      'x',
+      'z',
+    ]);
+    const without = showingBoard(v, { op: 'list.delete', id: 'a' });
+    expect(without.cards.map((each) => each.id)).toEqual(['z']);
+    // A card made for a list the board does not have is not shown.
+    expect(
+      showingBoard(v, { op: 'card.create', id: 'n', listId: 'nope', title: 'x', position: 'a5' }),
+    ).toBe(v);
+  });
+
+  it('finds the position among what is shown: the top, between two, and the end, in this list or another', () => {
+    const v = base();
+    expect(comparePositions(cardPositionFor(v.cards, 'y', 'a', 0), 'a0')).toBe(-1);
+    const between = cardPositionFor(v.cards, 'z', 'a', 1);
+    expect(comparePositions(between, 'a0')).toBe(1);
+    expect(comparePositions(between, 'a1')).toBe(-1);
+    expect(comparePositions(cardPositionFor(v.cards, 'x', 'a', 99), 'a1')).toBe(1);
+    // Moving within a list leaves the moved card out of the neighbours: x to after y.
+    expect(comparePositions(cardPositionFor(v.cards, 'x', 'a', 1), 'a1')).toBe(1);
+    expect(topPosition([], 'a')).toBeTruthy();
+  });
+
+  it('keeps the server’s card, drops an archived one and a deleted one, and a restored one rejoins', () => {
+    const v = base();
+    const server = card('x', 'b', 'a9');
+    expect(
+      settled(
+        v,
+        { op: 'card.move', id: 'x', listId: 'b', position: 'a9' },
+        { card: server },
+      ).cards.find((c) => c.id === 'x'),
+    ).toBe(server);
+    expect(
+      settled(v, { op: 'card.archive', id: 'x' }, { card: server }).cards.map((c) => c.id),
+    ).toEqual(['y', 'z']);
+    expect(
+      settled(v, { op: 'card.delete', id: 'x' }, { deletedCard: 'x' }).cards.map((c) => c.id),
+    ).toEqual(['y', 'z']);
+    const restored = card('r', 'a', 'a5');
+    expect(
+      settled(v, { op: 'card.restore', id: 'r' }, { card: restored }).cards.map((c) => c.id),
+    ).toContain('r');
   });
 });

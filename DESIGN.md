@@ -835,6 +835,9 @@ A card's status is Open or Archived. **Archive** takes it off the board, keeping
 board's menu lists archived cards, with Restore and Delete. **Delete** is only for an archived card, asks first, and is final; its activity stays,
 under the title it had.
 
+**As built (task 18.1):** a card is dragged by its whole tile (a press that does not move is a click), its position is computed against what is shown, and archived cards are behind
+_Archived cards_ in the board's header until the board's menu exists (17.2).
+
 ## 16. Inbox
 
 Basic notifications for phase 1: what a person needs to know about the boards they are on, in the app. Push and email are phase 2 (§25.2).

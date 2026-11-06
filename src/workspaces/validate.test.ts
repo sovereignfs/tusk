@@ -25,6 +25,11 @@ describe('an operation', () => {
       'list.rename',
       'list.move',
       'list.delete',
+      'card.create',
+      'card.move',
+      'card.archive',
+      'card.restore',
+      'card.delete',
     ]);
   });
 
@@ -60,6 +65,31 @@ describe('an operation', () => {
       if (parsed.ok && 'name' in parsed.value)
         expect(parsed.value.name).toBe(parsed.value.name.trim());
     }
+  });
+
+  it('takes the card operations whole, and refuses a blank title, a long one and a key it does not take', () => {
+    const [a, b] = [ID(), ID()];
+    const good = [
+      { op: 'card.create', id: a, listId: b, title: ' Write it ', position: 'a0' },
+      { op: 'card.move', id: a, listId: b, position: 'a1' },
+      { op: 'card.archive', id: a },
+      { op: 'card.restore', id: a },
+      { op: 'card.delete', id: a },
+    ];
+    for (const each of good) expect(parseOp({ opId: ID(), ...each }).ok, each.op).toBe(true);
+    const parsed = parseOp({ opId: ID(), ...good[0] });
+    if (parsed.ok && parsed.value.op === 'card.create') expect(parsed.value.title).toBe('Write it');
+    const bad: unknown[] = [
+      { op: 'card.create', id: a, listId: b, title: '  ', position: 'a0' },
+      { op: 'card.create', id: a, listId: b, title: 'x'.repeat(501), position: 'a0' },
+      { op: 'card.create', id: a, listId: b, title: 'x', position: '' },
+      { op: 'card.create', id: a, listId: b, title: 'x', position: 'a0', boardId: b },
+      { op: 'card.move', id: a, position: 'a1' },
+      { op: 'card.archive', id: 'x' },
+      { op: 'card.delete', id: a, force: true },
+    ];
+    for (const each of bad)
+      expect(parseOp({ opId: ID(), ...(each as object) }).ok, JSON.stringify(each)).toBe(false);
   });
 
   it('refuses a colour that is not #rrggbb, a position that is not one, a blank name and a key it does not take', () => {

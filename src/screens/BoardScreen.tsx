@@ -1,14 +1,35 @@
 'use client';
 
-import { DndContext, closestCenter, type DragEndEvent } from '@dnd-kit/core';
+import {
+  type CollisionDetection,
+  DndContext,
+  DragOverlay,
+  type DragEndEvent,
+  type DragStartEvent,
+  closestCenter,
+  closestCorners,
+} from '@dnd-kit/core';
 import { SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortable';
 import Link from 'next/link';
-import { type FormEvent, useEffect, useRef, useState } from 'react';
-import { endPosition, positionFor } from '../boards/board-optimistic';
+import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import {
+  cardPositionFor,
+  cardsIn,
+  endPosition,
+  positionFor,
+  topPosition,
+} from '../boards/board-optimistic';
 import { boardFailureMessage, useBoard } from '../boards/store';
 import { HORIZONTAL_AUTOSCROLL, useDragClickGuard, useReorderSensors } from '../ui/dnd';
-import { Alert, Button, EmptyState, Icon, Input, useToast } from '../ui';
-import { WORKSPACE_LIMITS, type BoardView } from '../workspaces/format';
+import { Alert, Button, ConfirmDialog, Dialog, EmptyState, Icon, Input, useToast } from '../ui';
+import {
+  type ArchivedCard,
+  type BoardView,
+  type CardTile,
+  type Op,
+  WORKSPACE_LIMITS,
+} from '../workspaces/format';
+import { TileBody } from './CardTileView';
 import { ListColumn } from './ListColumn';
 import styles from './BoardScreen.module.css';
 
@@ -18,6 +39,19 @@ import styles from './BoardScreen.module.css';
  * change at once and sends it. Only a member of the board changes it (§7.2): for anyone else there is no way to add, drag or configure, and the server
  * would refuse it as well. Cards arrive with task 18.1.
  */
+/** A list is dragged among lists, and a card among the cards and the empty places of every list: what each may land on is decided by what it is. */
+const collisions: CollisionDetection = (args) => {
+  const kind = args.active.data.current?.type;
+  const containers = args.droppableContainers.filter((each) =>
+    kind === 'list'
+      ? each.data.current?.type === 'list'
+      : each.data.current?.type === 'card' || each.data.current?.type === 'column',
+  );
+  return kind === 'list'
+    ? closestCenter({ ...args, droppableContainers: containers })
+    : closestCorners({ ...args, droppableContainers: containers });
+};
+
 export function BoardScreen({ initial }: { initial: BoardView }) {
   const toast = useToast();
   const store = useBoard(initial, (reason) =>
@@ -28,6 +62,8 @@ export function BoardScreen({ initial }: { initial: BoardView }) {
   const guard = useDragClickGuard();
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
+  const [dragging, setDragging] = useState<CardTile | null>(null);
+  const [archivedOpen, setArchivedOpen] = useState(false);
   const addForm = useRef<HTMLFormElement>(null);
   // The field is put in front of the person who asked for it.
   useEffect(() => {
@@ -61,10 +97,33 @@ export function BoardScreen({ initial }: { initial: BoardView }) {
     setAdding(false);
   }
 
+  function onDragStart(event: DragStartEvent) {
+    guard.begin();
+    if (event.active.data.current?.type === 'card')
+      setDragging(view.cards.find((each) => each.id === event.active.id) ?? null);
+  }
+
   function onDragEnd(event: DragEndEvent) {
     guard.end();
+    setDragging(null);
     const { active, over } = event;
     if (!over || active.id === over.id) return;
+    if (active.data.current?.type === 'card') {
+      const id = String(active.id);
+      // On a card: it takes that card's place in that card's list. On the empty part of a list: it goes to the end.
+      const target = over.data.current as { type: string; listId: string } | undefined;
+      if (!target) return;
+      const there = cardsIn(view.cards, target.listId);
+      const index =
+        target.type === 'card' ? there.findIndex((each) => each.id === over.id) : there.length;
+      if (index < 0) return;
+      const moving = view.cards.find((each) => each.id === id);
+      if (!moving) return;
+      const position = cardPositionFor(view.cards, id, target.listId, index);
+      if (target.listId === moving.listId && position === moving.position) return;
+      void store.perform({ op: 'card.move', id, listId: target.listId, position });
+      return;
+    }
     const to = view.lists.findIndex((each) => each.id === over.id);
     if (to < 0) return;
     // The list lands where the one it was dropped on was; one row is written.
@@ -89,6 +148,9 @@ export function BoardScreen({ initial }: { initial: BoardView }) {
         ) : !view.can.edit ? (
           <span className={styles.badge}>Viewing</span>
         ) : null}
+        <button type="button" className={styles.link} onClick={() => setArchivedOpen(true)}>
+          Archived cards
+        </button>
       </header>
       {offline ? (
         <Alert variant="warning">
@@ -100,10 +162,13 @@ export function BoardScreen({ initial }: { initial: BoardView }) {
         id={`board-${view.board.id}`}
         sensors={sensors}
         autoScroll={HORIZONTAL_AUTOSCROLL}
-        collisionDetection={closestCenter}
-        onDragStart={guard.begin}
+        collisionDetection={collisions}
+        onDragStart={onDragStart}
         onDragEnd={onDragEnd}
-        onDragCancel={guard.end}
+        onDragCancel={() => {
+          guard.end();
+          setDragging(null);
+        }}
       >
         <SortableContext
           items={view.lists.map((each) => each.id)}
@@ -114,6 +179,7 @@ export function BoardScreen({ initial }: { initial: BoardView }) {
               <ListColumn
                 key={list.id}
                 list={list}
+                cards={cardsIn(view.cards, list.id)}
                 index={index}
                 count={view.lists.length}
                 editable={editable}
@@ -128,6 +194,16 @@ export function BoardScreen({ initial }: { initial: BoardView }) {
                   })
                 }
                 onDelete={() => void store.perform({ op: 'list.delete', id: list.id })}
+                onAddCard={(title) =>
+                  void store.perform({
+                    op: 'card.create',
+                    id: crypto.randomUUID(),
+                    listId: list.id,
+                    title,
+                    position: topPosition(view.cards, list.id),
+                  })
+                }
+                onArchiveCard={(card) => void store.perform({ op: 'card.archive', id: card.id })}
               />
             ))}
             {editable ? (
@@ -177,7 +253,124 @@ export function BoardScreen({ initial }: { initial: BoardView }) {
             ) : null}
           </div>
         </SortableContext>
+        <DragOverlay>
+          {dragging ? (
+            <div className={`${styles.card} ${styles.overlay}`}>
+              <TileBody card={dragging} />
+            </div>
+          ) : null}
+        </DragOverlay>
       </DndContext>
+      {archivedOpen ? (
+        <ArchivedDialog
+          boardId={view.board.id}
+          lists={view.lists}
+          editable={editable}
+          onClose={() => setArchivedOpen(false)}
+          perform={store.perform}
+        />
+      ) : null}
     </div>
+  );
+}
+
+/** The board's archived cards (DESIGN.md §15.8), fetched when asked for, with Restore and Delete for someone who may change the board. */
+function ArchivedDialog({
+  boardId,
+  lists,
+  editable,
+  onClose,
+  perform,
+}: {
+  boardId: string;
+  lists: BoardView['lists'];
+  editable: boolean;
+  onClose: () => void;
+  perform: (op: Op) => Promise<boolean>;
+}) {
+  const [cards, setCards] = useState<readonly ArchivedCard[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [deleting, setDeleting] = useState<ArchivedCard | null>(null);
+
+  const read = useCallback(async () => {
+    try {
+      const reply = await fetch(`/api/boards/${boardId}/archived`, { cache: 'no-store' });
+      if (!reply.ok) return setFailed(true);
+      setCards(((await reply.json()) as { cards: ArchivedCard[] }).cards);
+      setFailed(false);
+    } catch {
+      setFailed(true);
+    }
+  }, [boardId]);
+  useEffect(() => {
+    void read();
+  }, [read]);
+
+  async function act(op: Op) {
+    await perform(op);
+    await read();
+  }
+
+  return (
+    <Dialog open onClose={onClose} aria-label="Archived cards" title="Archived cards" size="md">
+      <div className={styles.dialog}>
+        {failed ? <Alert variant="warning">This needs a connection.</Alert> : null}
+        {cards === null && !failed ? <p>Reading the archived cards…</p> : null}
+        {cards?.length === 0 ? <p>Nothing is archived on this board.</p> : null}
+        <ul className={styles.archivedList}>
+          {(cards ?? []).map((card) => (
+            <li key={card.id} className={styles.archivedRow}>
+              <span className={styles.archivedTitle}>
+                {card.title}
+                <span className={styles.badge}>
+                  {' '}
+                  in {lists.find((each) => each.id === card.listId)?.name ?? 'a list'}
+                </span>
+              </span>
+              {editable ? (
+                <>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    aria-label={`Restore ${card.title}`}
+                    onClick={() => void act({ op: 'card.restore', id: card.id })}
+                  >
+                    Restore
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    aria-label={`Delete ${card.title}`}
+                    onClick={() => setDeleting(card)}
+                  >
+                    Delete
+                  </Button>
+                </>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      </div>
+      {deleting ? (
+        <ConfirmDialog
+          open
+          onClose={() => setDeleting(null)}
+          title="Delete this card for good?"
+          message={
+            <>
+              <strong>{deleting.title}</strong> will be deleted with its checklist and comments. Its
+              history stays. This cannot be undone.
+            </>
+          }
+          confirmLabel="Delete card"
+          destructive
+          onConfirm={() => {
+            const card = deleting;
+            setDeleting(null);
+            void act({ op: 'card.delete', id: card.id });
+          }}
+        />
+      ) : null}
+    </Dialog>
   );
 }

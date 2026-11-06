@@ -201,3 +201,107 @@ test('a board that is not there for this account is the page for what is not her
     expect((await stranger.get(path)).status(), path).toBe(401);
   await stranger.dispose();
 });
+
+/** The titles of the cards in a list, top to bottom. */
+const cardsOf = (page: Page, list: string) =>
+  page
+    .locator(`section[aria-label="${list}"] [aria-roledescription="sortable card"]`)
+    .evaluateAll((els) => els.map((el) => el.getAttribute('aria-label')));
+
+async function addCard(page: Page, list: string, title: string) {
+  const column = page.locator(`section[aria-label="${list}"]`);
+  const field = column.getByLabel(`Title of a new card in ${list}`);
+  if (!(await field.isVisible())) await column.getByRole('button', { name: 'Add a card' }).click();
+  await field.fill(title);
+  await field.press('Enter');
+  await expect(column.getByLabel(title, { exact: true })).toBeVisible();
+}
+
+test('cards are added at the top of a list, moved by the keyboard and the pointer, and kept after a reload', async ({
+  page,
+}) => {
+  await signedIn(page);
+  const { workspace } = await makeBoard(page);
+  await addList(page, 'Doing');
+  await addCard(page, 'Backlog', 'First');
+  await addCard(page, 'Backlog', 'Second');
+  await addCard(page, 'Backlog', 'Third');
+  // A new card goes to the top.
+  expect(await cardsOf(page, 'Backlog')).toEqual(['Third', 'Second', 'First']);
+
+  // The keyboard alone: pick up, one step down, put down. It lands where it was announced.
+  const third = page.locator('section[aria-label="Backlog"]').getByLabel('Third', { exact: true });
+  await third.focus();
+  for (const key of ['Space', 'ArrowDown', 'Space']) {
+    await page.keyboard.press(key);
+    await page.waitForTimeout(250);
+  }
+  await expect.poll(() => cardsOf(page, 'Backlog')).toEqual(['Second', 'Third', 'First']);
+
+  // The pointer, to another list.
+  const from = await page
+    .locator('section[aria-label="Backlog"]')
+    .getByLabel('First', { exact: true })
+    .boundingBox();
+  const to = await page.locator('section[aria-label="Doing"]').boundingBox();
+  if (!from || !to) throw new Error('nothing to drag');
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from.x + from.width / 2 + 20, from.y + from.height / 2, { steps: 4 });
+  await page.mouse.move(to.x + to.width / 2, to.y + 60, { steps: 12 });
+  await page.waitForTimeout(200);
+  await page.mouse.up();
+  await expect.poll(() => cardsOf(page, 'Doing')).toEqual(['First']);
+  expect(await cardsOf(page, 'Backlog')).toEqual(['Second', 'Third']);
+
+  await page.reload();
+  expect(await cardsOf(page, 'Doing')).toEqual(['First']);
+  expect(await cardsOf(page, 'Backlog')).toEqual(['Second', 'Third']);
+  await cleanUp(page, workspace);
+});
+
+test('a card is archived from its menu, listed under Archived cards, restored to where it was, and deleted for good', async ({
+  page,
+}) => {
+  await signedIn(page);
+  const { workspace } = await makeBoard(page);
+  await addCard(page, 'Backlog', 'Keep');
+  await addCard(page, 'Backlog', 'Old');
+  expect(await cardsOf(page, 'Backlog')).toEqual(['Old', 'Keep']);
+
+  await page.getByRole('button', { name: 'Card options for Old' }).click();
+  await page.getByRole('menuitem', { name: 'Archive' }).click();
+  await expect.poll(() => cardsOf(page, 'Backlog')).toEqual(['Keep']);
+  await page.reload();
+  expect(await cardsOf(page, 'Backlog')).toEqual(['Keep']);
+
+  await page.getByRole('button', { name: 'Archived cards' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Archived cards' });
+  await expect(dialog.getByText('Old')).toBeVisible();
+  await dialog.getByRole('button', { name: 'Restore Old' }).click();
+  await expect(dialog.getByText('Nothing is archived on this board.')).toBeVisible();
+  await dialog.getByRole('button', { name: 'Close' }).click();
+  // Back at the place it had, above the one it was above.
+  await expect.poll(() => cardsOf(page, 'Backlog')).toEqual(['Old', 'Keep']);
+
+  await page.getByRole('button', { name: 'Card options for Old' }).click();
+  await page.getByRole('menuitem', { name: 'Archive' }).click();
+  await page.getByRole('button', { name: 'Archived cards' }).click();
+  await page
+    .getByRole('dialog', { name: 'Archived cards' })
+    .getByRole('button', { name: 'Delete Old' })
+    .click();
+  // It asks first.
+  await page.getByRole('button', { name: 'Delete card' }).click();
+  await expect(
+    page
+      .getByRole('dialog', { name: 'Archived cards' })
+      .getByText('Nothing is archived on this board.'),
+  ).toBeVisible();
+  await page
+    .getByRole('dialog', { name: 'Archived cards' })
+    .getByRole('button', { name: 'Close' })
+    .click();
+  expect(await cardsOf(page, 'Backlog')).toEqual(['Keep']);
+  await cleanUp(page, workspace);
+});

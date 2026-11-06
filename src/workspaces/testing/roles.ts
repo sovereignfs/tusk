@@ -37,6 +37,8 @@ export interface World {
   boards: { publicBoard: string; privateBoard: string; archivedBoard: string };
   /** One list on each board, so that the operations on a list have one to be done to. */
   lists: { publicBoard: string; privateBoard: string; archivedBoard: string };
+  /** Two cards in the public board's list, so that the operations on a card have one to be done to: one open, one archived. */
+  cards: { open: string; archived: string };
 }
 
 const uuid = () => crypto.randomUUID();
@@ -47,6 +49,7 @@ export async function seedWorld(database: Database): Promise<World> {
   const workspace = uuid();
   const boards = { publicBoard: uuid(), privateBoard: uuid(), archivedBoard: uuid() };
   const lists = { publicBoard: uuid(), privateBoard: uuid(), archivedBoard: uuid() };
+  const cards = { open: uuid(), archived: uuid() };
   const now = 1_800_000_000_000;
 
   await dbRun(
@@ -94,7 +97,17 @@ export async function seedWorld(database: Database): Promise<World> {
       database,
       sql`INSERT INTO ${t.boardList} (id, board_id, name, position, created_at, updated_at) VALUES (${lists[key]}, ${boards[key]}, 'Backlog', 'a0', ${now}, ${now})`,
     );
-  return { accounts, workspace, boards, lists };
+  await dbRun(
+    database,
+    sql`INSERT INTO ${t.card} (id, board_id, list_id, title, position, archived_at, created_by, created_at, updated_at)
+        VALUES (${cards.open}, ${boards.publicBoard}, ${lists.publicBoard}, 'Open one', 'a0', NULL, ${accounts.boardOwner}, ${now}, ${now})`,
+  );
+  await dbRun(
+    database,
+    sql`INSERT INTO ${t.card} (id, board_id, list_id, title, position, archived_at, created_by, created_at, updated_at)
+        VALUES (${cards.archived}, ${boards.publicBoard}, ${lists.publicBoard}, 'Old one', 'a1', ${now}, ${accounts.boardOwner}, ${now}, ${now})`,
+  );
+  return { accounts, workspace, boards, lists, cards };
 }
 
 /** The ids of the boards a permission reaches for an account, from the subquery itself. */
