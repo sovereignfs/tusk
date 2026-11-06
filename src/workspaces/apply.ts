@@ -1044,6 +1044,37 @@ async function run(
       );
       return { card: await cardTile(tx, request.newId), version };
     }
+    case 'board.publish':
+    case 'board.unpublish': {
+      // An administrator's. A board is published while it is open; taking it down is allowed whatever state it is in, so that an archived board's address can go.
+      const version = await touchBoard(
+        tx,
+        request.id,
+        boardsAdministeredBy(tx, accountId),
+        now,
+        request.op === 'board.publish',
+      );
+      const existing = await dbGet<{ token: string }>(
+        tx,
+        sql`SELECT token FROM ${t.publication} WHERE board_id = ${request.id}`,
+      );
+      if (request.op === 'board.unpublish') {
+        if (!existing) throw new Refused('stale');
+        await dbAll(
+          tx,
+          sql`DELETE FROM ${t.publication} WHERE board_id = ${request.id} RETURNING 1 AS one`,
+        );
+        return { unpublished: request.id, version };
+      }
+      if (existing) return { publication: { boardId: request.id, token: existing.token }, version };
+      // 32 random bytes, base64url: an address that cannot be guessed (DESIGN.md §14.6).
+      const token = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64url');
+      await dbAll(
+        tx,
+        sql`INSERT INTO ${t.publication} (board_id, token, created_by, created_at) VALUES (${request.id}, ${token}, ${accountId}, ${now}) RETURNING board_id`,
+      );
+      return { publication: { boardId: request.id, token }, version };
+    }
     case 'workspace.rename': {
       // The permission is in the statement: only an owner's workspace is a row it can reach.
       const changed = await dbAll<{ createdAt: number | string }>(

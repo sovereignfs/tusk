@@ -59,6 +59,8 @@ export const OPS = [
   'comment.delete',
   'card.moveToBoard',
   'card.clone',
+  'board.publish',
+  'board.unpublish',
 ] as const;
 export type OpName = (typeof OPS)[number];
 
@@ -214,7 +216,11 @@ export type Op =
       readonly position: string;
     }
   /** A copy below it in its list, as a card of its own under `newId`: title, description, due date, checklist unticked, labels and assignees; not comments. */
-  | { readonly op: 'card.clone'; readonly id: string; readonly newId: string };
+  | { readonly op: 'card.clone'; readonly id: string; readonly newId: string }
+  /** Gives the board an address anyone can open, read-only (DESIGN.md §14.6). Already published: the address it has. */
+  | { readonly op: 'board.publish'; readonly id: string }
+  /** Takes the address away for good: publishing again makes a different one. */
+  | { readonly op: 'board.unpublish'; readonly id: string };
 
 export type Visibility = 'public' | 'private';
 
@@ -434,6 +440,10 @@ export interface OpRows {
   readonly board?: BoardRow;
   readonly list?: ListRow;
   readonly card?: CardTile;
+  /** The board's address, as it now is. */
+  readonly publication?: { readonly boardId: string; readonly token: string };
+  /** The board that is no longer published. */
+  readonly unpublished?: string;
   /** A comment that is gone. */
   readonly deletedComment?: string;
   readonly item?: ChecklistItem;
@@ -585,6 +595,8 @@ export const ACTIVITY_KINDS = [
   'card.moved_out',
   'card.moved_in',
   'card.cloned',
+  'board.published',
+  'board.unpublished',
 ] as const;
 export type ActivityKind = (typeof ACTIVITY_KINDS)[number];
 
@@ -617,3 +629,13 @@ export interface MoveTargets {
     readonly members: readonly string[];
   }[];
 }
+
+/** A published board, with the address it has: for its owners (Share dialog) and for Settings > Data. */
+export interface Publication {
+  readonly boardId: string;
+  readonly boardName: string;
+  readonly token: string;
+}
+
+/** The token of a published board: 32 random bytes in base64url is 43 characters. */
+export const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;

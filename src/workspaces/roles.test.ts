@@ -88,6 +88,8 @@ interface Row {
   otherwise: OpRefusal;
   /** What a role is told when it is not `otherwise`: the one who is refused because they are already what the operation would make them. */
   refusals?: Partial<Record<Role, { code: OpRefusal; reason: OpReason }>>;
+  /** What the world needs before the operation makes sense (a board to be published before it is unpublished). */
+  prepare?(w: World): Promise<void>;
 }
 const OPERATIONS: Row[] = [
   {
@@ -466,6 +468,25 @@ const OPERATIONS: Row[] = [
     otherwise: 'not_found',
   },
   {
+    op: 'board.publish',
+    build: (w) => ({ op: 'board.publish', id: w.boards.publicBoard }),
+    may: ['owner', 'coOwner', 'boardOwner'],
+    otherwise: 'not_found',
+  },
+  {
+    op: 'board.unpublish',
+    build: (w) => ({ op: 'board.unpublish', id: w.boards.publicBoard }),
+    may: ['owner', 'coOwner', 'boardOwner'],
+    otherwise: 'not_found',
+    // It has an address to take away.
+    prepare: async (w) => {
+      await dbAll(
+        database,
+        sql`INSERT INTO ${tablesOf(database).publication} (board_id, token, created_by, created_at) VALUES (${w.boards.publicBoard}, ${'x'.repeat(43)}, ${w.accounts.owner}, ${NOW}) RETURNING board_id`,
+      );
+    },
+  },
+  {
     // Anyone in it may leave (there is another owner in this world); an outsider has nothing to leave.
     op: 'member.leave',
     build: (w) => ({ op: 'member.leave', workspaceId: w.workspace }),
@@ -478,11 +499,12 @@ const row = (table: unknown) =>
   dbAll<Record<string, unknown>>(database, sql`SELECT * FROM ${table as never} ORDER BY 1`);
 
 describe(`the roles (${leg})`, () => {
-  describe.each(OPERATIONS)('$op', ({ build, may, otherwise, refusals }) => {
+  describe.each(OPERATIONS)('$op', ({ build, may, otherwise, refusals, prepare }) => {
     for (const role of ROLES) {
       const allowed = may.includes(role);
       it(`${allowed ? 'lets' : 'refuses'} ${role}${allowed ? '' : `, as ${otherwise}, changing nothing`}`, async () => {
         const mine = await seedWorld(database);
+        await prepare?.(mine);
         const request = { opId: id(), ...build(mine) } as OpRequest;
         const before = JSON.stringify(await countAll(database));
         const beforeRows = JSON.stringify([

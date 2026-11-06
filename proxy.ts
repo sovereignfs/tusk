@@ -18,7 +18,9 @@ const SIGN_IN_PAGES = new Set(['/sign-in', '/sign-up']);
 
 export function proxy(request: NextRequest) {
   const { secure, development, authLocal } = edgeSettings();
-  const page = !request.nextUrl.pathname.startsWith('/api/');
+  // A published board is its own document with a policy of its own (`app/p/[token]/route.ts`): the proxy puts no nonce on it and no policy over it.
+  const page =
+    !request.nextUrl.pathname.startsWith('/api/') && !request.nextUrl.pathname.startsWith('/p/');
   const nonce = newNonce();
   const policy = contentSecurityPolicy({ nonce, secure, development });
 

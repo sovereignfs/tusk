@@ -5,6 +5,7 @@ import { useState } from 'react';
 import type { BoardStore } from '../boards/store';
 import { type BoardPeople, type BoardRow, type Role, type Visibility } from '../workspaces/format';
 import { Avatar, Button, ConfirmDialog, Dialog, FormField, Select } from '../ui';
+import { PublishingSection } from './PublishingSection';
 import styles from './BoardScreen.module.css';
 
 /**
@@ -166,6 +167,8 @@ export function ShareDialog({
             </Button>
           </div>
         ) : null}
+
+        {admin ? <PublishingSection board={board} store={store} /> : null}
 
         {me ? (
           <div>

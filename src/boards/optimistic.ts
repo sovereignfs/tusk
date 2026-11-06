@@ -58,6 +58,8 @@ export function showing(
     case 'comment.delete':
     case 'card.moveToBoard':
     case 'card.clone':
+    case 'board.publish':
+    case 'board.unpublish':
     case 'board.update':
     case 'board.archive':
     case 'board.restore':

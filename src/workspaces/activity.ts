@@ -27,6 +27,8 @@ export interface Before {
   item?: { title: string; cardId: string; cardTitle: string; boardId: string };
   label?: { name: string };
   board?: { id: string; name: string; workspaceId: string };
+  /** The board is published (before a publish). */
+  published?: boolean;
 }
 
 const cardIdOf = (request: OpRequest): string | undefined =>
@@ -96,6 +98,13 @@ export async function capture(tx: Database, request: OpRequest): Promise<Before>
     );
     if (label) before.label = label;
   }
+  if (request.op === 'board.publish') {
+    const there = await dbGet<{ one: number }>(
+      tx,
+      sql`SELECT 1 AS one FROM ${t.publication} WHERE board_id = ${request.id}`,
+    );
+    before.published = there !== undefined;
+  }
   const boardOp =
     request.op === 'board.update' ||
     request.op === 'board.archive' ||
@@ -159,6 +168,12 @@ export async function record(
       return log(request.id, null, 'board.archived', {});
     case 'board.restore':
       return log(request.id, null, 'board.restored', {});
+    case 'board.publish':
+      // Only when it was not published already.
+      if (!before.published) return log(request.id, null, 'board.published', {});
+      return;
+    case 'board.unpublish':
+      return log(request.id, null, 'board.unpublished', {});
     case 'board.join':
       return log(request.id, null, 'board.joined', {});
     case 'board.leave':

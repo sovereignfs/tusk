@@ -975,3 +975,134 @@ test('a board is searched as you type: accents and case do not decide, a line sa
   await expect(search).toBeFocused();
   await cleanUp(page, workspace);
 });
+
+test('a board is published from its Share dialog, readable signed out with the work and no people, listed in Settings, and taken away for good', async ({
+  page,
+  playwright,
+  baseURL,
+}) => {
+  await signedIn(page);
+  const { workspace } = await makeBoard(page, 'Public plans');
+  await addCard(page, 'Backlog', 'Ship the thing');
+  const column = page.locator('section[aria-label="Backlog"]');
+  await column.getByLabel('Ship the thing', { exact: true }).click();
+  const card = page.getByRole('dialog', { name: 'Ship the thing' });
+  await card.getByLabel('Description').fill('Do it\n<b>carefully</b>');
+  await card.getByLabel('Title').click();
+  await card.getByRole('button', { name: 'Assignees' }).click();
+  await page.getByRole('checkbox', { name: 'Assign Ada' }).check();
+  await card.getByRole('button', { name: 'Assignees' }).click();
+  await card.getByLabel('Write a comment').fill('A private remark');
+  await card.getByRole('button', { name: 'Comment', exact: true }).click();
+  await expect(card.getByText('A private remark')).toBeVisible();
+  await card.getByRole('button', { name: 'Close' }).click();
+
+  // Published from the Share dialog.
+  await page.getByRole('button', { name: /Share board/ }).click();
+  const share = page.getByRole('dialog', { name: 'Share board' });
+  await share.getByRole('button', { name: 'Publish board' }).click();
+  const address = share.getByLabel('Public address');
+  await expect(address).toHaveValue(/\/p\/[A-Za-z0-9_-]{43}$/);
+  const url = await address.inputValue();
+  const path = new URL(url).pathname;
+  await share.getByRole('button', { name: 'Close' }).click();
+
+  // Read signed out: a request with no cookies at all.
+  const stranger = await playwright.request.newContext({ baseURL: baseURL ?? 'http://localhost' });
+  const open = await stranger.get(path);
+  expect(open.status()).toBe(200);
+  expect(open.headers()['x-robots-tag']).toContain('noindex');
+  expect(open.headers()['content-security-policy']).toContain("default-src 'none'");
+  expect(open.headers()['content-security-policy']).not.toContain('script-src');
+  const html = await open.text();
+  expect(html).toContain('Public plans');
+  expect(html).toContain('Ship the thing');
+  for (const never of [
+    'Ada',
+    'owner@example.com',
+    'A private remark',
+    'Assigned',
+    '<script',
+    'commented',
+  ])
+    expect(html, never).not.toContain(never);
+  // The card's own page: its description as text.
+  const cardId = /href="\?card=([0-9a-f-]{36})"/.exec(html)?.[1] ?? '';
+  const detail = await (await stranger.get(`${path}?card=${cardId}`)).text();
+  expect(detail).toContain('Do it');
+  expect(detail).toContain('&lt;b&gt;carefully&lt;/b&gt;');
+  expect(detail).not.toContain('A private remark');
+  expect((await stranger.get(`${path}?card=${crypto.randomUUID()}`)).status()).toBe(404);
+  expect((await stranger.get('/p/' + 'A'.repeat(43))).status()).toBe(404);
+  expect((await stranger.get('/p/short')).status()).toBe(404);
+
+  // In a browser, signed out, it is a page.
+  const anonymous = await page
+    .context()
+    .browser()
+    ?.newContext({ baseURL: baseURL ?? 'http://localhost' });
+  const tab = await anonymous?.newPage();
+  await tab?.goto(path);
+  await expect(
+    tab?.getByRole('heading', { name: 'Public plans' }) ?? page.locator('nothing'),
+  ).toBeVisible();
+  await anonymous?.close();
+
+  // Listed in Settings > Data.
+  await page.goto('/account?section=data');
+  await expect(page.getByRole('heading', { name: 'Published boards' })).toBeVisible();
+  await expect(page.getByText(url)).toBeVisible();
+
+  // Taken away: the address is nothing at once, and publishing again makes a different one.
+  await page.goBack();
+  await page.getByRole('button', { name: /Share board/ }).click();
+  await page
+    .getByRole('dialog', { name: 'Share board' })
+    .getByRole('button', { name: 'Unpublish' })
+    .click();
+  await page.getByRole('button', { name: 'Unpublish', exact: true }).last().click();
+  await expect(
+    page
+      .getByRole('dialog', { name: 'Share board' })
+      .getByRole('button', { name: 'Publish board' }),
+  ).toBeVisible();
+  expect((await stranger.get(path)).status()).toBe(404);
+  await page
+    .getByRole('dialog', { name: 'Share board' })
+    .getByRole('button', { name: 'Publish board' })
+    .click();
+  const again = await page
+    .getByRole('dialog', { name: 'Share board' })
+    .getByLabel('Public address')
+    .inputValue();
+  expect(new URL(again).pathname).not.toBe(path);
+  expect((await stranger.get(path)).status()).toBe(404);
+  expect((await stranger.get(new URL(again).pathname)).status()).toBe(200);
+  await stranger.dispose();
+
+  // A deleted board's address is nothing.
+  await page
+    .getByRole('dialog', { name: 'Share board' })
+    .getByRole('button', { name: 'Close' })
+    .click();
+  const board = new URL(page.url()).pathname.split('/')[2] ?? '';
+  const gone = await page.request.post('/api/ops', {
+    headers: { origin: new URL(page.url()).origin },
+    data: { opId: crypto.randomUUID(), op: 'board.delete', id: board, name: 'Public plans' },
+  });
+  expect(((await gone.json()) as { status: string }).status).toBe('applied');
+  const after = await playwright.request.newContext({ baseURL: baseURL ?? 'http://localhost' });
+  expect((await after.get(new URL(again).pathname)).status()).toBe(404);
+  await after.dispose();
+  await page.goto('/boards');
+  await page
+    .getByRole('region', { name: 'My workspaces' })
+    .getByRole('region', { name: workspace })
+    .getByRole('link', { name: workspace, exact: true })
+    .click();
+  await page.getByRole('button', { name: 'Workspace settings' }).click();
+  await page.getByRole('button', { name: 'Delete workspace' }).click();
+  const wd = page.getByRole('dialog', { name: 'Delete workspace' });
+  await wd.getByLabel('Type the name to confirm').fill(workspace);
+  await wd.getByRole('button', { name: 'Delete this workspace' }).click();
+});

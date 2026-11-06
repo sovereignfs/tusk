@@ -161,3 +161,10 @@
   padding: 0;
   list-style: none;
 }
+
+.publishedRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sv-space-3);
+}

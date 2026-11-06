@@ -754,6 +754,9 @@ A board's owners publish it from the Share dialog: it gets an address, `/p/<toke
   the board as it is now, archived or not; a deleted board's address answers 404.
 - **Published boards are listed** in the board's Share dialog and in Settings > Data, so a person can see what of theirs is public.
 
+**As built (task 17.5):** the page is a route handler making a whole HTML document (`app/p/[token]/route.ts`, `src/published/render.ts`), with a policy that allows no script and a real 404 for an address that is
+nothing. `readPublished` selects no person.
+
 ### 14.7 Online, and still at once
 
 In phase 1, boards are read from the server and held in memory, not on the device.

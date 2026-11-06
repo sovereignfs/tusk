@@ -55,6 +55,10 @@ export const ROUTES: RouteRule[] = [
   { route: '/api/boards/[id]/activity', methods: { GET: { kind: 'account' } } },
   { route: '/api/cards/[id]/activity', methods: { GET: { kind: 'account' } } },
   { route: '/api/activity', methods: { GET: { kind: 'account' } } },
+  { route: '/api/boards/[id]/publication', methods: { GET: { kind: 'account' } } },
+  { route: '/api/publications', methods: { GET: { kind: 'account' } } },
+  // A published board (DESIGN.md §14.6): anyone with the address. It changes nothing, shows the work and no people, and is limited per address.
+  { route: '/p/[token]', methods: { GET: { kind: 'public' } } },
   { route: '/api/boards/[id]/destinations', methods: { GET: { kind: 'account' } } },
   { route: '/api/boards/[id]/people', methods: { GET: { kind: 'account' } } },
   { route: '/api/boards/[id]/archived', methods: { GET: { kind: 'account' } } },

@@ -61,6 +61,8 @@ describe('an operation', () => {
       'comment.delete',
       'card.moveToBoard',
       'card.clone',
+      'board.publish',
+      'board.unpublish',
     ]);
   });
 
@@ -321,6 +323,18 @@ describe('an operation', () => {
       { op: 'card.clone', id: a },
       { op: 'card.clone', id: a, newId: 'x' },
       { op: 'card.clone', id: a, newId: b, comments: true },
+    ])
+      expect(parseOp({ opId: ID(), ...bad }).ok, JSON.stringify(bad)).toBe(false);
+  });
+
+  it('takes publishing and unpublishing by board id alone', () => {
+    const a = ID();
+    expect(parseOp({ opId: ID(), op: 'board.publish', id: a }).ok).toBe(true);
+    expect(parseOp({ opId: ID(), op: 'board.unpublish', id: a }).ok).toBe(true);
+    for (const bad of [
+      { op: 'board.publish' },
+      { op: 'board.publish', id: 'x' },
+      { op: 'board.publish', id: a, token: 'chosen' },
     ])
       expect(parseOp({ opId: ID(), ...bad }).ok, JSON.stringify(bad)).toBe(false);
   });

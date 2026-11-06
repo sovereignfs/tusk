@@ -97,6 +97,10 @@ export function describe(
       return `${actor} moved ${card} to the board ${q(details.to, 'another board')}`;
     case 'card.moved_in':
       return `${actor} moved ${card} here from the board ${q(details.from, 'another board')}`;
+    case 'board.published':
+      return `${actor} published the board`;
+    case 'board.unpublished':
+      return `${actor} unpublished the board`;
     case 'card.cloned':
       return `${actor} cloned ${q(details.from, 'a card')} as ${card}`;
   }
