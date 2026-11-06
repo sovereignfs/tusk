@@ -187,7 +187,8 @@ As Fjord Web's. `app/` for routes, and `src/` for everything else, with tests be
 | `src/boards/`                                         | The browser's board state: loading, optimistic operations, freshness (§14.7)                                      |
 | `src/publish/`                                        | Published boards (§14.6)                                                                                          |
 | `src/crypto/`                                         | Credentials at rest (§21.2) and the operator-key mode (§9.5), on the server                                       |
-| `src/keys/`                                           | Personal keys, list keys and the field cipher, in the browser (§9)                                                |
+| `src/cipher/`                                         | Personal keys, list keys and the field cipher, in the browser (§9)                                                |
+| `src/keys/`                                           | The page's keyboard (§17.8)                                                                                       |
 | `src/recurrence.ts`, `src/time.ts`, `src/position.ts` | The pure rules                                                                                                    |
 | `src/portability/`                                    | The file format, and reading the tasks plugin's (§20)                                                             |
 | `src/backup/`, `src/providers/`                       | The connection and the job (§21); the git host interface, GitHub's implementation, an in-memory one               |
