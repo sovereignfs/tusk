@@ -213,6 +213,13 @@ export async function readBoard(
   const byCard = new Map<string, string[]>();
   for (const row of carried)
     byCard.set(row.cardId, [...(byCard.get(row.cardId) ?? []), row.labelId]);
+  const assigned = await dbAll<{ cardId: string; accountId: string }>(
+    database,
+    sql`SELECT card_id AS "cardId", account_id AS "accountId" FROM ${t.cardAssignee} WHERE board_id = ${boardId} ORDER BY created_at, account_id`,
+  );
+  const assigneesOf = new Map<string, string[]>();
+  for (const row of assigned)
+    assigneesOf.set(row.cardId, [...(assigneesOf.get(row.cardId) ?? []), row.accountId]);
   const board = toBoard(raw);
   return {
     board,
@@ -221,6 +228,7 @@ export async function readBoard(
       ...card,
       hasDescription: card.hasDescription === true || Number(card.hasDescription) === 1,
       labels: byCard.get(card.id) ?? [],
+      assignees: assigneesOf.get(card.id) ?? [],
     })),
     workspace: { id: raw.workspaceId, name: raw.workspaceName },
     lists: lists.map((list) => ({ ...list, cards: Number(list.cards) })),
@@ -392,9 +400,14 @@ export async function cardDetail(
     sql`SELECT cl.label_id AS id FROM ${t.cardLabel} cl JOIN ${t.label} l ON l.id = cl.label_id
         WHERE cl.card_id = ${cardId} ORDER BY l.created_at, l.id`,
   );
+  const assignedTo = await dbAll<{ id: string }>(
+    database,
+    sql`SELECT account_id AS id FROM ${t.cardAssignee} WHERE card_id = ${cardId} ORDER BY created_at, account_id`,
+  );
   return {
     id: row.id,
     labels: carried.map((each) => each.id),
+    assignees: assignedTo.map((each) => each.id),
     boardId: row.boardId,
     listId: row.listId,
     listName: row.listName,

@@ -335,3 +335,10 @@
   height: 0.4rem;
   border-radius: var(--sv-radius-sm);
 }
+
+.assignees {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sv-space-1);
+  margin-left: auto;
+}

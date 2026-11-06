@@ -366,6 +366,22 @@ const OPERATIONS: Row[] = [
     otherwise: 'not_found',
   },
   {
+    op: 'card.assign',
+    build: (w) => ({ op: 'card.assign', cardId: w.cards.open, accountId: w.accounts.boardMember }),
+    may: ['boardOwner', 'boardMember'],
+    otherwise: 'not_found',
+  },
+  {
+    op: 'card.unassign',
+    build: (w) => ({
+      op: 'card.unassign',
+      cardId: w.cards.open,
+      accountId: w.accounts.boardMember,
+    }),
+    may: ['boardOwner', 'boardMember'],
+    otherwise: 'not_found',
+  },
+  {
     // Anyone in it may leave (there is another owner in this world); an outsider has nothing to leave.
     op: 'member.leave',
     build: (w) => ({ op: 'member.leave', workspaceId: w.workspace }),
@@ -1965,6 +1981,140 @@ describe(`the roles (${leg})`, () => {
           labelId: w.labels.publicBoard,
         }),
       ).toEqual({ status: 'refused', code: 'not_found' });
+    });
+  });
+
+  describe('assignees', () => {
+    const apply = (w: World, role: Role, op: Op) =>
+      applyOp(database, w.accounts[role], { opId: id(), ...op } as OpRequest, OPTIONS);
+    const t = () => tablesOf(database);
+    const notices = (w: World) =>
+      dbAll<{
+        accountId: string;
+        kind: string;
+        actorId: string;
+        boardId: string;
+        cardId: string;
+        workspaceId: string;
+        details: string;
+      }>(
+        database,
+        sql`SELECT account_id AS "accountId", kind, actor_id AS "actorId", board_id AS "boardId", card_id AS "cardId", workspace_id AS "workspaceId", details
+            FROM ${t().notice} WHERE workspace_id = ${w.workspace} ORDER BY created_at, id`,
+      );
+    const assignees = async (cardId: string) =>
+      (
+        await dbAll<{ id: string }>(
+          database,
+          sql`SELECT account_id AS id FROM ${t().cardAssignee} WHERE card_id = ${cardId} ORDER BY 1`,
+        )
+      ).map((r) => r.id);
+
+    it('assigns a member of the board, shows it on the tile and in the card, and tells them', async () => {
+      const w = await seedWorld(database);
+      expect(
+        await apply(w, 'boardOwner', {
+          op: 'card.assign',
+          cardId: w.cards.open,
+          accountId: w.accounts.boardMember,
+        }),
+      ).toMatchObject({
+        status: 'applied',
+        rows: { card: { assignees: [w.accounts.boardMember] } },
+      });
+      expect(await assignees(w.cards.open)).toEqual([w.accounts.boardMember]);
+      expect((await cardDetail(database, w.accounts.member, w.cards.open))?.assignees).toEqual([
+        w.accounts.boardMember,
+      ]);
+      const tile = (await readBoard(database, w.accounts.member, w.boards.publicBoard))?.cards.find(
+        (c) => c.id === w.cards.open,
+      );
+      expect(tile?.assignees).toEqual([w.accounts.boardMember]);
+      // One notice, for the one who was assigned, from the one who did it, about this card.
+      expect(await notices(w)).toEqual([
+        {
+          accountId: w.accounts.boardMember,
+          kind: 'assigned',
+          actorId: w.accounts.boardOwner,
+          boardId: w.boards.publicBoard,
+          cardId: w.cards.open,
+          workspaceId: w.workspace,
+          details: JSON.stringify({ title: 'Open one' }),
+        },
+      ]);
+    });
+
+    it('tells nobody when a person assigns themselves, and tells them once when it is done twice', async () => {
+      const w = await seedWorld(database);
+      await apply(w, 'boardMember', {
+        op: 'card.assign',
+        cardId: w.cards.open,
+        accountId: w.accounts.boardMember,
+      });
+      expect(await notices(w)).toEqual([]);
+      // Someone else assigns them, and then the same again by another operation: they are told once.
+      for (let i = 0; i < 2; i++)
+        await apply(w, 'boardMember', {
+          op: 'card.assign',
+          cardId: w.cards.open,
+          accountId: w.accounts.boardOwner,
+        });
+      expect((await notices(w)).map((n) => n.accountId)).toEqual([w.accounts.boardOwner]);
+      expect(await assignees(w.cards.open)).toEqual(
+        [w.accounts.boardMember, w.accounts.boardOwner].sort(),
+      );
+    });
+
+    it('assigns only a member of the board: not someone else in the workspace, not an outsider, not an id that is nothing', async () => {
+      const w = await seedWorld(database);
+      const before = JSON.stringify(await countAll(database));
+      for (const who of [w.accounts.member, w.accounts.owner, w.accounts.outsider, id()])
+        expect(
+          await apply(w, 'boardOwner', { op: 'card.assign', cardId: w.cards.open, accountId: who }),
+          who,
+        ).toEqual({
+          status: 'refused',
+          code: 'invalid',
+          reason: 'not_on_board',
+        });
+      expect(JSON.stringify(await countAll(database))).toBe(before);
+      // A card that is archived is not assigned.
+      expect(
+        await apply(w, 'boardOwner', {
+          op: 'card.assign',
+          cardId: w.cards.archived,
+          accountId: w.accounts.boardMember,
+        }),
+      ).toEqual({ status: 'refused', code: 'not_found' });
+    });
+
+    it('takes an assignment away without a word, and a removed member is off the board’s cards', async () => {
+      const w = await seedWorld(database);
+      await apply(w, 'boardOwner', {
+        op: 'card.assign',
+        cardId: w.cards.open,
+        accountId: w.accounts.boardMember,
+      });
+      await apply(w, 'boardOwner', {
+        op: 'card.assign',
+        cardId: w.cards.open,
+        accountId: w.accounts.boardOwner,
+      });
+      const told = (await notices(w)).length;
+      await apply(w, 'boardMember', {
+        op: 'card.unassign',
+        cardId: w.cards.open,
+        accountId: w.accounts.boardOwner,
+      });
+      expect(await assignees(w.cards.open)).toEqual([w.accounts.boardMember]);
+      expect((await notices(w)).length).toBe(told);
+      // Taken off the board, they are taken off its cards.
+      await apply(w, 'owner', {
+        op: 'boardMember.remove',
+        boardId: w.boards.publicBoard,
+        accountId: w.accounts.boardMember,
+      });
+      expect(await assignees(w.cards.open)).toEqual([]);
     });
   });
 

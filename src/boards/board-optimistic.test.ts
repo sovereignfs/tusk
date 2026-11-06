@@ -128,6 +128,7 @@ describe('cards on a board', () => {
     dueTime: null,
     hasDescription: false,
     labels: [],
+    assignees: [],
   });
   const base = (): BoardView => ({
     ...view([list('a', 'a0'), list('b', 'a1')]),
@@ -249,6 +250,22 @@ describe('cards on a board', () => {
       settled(on, { op: 'label.delete', id: 'L1' }, { deletedLabel: 'L1' }).cards.find(
         (c) => c.id === 'x',
       )?.labels,
+    ).toEqual([]);
+  });
+
+  it('shows a person assigned and not, once', () => {
+    const v = base();
+    const on = showingBoard(v, { op: 'card.assign', cardId: 'x', accountId: 'a1' });
+    expect(on.cards.find((c) => c.id === 'x')?.assignees).toEqual(['a1']);
+    expect(
+      showingBoard(on, { op: 'card.assign', cardId: 'x', accountId: 'a1' }).cards.find(
+        (c) => c.id === 'x',
+      )?.assignees,
+    ).toEqual(['a1']);
+    expect(
+      showingBoard(on, { op: 'card.unassign', cardId: 'x', accountId: 'a1' }).cards.find(
+        (c) => c.id === 'x',
+      )?.assignees,
     ).toEqual([]);
   });
 

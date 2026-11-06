@@ -46,6 +46,8 @@ export const OPS = [
   'label.delete',
   'card.addLabel',
   'card.removeLabel',
+  'card.assign',
+  'card.unassign',
 ] as const;
 export type OpName = (typeof OPS)[number];
 
@@ -160,7 +162,10 @@ export type Op =
   | { readonly op: 'label.delete'; readonly id: string }
   /** The label must be the card's own board's. */
   | { readonly op: 'card.addLabel'; readonly cardId: string; readonly labelId: string }
-  | { readonly op: 'card.removeLabel'; readonly cardId: string; readonly labelId: string };
+  | { readonly op: 'card.removeLabel'; readonly cardId: string; readonly labelId: string }
+  /** The person must be a member of the card's board (DESIGN.md §15.3). Assigning someone else raises a notice for them; assigning oneself raises none. */
+  | { readonly op: 'card.assign'; readonly cardId: string; readonly accountId: string }
+  | { readonly op: 'card.unassign'; readonly cardId: string; readonly accountId: string };
 
 export type Visibility = 'public' | 'private';
 
@@ -217,8 +222,10 @@ export type OpRefusal = 'not_found' | 'invalid' | 'limit' | 'stale';
  *  - `already_in`  that account is in the workspace already
  *  - `last_owner`  a workspace keeps at least one owner: they make someone else owner first, or delete it
  *  - `not_in_workspace`  the people of a board come only from its workspace
+ *  - `not_on_board`  a card is assigned only to a member of its board
  */
-export type OpReason = 'no_account' | 'already_in' | 'last_owner' | 'not_in_workspace';
+export type OpReason =
+  'no_account' | 'already_in' | 'last_owner' | 'not_in_workspace' | 'not_on_board';
 
 /** A workspace as its people see it. */
 export interface WorkspaceRow {
@@ -291,6 +298,8 @@ export interface CardTile {
   readonly hasDescription: boolean;
   /** The ids of the board's labels it carries, in the order the labels were made. */
   readonly labels: readonly string[];
+  /** The accounts it is assigned to, in the order they were assigned. Always members of the board. */
+  readonly assignees: readonly string[];
 }
 
 /** A card whole, for its dialog (DESIGN.md §17.6): what the tile shows and the description, and the list it is in. */

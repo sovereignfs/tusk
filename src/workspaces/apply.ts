@@ -638,6 +638,53 @@ async function run(
         );
       return { card: await cardTile(tx, request.cardId), version };
     }
+    case 'card.assign':
+    case 'card.unassign': {
+      // The card, with the permission in its statement; the person must be on the card's board, which is what keeps an assignee a member.
+      const taken = await dbAll<{ boardId: string; title: string; workspaceId: string }>(
+        tx,
+        sql`UPDATE ${t.card} SET updated_at = ${now}
+            WHERE id = ${request.cardId} AND board_id IN ${boardsEditableBy(tx, accountId)} AND archived_at IS NULL
+            RETURNING board_id AS "boardId", title, (SELECT workspace_id FROM ${t.board} WHERE id = ${t.card}.board_id) AS "workspaceId"`,
+      );
+      const card = taken[0];
+      if (!card) throw new Refused('not_found');
+      const version = await touchBoard(
+        tx,
+        card.boardId,
+        boardsEditableBy(tx, accountId),
+        now,
+        true,
+      );
+      if (request.op === 'card.unassign') {
+        await dbAll(
+          tx,
+          sql`DELETE FROM ${t.cardAssignee} WHERE card_id = ${request.cardId} AND account_id = ${request.accountId} AND board_id = ${card.boardId} RETURNING 1 AS one`,
+        );
+        return { card: await cardTile(tx, request.cardId), version };
+      }
+      const onBoard = await dbGet<{ one: number }>(
+        tx,
+        sql`SELECT 1 AS one FROM ${t.boardMember} WHERE board_id = ${card.boardId} AND account_id = ${request.accountId}`,
+      );
+      if (!onBoard) throw new Refused('invalid', 'not_on_board');
+      const added = await dbAll<{ id: string }>(
+        tx,
+        sql`INSERT INTO ${t.cardAssignee} (card_id, account_id, board_id, assigned_by, created_at)
+            VALUES (${request.cardId}, ${request.accountId}, ${card.boardId}, ${accountId}, ${now})
+            ON CONFLICT (card_id, account_id) DO NOTHING RETURNING account_id AS id`,
+      );
+      // Written in the operation's transaction, once, for someone who is not the one who did it (DESIGN.md §16). Assigning oneself tells nobody.
+      if (added.length > 0 && request.accountId !== accountId)
+        await dbAll(
+          tx,
+          sql`INSERT INTO ${t.notice} (id, account_id, kind, actor_id, workspace_id, board_id, card_id, details, created_at)
+              VALUES (${crypto.randomUUID()}, ${request.accountId}, 'assigned', ${accountId}, ${card.workspaceId}, ${card.boardId}, ${request.cardId},
+                      ${JSON.stringify({ title: card.title })}, ${now})
+              RETURNING id`,
+        );
+      return { card: await cardTile(tx, request.cardId), version };
+    }
     case 'workspace.rename': {
       // The permission is in the statement: only an owner's workspace is a row it can reach.
       const changed = await dbAll<{ createdAt: number | string }>(
@@ -733,10 +780,15 @@ async function cardTile(tx: Database, id: string): Promise<CardTile> {
     sql`SELECT cl.label_id AS id FROM ${t.cardLabel} cl JOIN ${t.label} l ON l.id = cl.label_id
         WHERE cl.card_id = ${id} ORDER BY l.created_at, l.id`,
   );
+  const assignees = await dbAll<{ id: string }>(
+    tx,
+    sql`SELECT account_id AS id FROM ${t.cardAssignee} WHERE card_id = ${id} ORDER BY created_at, account_id`,
+  );
   return {
     ...row,
     hasDescription: row.hasDescription === true || Number(row.hasDescription) === 1,
     labels: labels.map((each) => each.id),
+    assignees: assignees.map((each) => each.id),
   };
 }
 

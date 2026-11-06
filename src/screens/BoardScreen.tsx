@@ -13,7 +13,7 @@ import { SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortabl
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
-import { BoardContext } from '../boards/context';
+import { BoardContext, BoardPeopleContext } from '../boards/context';
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import {
   cardPositionFor,
@@ -179,262 +179,266 @@ export function BoardScreen({
   const full = view.lists.length >= WORKSPACE_LIMITS.listsPerBoard;
   return (
     <BoardContext.Provider value={store}>
-      <div className={styles.page}>
-        <div className={styles.band} style={{ background: view.board.color }} aria-hidden />
-        <header className={styles.header}>
-          <Link href={`/w/${view.workspace.id}`} className={styles.crumb}>
-            {view.workspace.name}
-          </Link>
-          <h1 className={styles.title}>{view.board.name}</h1>
-          {view.board.archived ? (
-            <span className={styles.badge}>Archived</span>
-          ) : !view.can.edit ? (
-            <span className={styles.badge}>Viewing</span>
-          ) : null}
-          <button
-            type="button"
-            className={`${styles.avatars} ${styles.menuButton}`}
-            aria-label={`Share board, ${people?.members.length ?? 0} people`}
-            onClick={() => setDialog('share')}
-          >
-            {(people?.members ?? []).slice(0, 4).map((person) => (
-              <Avatar key={person.accountId} name={person.name} size="sm" />
-            ))}
-            {people && people.members.length > 4 ? (
-              <span className={styles.badge}>+{people.members.length - 4}</span>
+      <BoardPeopleContext.Provider value={people}>
+        <div className={styles.page}>
+          <div className={styles.band} style={{ background: view.board.color }} aria-hidden />
+          <header className={styles.header}>
+            <Link href={`/w/${view.workspace.id}`} className={styles.crumb}>
+              {view.workspace.name}
+            </Link>
+            <h1 className={styles.title}>{view.board.name}</h1>
+            {view.board.archived ? (
+              <span className={styles.badge}>Archived</span>
+            ) : !view.can.edit ? (
+              <span className={styles.badge}>Viewing</span>
             ) : null}
-            {people && people.members.length === 0 ? (
-              <span className={styles.badge}>Share</span>
-            ) : null}
-          </button>
-          {view.can.join ? (
-            <Button
-              size="sm"
-              onClick={() => void store.perform({ op: 'board.join', id: view.board.id })}
+            <button
+              type="button"
+              className={`${styles.avatars} ${styles.menuButton}`}
+              aria-label={`Share board, ${people?.members.length ?? 0} people`}
+              onClick={() => setDialog('share')}
             >
-              Join board
-            </Button>
-          ) : null}
-          <Menu
-            aria-label="Board menu"
-            open={menuOpen}
-            onClose={() => setMenuOpen(false)}
-            align="right"
-            width={220}
-            trigger={
-              <button
-                type="button"
-                className={styles.iconButton}
-                aria-label="Board menu"
-                aria-expanded={menuOpen}
-                onClick={() => setMenuOpen((was) => !was)}
-              >
-                <Icon name="ellipsis-vertical" aria-hidden />
-              </button>
-            }
-            items={[
-              ...(view.can.admin && !view.board.archived
-                ? [
-                    {
-                      label: 'Settings',
-                      icon: 'settings' as const,
-                      onSelect: () => setDialog('settings'),
-                    },
-                  ]
-                : []),
-              {
-                label: 'Archived cards',
-                icon: 'archive' as const,
-                onSelect: () => setArchivedOpen(true),
-              },
-              ...(view.can.admin
-                ? [
-                    { type: 'separator' as const },
-                    view.board.archived
-                      ? {
-                          label: 'Restore board',
-                          icon: 'archive-restore' as const,
-                          onSelect: () =>
-                            void store.perform({ op: 'board.restore', id: view.board.id }),
-                        }
-                      : {
-                          label: 'Archive board',
-                          icon: 'archive' as const,
-                          onSelect: () =>
-                            void store.perform({ op: 'board.archive', id: view.board.id }),
-                        },
-                    {
-                      label: 'Delete board',
-                      icon: 'trash-2' as const,
-                      destructive: true,
-                      onSelect: () => setDialog('delete'),
-                    },
-                  ]
-                : []),
-            ]}
-          />
-        </header>
-        {view.board.archived ? (
-          <Alert variant="info">
-            This board is archived and read-only for everyone.
-            {view.can.admin ? (
-              <>
-                {' '}
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => void store.perform({ op: 'board.restore', id: view.board.id })}
-                >
-                  Restore board
-                </Button>
-              </>
-            ) : null}
-          </Alert>
-        ) : null}
-        {dialog === 'settings' ? (
-          <BoardSettingsDialog board={view.board} store={store} onClose={() => setDialog(null)} />
-        ) : null}
-        {dialog === 'share' ? (
-          <ShareDialog
-            board={view.board}
-            workspaceId={view.workspace.id}
-            people={people}
-            admin={view.can.admin}
-            store={store}
-            refresh={readPeople}
-            onClose={() => setDialog(null)}
-          />
-        ) : null}
-        {dialog === 'delete' ? (
-          <DeleteBoardDialog
-            board={view.board}
-            workspaceId={view.workspace.id}
-            store={store}
-            onClose={() => setDialog(null)}
-          />
-        ) : null}
-        {offline ? (
-          <Alert variant="warning">
-            This board needs a connection. It is as it was when it was last read, and cannot be
-            changed until you are back online.
-          </Alert>
-        ) : null}
-        <DndContext
-          id={`board-${view.board.id}`}
-          sensors={sensors}
-          autoScroll={HORIZONTAL_AUTOSCROLL}
-          collisionDetection={collisions}
-          onDragStart={onDragStart}
-          onDragEnd={onDragEnd}
-          onDragCancel={() => {
-            guard.end();
-            setDragging(null);
-          }}
-        >
-          <SortableContext
-            items={view.lists.map((each) => each.id)}
-            strategy={horizontalListSortingStrategy}
-          >
-            <div className={styles.columns}>
-              {view.lists.map((list, index) => (
-                <ListColumn
-                  key={list.id}
-                  list={list}
-                  cards={cardsIn(view.cards, list.id)}
-                  labels={view.labels}
-                  index={index}
-                  count={view.lists.length}
-                  editable={editable}
-                  onRename={(next) =>
-                    void store.perform({ op: 'list.rename', id: list.id, name: next })
-                  }
-                  onMove={(to) =>
-                    void store.perform({
-                      op: 'list.move',
-                      id: list.id,
-                      position: positionFor(view.lists, list.id, to),
-                    })
-                  }
-                  onDelete={() => void store.perform({ op: 'list.delete', id: list.id })}
-                  onAddCard={(title) =>
-                    void store.perform({
-                      op: 'card.create',
-                      id: crypto.randomUUID(),
-                      listId: list.id,
-                      title,
-                      position: topPosition(view.cards, list.id),
-                    })
-                  }
-                  onArchiveCard={(card) => void store.perform({ op: 'card.archive', id: card.id })}
-                  onOpenCard={(card) => router.push(`/b/${view.board.id}/c/${card.id}`)}
-                />
+              {(people?.members ?? []).slice(0, 4).map((person) => (
+                <Avatar key={person.accountId} name={person.name} size="sm" />
               ))}
-              {editable ? (
-                <div className={styles.add}>
-                  {adding ? (
-                    <form ref={addForm} onSubmit={addList} className={styles.addForm}>
-                      <Input
-                        aria-label="Name of the new list"
-                        value={name}
-                        maxLength={WORKSPACE_LIMITS.nameChars}
-                        placeholder="Name of the list"
-                        onChange={(event) => setName(event.target.value)}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Escape') {
-                            setAdding(false);
-                            setName('');
+              {people && people.members.length > 4 ? (
+                <span className={styles.badge}>+{people.members.length - 4}</span>
+              ) : null}
+              {people && people.members.length === 0 ? (
+                <span className={styles.badge}>Share</span>
+              ) : null}
+            </button>
+            {view.can.join ? (
+              <Button
+                size="sm"
+                onClick={() => void store.perform({ op: 'board.join', id: view.board.id })}
+              >
+                Join board
+              </Button>
+            ) : null}
+            <Menu
+              aria-label="Board menu"
+              open={menuOpen}
+              onClose={() => setMenuOpen(false)}
+              align="right"
+              width={220}
+              trigger={
+                <button
+                  type="button"
+                  className={styles.iconButton}
+                  aria-label="Board menu"
+                  aria-expanded={menuOpen}
+                  onClick={() => setMenuOpen((was) => !was)}
+                >
+                  <Icon name="ellipsis-vertical" aria-hidden />
+                </button>
+              }
+              items={[
+                ...(view.can.admin && !view.board.archived
+                  ? [
+                      {
+                        label: 'Settings',
+                        icon: 'settings' as const,
+                        onSelect: () => setDialog('settings'),
+                      },
+                    ]
+                  : []),
+                {
+                  label: 'Archived cards',
+                  icon: 'archive' as const,
+                  onSelect: () => setArchivedOpen(true),
+                },
+                ...(view.can.admin
+                  ? [
+                      { type: 'separator' as const },
+                      view.board.archived
+                        ? {
+                            label: 'Restore board',
+                            icon: 'archive-restore' as const,
+                            onSelect: () =>
+                              void store.perform({ op: 'board.restore', id: view.board.id }),
                           }
-                        }}
-                      />
-                      <div className={styles.actions}>
-                        <Button type="submit" disabled={name.trim() === ''}>
-                          Add list
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          onClick={() => {
-                            setAdding(false);
-                            setName('');
+                        : {
+                            label: 'Archive board',
+                            icon: 'archive' as const,
+                            onSelect: () =>
+                              void store.perform({ op: 'board.archive', id: view.board.id }),
+                          },
+                      {
+                        label: 'Delete board',
+                        icon: 'trash-2' as const,
+                        destructive: true,
+                        onSelect: () => setDialog('delete'),
+                      },
+                    ]
+                  : []),
+              ]}
+            />
+          </header>
+          {view.board.archived ? (
+            <Alert variant="info">
+              This board is archived and read-only for everyone.
+              {view.can.admin ? (
+                <>
+                  {' '}
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => void store.perform({ op: 'board.restore', id: view.board.id })}
+                  >
+                    Restore board
+                  </Button>
+                </>
+              ) : null}
+            </Alert>
+          ) : null}
+          {dialog === 'settings' ? (
+            <BoardSettingsDialog board={view.board} store={store} onClose={() => setDialog(null)} />
+          ) : null}
+          {dialog === 'share' ? (
+            <ShareDialog
+              board={view.board}
+              workspaceId={view.workspace.id}
+              people={people}
+              admin={view.can.admin}
+              store={store}
+              refresh={readPeople}
+              onClose={() => setDialog(null)}
+            />
+          ) : null}
+          {dialog === 'delete' ? (
+            <DeleteBoardDialog
+              board={view.board}
+              workspaceId={view.workspace.id}
+              store={store}
+              onClose={() => setDialog(null)}
+            />
+          ) : null}
+          {offline ? (
+            <Alert variant="warning">
+              This board needs a connection. It is as it was when it was last read, and cannot be
+              changed until you are back online.
+            </Alert>
+          ) : null}
+          <DndContext
+            id={`board-${view.board.id}`}
+            sensors={sensors}
+            autoScroll={HORIZONTAL_AUTOSCROLL}
+            collisionDetection={collisions}
+            onDragStart={onDragStart}
+            onDragEnd={onDragEnd}
+            onDragCancel={() => {
+              guard.end();
+              setDragging(null);
+            }}
+          >
+            <SortableContext
+              items={view.lists.map((each) => each.id)}
+              strategy={horizontalListSortingStrategy}
+            >
+              <div className={styles.columns}>
+                {view.lists.map((list, index) => (
+                  <ListColumn
+                    key={list.id}
+                    list={list}
+                    cards={cardsIn(view.cards, list.id)}
+                    labels={view.labels}
+                    index={index}
+                    count={view.lists.length}
+                    editable={editable}
+                    onRename={(next) =>
+                      void store.perform({ op: 'list.rename', id: list.id, name: next })
+                    }
+                    onMove={(to) =>
+                      void store.perform({
+                        op: 'list.move',
+                        id: list.id,
+                        position: positionFor(view.lists, list.id, to),
+                      })
+                    }
+                    onDelete={() => void store.perform({ op: 'list.delete', id: list.id })}
+                    onAddCard={(title) =>
+                      void store.perform({
+                        op: 'card.create',
+                        id: crypto.randomUUID(),
+                        listId: list.id,
+                        title,
+                        position: topPosition(view.cards, list.id),
+                      })
+                    }
+                    onArchiveCard={(card) =>
+                      void store.perform({ op: 'card.archive', id: card.id })
+                    }
+                    onOpenCard={(card) => router.push(`/b/${view.board.id}/c/${card.id}`)}
+                  />
+                ))}
+                {editable ? (
+                  <div className={styles.add}>
+                    {adding ? (
+                      <form ref={addForm} onSubmit={addList} className={styles.addForm}>
+                        <Input
+                          aria-label="Name of the new list"
+                          value={name}
+                          maxLength={WORKSPACE_LIMITS.nameChars}
+                          placeholder="Name of the list"
+                          onChange={(event) => setName(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Escape') {
+                              setAdding(false);
+                              setName('');
+                            }
                           }}
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    </form>
-                  ) : (
-                    <Button
-                      variant="secondary"
-                      disabled={full}
-                      title={full ? 'A board can hold 100 lists.' : undefined}
-                      onClick={() => setAdding(true)}
-                    >
-                      <Icon name="plus" aria-hidden /> Add a list
-                    </Button>
-                  )}
+                        />
+                        <div className={styles.actions}>
+                          <Button type="submit" disabled={name.trim() === ''}>
+                            Add list
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => {
+                              setAdding(false);
+                              setName('');
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </form>
+                    ) : (
+                      <Button
+                        variant="secondary"
+                        disabled={full}
+                        title={full ? 'A board can hold 100 lists.' : undefined}
+                        onClick={() => setAdding(true)}
+                      >
+                        <Icon name="plus" aria-hidden /> Add a list
+                      </Button>
+                    )}
+                  </div>
+                ) : null}
+              </div>
+            </SortableContext>
+            <DragOverlay>
+              {dragging ? (
+                <div className={`${styles.card} ${styles.overlay}`}>
+                  <TileBody card={dragging} labels={view.labels} />
                 </div>
               ) : null}
-            </div>
-          </SortableContext>
-          <DragOverlay>
-            {dragging ? (
-              <div className={`${styles.card} ${styles.overlay}`}>
-                <TileBody card={dragging} labels={view.labels} />
-              </div>
-            ) : null}
-          </DragOverlay>
-        </DndContext>
-        {archivedOpen ? (
-          <ArchivedDialog
-            boardId={view.board.id}
-            lists={view.lists}
-            editable={editable}
-            onClose={() => setArchivedOpen(false)}
-            perform={store.perform}
-          />
-        ) : null}
-        {children}
-      </div>
+            </DragOverlay>
+          </DndContext>
+          {archivedOpen ? (
+            <ArchivedDialog
+              boardId={view.board.id}
+              lists={view.lists}
+              editable={editable}
+              onClose={() => setArchivedOpen(false)}
+              perform={store.perform}
+            />
+          ) : null}
+          {children}
+        </div>
+      </BoardPeopleContext.Provider>
     </BoardContext.Provider>
   );
 }

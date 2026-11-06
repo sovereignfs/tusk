@@ -59,6 +59,8 @@ const ARGUMENTS: Record<OpName, readonly string[]> = {
   'label.delete': ['id'],
   'card.addLabel': ['cardId', 'labelId'],
   'card.removeLabel': ['cardId', 'labelId'],
+  'card.assign': ['cardId', 'accountId'],
+  'card.unassign': ['cardId', 'accountId'],
 };
 
 /** A label's name may be empty: a colour alone is a label (DESIGN.md §15.2). */
@@ -432,6 +434,17 @@ export function parseOp(value: unknown): Parsed<OpRequest> {
       return {
         ok: true,
         value: { opId: opId.value, op: kind, cardId: cardId.value, labelId: labelId.value },
+      };
+    }
+    case 'card.assign':
+    case 'card.unassign': {
+      const cardId = uuid(value.cardId);
+      if (!cardId.ok) return no('cardId: not an id');
+      const accountId = text(1, 128)(value.accountId);
+      if (!accountId.ok) return no('accountId: not an id');
+      return {
+        ok: true,
+        value: { opId: opId.value, op: kind, cardId: cardId.value, accountId: accountId.value },
       };
     }
   }

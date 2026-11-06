@@ -2,11 +2,11 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useBoardStore } from '../boards/context';
+import { useBoardPeople, useBoardStore } from '../boards/context';
 import { DuePicker } from '../dates/DuePicker';
 import { formatDue } from '../format-due';
 import { browserZone, todayFor } from '../time';
-import { Button, Dialog, FormField, Input, Popover, Textarea } from '../ui';
+import { Avatar, Button, Checkbox, Dialog, FormField, Input, Popover, Textarea } from '../ui';
 import { LabelChip, LabelsEditor } from './LabelsEditor';
 import { type CardDetail, WORKSPACE_LIMITS } from '../workspaces/format';
 import styles from './CardDialog.module.css';
@@ -29,6 +29,8 @@ export function CardDialog({ detail: first }: { detail: CardDetail }) {
   const [title, setTitle] = useState(first.title);
   const [description, setDescription] = useState(first.description ?? '');
   const [pickingLabels, setPickingLabels] = useState(false);
+  const [pickingPeople, setPickingPeople] = useState(false);
+  const people = useBoardPeople();
   // What the server last said, which a blank title goes back to and which a draft is compared with.
   const saved = useRef({ title: first.title, description: first.description ?? '' });
 
@@ -130,6 +132,59 @@ export function CardDialog({ detail: first }: { detail: CardDetail }) {
               .map((label) => (
                 <LabelChip key={label.id} label={label} />
               ))}
+            {(tile?.assignees ?? []).map((id) => {
+              const person = people?.members.find((each) => each.accountId === id);
+              return person ? (
+                <span key={id} className={styles.chip}>
+                  <Avatar name={person.name} size="sm" /> {person.name}
+                </span>
+              ) : null;
+            })}
+            {editable && people ? (
+              <Popover
+                aria-label="Assignees"
+                open={pickingPeople}
+                onClose={() => setPickingPeople(false)}
+                align="left"
+                width={280}
+                trigger={
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    aria-expanded={pickingPeople}
+                    onClick={() => setPickingPeople((was) => !was)}
+                  >
+                    Assignees
+                  </Button>
+                }
+              >
+                <ul className={styles.picker} aria-label="People on the board">
+                  {people.members.map((person) => (
+                    <li key={person.accountId}>
+                      <Checkbox
+                        label={`Assign ${person.name}`}
+                        checked={(tile?.assignees ?? []).includes(person.accountId)}
+                        onChange={(checked) =>
+                          void store.perform(
+                            checked
+                              ? {
+                                  op: 'card.assign',
+                                  cardId: detail.id,
+                                  accountId: person.accountId,
+                                }
+                              : {
+                                  op: 'card.unassign',
+                                  cardId: detail.id,
+                                  accountId: person.accountId,
+                                },
+                          )
+                        }
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </Popover>
+            ) : null}
             {editable ? (
               <Popover
                 aria-label="Labels"

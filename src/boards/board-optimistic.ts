@@ -64,6 +64,7 @@ export function showingBoard(view: BoardView, op: Op): BoardView {
             dueTime: null,
             hasDescription: false,
             labels: [],
+            assignees: [],
           },
         ],
       };
@@ -132,6 +133,24 @@ export function showingBoard(view: BoardView, op: Op): BoardView {
         cards: view.cards.map((each) =>
           each.id === op.cardId && !each.labels.includes(op.labelId)
             ? { ...each, labels: orderedLabels(view, [...each.labels, op.labelId]) }
+            : each,
+        ),
+      };
+    case 'card.assign':
+      return {
+        ...view,
+        cards: view.cards.map((each) =>
+          each.id === op.cardId && !each.assignees.includes(op.accountId)
+            ? { ...each, assignees: [...each.assignees, op.accountId] }
+            : each,
+        ),
+      };
+    case 'card.unassign':
+      return {
+        ...view,
+        cards: view.cards.map((each) =>
+          each.id === op.cardId
+            ? { ...each, assignees: each.assignees.filter((id) => id !== op.accountId) }
             : each,
         ),
       };

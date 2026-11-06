@@ -45,6 +45,8 @@ export function showing(
     case 'label.delete':
     case 'card.addLabel':
     case 'card.removeLabel':
+    case 'card.assign':
+    case 'card.unassign':
     case 'board.update':
     case 'board.archive':
     case 'board.restore':

@@ -602,3 +602,53 @@ test('a label is made in a card’s dialog, put on the card as a bar on its tile
   expect(await refused.json()).toEqual({ status: 'refused', code: 'not_found' });
   await cleanUp(page, workspace);
 });
+
+test('a card is assigned to a member of the board from its dialog, shown as an avatar on its tile, and unassigned; a person who is not on the board cannot be', async ({
+  page,
+}) => {
+  await signedIn(page);
+  const { workspace } = await makeBoard(page);
+  await addCard(page, 'Backlog', 'Assigned');
+  const column = page.locator('section[aria-label="Backlog"]');
+  await column.getByLabel('Assigned', { exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Assigned' });
+
+  await dialog.getByRole('button', { name: 'Assignees' }).click();
+  await page.getByRole('checkbox', { name: 'Assign Ada' }).check();
+  await dialog.getByRole('button', { name: 'Assignees' }).click();
+  await expect(column.getByLabel('Assigned to Ada')).toBeVisible();
+  await expect(dialog.getByText('Ada')).toBeVisible();
+
+  // Kept after a reload, and taken off.
+  await page.reload();
+  await expect(
+    page.locator('section[aria-label="Backlog"]').getByLabel('Assigned to Ada'),
+  ).toBeVisible();
+  const again = page.getByRole('dialog', { name: 'Assigned' });
+  await again.getByRole('button', { name: 'Assignees' }).click();
+  await page.getByRole('checkbox', { name: 'Assign Ada' }).uncheck();
+  await again.getByRole('button', { name: 'Assignees' }).click();
+  await expect(page.getByLabel('Assigned to Ada')).toHaveCount(0);
+
+  // Someone who is not on the board cannot be assigned: the door says why, to someone who may change the card.
+  const board = new URL(page.url()).pathname.split('/')[2] ?? '';
+  const view = (await (await page.request.get(`/api/boards/${board}`)).json()) as {
+    cards: { id: string }[];
+  };
+  const refused = await page.request.post('/api/ops', {
+    headers: { origin: new URL(page.url()).origin },
+    data: {
+      opId: crypto.randomUUID(),
+      op: 'card.assign',
+      cardId: view.cards[0]?.id,
+      accountId: crypto.randomUUID(),
+    },
+  });
+  expect(await refused.json()).toEqual({
+    status: 'refused',
+    code: 'invalid',
+    reason: 'not_on_board',
+  });
+  await again.getByRole('button', { name: 'Close' }).click();
+  await cleanUp(page, workspace);
+});

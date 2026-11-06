@@ -48,6 +48,8 @@ describe('an operation', () => {
       'label.delete',
       'card.addLabel',
       'card.removeLabel',
+      'card.assign',
+      'card.unassign',
     ]);
   });
 
@@ -232,6 +234,22 @@ describe('an operation', () => {
       { op: 'card.addLabel', cardId: a },
       { op: 'card.addLabel', cardId: a, labelId: 'x' },
       { op: 'label.delete', id: a, boardId: b },
+    ])
+      expect(parseOp({ opId: ID(), ...bad }).ok, JSON.stringify(bad)).toBe(false);
+  });
+
+  it('takes assigning and unassigning whole, and refuses a missing person or an id that is not one', () => {
+    const a = ID();
+    for (const good of [
+      { op: 'card.assign', cardId: a, accountId: 'account-1' },
+      { op: 'card.unassign', cardId: a, accountId: 'account-1' },
+    ])
+      expect(parseOp({ opId: ID(), ...good }).ok, good.op).toBe(true);
+    for (const bad of [
+      { op: 'card.assign', cardId: a },
+      { op: 'card.assign', cardId: a, accountId: '' },
+      { op: 'card.assign', cardId: 'x', accountId: 'account-1' },
+      { op: 'card.unassign', cardId: a, accountId: 'account-1', notify: false },
     ])
       expect(parseOp({ opId: ID(), ...bad }).ok, JSON.stringify(bad)).toBe(false);
   });

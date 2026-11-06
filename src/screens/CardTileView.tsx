@@ -3,9 +3,10 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { useState } from 'react';
 import type { CardTile, LabelRow } from '../workspaces/format';
+import { useBoardPeople } from '../boards/context';
 import { formatDue } from '../format-due';
 import { browserZone, todayFor } from '../time';
-import { Icon, Menu } from '../ui';
+import { Avatar, Icon, Menu } from '../ui';
 import styles from './BoardScreen.module.css';
 
 /**
@@ -92,6 +93,11 @@ export function CardTileView({
 
 /** What a tile shows, also drawn in the overlay that follows the pointer. */
 export function TileBody({ card, labels }: { card: CardTile; labels: readonly LabelRow[] }) {
+  const people = useBoardPeople();
+  const assigned = card.assignees.flatMap((id) => {
+    const person = people?.members.find((each) => each.accountId === id);
+    return person ? [person] : [];
+  });
   const carried = card.labels
     .map((id) => labels.find((each) => each.id === id))
     .filter((each): each is LabelRow => each !== undefined);
@@ -113,11 +119,24 @@ export function TileBody({ card, labels }: { card: CardTile; labels: readonly La
         </span>
       ) : null}
       <span className={styles.cardTitle}>{card.title}</span>
-      {card.dueDate || card.hasDescription ? (
+      {card.dueDate || card.hasDescription || assigned.length > 0 ? (
         <span className={styles.badges}>
           {due ? (
             <span className={`${styles.badge} ${due.overdue ? styles.overdue : ''}`}>
               <Icon name="calendar" aria-hidden /> {due.text}
+            </span>
+          ) : null}
+          {assigned.length > 0 ? (
+            <span
+              className={styles.assignees}
+              aria-label={`Assigned to ${assigned.map((each) => each.name).join(', ')}`}
+            >
+              {assigned.slice(0, 3).map((person) => (
+                <Avatar key={person.accountId} name={person.name} size="sm" />
+              ))}
+              {assigned.length > 3 ? (
+                <span className={styles.badge}>+{assigned.length - 3}</span>
+              ) : null}
             </span>
           ) : null}
           {card.hasDescription ? (

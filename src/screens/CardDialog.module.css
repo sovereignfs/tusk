@@ -93,3 +93,9 @@
   padding: var(--sv-space-3);
   overflow-y: auto;
 }
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sv-space-2);
+}

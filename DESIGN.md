@@ -806,6 +806,9 @@ A card can be assigned to any of its board's members, from its detail. Assigning
 themselves. Someone removed from the board, or the workspace, is unassigned from its cards. A person's assigned cards across every board are in their
 Inbox (§16).
 
+**As built (task 18.4):** the `assigned` notice is a `notice` row written in the operation's transaction, once, for a new assignment by someone other than the person assigned. Its `details` hold the
+card's title as it was. The Inbox that reads it is §16's, task 8.1.
+
 ### 15.4 Checklist
 
 As the Desk's (§10.3), in a table of its own: items with a title, a tick and an order, added, renamed, ticked, dragged into order and deleted in the
