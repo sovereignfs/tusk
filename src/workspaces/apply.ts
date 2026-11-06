@@ -5,7 +5,13 @@ import * as postgresApp from '../db/schema/postgres/app';
 import * as sqliteApp from '../db/schema/sqlite/app';
 import type { Directory } from '../auth/directory';
 import { first } from '../position';
-import { boardsAdministeredBy, boardsEditableBy, workspacesOf, workspacesOwnedBy } from './can';
+import {
+  boardsAdministeredBy,
+  boardsEditableBy,
+  boardsVisibleTo,
+  workspacesOf,
+  workspacesOwnedBy,
+} from './can';
 import { boardRowOf } from './reads';
 import {
   type OpReason,
@@ -415,6 +421,125 @@ async function run(
       );
       return { deletedBoard: request.id };
     }
+    case 'board.setVisibility': {
+      const changed = await dbAll<{ id: string }>(
+        tx,
+        sql`UPDATE ${t.board} SET visibility = ${request.visibility}, updated_at = ${now}
+            WHERE id = ${request.id} AND id IN ${boardsAdministeredBy(tx, accountId)} AND archived_at IS NULL RETURNING id`,
+      );
+      if (changed.length === 0) throw new Refused('not_found');
+      const version = await touchBoard(
+        tx,
+        request.id,
+        boardsAdministeredBy(tx, accountId),
+        now,
+        true,
+      );
+      const board = await boardRowOf(tx, request.id);
+      if (!board) throw new Refused('not_found');
+      return { board, version };
+    }
+    case 'boardMember.add':
+    case 'boardMember.setRole':
+    case 'boardMember.remove': {
+      if (request.op === 'boardMember.add') {
+        // The workspace's row first, as removing a person from the workspace does, so that adding someone to a board and taking them off the workspace
+        // wait for each other and never leave a person on a board of a workspace they are not in.
+        const held = await dbAll<{ id: string }>(
+          tx,
+          sql`UPDATE ${t.workspace} SET updated_at = ${now}
+              WHERE id = (SELECT workspace_id FROM ${t.board} WHERE id = ${request.boardId}) AND id IN ${workspacesOf(tx, accountId)}
+              RETURNING id`,
+        );
+        if (held.length === 0) throw new Refused('not_found');
+      }
+      const version = await touchBoard(
+        tx,
+        request.boardId,
+        boardsAdministeredBy(tx, accountId),
+        now,
+        true,
+      );
+      if (request.op === 'boardMember.add') {
+        const inWorkspace = await dbGet<{ one: number }>(
+          tx,
+          sql`SELECT 1 AS one FROM ${t.workspaceMember} wm JOIN ${t.board} b ON b.workspace_id = wm.workspace_id
+              WHERE b.id = ${request.boardId} AND wm.account_id = ${request.accountId}`,
+        );
+        if (!inWorkspace) throw new Refused('invalid', 'not_in_workspace');
+        const added = await dbAll<{ id: string }>(
+          tx,
+          sql`INSERT INTO ${t.boardMember} (board_id, account_id, workspace_id, role, created_at)
+              VALUES (${request.boardId}, ${request.accountId}, (SELECT workspace_id FROM ${t.board} WHERE id = ${request.boardId}), 'member', ${now})
+              ON CONFLICT (board_id, account_id) DO NOTHING RETURNING account_id AS id`,
+        );
+        if (added.length === 0) throw new Refused('invalid', 'already_in');
+        return {
+          boardMember: {
+            boardId: request.boardId,
+            accountId: request.accountId,
+            role: 'member' as Role,
+          },
+          version,
+        };
+      }
+      if (request.op === 'boardMember.setRole') {
+        const set = await dbAll<{ id: string }>(
+          tx,
+          sql`UPDATE ${t.boardMember} SET role = ${request.role}
+              WHERE board_id = ${request.boardId} AND account_id = ${request.accountId} RETURNING account_id AS id`,
+        );
+        if (set.length === 0) throw new Refused('stale');
+        return {
+          boardMember: {
+            boardId: request.boardId,
+            accountId: request.accountId,
+            role: request.role,
+          },
+          version,
+        };
+      }
+      await takeOffBoard(tx, request.boardId, request.accountId, 'stale');
+      return {
+        removedBoardMember: { boardId: request.boardId, accountId: request.accountId },
+        version,
+      };
+    }
+    case 'board.join': {
+      // Anyone in the workspace on a public board, and a workspace owner on any board (they administer it and can add themselves, §7.2); not an
+      // archived one. The workspace's row is taken first, as adding someone does.
+      const held = await dbAll<{ workspaceId: string }>(
+        tx,
+        sql`UPDATE ${t.workspace} SET updated_at = ${now}
+            WHERE id = (SELECT workspace_id FROM ${t.board} WHERE id = ${request.id}
+                        AND archived_at IS NULL
+                        AND (visibility = 'public' OR workspace_id IN ${workspacesOwnedBy(tx, accountId)}))
+              AND id IN ${workspacesOf(tx, accountId)}
+            RETURNING id AS "workspaceId"`,
+      );
+      const workspaceId = held[0]?.workspaceId;
+      if (!workspaceId) throw new Refused('not_found');
+      const added = await dbAll<{ id: string }>(
+        tx,
+        sql`INSERT INTO ${t.boardMember} (board_id, account_id, workspace_id, role, created_at)
+            VALUES (${request.id}, ${accountId}, ${workspaceId}, 'member', ${now})
+            ON CONFLICT (board_id, account_id) DO NOTHING RETURNING account_id AS id`,
+      );
+      if (added.length === 0) throw new Refused('invalid', 'already_in');
+      const version = await touchBoard(tx, request.id, boardsVisibleTo(tx, accountId), now, true);
+      return { boardMember: { boardId: request.id, accountId, role: 'member' as Role }, version };
+    }
+    case 'board.leave': {
+      // A member of the board, whether or not it is archived.
+      const version = await touchBoard(
+        tx,
+        request.id,
+        sql`(SELECT board_id FROM ${t.boardMember} WHERE account_id = ${accountId})`,
+        now,
+      );
+      await takeOffBoard(tx, request.id, accountId, 'not_found');
+      return { removedBoardMember: { boardId: request.id, accountId }, version };
+    }
     case 'workspace.rename': {
       // The permission is in the statement: only an owner's workspace is a row it can reach.
       const changed = await dbAll<{ createdAt: number | string }>(
@@ -448,12 +573,14 @@ async function touchBoard(
   boardId: string,
   permission: SQL,
   now: number,
+  /** Only a board that is not archived: an archived board is read-only for everyone (DESIGN.md §14.4). */
+  open = false,
 ): Promise<number> {
   const t = tablesOf(tx);
   const moved = await dbAll<{ version: number | string; workspaceId: string }>(
     tx,
     sql`UPDATE ${t.board} SET version = version + 1, updated_at = ${now}
-        WHERE id = ${boardId} AND id IN ${permission}
+        WHERE id = ${boardId} AND id IN ${permission} ${open ? sql`AND archived_at IS NULL` : sql``}
         RETURNING version, workspace_id AS "workspaceId"`,
   );
   const row = moved[0];
@@ -463,6 +590,25 @@ async function touchBoard(
     sql`UPDATE ${t.workspace} SET updated_at = ${now} WHERE id = ${row.workspaceId} RETURNING id`,
   );
   return Number(row.version);
+}
+
+/** Takes a person off a board and unassigns them from its cards, in the transaction that holds it. Their comments and activity stay. */
+async function takeOffBoard(
+  tx: Database,
+  boardId: string,
+  accountId: string,
+  absent: OpRefusal,
+): Promise<void> {
+  const t = tablesOf(tx);
+  const gone = await dbAll<{ id: string }>(
+    tx,
+    sql`DELETE FROM ${t.boardMember} WHERE board_id = ${boardId} AND account_id = ${accountId} RETURNING account_id AS id`,
+  );
+  if (gone.length === 0) throw new Refused(absent);
+  await dbAll(
+    tx,
+    sql`DELETE FROM ${t.cardAssignee} WHERE board_id = ${boardId} AND account_id = ${accountId} RETURNING 1 AS one`,
+  );
 }
 
 /** A card as its tile shows it, as the transaction now has it. */

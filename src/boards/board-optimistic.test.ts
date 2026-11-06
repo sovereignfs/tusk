@@ -35,7 +35,7 @@ const view = (lists: ListRow[]): BoardView => ({
   workspace: { id: 'w', name: 'Acme' },
   lists,
   cards: [],
-  can: { edit: true, admin: true },
+  can: { edit: true, admin: true, join: false },
 });
 const names = (v: BoardView) => v.lists.map((each) => each.id);
 

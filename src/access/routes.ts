@@ -47,6 +47,7 @@ export const ROUTES: RouteRule[] = [
   { route: '/api/boards', methods: { GET: { kind: 'account' } } },
   { route: '/api/settings', methods: { PATCH: { kind: 'account' } } },
   { route: '/api/boards/[id]', methods: { GET: { kind: 'account' } } },
+  { route: '/api/boards/[id]/people', methods: { GET: { kind: 'account' } } },
   { route: '/api/boards/[id]/archived', methods: { GET: { kind: 'account' } } },
   { route: '/api/boards/[id]/version', methods: { GET: { kind: 'account' } } },
   { route: '/api/health', methods: { GET: { kind: 'public' } } },

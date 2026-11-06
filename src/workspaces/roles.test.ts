@@ -6,9 +6,18 @@ import { testTarget } from '../db/test-support';
 import { makeStore } from '../sync/test-support';
 import { applyOp } from './apply';
 import { boardsAdministeredBy, boardsEditableBy, boardsVisibleTo } from './can';
-import { type Op, OPS, type OpRefusal, type OpRequest, WORKSPACE_LIMITS } from './format';
+import {
+  type Op,
+  OPS,
+  type OpReason,
+  type OpRefusal,
+  type OpRequest,
+  WORKSPACE_LIMITS,
+} from './format';
 import {
   archivedCards,
+  boardPeople,
+  boardsIndex,
   cardDetail,
   boardVersion,
   boardsOfWorkspace,
@@ -74,6 +83,8 @@ interface Row {
   may: readonly Role[];
   /** What anyone else is told. */
   otherwise: OpRefusal;
+  /** What a role is told when it is not `otherwise`: the one who is refused because they are already what the operation would make them. */
+  refusals?: Partial<Record<Role, { code: OpRefusal; reason: OpReason }>>;
 }
 const OPERATIONS: Row[] = [
   {
@@ -249,6 +260,60 @@ const OPERATIONS: Row[] = [
     otherwise: 'not_found',
   },
   {
+    op: 'board.setVisibility',
+    build: (w) => ({ op: 'board.setVisibility', id: w.boards.publicBoard, visibility: 'private' }),
+    may: ['owner', 'coOwner', 'boardOwner'],
+    otherwise: 'not_found',
+  },
+  {
+    op: 'boardMember.add',
+    build: (w) => ({
+      op: 'boardMember.add',
+      boardId: w.boards.publicBoard,
+      accountId: w.accounts.member,
+    }),
+    may: ['owner', 'coOwner', 'boardOwner'],
+    otherwise: 'not_found',
+  },
+  {
+    op: 'boardMember.setRole',
+    build: (w) => ({
+      op: 'boardMember.setRole',
+      boardId: w.boards.publicBoard,
+      accountId: w.accounts.boardMember,
+      role: 'owner',
+    }),
+    may: ['owner', 'coOwner', 'boardOwner'],
+    otherwise: 'not_found',
+  },
+  {
+    op: 'boardMember.remove',
+    build: (w) => ({
+      op: 'boardMember.remove',
+      boardId: w.boards.publicBoard,
+      accountId: w.accounts.boardMember,
+    }),
+    may: ['owner', 'coOwner', 'boardOwner'],
+    otherwise: 'not_found',
+  },
+  {
+    // Anyone in the workspace joins a public board, and the workspace's owners add themselves. Those already on it are told so; an outsider is not told.
+    op: 'board.join',
+    build: (w) => ({ op: 'board.join', id: w.boards.publicBoard }),
+    may: ['owner', 'coOwner', 'member'],
+    otherwise: 'not_found',
+    refusals: {
+      boardOwner: { code: 'invalid', reason: 'already_in' },
+      boardMember: { code: 'invalid', reason: 'already_in' },
+    },
+  },
+  {
+    op: 'board.leave',
+    build: (w) => ({ op: 'board.leave', id: w.boards.publicBoard }),
+    may: ['boardOwner', 'boardMember'],
+    otherwise: 'not_found',
+  },
+  {
     // Anyone in it may leave (there is another owner in this world); an outsider has nothing to leave.
     op: 'member.leave',
     build: (w) => ({ op: 'member.leave', workspaceId: w.workspace }),
@@ -261,7 +326,7 @@ const row = (table: unknown) =>
   dbAll<Record<string, unknown>>(database, sql`SELECT * FROM ${table as never} ORDER BY 1`);
 
 describe(`the roles (${leg})`, () => {
-  describe.each(OPERATIONS)('$op', ({ build, may, otherwise }) => {
+  describe.each(OPERATIONS)('$op', ({ build, may, otherwise, refusals }) => {
     for (const role of ROLES) {
       const allowed = may.includes(role);
       it(`${allowed ? 'lets' : 'refuses'} ${role}${allowed ? '' : `, as ${otherwise}, changing nothing`}`, async () => {
@@ -276,7 +341,10 @@ describe(`the roles (${leg})`, () => {
         if (allowed) {
           expect(result.status).toBe('applied');
         } else {
-          expect(result).toEqual({ status: 'refused', code: otherwise });
+          expect(result).toEqual({
+            status: 'refused',
+            ...(refusals?.[role] ?? { code: otherwise }),
+          });
           expect(JSON.stringify(await countAll(database))).toBe(before);
           expect(
             JSON.stringify([
@@ -1414,6 +1482,216 @@ describe(`the roles (${leg})`, () => {
           name,
         ).toEqual({ status: 'refused', code: 'invalid' });
       expect(JSON.stringify(await countAll(database))).toBe(before);
+    });
+  });
+
+  describe('who is on a board', () => {
+    const apply = (w: World, role: Role, op: Op) =>
+      applyOp(database, w.accounts[role], { opId: id(), ...op } as OpRequest, OPTIONS);
+    const t = () => tablesOf(database);
+    const onBoard = async (boardId: string, account: string) =>
+      (
+        await dbAll(
+          database,
+          sql`SELECT 1 FROM ${t().boardMember} WHERE board_id = ${boardId} AND account_id = ${account}`,
+        )
+      ).length === 1;
+
+    it('hides a board made private from a member of the workspace at once, and not from its members or the workspace’s owners', async () => {
+      const w = await seedWorld(database);
+      expect(
+        (
+          await apply(w, 'boardOwner', {
+            op: 'board.setVisibility',
+            id: w.boards.publicBoard,
+            visibility: 'private',
+          })
+        ).status,
+      ).toBe('applied');
+      for (const role of ['owner', 'coOwner', 'boardOwner', 'boardMember'] as const)
+        expect(
+          await readBoard(database, w.accounts[role], w.boards.publicBoard),
+          role,
+        ).toBeDefined();
+      expect(await readBoard(database, w.accounts.member, w.boards.publicBoard)).toBeUndefined();
+      expect(await boardVersion(database, w.accounts.member, w.boards.publicBoard)).toBeUndefined();
+      expect(
+        (await boardsOfWorkspace(database, w.accounts.member, w.workspace))?.map((b) => b.name),
+      ).toEqual(['Last year']);
+      const index = await boardsIndex(database, directory, w.accounts.member);
+      expect(index.workspaces.flatMap((each) => each.boards).map((b) => b.name)).toEqual([
+        'Last year',
+      ]);
+      expect(
+        await boardPeople(database, directory, w.accounts.member, w.boards.publicBoard),
+      ).toBeUndefined();
+      expect(await cardDetail(database, w.accounts.member, w.cards.open)).toBeUndefined();
+      // And public again, it is back.
+      await apply(w, 'owner', {
+        op: 'board.setVisibility',
+        id: w.boards.publicBoard,
+        visibility: 'public',
+      });
+      expect(await readBoard(database, w.accounts.member, w.boards.publicBoard)).toBeDefined();
+    });
+
+    it('adds only someone who is in the workspace, as a member who then edits, and not twice', async () => {
+      const w = await seedWorld(database);
+      const add = (account: string): Op => ({
+        op: 'boardMember.add',
+        boardId: w.boards.publicBoard,
+        accountId: account,
+      });
+      expect(await apply(w, 'owner', add(w.accounts.outsider))).toEqual({
+        status: 'refused',
+        code: 'invalid',
+        reason: 'not_in_workspace',
+      });
+      expect(await apply(w, 'owner', add(id()))).toEqual({
+        status: 'refused',
+        code: 'invalid',
+        reason: 'not_in_workspace',
+      });
+      expect(await onBoard(w.boards.publicBoard, w.accounts.outsider)).toBe(false);
+      expect(await apply(w, 'owner', add(w.accounts.member))).toMatchObject({
+        status: 'applied',
+        rows: { boardMember: { accountId: w.accounts.member, role: 'member' } },
+      });
+      expect(
+        (await readBoard(database, w.accounts.member, w.boards.publicBoard))?.can,
+      ).toMatchObject({ edit: true, admin: false });
+      expect(await apply(w, 'owner', add(w.accounts.member))).toEqual({
+        status: 'refused',
+        code: 'invalid',
+        reason: 'already_in',
+      });
+      // An archived board's people are read-only too.
+      await apply(w, 'owner', { op: 'board.archive', id: w.boards.publicBoard });
+      expect(await apply(w, 'owner', add(w.accounts.coOwner))).toEqual({
+        status: 'refused',
+        code: 'not_found',
+      });
+    });
+
+    it('makes a member an owner, who then administers the board, and says stale for someone who is not on it', async () => {
+      const w = await seedWorld(database);
+      const set = (account: string): Op => ({
+        op: 'boardMember.setRole',
+        boardId: w.boards.publicBoard,
+        accountId: account,
+        role: 'owner',
+      });
+      expect((await apply(w, 'boardOwner', set(w.accounts.boardMember))).status).toBe('applied');
+      expect(
+        (await readBoard(database, w.accounts.boardMember, w.boards.publicBoard))?.can.admin,
+      ).toBe(true);
+      expect(await apply(w, 'boardOwner', set(w.accounts.member))).toEqual({
+        status: 'refused',
+        code: 'stale',
+      });
+    });
+
+    it('takes a removed or leaving person off the board and out of its assignments, and leaves their comments', async () => {
+      for (const how of ['remove', 'leave'] as const) {
+        const w = await seedWorld(database);
+        await seedBoardContents(database, w);
+        const mine = (table: unknown, column = 'account_id') =>
+          dbAll(
+            database,
+            sql`SELECT 1 FROM ${table as never} WHERE ${sql.raw(column)} = ${w.accounts.boardOwner} AND board_id = ${w.boards.publicBoard}`,
+          );
+        expect((await mine(t().cardAssignee)).length).toBe(1);
+        const result =
+          how === 'remove'
+            ? await apply(w, 'owner', {
+                op: 'boardMember.remove',
+                boardId: w.boards.publicBoard,
+                accountId: w.accounts.boardOwner,
+              })
+            : await apply(w, 'boardOwner', { op: 'board.leave', id: w.boards.publicBoard });
+        expect(result).toMatchObject({
+          status: 'applied',
+          rows: { removedBoardMember: { accountId: w.accounts.boardOwner } },
+        });
+        expect(await onBoard(w.boards.publicBoard, w.accounts.boardOwner), how).toBe(false);
+        expect((await mine(t().cardAssignee)).length, how).toBe(0);
+        expect((await mine(t().comment, 'author_id')).length, how).toBe(1);
+        // They are still in the workspace and see the public board, as a viewer; the others on it are untouched.
+        expect(
+          (await readBoard(database, w.accounts.boardOwner, w.boards.publicBoard))?.can,
+        ).toMatchObject({ edit: false, admin: false, join: true });
+        expect(await onBoard(w.boards.publicBoard, w.accounts.boardMember)).toBe(true);
+        // And the one who is not on it cannot be removed or left.
+        expect(
+          await apply(w, 'owner', {
+            op: 'boardMember.remove',
+            boardId: w.boards.publicBoard,
+            accountId: w.accounts.boardOwner,
+          }),
+        ).toEqual({ status: 'refused', code: 'stale' });
+      }
+    });
+
+    it('lets a viewer join a public board with one click and edit it, and no one join what they may not see or what is archived', async () => {
+      const w = await seedWorld(database);
+      expect(
+        (await readBoard(database, w.accounts.member, w.boards.publicBoard))?.can,
+      ).toMatchObject({ edit: false, join: true });
+      expect(
+        (await apply(w, 'member', { op: 'board.join', id: w.boards.publicBoard })).status,
+      ).toBe('applied');
+      expect(
+        (await readBoard(database, w.accounts.member, w.boards.publicBoard))?.can,
+      ).toMatchObject({ edit: true, join: false });
+      // A private board is not there for a member who is not on it; a workspace owner can add themselves to it; an archived board cannot be joined.
+      expect(await apply(w, 'member', { op: 'board.join', id: w.boards.privateBoard })).toEqual({
+        status: 'refused',
+        code: 'not_found',
+      });
+      expect((await readBoard(database, w.accounts.owner, w.boards.privateBoard))?.can.join).toBe(
+        true,
+      );
+      expect(
+        (await apply(w, 'owner', { op: 'board.join', id: w.boards.privateBoard })).status,
+      ).toBe('applied');
+      expect(await apply(w, 'member', { op: 'board.join', id: w.boards.archivedBoard })).toEqual({
+        status: 'refused',
+        code: 'not_found',
+      });
+      expect(await apply(w, 'outsider', { op: 'board.join', id: w.boards.publicBoard })).toEqual({
+        status: 'refused',
+        code: 'not_found',
+      });
+    });
+
+    it('lists a board’s people owners first, with addresses and a picker for an administrator only', async () => {
+      const w = await seedWorld(database);
+      const asAdmin = await boardPeople(
+        database,
+        directory,
+        w.accounts.boardOwner,
+        w.boards.publicBoard,
+      );
+      expect(asAdmin?.members.map((m) => [m.accountId, m.role])).toEqual([
+        [w.accounts.boardOwner, 'owner'],
+        [w.accounts.boardMember, 'member'],
+      ]);
+      expect(asAdmin?.members.every((m) => m.email !== undefined)).toBe(true);
+      // The picker is the workspace's people who are not on the board: never anyone else.
+      expect(asAdmin?.candidates.map((c) => c.accountId).sort()).toEqual(
+        [w.accounts.owner, w.accounts.coOwner, w.accounts.member].sort(),
+      );
+      const asMember = await boardPeople(
+        database,
+        directory,
+        w.accounts.boardMember,
+        w.boards.publicBoard,
+      );
+      expect(asMember?.members.some((m) => m.email !== undefined)).toBe(false);
+      expect(asMember?.candidates).toEqual([]);
+      expect(
+        await boardPeople(database, directory, w.accounts.outsider, w.boards.publicBoard),
+      ).toBeUndefined();
     });
   });
 

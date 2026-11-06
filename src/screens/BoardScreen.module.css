@@ -252,3 +252,68 @@
 .menuButton {
   margin-left: auto;
 }
+
+.avatars {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sv-space-1);
+  padding: var(--sv-space-1);
+  border: 0;
+  border-radius: var(--sv-radius-sm);
+  background: transparent;
+  cursor: pointer;
+}
+
+.avatars:hover {
+  background: var(--sv-color-surface-sunken);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sv-space-1);
+}
+
+.muted {
+  margin: 0;
+  color: var(--sv-color-text-muted);
+  font-size: var(--sv-font-size-sm);
+}
+
+.sectionTitle {
+  margin: 0 0 var(--sv-space-2);
+  font-size: var(--sv-font-size-md);
+  font-weight: var(--sv-font-weight-semibold);
+}
+
+.people {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sv-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.personRow {
+  display: flex;
+  align-items: center;
+  gap: var(--sv-space-3);
+}
+
+.personName {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.roleSelect {
+  flex: none;
+  width: 8rem;
+}
+
+.pickRow {
+  display: flex;
+  align-items: center;
+  gap: var(--sv-space-2);
+}

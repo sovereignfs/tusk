@@ -15,6 +15,17 @@ import { settled, showingBoard } from './board-optimistic';
  */
 export const POLL_MS = 20_000;
 
+const CHANGES_WHAT_I_MAY: ReadonlySet<Op['op']> = new Set([
+  'board.archive',
+  'board.restore',
+  'board.setVisibility',
+  'boardMember.add',
+  'boardMember.setRole',
+  'boardMember.remove',
+  'board.join',
+  'board.leave',
+]);
+
 export type BoardFailure = OpRefusal | 'offline' | 'rate';
 
 export interface BoardStore {
@@ -94,8 +105,9 @@ export function useBoard(
           if (result.status === 'applied') {
             confirmed.current = settled(showingBoard(confirmed.current, op), op, result.rows);
             pending.current -= 1;
-            // Archiving and restoring change what the person may do here, which only the server knows: the board is read again.
-            if (op.op === 'board.archive' || op.op === 'board.restore') await reload();
+            // These change what the person may do here (archiving, joining, leaving, being given a role, a board made private), which only the server
+            // knows: the board is read again.
+            if (CHANGES_WHAT_I_MAY.has(op.op)) await reload();
             // Nothing else waits: the screen is the server's, with the row it sent in place of the guess.
             if (pending.current === 0) setView(confirmed.current);
             else setView((now) => settled(now, op, result.rows));

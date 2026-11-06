@@ -721,6 +721,9 @@ Lists are dragged by their header to reorder, which writes one row. A new list g
   the server), makes them owners, removes them, and publishes the board (§14.6). Anyone can leave it.
 - **The board's header shows its members' avatars,** a few and then "+N", which open the Share dialog.
 
+**As built (task 17.3):** adding and joining take the workspace's row first, so that they and the removal of a person from a workspace wait for each other. A private board is hidden by the
+same subquery in every read (`boardsVisibleTo`). The board's people are read from `GET /api/boards/<id>/people`, and the picker is the workspace's people who are not on the board.
+
 ### 14.4 Archive and delete
 
 - **Archive** (from the board's menu) hides it from the workspace's tiles and the sidebar behind _Archived_, and makes it read-only for everyone. It

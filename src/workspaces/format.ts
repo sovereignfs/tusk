@@ -34,6 +34,12 @@ export const OPS = [
   'board.archive',
   'board.restore',
   'board.delete',
+  'board.setVisibility',
+  'boardMember.add',
+  'boardMember.setRole',
+  'boardMember.remove',
+  'board.join',
+  'board.leave',
 ] as const;
 export type OpName = (typeof OPS)[number];
 
@@ -107,7 +113,24 @@ export type Op =
   | { readonly op: 'board.archive'; readonly id: string }
   | { readonly op: 'board.restore'; readonly id: string }
   /** `name` is the board's name as it is, typed by the person: deleting is final and takes everything on the board (DESIGN.md §14.4). */
-  | { readonly op: 'board.delete'; readonly id: string; readonly name: string };
+  | { readonly op: 'board.delete'; readonly id: string; readonly name: string }
+  /** Public: everyone in the workspace sees it and can join. Private: its members and the workspace's owners (DESIGN.md §14.3). */
+  | { readonly op: 'board.setVisibility'; readonly id: string; readonly visibility: Visibility }
+  /** Only someone already in the board's workspace can be added (§13.2: the people of a board come only from its workspace). */
+  | { readonly op: 'boardMember.add'; readonly boardId: string; readonly accountId: string }
+  | {
+      readonly op: 'boardMember.setRole';
+      readonly boardId: string;
+      readonly accountId: string;
+      readonly role: Role;
+    }
+  | { readonly op: 'boardMember.remove'; readonly boardId: string; readonly accountId: string }
+  /** The asker becomes a member: anyone in the workspace on a public board, and a workspace owner on any (§7.2). */
+  | { readonly op: 'board.join'; readonly id: string }
+  /** The asker leaves it, and is unassigned from its cards. */
+  | { readonly op: 'board.leave'; readonly id: string };
+
+export type Visibility = 'public' | 'private';
 
 /** A person's role in a workspace (DESIGN.md §7.2). */
 export type Role = 'owner' | 'member';
@@ -158,8 +181,9 @@ export type OpRefusal = 'not_found' | 'invalid' | 'limit' | 'stale';
  *  - `no_account`  no account here has that address (an owner adding someone)
  *  - `already_in`  that account is in the workspace already
  *  - `last_owner`  a workspace keeps at least one owner: they make someone else owner first, or delete it
+ *  - `not_in_workspace`  the people of a board come only from its workspace
  */
-export type OpReason = 'no_account' | 'already_in' | 'last_owner';
+export type OpReason = 'no_account' | 'already_in' | 'last_owner' | 'not_in_workspace';
 
 /** A workspace as its people see it. */
 export interface WorkspaceRow {
@@ -195,7 +219,7 @@ export interface BoardRow {
   readonly name: string;
   readonly color: string;
   readonly description: string | null;
-  readonly visibility: 'public' | 'private';
+  readonly visibility: Visibility;
   readonly archived: boolean;
   /** Moved on by every operation on the board, so that an open one can tell it has changed (DESIGN.md §14.7). */
   readonly version: number;
@@ -249,7 +273,7 @@ export interface BoardView {
   /** Every open card, with what its tile shows. */
   readonly cards: readonly CardTile[];
   /** What the one asking may do here: only a member changes the board, and an archived one is read-only (§7.2). */
-  readonly can: { readonly edit: boolean; readonly admin: boolean };
+  readonly can: { readonly edit: boolean; readonly admin: boolean; readonly join: boolean };
 }
 
 export interface OpRows {
@@ -257,6 +281,12 @@ export interface OpRows {
   readonly board?: BoardRow;
   readonly list?: ListRow;
   readonly card?: CardTile;
+  readonly boardMember?: {
+    readonly boardId: string;
+    readonly accountId: string;
+    readonly role: Role;
+  };
+  readonly removedBoardMember?: { readonly boardId: string; readonly accountId: string };
   /** The id of a board that is gone for good. */
   readonly deletedBoard?: string;
   /** The id of a card that is gone for good. */
@@ -296,3 +326,18 @@ export interface BoardsIndex {
 
 /** People shown as avatars on a workspace's header; the rest are a count. */
 export const INDEX_AVATARS = 5;
+
+/** One of a board's people, for its Share dialog and the avatars in its header. The address is shown to an administrator only. */
+export interface BoardPerson {
+  readonly accountId: string;
+  readonly name: string;
+  readonly email?: string;
+  readonly role: Role;
+  readonly you: boolean;
+}
+
+/** A board's people, and for an administrator the workspace's people who are not on it yet (the picker; never a search of the server, §14.3). */
+export interface BoardPeople {
+  readonly members: readonly BoardPerson[];
+  readonly candidates: readonly { readonly accountId: string; readonly name: string }[];
+}

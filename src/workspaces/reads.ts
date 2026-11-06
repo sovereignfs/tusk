@@ -4,9 +4,17 @@ import { dbAll, dbGet } from '../db/exec';
 import * as postgresApp from '../db/schema/postgres/app';
 import * as sqliteApp from '../db/schema/sqlite/app';
 import type { Directory } from '../auth/directory';
-import { boardsEditableBy, boardsAdministeredBy, boardsVisibleTo, workspacesOf } from './can';
+import {
+  boardsAdministeredBy,
+  boardsEditableBy,
+  boardsVisibleTo,
+  workspacesOf,
+  workspacesOwnedBy,
+} from './can';
 import {
   type ArchivedCard,
+  type BoardPeople,
+  type BoardPerson,
   type CardDetail,
   type CardTile,
   type BoardRow,
@@ -159,12 +167,21 @@ export async function readBoard(
 ): Promise<BoardView | undefined> {
   const t = tablesOf(database);
   const raw = await dbGet<
-    RawBoard & { workspaceName: string; canEdit: number | boolean; canAdmin: number | boolean }
+    RawBoard & {
+      workspaceName: string;
+      canEdit: number | boolean;
+      canAdmin: number | boolean;
+      canJoin: number | boolean;
+    }
   >(
     database,
     sql`SELECT ${sql.raw(BOARD_COLUMNS)}, w.name AS "workspaceName",
           (b.id IN ${boardsEditableBy(database, accountId)}) AS "canEdit",
-          (b.id IN ${boardsAdministeredBy(database, accountId)}) AS "canAdmin"
+          (b.id IN ${boardsAdministeredBy(database, accountId)}) AS "canAdmin",
+          (b.archived_at IS NULL
+            AND b.id NOT IN (SELECT board_id FROM ${t.boardMember} WHERE account_id = ${accountId})
+            AND ((b.visibility = 'public' AND b.workspace_id IN ${workspacesOf(database, accountId)})
+                 OR b.workspace_id IN ${workspacesOwnedBy(database, accountId)})) AS "canJoin"
         FROM ${t.board} b JOIN ${t.workspace} w ON w.id = b.workspace_id
         WHERE b.id = ${boardId} AND b.id IN ${boardsVisibleTo(database, accountId)}`,
   );
@@ -194,6 +211,7 @@ export async function readBoard(
     can: {
       edit: Boolean(Number(raw.canEdit)) && !board.archived,
       admin: Boolean(Number(raw.canAdmin)),
+      join: Boolean(Number(raw.canJoin)),
     },
   };
 }
@@ -383,4 +401,66 @@ export async function boardRowOf(
     sql`SELECT ${sql.raw(BOARD_COLUMNS)} FROM ${tablesOf(database).board} b WHERE b.id = ${boardId}`,
   );
   return raw ? toBoard(raw) : undefined;
+}
+
+/**
+ * A board's people (DESIGN.md §14.3), for someone who can see the board: its members, owners first, and, for an administrator, the workspace's people who
+ * are not on it yet, for the picker. **The statement names the asker.** A name is read from the account when it is shown and never kept; the address is
+ * shown to an administrator only. `undefined` for a board that is not theirs.
+ */
+export async function boardPeople(
+  database: Database,
+  directory: Pick<Directory, 'profiles'>,
+  accountId: string,
+  boardId: string,
+): Promise<BoardPeople | undefined> {
+  const t = tablesOf(database);
+  const board = await dbGet<{ admin: number | boolean }>(
+    database,
+    sql`SELECT (b.id IN ${boardsAdministeredBy(database, accountId)}) AS admin FROM ${t.board} b
+        WHERE b.id = ${boardId} AND b.id IN ${boardsVisibleTo(database, accountId)}`,
+  );
+  if (!board) return undefined;
+  const admin = Boolean(Number(board.admin));
+  const members = await dbAll<{ accountId: string; role: string }>(
+    database,
+    sql`SELECT account_id AS "accountId", role FROM ${t.boardMember} WHERE board_id = ${boardId} ORDER BY created_at, account_id`,
+  );
+  const candidates = admin
+    ? await dbAll<{ accountId: string }>(
+        database,
+        sql`SELECT wm.account_id AS "accountId" FROM ${t.workspaceMember} wm JOIN ${t.board} b ON b.workspace_id = wm.workspace_id
+            WHERE b.id = ${boardId}
+              AND wm.account_id NOT IN (SELECT account_id FROM ${t.boardMember} WHERE board_id = ${boardId})
+            ORDER BY wm.created_at, wm.account_id LIMIT ${WORKSPACE_LIMITS.membersPerWorkspace}`,
+      )
+    : [];
+  const profiles = await directory.profiles(
+    [...members, ...candidates].map((row) => row.accountId),
+  );
+  const collator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
+  const named = (id: string) => profiles.get(id)?.name ?? 'Someone';
+  const people = members
+    .map((row): BoardPerson => {
+      const profile = profiles.get(row.accountId);
+      return {
+        accountId: row.accountId,
+        name: named(row.accountId),
+        ...(admin && profile ? { email: profile.email } : {}),
+        role: row.role === 'owner' ? 'owner' : 'member',
+        you: row.accountId === accountId,
+      };
+    })
+    .sort(
+      (a, b) =>
+        Number(b.role === 'owner') - Number(a.role === 'owner') ||
+        collator.compare(a.name, b.name) ||
+        (a.accountId < b.accountId ? -1 : 1),
+    );
+  return {
+    members: people,
+    candidates: candidates
+      .map((row) => ({ accountId: row.accountId, name: named(row.accountId) }))
+      .sort((a, b) => collator.compare(a.name, b.name) || (a.accountId < b.accountId ? -1 : 1)),
+  };
 }

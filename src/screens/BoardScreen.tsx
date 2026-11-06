@@ -26,6 +26,7 @@ import { boardFailureMessage, useBoard } from '../boards/store';
 import { HORIZONTAL_AUTOSCROLL, useDragClickGuard, useReorderSensors } from '../ui/dnd';
 import {
   Alert,
+  Avatar,
   Button,
   ConfirmDialog,
   Dialog,
@@ -37,6 +38,7 @@ import {
 } from '../ui';
 import {
   type ArchivedCard,
+  type BoardPeople,
   type BoardView,
   type CardTile,
   type Op,
@@ -44,6 +46,7 @@ import {
 } from '../workspaces/format';
 import { TileBody } from './CardTileView';
 import { BoardSettingsDialog, DeleteBoardDialog } from './BoardSettings';
+import { ShareDialog } from './ShareDialog';
 import { ListColumn } from './ListColumn';
 import styles from './BoardScreen.module.css';
 
@@ -87,7 +90,22 @@ export function BoardScreen({
   const [dragging, setDragging] = useState<CardTile | null>(null);
   const [archivedOpen, setArchivedOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [dialog, setDialog] = useState<'settings' | 'delete' | null>(null);
+  const [dialog, setDialog] = useState<'settings' | 'delete' | 'share' | null>(null);
+  const [people, setPeople] = useState<BoardPeople | null>(null);
+  const boardId = view.board.id;
+  const version = view.board.version;
+  // The board's people: for the avatars in its header and its Share dialog, read again when the board's version moves (someone was added or left).
+  const readPeople = useCallback(async () => {
+    try {
+      const reply = await fetch(`/api/boards/${boardId}/people`, { cache: 'no-store' });
+      if (reply.ok) setPeople((await reply.json()) as BoardPeople);
+    } catch {
+      // Offline: the people that were read stay.
+    }
+  }, [boardId]);
+  useEffect(() => {
+    void readPeople();
+  }, [readPeople, version]);
   const addForm = useRef<HTMLFormElement>(null);
   // The field is put in front of the person who asked for it.
   useEffect(() => {
@@ -173,6 +191,30 @@ export function BoardScreen({
           ) : !view.can.edit ? (
             <span className={styles.badge}>Viewing</span>
           ) : null}
+          <button
+            type="button"
+            className={`${styles.avatars} ${styles.menuButton}`}
+            aria-label={`Share board, ${people?.members.length ?? 0} people`}
+            onClick={() => setDialog('share')}
+          >
+            {(people?.members ?? []).slice(0, 4).map((person) => (
+              <Avatar key={person.accountId} name={person.name} size="sm" />
+            ))}
+            {people && people.members.length > 4 ? (
+              <span className={styles.badge}>+{people.members.length - 4}</span>
+            ) : null}
+            {people && people.members.length === 0 ? (
+              <span className={styles.badge}>Share</span>
+            ) : null}
+          </button>
+          {view.can.join ? (
+            <Button
+              size="sm"
+              onClick={() => void store.perform({ op: 'board.join', id: view.board.id })}
+            >
+              Join board
+            </Button>
+          ) : null}
           <Menu
             aria-label="Board menu"
             open={menuOpen}
@@ -182,7 +224,7 @@ export function BoardScreen({
             trigger={
               <button
                 type="button"
-                className={`${styles.iconButton} ${styles.menuButton}`}
+                className={styles.iconButton}
                 aria-label="Board menu"
                 aria-expanded={menuOpen}
                 onClick={() => setMenuOpen((was) => !was)}
@@ -251,6 +293,17 @@ export function BoardScreen({
         ) : null}
         {dialog === 'settings' ? (
           <BoardSettingsDialog board={view.board} store={store} onClose={() => setDialog(null)} />
+        ) : null}
+        {dialog === 'share' ? (
+          <ShareDialog
+            board={view.board}
+            workspaceId={view.workspace.id}
+            people={people}
+            admin={view.can.admin}
+            store={store}
+            refresh={readPeople}
+            onClose={() => setDialog(null)}
+          />
         ) : null}
         {dialog === 'delete' ? (
           <DeleteBoardDialog

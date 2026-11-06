@@ -38,7 +38,15 @@ const ARGUMENTS: Record<OpName, readonly string[]> = {
   'board.archive': ['id'],
   'board.restore': ['id'],
   'board.delete': ['id', 'name'],
+  'board.setVisibility': ['id', 'visibility'],
+  'boardMember.add': ['boardId', 'accountId'],
+  'boardMember.setRole': ['boardId', 'accountId', 'role'],
+  'boardMember.remove': ['boardId', 'accountId'],
+  'board.join': ['id'],
+  'board.leave': ['id'],
 };
+
+const VISIBILITY = oneOf('public', 'private');
 
 const BOARD_DESCRIPTION = text(0, WORKSPACE_LIMITS.boardDescriptionChars);
 
@@ -294,6 +302,51 @@ export function parseOp(value: unknown): Parsed<OpRequest> {
       const name = NAME(value.name);
       if (!name.ok) return no(`name: ${name.reason}`);
       return { ok: true, value: { opId: opId.value, op: kind, id: id.value, name: name.value } };
+    }
+    case 'board.setVisibility': {
+      const id = uuid(value.id);
+      if (!id.ok) return no('id: not an id');
+      const visibility = VISIBILITY(value.visibility);
+      if (!visibility.ok) return no('visibility: not a visibility');
+      return {
+        ok: true,
+        value: { opId: opId.value, op: kind, id: id.value, visibility: visibility.value },
+      };
+    }
+    case 'boardMember.add':
+    case 'boardMember.remove': {
+      const boardId = uuid(value.boardId);
+      if (!boardId.ok) return no('boardId: not an id');
+      const accountId = text(1, 128)(value.accountId);
+      if (!accountId.ok) return no('accountId: not an id');
+      return {
+        ok: true,
+        value: { opId: opId.value, op: kind, boardId: boardId.value, accountId: accountId.value },
+      };
+    }
+    case 'boardMember.setRole': {
+      const boardId = uuid(value.boardId);
+      if (!boardId.ok) return no('boardId: not an id');
+      const accountId = text(1, 128)(value.accountId);
+      if (!accountId.ok) return no('accountId: not an id');
+      const role = ROLE(value.role);
+      if (!role.ok) return no('role: not a role');
+      return {
+        ok: true,
+        value: {
+          opId: opId.value,
+          op: kind,
+          boardId: boardId.value,
+          accountId: accountId.value,
+          role: role.value,
+        },
+      };
+    }
+    case 'board.join':
+    case 'board.leave': {
+      const id = uuid(value.id);
+      if (!id.ok) return no('id: not an id');
+      return { ok: true, value: { opId: opId.value, op: kind, id: id.value } };
     }
   }
 }

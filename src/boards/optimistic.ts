@@ -43,6 +43,12 @@ export function showing(
     case 'board.archive':
     case 'board.restore':
     case 'board.delete':
+    case 'board.setVisibility':
+    case 'boardMember.add':
+    case 'boardMember.setRole':
+    case 'boardMember.remove':
+    case 'board.join':
+    case 'board.leave':
     case 'member.add':
     case 'member.setRole':
     case 'member.remove':

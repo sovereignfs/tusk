@@ -36,6 +36,12 @@ describe('an operation', () => {
       'board.archive',
       'board.restore',
       'board.delete',
+      'board.setVisibility',
+      'boardMember.add',
+      'boardMember.setRole',
+      'boardMember.remove',
+      'board.join',
+      'board.leave',
     ]);
   });
 
@@ -150,6 +156,28 @@ describe('an operation', () => {
       { op: 'board.update', id: a, name: 'x', color: '#7c3aed' },
       { op: 'board.delete', id: a, name: '' },
       { op: 'board.archive', id: a, name: 'x' },
+    ])
+      expect(parseOp({ opId: ID(), ...bad }).ok, JSON.stringify(bad)).toBe(false);
+  });
+
+  it('takes visibility, board people, join and leave whole, and refuses a visibility or a role that is not one', () => {
+    const [a, b] = [ID(), ID()];
+    for (const good of [
+      { op: 'board.setVisibility', id: a, visibility: 'private' },
+      { op: 'boardMember.add', boardId: a, accountId: b },
+      { op: 'boardMember.setRole', boardId: a, accountId: b, role: 'owner' },
+      { op: 'boardMember.remove', boardId: a, accountId: b },
+      { op: 'board.join', id: a },
+      { op: 'board.leave', id: a },
+    ])
+      expect(parseOp({ opId: ID(), ...good }).ok, good.op).toBe(true);
+    for (const bad of [
+      { op: 'board.setVisibility', id: a, visibility: 'secret' },
+      { op: 'board.setVisibility', id: a },
+      { op: 'boardMember.setRole', boardId: a, accountId: b, role: 'admin' },
+      { op: 'boardMember.add', boardId: a },
+      { op: 'board.join', id: a, accountId: b },
+      { op: 'board.leave', id: 'x' },
     ])
       expect(parseOp({ opId: ID(), ...bad }).ok, JSON.stringify(bad)).toBe(false);
   });

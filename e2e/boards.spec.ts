@@ -488,3 +488,43 @@ test('a board is deleted by typing its name, and is gone from its workspace and 
   await wd.getByLabel('Type the name to confirm').fill(workspace);
   await wd.getByRole('button', { name: 'Delete this workspace' }).click();
 });
+
+test('the Share dialog lists the board’s people, sets who can see it, and leaving and joining turn an editor into a viewer and back', async ({
+  page,
+}) => {
+  await signedIn(page);
+  const { workspace } = await makeBoard(page);
+
+  // The header's avatars open it; the maker is its owner, with an address shown to them.
+  await page.getByRole('button', { name: /Share board, 1 people/ }).click();
+  const share = page.getByRole('dialog', { name: 'Share board' });
+  const people = share.getByRole('region', { name: 'People on the board' });
+  await expect(people.getByText('(you)')).toBeVisible();
+  await expect(people.getByLabel('Role of Ada')).toHaveValue('owner');
+  await expect(people.getByText(EMAIL)).toBeVisible();
+
+  // Public by default, then private, kept after a reload; the workspace's owner still sees it.
+  await expect(share.getByLabel('Who can see it')).toHaveValue('public');
+  await share.getByLabel('Who can see it').selectOption('private');
+  await expect
+    .poll(async () => {
+      const board = new URL(page.url()).pathname.split('/')[2] ?? '';
+      const reply = await page.request.get(`/api/boards/${board}`);
+      return ((await reply.json()) as { board: { visibility: string } }).board.visibility;
+    })
+    .toBe('private');
+  await share.getByLabel('Who can see it').selectOption('public');
+  await expect(share.getByLabel('Who can see it')).toHaveValue('public');
+
+  // Leaving: the board is public, so they stay as a viewer, and can join again with one click.
+  await share.getByRole('button', { name: 'Leave board' }).click();
+  await page.getByRole('button', { name: 'Leave', exact: true }).click();
+  await share.getByRole('button', { name: 'Close' }).click();
+  await expect(page.getByRole('button', { name: 'Join board' })).toBeVisible();
+  await expect(addListButton(page)).toHaveCount(0);
+  await expect(page.getByText('Viewing')).toBeVisible();
+  await page.getByRole('button', { name: 'Join board' }).click();
+  await expect(addListButton(page)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Join board' })).toHaveCount(0);
+  await cleanUp(page, workspace);
+});
