@@ -2,7 +2,7 @@
 
 ## Status
 
-📋 Planned. 6.1 and 6.2 are phase 1; Today, its cards and Review (6.3 to 6.5) are the phone's, in phase 2.
+⏳ In progress: 6.1 is done. 6.1 and 6.2 are phase 1; Today, its cards and Review (6.3 to 6.5) are the phone's, in phase 2.
 
 ## Overview
 
@@ -15,7 +15,7 @@ action button. Each is computed in the browser, from the local store, so each wo
 
 ## Tasks
 
-#### 📋 6.1 — Starred
+#### ✅ 6.1 — Starred
 
 **Goal:** see a list's starred cards alone.
 
@@ -27,6 +27,8 @@ place for one, and the Planner and Today cover "what matters" across lists in ph
 
 **Accepts when:** the filter shows only starred, open cards and survives a reload; dragging is still possible under Custom; un-starring a card under the
 filter takes it out of view without moving it.
+
+**Done as:** `src/lists/filter.ts`, pure: the four filters (_All_, _Active_, _Starred_, _Overdue_) with their labels, `filterOf(list)` (anything unknown, missing or ciphertext is All), `filterCards(open, filter, now)` and `showsCompleted`. **The filter is now a field of the list,** `filter`, beside `sort` and `showCompleted`: a name in `FIELD_NAMES`, a rule in the server's validator that takes exactly the four, `setFilter` as the action, and §23.3's table updated. It survives a reload and reaches the person's other devices (3.10 had left it unremembered, as its epic did not ask). _Starred_ shows the open starred cards in the order they already have, with the pinning and the sort of the list unchanged; the Completed section is part of _All_ alone, so it follows the filter by not being there for the others, as it already was for _Active_ and _Overdue_. A filter only chooses what is shown: a card that is un-starred under _Starred_ leaves the view and is back in its place under _All_, and dragging under Custom works against the cards shown, as 3.6 does for any filter. Tests: the filters and their labels, the server taking each and nothing else, reading the list's field (and All for a missing, unknown or sealed one), `setFilter` as one change to one field, each filter's choice of cards without changing the input or its order, a star that cannot be read counting as none; and in Chromium and WebKit: Starred showing only the open starred cards with no Completed section, kept after a reload, a card dragged with the keyboard under it, and an un-starred card going without moving (All shows the order the drag made, with it where it was). **Not as the epic said:** none.
 
 #### 📋 6.2 — Search
 

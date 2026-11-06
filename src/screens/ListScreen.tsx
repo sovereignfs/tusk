@@ -4,17 +4,22 @@ import { DndContext, closestCenter, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useState } from 'react';
 import { uuid } from '../access/parse';
-import { setShowCompleted, setSort } from '../actions/lists';
+import { setFilter, setShowCompleted, setSort } from '../actions/lists';
 import { deleteMany, isCompleted, moveCard, restoreMany, type Group } from '../actions/cards';
-import { isOverdue } from '../dates/overdue';
+import {
+  FILTERS,
+  FILTER_LABELS,
+  type Filter,
+  filterCards,
+  filterOf,
+  showsCompleted,
+} from '../lists/filter';
 import {
   SORTS,
   SORT_LABELS,
   canReorder,
   dropWithinGroup,
-  dueAt,
   isSort,
   pinFirst,
   sortOf,
@@ -163,14 +168,12 @@ function OpenCards({
   );
 }
 
-type Filter = 'all' | 'active' | 'overdue';
-
 const ids = { newId: () => crypto.randomUUID() };
 
 /**
  * The list's cards, from the working copy, **the way the person wants to see them, remembered**: the order (`sort`) and whether the Completed
- * section is open (`showCompleted`) are fields of the list, so they survive a reload and reach the person's other devices (DESIGN.md §10.5). The
- * filter is for now and is not remembered. Under any order but Custom a card has no handle and cannot be dragged, since where it landed would be the
+ * section is open (`showCompleted`) are fields of the list, as is the filter (`filter`), so they survive a reload and reach the person's other devices
+ * (DESIGN.md §10.5). Under any order but Custom a card has no handle and cannot be dragged, since where it landed would be the
  * sort's doing and not the person's.
  */
 function ListCards({ list }: { list: LocalRow }) {
@@ -179,7 +182,7 @@ function ListCards({ list }: { list: LocalRow }) {
   const cards = useLocal((db) => cardsOf(db, list.id), [list.id]);
   const counts = useLocal(checkCounts);
   const openId = useSearchParams().get('card');
-  const [filter, setFilter] = useState<Filter>('all');
+  const filter = filterOf(list);
   const sort = sortOf(list);
   const showCompleted = (() => {
     const field = list.fields.showCompleted;
@@ -194,8 +197,7 @@ function ListCards({ list }: { list: LocalRow }) {
   );
   // Under the order the person made, what is overdue or due today floats to the top; a partition, so no position changes. Under a sort it is the sort's.
   const ordered = sort === 'custom' ? pinFirst(sorted, now) : sorted;
-  const open =
-    filter === 'overdue' ? ordered.filter((card) => isOverdue(dueAt(card), now)) : ordered;
+  const open = filterCards(ordered, filter, now);
   // Most recently finished first, whatever the sort: it is a record of what was done.
   const done = all
     .filter(isCompleted)
@@ -204,6 +206,11 @@ function ListCards({ list }: { list: LocalRow }) {
   function choose(next: string) {
     if (!isSort(next)) return;
     const result = setSort(list, next, ids);
+    if (result.ok) void client.commit(result.mutation);
+  }
+
+  function chooseFilter(next: Filter) {
+    const result = setFilter(list, next, ids);
     if (result.ok) void client.commit(result.mutation);
   }
 
@@ -250,12 +257,8 @@ function ListCards({ list }: { list: LocalRow }) {
             aria-label="Show"
             size="sm"
             value={filter}
-            onChange={setFilter}
-            options={[
-              { label: 'All', value: 'all' },
-              { label: 'Active', value: 'active' },
-              { label: 'Overdue', value: 'overdue' },
-            ]}
+            onChange={chooseFilter}
+            options={FILTERS.map((value) => ({ label: FILTER_LABELS[value], value }))}
           />
           <Select
             aria-label="Sort by"
@@ -282,7 +285,7 @@ function ListCards({ list }: { list: LocalRow }) {
         reorderable={canReorder(sort)}
         pinNow={sort === 'custom' ? now : null}
       />
-      {done.length > 0 && filter === 'all' ? (
+      {done.length > 0 && showsCompleted(filter) ? (
         <div className={styles.completed}>
           <div className={styles.completedBar}>
             <button

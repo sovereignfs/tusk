@@ -447,6 +447,9 @@ test.describe('putting tasks in order', () => {
     await ring.click();
     await expect(page).toHaveURL(/\?card=/);
     await detail.getByRole('button', { name: 'Close' }).click();
+    // The rows are measured once the detail is gone: the header above them wraps while it is open and not after, and the rows move with it.
+    await expect(page).not.toHaveURL(/\?card=/);
+    await expect(detail).toHaveCount(0);
 
     const from = await ring.boundingBox();
     const to = await page.getByRole('link', { name: first as string }).boundingBox();

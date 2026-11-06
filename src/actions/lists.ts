@@ -1,5 +1,6 @@
 import { text as textParser } from '../access/parse';
 import { DEFAULT_COLOR, isListColor } from '../lists/colors';
+import { filterOf, isFilter } from '../lists/filter';
 import { isSort } from '../lists/sort';
 import type { LocalRow } from '../local/rows';
 import { after, first } from '../position';
@@ -89,6 +90,14 @@ export function setShowCompleted(
   return mutationOf(ids, [
     { table: 'desk_list', id: list.id, fields: { showCompleted: { v: show } } },
   ]);
+}
+
+/** Chooses which cards a list shows (DESIGN.md §10.5). It is remembered with the list, and shows on the person's other devices. Writes the one field. */
+export function setFilter(list: LocalRow | undefined, filter: string, ids: Ids): ActionResult {
+  if (!list) return { ok: false, reason: 'missing' };
+  if (!isFilter(filter)) return { ok: false, reason: 'nothing' };
+  if (filterOf(list) === filter) return { ok: false, reason: 'nothing' };
+  return mutationOf(ids, [{ table: 'desk_list', id: list.id, fields: { filter: { v: filter } } }]);
 }
 
 export function setColor(list: LocalRow | undefined, color: string, ids: Ids): ActionResult {

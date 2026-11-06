@@ -42,7 +42,7 @@ export type Fields = Readonly<Record<string, FieldValue>>;
  * is the one a new row cannot do without.
  */
 export const FIELD_NAMES = {
-  desk_list: ['title', 'color', 'sort', 'showCompleted'],
+  desk_list: ['title', 'color', 'sort', 'showCompleted', 'filter'],
   // `startedAt` and `completedAt` are a card's status (§10.2): Done if `completedAt`, In progress if only `startedAt`, else Open. Phase 2 adds the fields
   // of Today and Review (`reviewedAt`, `dismissedOn`, §25.3).
   desk_card: [

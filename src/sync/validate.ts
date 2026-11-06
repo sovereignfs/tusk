@@ -1,3 +1,4 @@
+import { FILTERS } from '../lists/filter';
 import { isRule } from '../recurrence';
 import { HEX_COLOR } from '../lists/colors';
 import {
@@ -87,6 +88,7 @@ const FIELDS: Record<SyncTable, Record<string, FieldSpec>> = {
     color: short(color),
     sort: short(oneOf(...SORTS)),
     showCompleted: short(bool),
+    filter: short(oneOf(...FILTERS)),
   },
   desk_card: {
     title: TITLE,
