@@ -19,6 +19,7 @@ import {
   type OpRequest,
   type OpResult,
   type CardTile,
+  type LabelRow,
   type ListRow,
   type Role,
   WORKSPACE_LIMITS,
@@ -552,6 +553,91 @@ async function run(
       const version = await touchBoard(tx, boardId, boardsEditableBy(tx, accountId), now);
       return { card: await cardTile(tx, request.id), version };
     }
+    case 'label.create': {
+      const version = await touchBoard(
+        tx,
+        request.boardId,
+        boardsEditableBy(tx, accountId),
+        now,
+        true,
+      );
+      const count = await dbGet<{ n: number | string }>(
+        tx,
+        sql`SELECT COUNT(*) AS n FROM ${t.label} WHERE board_id = ${request.boardId}`,
+      );
+      if (Number(count?.n ?? 0) >= WORKSPACE_LIMITS.labelsPerBoard) throw new Refused('limit');
+      const made = await dbAll<{ id: string }>(
+        tx,
+        sql`INSERT INTO ${t.label} (id, board_id, name, color, created_at)
+            VALUES (${request.id}, ${request.boardId}, ${request.name}, ${request.color}, ${now})
+            ON CONFLICT (id) DO NOTHING RETURNING id`,
+      );
+      if (made.length === 0) throw new Refused('not_found');
+      const label: LabelRow = {
+        id: request.id,
+        boardId: request.boardId,
+        name: request.name,
+        color: request.color,
+      };
+      return { label, version };
+    }
+    case 'label.update':
+    case 'label.delete': {
+      // The label's own statement carries the permission; the board is the label's.
+      const changed = await dbAll<{ boardId: string }>(
+        tx,
+        request.op === 'label.update'
+          ? sql`UPDATE ${t.label} SET name = ${request.name}, color = ${request.color}
+                WHERE id = ${request.id} AND board_id IN ${boardsEditableBy(tx, accountId)}
+                RETURNING board_id AS "boardId"`
+          : sql`DELETE FROM ${t.label}
+                WHERE id = ${request.id} AND board_id IN ${boardsEditableBy(tx, accountId)}
+                RETURNING board_id AS "boardId"`,
+      );
+      const boardId = changed[0]?.boardId;
+      if (!boardId) throw new Refused('not_found');
+      if (request.op === 'label.delete') {
+        // Off every card, in the same transaction.
+        await dbAll(
+          tx,
+          sql`DELETE FROM ${t.cardLabel} WHERE label_id = ${request.id} AND board_id = ${boardId} RETURNING 1 AS one`,
+        );
+      }
+      const version = await touchBoard(tx, boardId, boardsEditableBy(tx, accountId), now, true);
+      return request.op === 'label.delete'
+        ? { deletedLabel: request.id, version }
+        : { label: { id: request.id, boardId, name: request.name, color: request.color }, version };
+    }
+    case 'card.addLabel':
+    case 'card.removeLabel': {
+      // The card is taken with the permission in its statement; the label must be that card's board's, so a label of another board is a label that is not there.
+      const taken = await dbAll<{ boardId: string }>(
+        tx,
+        sql`UPDATE ${t.card} SET updated_at = ${now}
+            WHERE id = ${request.cardId} AND board_id IN ${boardsEditableBy(tx, accountId)} AND archived_at IS NULL
+            RETURNING board_id AS "boardId"`,
+      );
+      const boardId = taken[0]?.boardId;
+      if (!boardId) throw new Refused('not_found');
+      const version = await touchBoard(tx, boardId, boardsEditableBy(tx, accountId), now, true);
+      const ours = await dbGet<{ one: number }>(
+        tx,
+        sql`SELECT 1 AS one FROM ${t.label} WHERE id = ${request.labelId} AND board_id = ${boardId}`,
+      );
+      if (!ours) throw new Refused('not_found');
+      if (request.op === 'card.addLabel')
+        await dbAll(
+          tx,
+          sql`INSERT INTO ${t.cardLabel} (card_id, label_id, board_id) VALUES (${request.cardId}, ${request.labelId}, ${boardId})
+              ON CONFLICT (card_id, label_id) DO NOTHING RETURNING card_id`,
+        );
+      else
+        await dbAll(
+          tx,
+          sql`DELETE FROM ${t.cardLabel} WHERE card_id = ${request.cardId} AND label_id = ${request.labelId} AND board_id = ${boardId} RETURNING 1 AS one`,
+        );
+      return { card: await cardTile(tx, request.cardId), version };
+    }
     case 'workspace.rename': {
       // The permission is in the statement: only an owner's workspace is a row it can reach.
       const changed = await dbAll<{ createdAt: number | string }>(
@@ -642,9 +728,15 @@ async function cardTile(tx: Database, id: string): Promise<CardTile> {
         FROM ${t.card} WHERE id = ${id}`,
   );
   if (!row) throw new Refused('not_found');
+  const labels = await dbAll<{ id: string }>(
+    tx,
+    sql`SELECT cl.label_id AS id FROM ${t.cardLabel} cl JOIN ${t.label} l ON l.id = cl.label_id
+        WHERE cl.card_id = ${id} ORDER BY l.created_at, l.id`,
+  );
   return {
     ...row,
     hasDescription: row.hasDescription === true || Number(row.hasDescription) === 1,
+    labels: labels.map((each) => each.id),
   };
 }
 

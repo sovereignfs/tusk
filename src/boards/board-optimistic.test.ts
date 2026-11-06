@@ -34,6 +34,7 @@ const view = (lists: ListRow[]): BoardView => ({
   },
   workspace: { id: 'w', name: 'Acme' },
   lists,
+  labels: [],
   cards: [],
   can: { edit: true, admin: true, join: false },
 });
@@ -126,6 +127,7 @@ describe('cards on a board', () => {
     dueDate: null,
     dueTime: null,
     hasDescription: false,
+    labels: [],
   });
   const base = (): BoardView => ({
     ...view([list('a', 'a0'), list('b', 'a1')]),
@@ -198,6 +200,56 @@ describe('cards on a board', () => {
       dueTime: '10:00',
     });
     expect(cleared.cards.find((c) => c.id === 'x')).toMatchObject({ dueDate: null, dueTime: null });
+  });
+
+  it('shows a label made, changed and deleted, and on and off a card', () => {
+    const v = base();
+    const made = showingBoard(v, {
+      op: 'label.create',
+      id: 'L1',
+      boardId: 'b',
+      name: 'Bug',
+      color: '#dc2626',
+    });
+    expect(made.labels).toEqual([{ id: 'L1', boardId: 'b', name: 'Bug', color: '#dc2626' }]);
+    const on = showingBoard(made, { op: 'card.addLabel', cardId: 'x', labelId: 'L1' });
+    expect(on.cards.find((c) => c.id === 'x')?.labels).toEqual(['L1']);
+    // A label the board does not have is not put on a card, and twice is once.
+    expect(showingBoard(made, { op: 'card.addLabel', cardId: 'x', labelId: 'nope' })).toBe(made);
+    expect(
+      showingBoard(on, { op: 'card.addLabel', cardId: 'x', labelId: 'L1' }).cards.find(
+        (c) => c.id === 'x',
+      )?.labels,
+    ).toEqual(['L1']);
+    const changed = showingBoard(on, {
+      op: 'label.update',
+      id: 'L1',
+      name: 'Defect',
+      color: '#000000',
+    });
+    expect(changed.labels[0]).toMatchObject({ name: 'Defect', color: '#000000' });
+    expect(
+      showingBoard(changed, { op: 'card.removeLabel', cardId: 'x', labelId: 'L1' }).cards.find(
+        (c) => c.id === 'x',
+      )?.labels,
+    ).toEqual([]);
+    // Deleted, it is off every card.
+    const gone = showingBoard(on, { op: 'label.delete', id: 'L1' });
+    expect(gone.labels).toEqual([]);
+    expect(gone.cards.every((c) => c.labels.length === 0)).toBe(true);
+    // The server's answer keeps the label where it was, and a deleted one is off every card.
+    expect(
+      settled(
+        on,
+        { op: 'label.update', id: 'L1', name: 'Z', color: '#000000' },
+        { label: { id: 'L1', boardId: 'b', name: 'Z', color: '#000000' } },
+      ).labels,
+    ).toHaveLength(1);
+    expect(
+      settled(on, { op: 'label.delete', id: 'L1' }, { deletedLabel: 'L1' }).cards.find(
+        (c) => c.id === 'x',
+      )?.labels,
+    ).toEqual([]);
   });
 
   it('finds the position among what is shown: the top, between two, and the end, in this list or another', () => {

@@ -5,6 +5,7 @@ import { type FormEvent, useState } from 'react';
 import type { BoardStore } from '../boards/store';
 import { SWATCHES } from '../lists/colors';
 import { type BoardRow, WORKSPACE_LIMITS } from '../workspaces/format';
+import { LabelsEditor } from './LabelsEditor';
 import { Alert, Button, ColorPicker, Dialog, FormField, Input, Textarea } from '../ui';
 import styles from './BoardScreen.module.css';
 
@@ -86,6 +87,12 @@ export function BoardSettingsDialog({
           </Button>
         </div>
       </form>
+      <div className={styles.dialog}>
+        <section aria-label="Labels of the board">
+          <h3 className={styles.sectionTitle}>Labels</h3>
+          <LabelsEditor labels={store.view.labels} boardId={board.id} perform={store.perform} />
+        </section>
+      </div>
     </Dialog>
   );
 }

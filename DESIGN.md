@@ -797,6 +797,9 @@ Each board has its own labels: a colour (any colour, §17.7) and an optional nam
 deleted from the card detail's label picker or the board's settings. Deleting a label takes it off every card. A label's text is shown in black or white,
 whichever reads against its colour.
 
+**As built (task 18.3):** a label is put on a card only if it is the card's board's; deleting one takes it off every card in the same operation. A tile shows a card's labels as bars, and the
+dialog's chips and the picker's rows are drawn in the label's colour with black or white text by `src/ui/contrast.ts`.
+
 ### 15.3 Assignees
 
 A card can be assigned to any of its board's members, from its detail. Assigning someone raises a notice in their Inbox (§16), unless they assigned

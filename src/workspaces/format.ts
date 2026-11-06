@@ -41,6 +41,11 @@ export const OPS = [
   'board.join',
   'board.leave',
   'card.setDue',
+  'label.create',
+  'label.update',
+  'label.delete',
+  'card.addLabel',
+  'card.removeLabel',
 ] as const;
 export type OpName = (typeof OPS)[number];
 
@@ -136,7 +141,26 @@ export type Op =
       readonly id: string;
       readonly dueDate: string | null;
       readonly dueTime: string | null;
-    };
+    }
+  /** A label of the board: any colour, and a name that may be empty (DESIGN.md §15.2). */
+  | {
+      readonly op: 'label.create';
+      readonly id: string;
+      readonly boardId: string;
+      readonly name: string;
+      readonly color: string;
+    }
+  | {
+      readonly op: 'label.update';
+      readonly id: string;
+      readonly name: string;
+      readonly color: string;
+    }
+  /** Takes it off every card, in the same operation. */
+  | { readonly op: 'label.delete'; readonly id: string }
+  /** The label must be the card's own board's. */
+  | { readonly op: 'card.addLabel'; readonly cardId: string; readonly labelId: string }
+  | { readonly op: 'card.removeLabel'; readonly cardId: string; readonly labelId: string };
 
 export type Visibility = 'public' | 'private';
 
@@ -166,6 +190,9 @@ export const WORKSPACE_LIMITS = {
   descriptionChars: 20_000,
   /** A board's description, in characters. */
   boardDescriptionChars: 2000,
+  /** Labels on a board, and the length of a label's name (DESIGN.md §7.4). */
+  labelsPerBoard: 50,
+  labelNameChars: 50,
   /** A position key, in characters. */
   positionChars: 64,
   /** A request body, in bytes: an operation is small. */
@@ -244,6 +271,14 @@ export interface ListRow {
   readonly cards: number;
 }
 
+/** A label of a board. */
+export interface LabelRow {
+  readonly id: string;
+  readonly boardId: string;
+  readonly name: string;
+  readonly color: string;
+}
+
 /** A card as its tile shows it (DESIGN.md §15.1): what the board is sent of every open card. The badges of later tasks join it as they are built. */
 export interface CardTile {
   readonly id: string;
@@ -254,6 +289,8 @@ export interface CardTile {
   readonly dueDate: string | null;
   readonly dueTime: string | null;
   readonly hasDescription: boolean;
+  /** The ids of the board's labels it carries, in the order the labels were made. */
+  readonly labels: readonly string[];
 }
 
 /** A card whole, for its dialog (DESIGN.md §17.6): what the tile shows and the description, and the list it is in. */
@@ -278,6 +315,8 @@ export interface BoardView {
   readonly board: BoardRow;
   readonly workspace: { readonly id: string; readonly name: string };
   readonly lists: readonly ListRow[];
+  /** The board's labels, in the order they were made. */
+  readonly labels: readonly LabelRow[];
   /** Every open card, with what its tile shows. */
   readonly cards: readonly CardTile[];
   /** What the one asking may do here: only a member changes the board, and an archived one is read-only (§7.2). */
@@ -289,6 +328,9 @@ export interface OpRows {
   readonly board?: BoardRow;
   readonly list?: ListRow;
   readonly card?: CardTile;
+  readonly label?: LabelRow;
+  /** A label that is gone, and so off every card. */
+  readonly deletedLabel?: string;
   readonly boardMember?: {
     readonly boardId: string;
     readonly accountId: string;

@@ -13,6 +13,7 @@ import {
 } from './can';
 import {
   type ArchivedCard,
+  type LabelRow,
   type BoardPeople,
   type BoardPerson,
   type CardDetail,
@@ -199,12 +200,27 @@ export async function readBoard(
         FROM ${t.card} WHERE board_id = ${boardId} AND archived_at IS NULL
         ORDER BY list_id, position, id LIMIT ${WORKSPACE_LIMITS.cardsPerBoard}`,
   );
+  const labels = await dbAll<LabelRow>(
+    database,
+    sql`SELECT id, board_id AS "boardId", name, color FROM ${t.label} WHERE board_id = ${boardId}
+        ORDER BY created_at, id LIMIT ${WORKSPACE_LIMITS.labelsPerBoard}`,
+  );
+  const carried = await dbAll<{ cardId: string; labelId: string }>(
+    database,
+    sql`SELECT cl.card_id AS "cardId", cl.label_id AS "labelId" FROM ${t.cardLabel} cl JOIN ${t.label} l ON l.id = cl.label_id
+        WHERE cl.board_id = ${boardId} ORDER BY l.created_at, l.id`,
+  );
+  const byCard = new Map<string, string[]>();
+  for (const row of carried)
+    byCard.set(row.cardId, [...(byCard.get(row.cardId) ?? []), row.labelId]);
   const board = toBoard(raw);
   return {
     board,
+    labels,
     cards: cards.map((card) => ({
       ...card,
       hasDescription: card.hasDescription === true || Number(card.hasDescription) === 1,
+      labels: byCard.get(card.id) ?? [],
     })),
     workspace: { id: raw.workspaceId, name: raw.workspaceName },
     lists: lists.map((list) => ({ ...list, cards: Number(list.cards) })),
@@ -371,8 +387,14 @@ export async function cardDetail(
         WHERE c.id = ${cardId} AND c.board_id IN ${boardsVisibleTo(database, accountId)}`,
   );
   if (!row) return undefined;
+  const carried = await dbAll<{ id: string }>(
+    database,
+    sql`SELECT cl.label_id AS id FROM ${t.cardLabel} cl JOIN ${t.label} l ON l.id = cl.label_id
+        WHERE cl.card_id = ${cardId} ORDER BY l.created_at, l.id`,
+  );
   return {
     id: row.id,
+    labels: carried.map((each) => each.id),
     boardId: row.boardId,
     listId: row.listId,
     listName: row.listName,

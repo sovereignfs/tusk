@@ -87,3 +87,9 @@
   border-radius: var(--sv-radius-md);
   font-size: var(--sv-font-size-sm);
 }
+
+.picker {
+  max-height: 24rem;
+  padding: var(--sv-space-3);
+  overflow-y: auto;
+}

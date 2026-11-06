@@ -1,0 +1,55 @@
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sv-space-3);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sv-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--sv-space-2);
+}
+
+/* The colour is a label's own and is data: the chip is drawn in it, with its name in black or white by contrast (set where it is used). */
+.chip {
+  flex: 1;
+  min-width: 3rem;
+  padding: var(--sv-space-1) var(--sv-space-3);
+  border-radius: var(--sv-radius-sm);
+  font-size: var(--sv-font-size-sm);
+  font-weight: var(--sv-font-weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+.muted {
+  margin: 0;
+  color: var(--sv-color-text-muted);
+  font-size: var(--sv-font-size-sm);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sv-space-2);
+}
+
+.buttons {
+  display: flex;
+  gap: var(--sv-space-2);
+}
+
+.swatch {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+  border-radius: var(--sv-radius-sm);
+}

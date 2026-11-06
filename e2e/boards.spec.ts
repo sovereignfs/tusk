@@ -410,7 +410,7 @@ test('a board’s settings change its name, colour and description; archiving ma
   await openFromMenu(page, 'Settings');
   const settings = page.getByRole('dialog', { name: 'Board settings' });
   const renamed = unique('Plans');
-  await settings.getByLabel('Name').fill(renamed);
+  await settings.getByLabel('Name', { exact: true }).fill(renamed);
   await settings.getByLabel('Description').fill('What we do next');
   await settings.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByRole('heading', { level: 1, name: renamed })).toBeVisible();
@@ -526,5 +526,79 @@ test('the Share dialog lists the board’s people, sets who can see it, and leav
   await page.getByRole('button', { name: 'Join board' }).click();
   await expect(addListButton(page)).toBeVisible();
   await expect(page.getByRole('button', { name: 'Join board' })).toHaveCount(0);
+  await cleanUp(page, workspace);
+});
+
+test('a label is made in a card’s dialog, put on the card as a bar on its tile, taken off, and deleted from the board’s settings', async ({
+  page,
+}) => {
+  await signedIn(page);
+  const { workspace } = await makeBoard(page);
+  await addCard(page, 'Backlog', 'Labelled');
+  await addCard(page, 'Backlog', 'Plain');
+  await page
+    .locator('section[aria-label="Backlog"]')
+    .getByLabel('Labelled', { exact: true })
+    .click();
+  const dialog = page.getByRole('dialog', { name: 'Labelled' });
+
+  // Made and ticked from the card's picker; the tile behind carries a bar and the dialog a chip with its name.
+  await dialog.getByRole('button', { name: 'Labels' }).click();
+  await page.getByLabel('Label name').fill('Urgent');
+  await page.getByRole('button', { name: 'Add label' }).click();
+  await page.getByRole('checkbox', { name: 'Label Urgent' }).check();
+  await expect(dialog.getByText('Urgent', { exact: true }).first()).toBeVisible();
+  await dialog.getByRole('button', { name: 'Labels' }).click();
+  await expect(
+    page
+      .locator('section[aria-label="Backlog"]')
+      .getByLabel('Labelled', { exact: true })
+      .getByLabel('Labels: Urgent'),
+  ).toBeVisible();
+  await expect(
+    page
+      .locator('section[aria-label="Backlog"]')
+      .getByLabel('Plain', { exact: true })
+      .getByLabel(/^Labels:/),
+  ).toHaveCount(0);
+
+  // Kept after a reload, taken off, and put back for the deletion below.
+  await page.reload();
+  const again = page.getByRole('dialog', { name: 'Labelled' });
+  await expect(again.getByText('Urgent', { exact: true }).first()).toBeVisible();
+  await again.getByRole('button', { name: 'Labels' }).click();
+  await page.getByRole('checkbox', { name: 'Label Urgent' }).uncheck();
+  // Off the card: its chip is gone from the dialog (the picker's rows are in the popover, outside it).
+  await expect(again.getByText('Urgent', { exact: true })).toHaveCount(0);
+  await page.getByRole('checkbox', { name: 'Label Urgent' }).check();
+  await again.getByRole('button', { name: 'Labels' }).click();
+  await again.getByRole('button', { name: 'Close' }).click();
+  await expect(page.getByLabel(/^Labels: Urgent/)).toBeVisible();
+
+  // The board's settings list the same labels, and deleting one takes it off every card.
+  await openFromMenu(page, 'Settings');
+  const settings = page.getByRole('dialog', { name: 'Board settings' });
+  await expect(settings.getByText('Urgent', { exact: true })).toBeVisible();
+  await settings.getByRole('button', { name: 'Delete label Urgent' }).click();
+  await page.getByRole('button', { name: 'Delete label', exact: true }).click();
+  await expect(settings.getByText('This board has no labels yet.')).toBeVisible();
+  await settings.getByRole('button', { name: 'Cancel' }).click();
+  await expect(page.getByLabel(/^Labels:/)).toHaveCount(0);
+
+  // The door refuses a label of nobody's board.
+  const board = new URL(page.url()).pathname.split('/')[2] ?? '';
+  const view = (await (await page.request.get(`/api/boards/${board}`)).json()) as {
+    cards: { id: string }[];
+  };
+  const refused = await page.request.post('/api/ops', {
+    headers: { origin: new URL(page.url()).origin },
+    data: {
+      opId: crypto.randomUUID(),
+      op: 'card.addLabel',
+      cardId: view.cards[0]?.id,
+      labelId: crypto.randomUUID(),
+    },
+  });
+  expect(await refused.json()).toEqual({ status: 'refused', code: 'not_found' });
   await cleanUp(page, workspace);
 });

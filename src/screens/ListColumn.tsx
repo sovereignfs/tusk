@@ -3,7 +3,7 @@
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { type FormEvent, useEffect, useRef, useState } from 'react';
-import { WORKSPACE_LIMITS, type CardTile, type ListRow } from '../workspaces/format';
+import { WORKSPACE_LIMITS, type CardTile, type LabelRow, type ListRow } from '../workspaces/format';
 import { CardTileView } from './CardTileView';
 import { Button, ConfirmDialog, Dialog, FormField, Icon, Input, Menu } from '../ui';
 import styles from './BoardScreen.module.css';
@@ -16,6 +16,7 @@ import styles from './BoardScreen.module.css';
 export function ListColumn({
   list,
   cards,
+  labels,
   index,
   count,
   editable,
@@ -29,6 +30,8 @@ export function ListColumn({
   list: ListRow;
   /** Its open cards, top to bottom. */
   cards: readonly CardTile[];
+  /** The board's labels. */
+  labels: readonly LabelRow[];
   /** Where it is now, from 0, and how many lists there are. */
   index: number;
   count: number;
@@ -177,6 +180,7 @@ export function ListColumn({
             <CardTileView
               key={card.id}
               card={card}
+              labels={labels}
               editable={editable}
               onArchive={() => onArchiveCard(card)}
               onOpen={() => onOpenCard(card)}

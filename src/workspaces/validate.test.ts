@@ -43,6 +43,11 @@ describe('an operation', () => {
       'board.join',
       'board.leave',
       'card.setDue',
+      'label.create',
+      'label.update',
+      'label.delete',
+      'card.addLabel',
+      'card.removeLabel',
     ]);
   });
 
@@ -207,6 +212,28 @@ describe('an operation', () => {
         parseOp({ opId: ID(), op: 'card.setDue', id: a, ...bad }).ok,
         JSON.stringify(bad),
       ).toBe(false);
+  });
+
+  it('takes the label operations, a name that may be empty, and refuses a colour that is not one or a name that is too long', () => {
+    const [a, b] = [ID(), ID()];
+    for (const good of [
+      { op: 'label.create', id: a, boardId: b, name: '', color: '#12ab9f' },
+      { op: 'label.create', id: a, boardId: b, name: ' Bug ', color: '#12ab9f' },
+      { op: 'label.update', id: a, name: '', color: '#000000' },
+      { op: 'label.delete', id: a },
+      { op: 'card.addLabel', cardId: a, labelId: b },
+      { op: 'card.removeLabel', cardId: a, labelId: b },
+    ])
+      expect(parseOp({ opId: ID(), ...good }).ok, good.op).toBe(true);
+    for (const bad of [
+      { op: 'label.create', id: a, boardId: b, name: 'x', color: 'red' },
+      { op: 'label.create', id: a, boardId: b, name: 'x'.repeat(51), color: '#12ab9f' },
+      { op: 'label.update', id: a, name: 'x', color: '#12AB9F' },
+      { op: 'card.addLabel', cardId: a },
+      { op: 'card.addLabel', cardId: a, labelId: 'x' },
+      { op: 'label.delete', id: a, boardId: b },
+    ])
+      expect(parseOp({ opId: ID(), ...bad }).ok, JSON.stringify(bad)).toBe(false);
   });
 
   it('refuses a colour that is not #rrggbb, a position that is not one, a blank name and a key it does not take', () => {

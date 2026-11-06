@@ -2,7 +2,7 @@
 
 import { useSortable } from '@dnd-kit/sortable';
 import { useState } from 'react';
-import type { CardTile } from '../workspaces/format';
+import type { CardTile, LabelRow } from '../workspaces/format';
 import { formatDue } from '../format-due';
 import { browserZone, todayFor } from '../time';
 import { Icon, Menu } from '../ui';
@@ -17,10 +17,13 @@ import styles from './BoardScreen.module.css';
 export function CardTileView({
   card,
   editable,
+  labels,
   onArchive,
   onOpen,
 }: {
   card: CardTile;
+  /** The board's labels, to draw the ones the card carries. */
+  labels: readonly LabelRow[];
   editable: boolean;
   onArchive: () => void;
   onOpen: () => void;
@@ -58,7 +61,7 @@ export function CardTileView({
         aria-label={card.title}
         aria-roledescription="sortable card"
       >
-        <TileBody card={card} />
+        <TileBody card={card} labels={labels} />
       </div>
       {editable ? (
         <div className={styles.cardMenu}>
@@ -88,13 +91,27 @@ export function CardTileView({
 }
 
 /** What a tile shows, also drawn in the overlay that follows the pointer. */
-export function TileBody({ card }: { card: CardTile }) {
+export function TileBody({ card, labels }: { card: CardTile; labels: readonly LabelRow[] }) {
+  const carried = card.labels
+    .map((id) => labels.find((each) => each.id === id))
+    .filter((each): each is LabelRow => each !== undefined);
   // A due date is floating, shown as written; today is the browser's own (DESIGN.md §11), and overdue is the danger colour.
   const due = card.dueDate
     ? formatDue(card.dueDate, card.dueTime, todayFor(browserZone(), Date.now()))
     : null;
   return (
     <>
+      {carried.length > 0 ? (
+        <span
+          className={styles.labelBars}
+          aria-label={`Labels: ${carried.map((each) => each.name || each.color).join(', ')}`}
+        >
+          {carried.map((each) => (
+            // A label's colour is its own and is data: a small bar of it, with no text on it.
+            <span key={each.id} className={styles.labelBar} style={{ background: each.color }} />
+          ))}
+        </span>
+      ) : null}
       <span className={styles.cardTitle}>{card.title}</span>
       {card.dueDate || card.hasDescription ? (
         <span className={styles.badges}>

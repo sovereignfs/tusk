@@ -322,3 +322,16 @@
 .overdue {
   color: var(--sv-color-error-text);
 }
+
+/* A card's labels are small bars of their own colour above its title (DESIGN.md §15.2). */
+.labelBars {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sv-space-1);
+}
+
+.labelBar {
+  width: 2.5rem;
+  height: 0.4rem;
+  border-radius: var(--sv-radius-sm);
+}

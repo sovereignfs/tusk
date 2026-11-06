@@ -54,7 +54,15 @@ const ARGUMENTS: Record<OpName, readonly string[]> = {
   'board.join': ['id'],
   'board.leave': ['id'],
   'card.setDue': ['id', 'dueDate', 'dueTime'],
+  'label.create': ['id', 'boardId', 'name', 'color'],
+  'label.update': ['id', 'name', 'color'],
+  'label.delete': ['id'],
+  'card.addLabel': ['cardId', 'labelId'],
+  'card.removeLabel': ['cardId', 'labelId'],
 };
+
+/** A label's name may be empty: a colour alone is a label (DESIGN.md §15.2). */
+const LABEL_NAME = text(0, WORKSPACE_LIMITS.labelNameChars);
 
 const VISIBILITY = oneOf('public', 'private');
 
@@ -377,6 +385,53 @@ export function parseOp(value: unknown): Parsed<OpRequest> {
           dueDate: dueDate.value,
           dueTime: dueTime.value,
         },
+      };
+    }
+    case 'label.create': {
+      const id = uuid(value.id);
+      const boardId = uuid(value.boardId);
+      if (!id.ok || !boardId.ok) return no('not an id');
+      const name = LABEL_NAME(typeof value.name === 'string' ? value.name.trim() : value.name);
+      if (!name.ok) return no(`name: ${name.reason}`);
+      if (typeof value.color !== 'string' || !HEX_COLOR.test(value.color))
+        return no('color: not a colour');
+      return {
+        ok: true,
+        value: {
+          opId: opId.value,
+          op: kind,
+          id: id.value,
+          boardId: boardId.value,
+          name: name.value,
+          color: value.color,
+        },
+      };
+    }
+    case 'label.update': {
+      const id = uuid(value.id);
+      if (!id.ok) return no('id: not an id');
+      const name = LABEL_NAME(typeof value.name === 'string' ? value.name.trim() : value.name);
+      if (!name.ok) return no(`name: ${name.reason}`);
+      if (typeof value.color !== 'string' || !HEX_COLOR.test(value.color))
+        return no('color: not a colour');
+      return {
+        ok: true,
+        value: { opId: opId.value, op: kind, id: id.value, name: name.value, color: value.color },
+      };
+    }
+    case 'label.delete': {
+      const id = uuid(value.id);
+      if (!id.ok) return no('id: not an id');
+      return { ok: true, value: { opId: opId.value, op: kind, id: id.value } };
+    }
+    case 'card.addLabel':
+    case 'card.removeLabel': {
+      const cardId = uuid(value.cardId);
+      const labelId = uuid(value.labelId);
+      if (!cardId.ok || !labelId.ok) return no('not an id');
+      return {
+        ok: true,
+        value: { opId: opId.value, op: kind, cardId: cardId.value, labelId: labelId.value },
       };
     }
   }

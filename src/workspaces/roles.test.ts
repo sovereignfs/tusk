@@ -325,6 +325,47 @@ const OPERATIONS: Row[] = [
     otherwise: 'not_found',
   },
   {
+    op: 'label.create',
+    build: (w) => ({
+      op: 'label.create',
+      id: id(),
+      boardId: w.boards.publicBoard,
+      name: 'Bug',
+      color: '#7c3aed',
+    }),
+    may: ['boardOwner', 'boardMember'],
+    otherwise: 'not_found',
+  },
+  {
+    op: 'label.update',
+    build: (w) => ({
+      op: 'label.update',
+      id: w.labels.publicBoard,
+      name: 'Renamed',
+      color: '#2563eb',
+    }),
+    may: ['boardOwner', 'boardMember'],
+    otherwise: 'not_found',
+  },
+  {
+    op: 'label.delete',
+    build: (w) => ({ op: 'label.delete', id: w.labels.publicBoard }),
+    may: ['boardOwner', 'boardMember'],
+    otherwise: 'not_found',
+  },
+  {
+    op: 'card.addLabel',
+    build: (w) => ({ op: 'card.addLabel', cardId: w.cards.open, labelId: w.labels.publicBoard }),
+    may: ['boardOwner', 'boardMember'],
+    otherwise: 'not_found',
+  },
+  {
+    op: 'card.removeLabel',
+    build: (w) => ({ op: 'card.removeLabel', cardId: w.cards.open, labelId: w.labels.publicBoard }),
+    may: ['boardOwner', 'boardMember'],
+    otherwise: 'not_found',
+  },
+  {
     // Anyone in it may leave (there is another owner in this world); an outsider has nothing to leave.
     op: 'member.leave',
     build: (w) => ({ op: 'member.leave', workspaceId: w.workspace }),
@@ -464,8 +505,9 @@ describe(`the roles (${leg})`, () => {
       expect(gone('board_list')).toBe(3);
       // The world's two cards and the one the contents add.
       expect(gone('card')).toBe(3);
+      // The world's two labels and the one the contents add.
+      expect(gone('label')).toBe(3);
       for (const name of [
-        'label',
         'card_label',
         'card_assignee',
         'checklist_item',
@@ -1515,8 +1557,9 @@ describe(`the roles (${leg})`, () => {
       expect(gone('board_list')).toBe(1);
       // The world's two cards and the one with contents.
       expect(gone('card')).toBe(3);
+      // The world's label of this board and the one the contents add.
+      expect(gone('label')).toBe(2);
       for (const name of [
-        'label',
         'card_label',
         'card_assignee',
         'checklist_item',
@@ -1752,6 +1795,176 @@ describe(`the roles (${leg})`, () => {
       expect(
         await boardPeople(database, directory, w.accounts.outsider, w.boards.publicBoard),
       ).toBeUndefined();
+    });
+  });
+
+  describe('labels', () => {
+    const apply = (w: World, role: Role, op: Op) =>
+      applyOp(database, w.accounts[role], { opId: id(), ...op } as OpRequest, OPTIONS);
+    const t = () => tablesOf(database);
+    const carried = async (cardId: string) =>
+      (
+        await dbAll<{ id: string }>(
+          database,
+          sql`SELECT label_id AS id FROM ${t().cardLabel} WHERE card_id = ${cardId} ORDER BY 1`,
+        )
+      ).map((r) => r.id);
+
+    it('makes a label of any colour with a name or without one, and changes both', async () => {
+      const w = await seedWorld(database);
+      const one = id();
+      expect(
+        await apply(w, 'boardMember', {
+          op: 'label.create',
+          id: one,
+          boardId: w.boards.publicBoard,
+          name: '',
+          color: '#12ab9f',
+        }),
+      ).toMatchObject({
+        status: 'applied',
+        rows: { label: { id: one, name: '', color: '#12ab9f' } },
+      });
+      expect(
+        await apply(w, 'boardOwner', {
+          op: 'label.update',
+          id: one,
+          name: 'Later',
+          color: '#000000',
+        }),
+      ).toMatchObject({
+        rows: { label: { name: 'Later', color: '#000000' } },
+      });
+      const read = await readBoard(database, w.accounts.member, w.boards.publicBoard);
+      expect(read?.labels.map((l) => [l.name, l.color])).toEqual([
+        ['Urgent', '#dc2626'],
+        ['Later', '#000000'],
+      ]);
+    });
+
+    it('puts a label on a card and takes it off, and refuses one of another board', async () => {
+      const w = await seedWorld(database);
+      expect(
+        (
+          await apply(w, 'boardMember', {
+            op: 'card.addLabel',
+            cardId: w.cards.open,
+            labelId: w.labels.publicBoard,
+          })
+        ).status,
+      ).toBe('applied');
+      expect(await carried(w.cards.open)).toEqual([w.labels.publicBoard]);
+      // Twice is harmless, and the card read carries it.
+      await apply(w, 'boardMember', {
+        op: 'card.addLabel',
+        cardId: w.cards.open,
+        labelId: w.labels.publicBoard,
+      });
+      expect(await carried(w.cards.open)).toHaveLength(1);
+      expect((await cardDetail(database, w.accounts.member, w.cards.open))?.labels).toEqual([
+        w.labels.publicBoard,
+      ]);
+      const tile = (await readBoard(database, w.accounts.member, w.boards.publicBoard))?.cards.find(
+        (c) => c.id === w.cards.open,
+      );
+      expect(tile?.labels).toEqual([w.labels.publicBoard]);
+      // A label of the private board is not the public board's card’s to carry, and nothing was written.
+      const before = JSON.stringify(await countAll(database));
+      expect(
+        await apply(w, 'boardMember', {
+          op: 'card.addLabel',
+          cardId: w.cards.open,
+          labelId: w.labels.privateBoard,
+        }),
+      ).toEqual({ status: 'refused', code: 'not_found' });
+      expect(
+        await apply(w, 'boardMember', { op: 'card.addLabel', cardId: w.cards.open, labelId: id() }),
+      ).toEqual({ status: 'refused', code: 'not_found' });
+      expect(JSON.stringify(await countAll(database))).toBe(before);
+      expect(
+        (
+          await apply(w, 'boardMember', {
+            op: 'card.removeLabel',
+            cardId: w.cards.open,
+            labelId: w.labels.publicBoard,
+          })
+        ).status,
+      ).toBe('applied');
+      expect(await carried(w.cards.open)).toEqual([]);
+    });
+
+    it('takes a deleted label off every card in the one operation, and leaves the others', async () => {
+      const w = await seedWorld(database);
+      const second = id();
+      await apply(w, 'boardMember', {
+        op: 'label.create',
+        id: second,
+        boardId: w.boards.publicBoard,
+        name: 'Keep',
+        color: '#16a34a',
+      });
+      const other = id();
+      await apply(w, 'boardMember', {
+        op: 'card.create',
+        id: other,
+        listId: w.lists.publicBoard,
+        title: 'Second',
+        position: 'a9',
+      });
+      for (const card of [w.cards.open, other])
+        for (const label of [w.labels.publicBoard, second])
+          await apply(w, 'boardMember', { op: 'card.addLabel', cardId: card, labelId: label });
+      expect(await carried(w.cards.open)).toHaveLength(2);
+      expect(
+        await apply(w, 'boardOwner', { op: 'label.delete', id: w.labels.publicBoard }),
+      ).toMatchObject({
+        status: 'applied',
+        rows: { deletedLabel: w.labels.publicBoard },
+      });
+      expect(await carried(w.cards.open)).toEqual([second]);
+      expect(await carried(other)).toEqual([second]);
+      // The private board's label is whole.
+      expect(
+        (await dbAll(database, sql`SELECT 1 FROM ${t().label} WHERE id = ${w.labels.privateBoard}`))
+          .length,
+      ).toBe(1);
+    });
+
+    it('holds 50 labels a board, takes no id another label has, and none on an archived board', async () => {
+      const w = await seedWorld(database);
+      const make = (labelId: string): Op => ({
+        op: 'label.create',
+        id: labelId,
+        boardId: w.boards.publicBoard,
+        name: 'x',
+        color: '#2563eb',
+      });
+      expect(await apply(w, 'boardMember', make(w.labels.privateBoard))).toEqual({
+        status: 'refused',
+        code: 'not_found',
+      });
+      for (let i = 1; i < WORKSPACE_LIMITS.labelsPerBoard; i++)
+        expect((await apply(w, 'boardMember', make(id()))).status).toBe('applied');
+      expect(await apply(w, 'boardMember', make(id()))).toEqual({
+        status: 'refused',
+        code: 'limit',
+      });
+      await apply(w, 'owner', { op: 'board.archive', id: w.boards.publicBoard });
+      expect(
+        await apply(w, 'boardOwner', {
+          op: 'label.update',
+          id: w.labels.publicBoard,
+          name: 'x',
+          color: '#000000',
+        }),
+      ).toEqual({ status: 'refused', code: 'not_found' });
+      expect(
+        await apply(w, 'boardOwner', {
+          op: 'card.addLabel',
+          cardId: w.cards.open,
+          labelId: w.labels.publicBoard,
+        }),
+      ).toEqual({ status: 'refused', code: 'not_found' });
     });
   });
 

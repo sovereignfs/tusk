@@ -341,6 +341,7 @@ export function BoardScreen({
                   key={list.id}
                   list={list}
                   cards={cardsIn(view.cards, list.id)}
+                  labels={view.labels}
                   index={index}
                   count={view.lists.length}
                   editable={editable}
@@ -418,7 +419,7 @@ export function BoardScreen({
           <DragOverlay>
             {dragging ? (
               <div className={`${styles.card} ${styles.overlay}`}>
-                <TileBody card={dragging} />
+                <TileBody card={dragging} labels={view.labels} />
               </div>
             ) : null}
           </DragOverlay>

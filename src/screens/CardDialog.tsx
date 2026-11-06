@@ -6,7 +6,8 @@ import { useBoardStore } from '../boards/context';
 import { DuePicker } from '../dates/DuePicker';
 import { formatDue } from '../format-due';
 import { browserZone, todayFor } from '../time';
-import { Button, Dialog, FormField, Input, Textarea } from '../ui';
+import { Button, Dialog, FormField, Input, Popover, Textarea } from '../ui';
+import { LabelChip, LabelsEditor } from './LabelsEditor';
 import { type CardDetail, WORKSPACE_LIMITS } from '../workspaces/format';
 import styles from './CardDialog.module.css';
 
@@ -27,6 +28,7 @@ export function CardDialog({ detail: first }: { detail: CardDetail }) {
   const [detail, setDetail] = useState(first);
   const [title, setTitle] = useState(first.title);
   const [description, setDescription] = useState(first.description ?? '');
+  const [pickingLabels, setPickingLabels] = useState(false);
   // What the server last said, which a blank title goes back to and which a draft is compared with.
   const saved = useRef({ title: first.title, description: first.description ?? '' });
 
@@ -122,6 +124,41 @@ export function CardDialog({ detail: first }: { detail: CardDetail }) {
 
           {/* The chips: the due date now, labels and assignees with their tasks. */}
           <div className={styles.chips}>
+            {(tile?.labels ?? [])
+              .map((id) => store.view.labels.find((each) => each.id === id))
+              .filter((each) => each !== undefined)
+              .map((label) => (
+                <LabelChip key={label.id} label={label} />
+              ))}
+            {editable ? (
+              <Popover
+                aria-label="Labels"
+                open={pickingLabels}
+                onClose={() => setPickingLabels(false)}
+                align="left"
+                width={320}
+                trigger={
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    aria-expanded={pickingLabels}
+                    onClick={() => setPickingLabels((was) => !was)}
+                  >
+                    Labels
+                  </Button>
+                }
+              >
+                <div className={styles.picker}>
+                  <LabelsEditor
+                    labels={store.view.labels}
+                    carried={tile?.labels ?? []}
+                    cardId={detail.id}
+                    boardId={detail.boardId}
+                    perform={store.perform}
+                  />
+                </div>
+              </Popover>
+            ) : null}
             {editable ? (
               <DuePicker
                 value={{ date: tile?.dueDate ?? null, time: tile?.dueTime ?? null }}

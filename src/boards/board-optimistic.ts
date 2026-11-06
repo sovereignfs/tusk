@@ -18,6 +18,12 @@ export function cardsIn(cards: readonly CardTile[], listId: string): CardTile[] 
     .sort((a, b) => comparePositions(a.position, b.position) || (a.id < b.id ? -1 : 1));
 }
 
+/** Label ids in the order the board's labels were made, which is how a tile lists them. */
+function orderedLabels(view: BoardView, ids: readonly string[]): string[] {
+  const order = new Map(view.labels.map((label, index) => [label.id, index]));
+  return [...ids].sort((a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0));
+}
+
 /** The same change the server will make, to the board the screen holds. Operations that are not about a board's lists change nothing here. */
 export function showingBoard(view: BoardView, op: Op): BoardView {
   const change = (lists: readonly ListRow[]): BoardView => ({ ...view, lists: sortLists(lists) });
@@ -57,6 +63,7 @@ export function showingBoard(view: BoardView, op: Op): BoardView {
             dueDate: null,
             dueTime: null,
             hasDescription: false,
+            labels: [],
           },
         ],
       };
@@ -90,6 +97,52 @@ export function showingBoard(view: BoardView, op: Op): BoardView {
       return {
         ...view,
         cards: view.cards.map((each) => (each.id === op.id ? { ...each, title: op.title } : each)),
+      };
+    case 'label.create':
+      if (op.boardId !== view.board.id) return view;
+      return {
+        ...view,
+        labels: [
+          ...view.labels.filter((each) => each.id !== op.id),
+          { id: op.id, boardId: op.boardId, name: op.name, color: op.color },
+        ],
+      };
+    case 'label.update':
+      return {
+        ...view,
+        labels: view.labels.map((each) =>
+          each.id === op.id ? { ...each, name: op.name, color: op.color } : each,
+        ),
+      };
+    case 'label.delete':
+      // Off every card with it.
+      return {
+        ...view,
+        labels: view.labels.filter((each) => each.id !== op.id),
+        cards: view.cards.map((each) =>
+          each.labels.includes(op.id)
+            ? { ...each, labels: each.labels.filter((id) => id !== op.id) }
+            : each,
+        ),
+      };
+    case 'card.addLabel':
+      if (!view.labels.some((each) => each.id === op.labelId)) return view;
+      return {
+        ...view,
+        cards: view.cards.map((each) =>
+          each.id === op.cardId && !each.labels.includes(op.labelId)
+            ? { ...each, labels: orderedLabels(view, [...each.labels, op.labelId]) }
+            : each,
+        ),
+      };
+    case 'card.removeLabel':
+      return {
+        ...view,
+        cards: view.cards.map((each) =>
+          each.id === op.cardId
+            ? { ...each, labels: each.labels.filter((id) => id !== op.labelId) }
+            : each,
+        ),
       };
     case 'card.setDue':
       return {
@@ -126,6 +179,22 @@ export function settled(view: BoardView, op: Op, rows: OpRows): BoardView {
   if (op.op === 'card.archive') cards = cards.filter((each) => each.id !== op.id);
   // The board's own row, once the server has said so: an archived board is read-only for everyone, so it can no longer be edited.
   const board = rows.board && rows.board.id === view.board.id ? rows.board : null;
+  let labels = view.labels;
+  const label = rows.label;
+  if (label && label.boardId === view.board.id)
+    // In place if the board has it, and at the end if not: labels are in the order they were made.
+    labels = labels.some((each) => each.id === label.id)
+      ? labels.map((each) => (each.id === label.id ? label : each))
+      : [...labels, label];
+  const goneLabel = rows.deletedLabel;
+  if (goneLabel) {
+    labels = labels.filter((each) => each.id !== goneLabel);
+    cards = cards.map((each) =>
+      each.labels.includes(goneLabel)
+        ? { ...each, labels: each.labels.filter((id) => id !== goneLabel) }
+        : each,
+    );
+  }
   const goneCard = rows.deletedCard;
   if (goneCard) cards = cards.filter((each) => each.id !== goneCard);
   const row = rows.list;
@@ -139,6 +208,7 @@ export function settled(view: BoardView, op: Op, rows: OpRows): BoardView {
   return {
     ...view,
     lists: sortLists(lists),
+    labels,
     cards,
     board: {
       ...(board ?? view.board),
