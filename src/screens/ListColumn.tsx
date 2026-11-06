@@ -20,6 +20,7 @@ export function ListColumn({
   index,
   count,
   editable,
+  filtering,
   onRename,
   onMove,
   onDelete,
@@ -37,6 +38,8 @@ export function ListColumn({
   index: number;
   count: number;
   editable: boolean;
+  /** A search is on: the lists and cards are not dragged. */
+  filtering: boolean;
   onRename(name: string): void;
   /** To this place among the others, from 0. */
   onMove(index: number): void;
@@ -47,7 +50,11 @@ export function ListColumn({
   onCloneCard(card: CardTile): void;
   onOpenCard(card: CardTile): void;
 }) {
-  const sortable = useSortable({ id: list.id, data: { type: 'list' }, disabled: !editable });
+  const sortable = useSortable({
+    id: list.id,
+    data: { type: 'list' },
+    disabled: !editable || filtering,
+  });
   const [menu, setMenu] = useState(false);
   const [dialog, setDialog] = useState<'configure' | 'position' | 'delete' | null>(null);
   const [adding, setAdding] = useState(false);
@@ -184,6 +191,7 @@ export function ListColumn({
               card={card}
               labels={labels}
               editable={editable}
+              draggable={!filtering}
               onArchive={() => onArchiveCard(card)}
               onClone={() => onCloneCard(card)}
               onOpen={() => onOpenCard(card)}

@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { BoardContext, BoardPeopleContext } from '../boards/context';
+import { filterCards } from '../boards/filter';
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import {
   cardPositionFor,
@@ -91,10 +92,28 @@ export function BoardScreen({
   const [dragging, setDragging] = useState<CardTile | null>(null);
   const [archivedOpen, setArchivedOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const search = useRef<HTMLInputElement>(null);
   const [dialog, setDialog] = useState<'settings' | 'delete' | 'share' | 'activity' | null>(null);
   const [people, setPeople] = useState<BoardPeople | null>(null);
   const boardId = view.board.id;
   const version = view.board.version;
+  // `/` goes to the search field, unless a field is being typed in.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      if (
+        target &&
+        (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
+      )
+        return;
+      event.preventDefault();
+      search.current?.focus();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   // The board's people: for the avatars in its header and its Share dialog, read again when the board's version moves (someone was added or left).
   const readPeople = useCallback(async () => {
     try {
@@ -177,6 +196,11 @@ export function BoardScreen({
     });
   }
 
+  // What is shown: the filter, in the browser, over the cards the board has loaded. Dragging is off while it is on, since a card moved among the few shown would
+  // land among the many hidden.
+  const filtered = filterCards(view.cards, query, view.labels, people?.members ?? []);
+  const filtering = query.trim() !== '';
+  const hidden = filtered.hidden;
   const full = view.lists.length >= WORKSPACE_LIMITS.listsPerBoard;
   return (
     <BoardContext.Provider value={store}>
@@ -188,6 +212,27 @@ export function BoardScreen({
               {view.workspace.name}
             </Link>
             <h1 className={styles.title}>{view.board.name}</h1>
+            <div className={styles.search}>
+              <Input
+                ref={search}
+                type="search"
+                aria-label="Search cards"
+                placeholder="Search cards…  ( / )"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') {
+                    setQuery('');
+                    event.currentTarget.blur();
+                  }
+                }}
+              />
+              {filtering && hidden > 0 ? (
+                <span className={styles.muted} role="status">
+                  {hidden} {hidden === 1 ? 'card is' : 'cards are'} hidden
+                </span>
+              ) : null}
+            </div>
             {view.board.archived ? (
               <span className={styles.badge}>Archived</span>
             ) : !view.can.edit ? (
@@ -360,11 +405,12 @@ export function BoardScreen({
                   <ListColumn
                     key={list.id}
                     list={list}
-                    cards={cardsIn(view.cards, list.id)}
+                    cards={cardsIn(filtered.shown, list.id)}
                     labels={view.labels}
                     index={index}
                     count={view.lists.length}
                     editable={editable}
+                    filtering={filtering}
                     onRename={(next) =>
                       void store.perform({ op: 'list.rename', id: list.id, name: next })
                     }

@@ -18,6 +18,7 @@ import styles from './BoardScreen.module.css';
 export function CardTileView({
   card,
   editable,
+  draggable = true,
   labels,
   onArchive,
   onClone,
@@ -27,6 +28,8 @@ export function CardTileView({
   /** The board's labels, to draw the ones the card carries. */
   labels: readonly LabelRow[];
   editable: boolean;
+  /** Whether it can be dragged: not while a search is on. */
+  draggable?: boolean;
   onArchive: () => void;
   onClone: () => void;
   onOpen: () => void;
@@ -34,7 +37,7 @@ export function CardTileView({
   const sortable = useSortable({
     id: card.id,
     data: { type: 'card', listId: card.listId },
-    disabled: !editable,
+    disabled: !editable || !draggable,
   });
   const [menu, setMenu] = useState(false);
   const style = {

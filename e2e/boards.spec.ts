@@ -927,3 +927,51 @@ test('a card is cloned below itself, and moved to a list of another board of the
   await wd.getByLabel('Type the name to confirm').fill(workspace);
   await wd.getByRole('button', { name: 'Delete this workspace' }).click();
 });
+
+test('a board is searched as you type: accents and case do not decide, a line says how many cards are hidden, / finds the field, Esc clears it, and nothing is dragged meanwhile', async ({
+  page,
+}) => {
+  await signedIn(page);
+  const { workspace } = await makeBoard(page);
+  for (const title of ['Écrire la spec', 'Pay the invoice', 'Fix login'])
+    await addCard(page, 'Backlog', title);
+  const search = page.getByLabel('Search cards');
+  expect(await cardsOf(page, 'Backlog')).toEqual([
+    'Fix login',
+    'Pay the invoice',
+    'Écrire la spec',
+  ]);
+
+  // "é" finds "É" and "e"; the others are hidden, and a line says how many.
+  await search.fill('ecrire');
+  await expect.poll(() => cardsOf(page, 'Backlog')).toEqual(['Écrire la spec']);
+  await expect(page.getByRole('status').filter({ hasText: '2 cards are hidden' })).toBeVisible();
+  await search.fill('É');
+  await expect.poll(() => cardsOf(page, 'Backlog')).toEqual(['Pay the invoice', 'Écrire la spec']);
+  await expect(page.getByRole('status').filter({ hasText: '1 card is hidden' })).toBeVisible();
+
+  // Nothing is picked up while it is on.
+  const tile = page
+    .locator('section[aria-label="Backlog"]')
+    .getByLabel('Écrire la spec', { exact: true });
+  await tile.focus();
+  for (const key of ['Space', 'ArrowUp', 'Space']) {
+    await page.keyboard.press(key);
+    await page.waitForTimeout(300);
+  }
+  expect(await cardsOf(page, 'Backlog')).toEqual(['Pay the invoice', 'Écrire la spec']);
+
+  // Esc clears it, and every card is back in its place.
+  await search.focus();
+  await page.keyboard.press('Escape');
+  await expect(search).toHaveValue('');
+  await expect
+    .poll(() => cardsOf(page, 'Backlog'))
+    .toEqual(['Fix login', 'Pay the invoice', 'Écrire la spec']);
+
+  // "/" goes to the field from anywhere that is not a field.
+  await page.locator('body').click({ position: { x: 5, y: 5 } });
+  await page.keyboard.press('/');
+  await expect(search).toBeFocused();
+  await cleanUp(page, workspace);
+});

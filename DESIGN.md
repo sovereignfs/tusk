@@ -741,6 +741,8 @@ of them but Restore and Delete. Its settings dialog changes the name, colour and
 A search field in the board's header filters the cards shown, as you type, by title, label name and assignee name, in the browser over the board it has
 loaded. A filter is not saved, and says how many cards it hides. Search across boards is phase 3.
 
+**As built (task 17.4):** the filter is `src/boards/filter.ts`; `/` focuses it, Esc clears it, and dragging is off while it is on.
+
 ### 14.6 Publishing
 
 A board's owners publish it from the Share dialog: it gets an address, `/p/<token>`, that anyone can open without signing in.
