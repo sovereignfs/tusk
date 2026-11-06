@@ -8,6 +8,7 @@ import {
   readSeries,
   seriesIdOf,
   setRepeat,
+  stopRepeat,
 } from './series';
 
 /** A repeating card (DESIGN.md §12): completing makes exactly one next, from the series' rule, and the same one on every device. */
@@ -358,5 +359,25 @@ describe('two open occurrences of one series', () => {
   it('is nothing when there is one', () => {
     expect(duplicateOccurrences([open('a', '2026-11-13')])).toEqual([]);
     expect(duplicateOccurrences([])).toEqual([]);
+  });
+});
+
+describe('"Does not repeat"', () => {
+  it('detaches this card alone, as one change, and leaves the series row for the job that removes it', () => {
+    const result = stopRepeat(repeating(), ids());
+    expect(result.ok && result.mutation.changes).toEqual([
+      { table: 'desk_card', id: 'c1', fields: { seriesId: { v: null } } },
+    ]);
+  });
+
+  it('is nothing for a card that does not repeat, and missing for none', () => {
+    expect(stopRepeat(card('c9', { title: 'x' }), ids())).toEqual({ ok: false, reason: 'nothing' });
+    expect(stopRepeat(undefined, ids())).toEqual({ ok: false, reason: 'missing' });
+  });
+
+  it('makes a card that completes without a next', () => {
+    const detached = repeating({ seriesId: null });
+    const weekly = series('FREQ=DAILY', '2026-11-06');
+    expect(nextOccurrenceChanges(detached, [], weekly, TODAY)).toEqual([]);
   });
 });

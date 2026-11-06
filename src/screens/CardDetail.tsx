@@ -14,11 +14,12 @@ import {
 import type { LocalRow } from '../local/rows';
 import { allChecksOf, cardsOf, checksOf, getRow, listsOf } from '../local/store';
 import { useLocal, useSync } from '../sync/react';
-import { Button, FormField, Icon, Input, SegmentedControl, Select, Textarea } from '../ui';
+import { Button, FormField, Input, SegmentedControl, Select, Textarea } from '../ui';
 import { text } from './fields';
 import styles from './CardDetail.module.css';
 import { dueOf, setDue } from '../actions/due';
-import { readSeries, seriesIdOf } from '../actions/series';
+import { readSeries, seriesIdOf, setRepeat, stopRepeat } from '../actions/series';
+import { RepeatPicker } from '../dates/RepeatPicker';
 import { describe as describeRule } from '../recurrence';
 import { nowHere } from '../time';
 import { DuePicker } from '../dates/DuePicker';
@@ -144,10 +145,20 @@ function Fields({ card, onDeleted }: { card: LocalRow; onDeleted: () => void }) 
             if (result.ok) void client.commit(result.mutation);
           }}
         />
+        <RepeatPicker
+          value={repeats?.rule ?? null}
+          date={dueOf(card).date ?? nowHere().date}
+          disabled={status === 'done'}
+          onChange={(rule) => {
+            const result =
+              rule === null
+                ? stopRepeat(card, ids)
+                : setRepeat(card, series?.row, rule, nowHere().date, ids);
+            if (result.ok) void client.commit(result.mutation);
+          }}
+        />
         {repeats ? (
-          <span className={styles.repeats}>
-            <Icon name="refresh-cw" aria-hidden /> Repeats {describeRule(repeats.rule)}
-          </span>
+          <span className={styles.repeats}>Repeats {describeRule(repeats.rule)}</span>
         ) : null}
       </div>
       <FormField label="Title">

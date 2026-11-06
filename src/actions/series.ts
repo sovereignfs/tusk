@@ -168,3 +168,20 @@ export function duplicateOccurrences(cards: readonly LocalRow[]): string[] {
   }
   return later.sort();
 }
+
+/**
+ * "Does not repeat" (§12.4): this card **leaves its series and stays as a one-off**, and the series ends, since it has no open occurrence. The series
+ * row is left for the job that removes one with nothing pointing at it (task 5.5). Completed occurrences are never written: this is one change to
+ * this card alone.
+ */
+export function stopRepeat(card: LocalRow | undefined, ids: Ids): ActionResult {
+  if (!card || card.table !== 'desk_card') return { ok: false, reason: 'missing' };
+  if (seriesIdOf(card) === undefined) return { ok: false, reason: 'nothing' };
+  return {
+    ok: true,
+    mutation: {
+      mutationId: ids.newId(),
+      changes: [{ table: 'desk_card', id: card.id, fields: { seriesId: { v: null } } }],
+    },
+  };
+}

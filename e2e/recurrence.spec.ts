@@ -100,6 +100,7 @@ test('ticking a card that repeats makes one next, due after today, with its chec
   await open.getByRole('link', { name: 'Water the plants' }).click();
   const detail = page.getByRole('region', { name: 'Card' });
   await expect(detail.getByText('Repeats every day')).toBeVisible();
+  await expect(detail.getByRole('button', { name: 'Repeats every day' })).toBeVisible();
   await expect(detail.getByLabel('Description')).toHaveValue('The ones by the window');
   await expect(detail.getByRole('checkbox', { name: /Fill the can/ })).not.toBeChecked();
 
@@ -113,4 +114,97 @@ test('ticking a card that repeats makes one next, due after today, with its chec
       .filter({ hasText: 'Tomorrow' }),
   ).toHaveCount(1);
   await expect(page.getByRole('button', { name: /Completed \(1\)/ })).toBeVisible();
+});
+
+test('the repeat picker sets a preset from the keyboard, a custom rule, keeps weekdays to weekly, and stops it', async ({
+  page,
+}) => {
+  await signedIn(page);
+  // It is Friday 6 November in Berlin.
+  await page.clock.setFixedTime(new Date('2026-11-06T09:00:00+01:00'));
+  const name = unique('Picker');
+  await page.getByRole('button', { name: 'Add a list' }).click();
+  await page.getByLabel('New list name').fill(name);
+  await page.getByLabel('New list name').press('Enter');
+  await page
+    .getByRole('navigation', { name: 'Lists' })
+    .getByRole('link', { name: new RegExp(`^${name}`) })
+    .click();
+  await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
+  await page.getByLabel('Add a card').fill('Take out the bins');
+  await page.getByLabel('Add a card').press('Enter');
+  await page.getByRole('link', { name: 'Take out the bins' }).click();
+  const detail = page.getByRole('region', { name: 'Card' });
+
+  // From the keyboard alone: down through the choices to Weekly (which says its day), and Apply.
+  await detail.getByRole('button', { name: 'Set a repeat' }).click();
+  await page.getByRole('radio', { name: 'Does not repeat' }).focus();
+  for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowDown');
+  await expect(page.getByRole('radio', { name: 'Weekly on Friday' })).toBeChecked();
+  // Choosing did not apply: the panel is still open, and the card does not repeat.
+  await expect(page.getByRole('button', { name: 'Apply' })).toBeVisible();
+  await page.getByRole('button', { name: 'Apply' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(detail.getByRole('button', { name: 'Repeats every week on Friday' })).toBeVisible();
+  // A card with no date is given one: the first date the rule matches from today.
+  await expect(detail.getByRole('button', { name: /^Due Today/ })).toBeVisible();
+  await expect(detail.getByText('Repeats every week on Friday')).toBeVisible();
+
+  // Custom: every 2 weeks on Monday and Friday. Weekdays are weekly's: not carried to months, and back to weekly starts again from the date's.
+  await detail.getByRole('button', { name: 'Repeats every week on Friday' }).click();
+  await page.getByRole('radio', { name: 'Custom' }).check();
+  await page.getByLabel('Every how many').fill('2');
+  await page.getByRole('button', { name: 'Monday', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Monday', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await page.getByLabel('Unit').selectOption({ label: 'months' });
+  await expect(page.getByRole('group', { name: 'On' })).toHaveCount(0);
+  await page.getByLabel('Unit').selectOption({ label: 'weeks' });
+  await expect(page.getByRole('button', { name: 'Monday', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'false',
+  );
+  await expect(page.getByRole('button', { name: 'Friday', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await page.getByRole('button', { name: 'Monday', exact: true }).click();
+  await page.getByLabel('Ends').selectOption({ label: 'After a number of times' });
+  await page.getByLabel('How many times').fill('3');
+  await expect(page.getByText('Repeats every 2 weeks on Monday, Friday, 3 times')).toBeVisible();
+  await page.getByRole('button', { name: 'Apply' }).click();
+  await expect(
+    detail.getByRole('button', { name: 'Repeats every 2 weeks on Monday, Friday, 3 times' }),
+  ).toBeVisible();
+
+  // It is kept after a reload.
+  await page.reload();
+  await expect(
+    page
+      .getByRole('region', { name: 'Card' })
+      .getByRole('button', { name: 'Repeats every 2 weeks on Monday, Friday, 3 times' }),
+  ).toBeVisible();
+
+  // A number that is not one cannot be applied.
+  await page
+    .getByRole('region', { name: 'Card' })
+    .getByRole('button', { name: /^Repeats every 2 weeks/ })
+    .click();
+  await page.getByLabel('Every how many').fill('0');
+  await expect(page.getByRole('button', { name: 'Apply' })).toBeDisabled();
+  await page.getByLabel('Every how many').fill('1');
+  await expect(page.getByRole('button', { name: 'Apply' })).toBeEnabled();
+
+  // Does not repeat: the card is a one-off again, and keeps its date.
+  await page.getByRole('radio', { name: 'Does not repeat' }).check();
+  await page.getByRole('button', { name: 'Apply' }).click();
+  await expect(
+    page.getByRole('region', { name: 'Card' }).getByRole('button', { name: 'Set a repeat' }),
+  ).toBeVisible();
+  await expect(page.getByText(/^Repeats every/)).toHaveCount(0);
+  await expect(
+    page.getByRole('region', { name: 'Card' }).getByRole('button', { name: /^Due Today/ }),
+  ).toBeVisible();
 });
