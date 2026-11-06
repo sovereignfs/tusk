@@ -28,7 +28,7 @@ const CIPHER = 'YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0-IFgyNTUxOSBhYmM';
 
 /** One value that is right for every field there is. A field with no sample fails the first test, so a field cannot be added without its rule. */
 const SAMPLE: Record<SyncTable, Record<string, unknown>> = {
-  desk_list: { title: 'Home', color: 'green', sort: 'due', showCompleted: true },
+  desk_list: { title: 'Home', color: '#16a34a', sort: 'due', showCompleted: true },
   desk_card: {
     title: 'Water the plants',
     description: 'Twice if it is hot.\nNot the cactus.',
@@ -181,7 +181,7 @@ describe('a change', () => {
         table: 'desk_list',
         id: ID(),
         position: 'Zz',
-        fields: { title: { v: 'Home' }, color: { v: 'blue' } },
+        fields: { title: { v: 'Home' }, color: { v: '#2563eb' } },
       },
       {
         table: 'desk_series',

@@ -31,10 +31,10 @@ export function proxy(request: NextRequest) {
   // Off means off (DESIGN.md §6): with local sign-in off, the sign-in pages are not there. A page cannot say so itself: the root loading state
   // has already sent a 200 by the time it would, so the proxy answers with the page that is not found, and its status.
   const absent = !authLocal && SIGN_IN_PAGES.has(request.nextUrl.pathname);
-  // The front address is the first list for someone with a session cookie, and the address stays `/` (DESIGN.md §14.1). Only the cookie is looked at:
-  // it cannot be checked here, and `/home` checks it and sends a forged one to sign in.
+  // The front address is the first list for someone with a session cookie, and the address stays `/` (DESIGN.md §17.11). Only the cookie is looked at:
+  // it cannot be checked here, and `/desk` checks it and sends a forged one to sign in.
   const signedIn = request.nextUrl.pathname === '/' && hasSessionCookie(request.cookies);
-  const target = absent ? '/not-found' : signedIn ? '/home' : null;
+  const target = absent ? '/not-found' : signedIn ? '/desk' : null;
   const response = target
     ? NextResponse.rewrite(new URL(target, request.url), { request: { headers: requestHeaders } })
     : NextResponse.next({ request: { headers: requestHeaders } });

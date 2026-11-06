@@ -64,12 +64,12 @@ const LONG_DESCRIPTION = Array.from(
 export function planSeed(accountId: string): Plan {
   const id = (name: string) => uuid5(`seed:${accountId}:${name}`, TUSK_NAMESPACE);
   const lists = [
-    { key: 'first', id: firstListId(accountId), title: 'Backlog', color: 'black' },
-    { key: 'work', id: id('list:work'), title: 'Work', color: 'blue' },
-    { key: 'groceries', id: id('list:groceries'), title: 'Groceries', color: 'green' },
-    { key: 'errands', id: id('list:errands'), title: 'Errands', color: 'amber' },
-    { key: 'someday', id: id('list:someday'), title: 'Someday', color: 'grey' },
-    { key: 'empty', id: id('list:empty'), title: 'An empty list', color: 'red' },
+    { key: 'first', id: firstListId(accountId), title: 'Backlog', color: '#6b7280' },
+    { key: 'work', id: id('list:work'), title: 'Work', color: '#2563eb' },
+    { key: 'groceries', id: id('list:groceries'), title: 'Groceries', color: '#16a34a' },
+    { key: 'errands', id: id('list:errands'), title: 'Errands', color: '#d97706' },
+    { key: 'someday', id: id('list:someday'), title: 'Someday', color: '#9ca3af' },
+    { key: 'empty', id: id('list:empty'), title: 'An empty list', color: '#dc2626' },
   ] as const;
   const listPositions = many(null, null, lists.length);
 

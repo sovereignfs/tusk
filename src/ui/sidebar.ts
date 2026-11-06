@@ -15,7 +15,7 @@ export type PageKind = 'index' | 'canvas';
  */
 export function pageKind(pathname: string): PageKind {
   const first = `/${pathname.split('/').filter(Boolean)[0] ?? ''}`;
-  return ['/', '/home', '/desk', '/lists', '/b'].includes(first) ? 'canvas' : 'index';
+  return ['/', '/desk', '/b'].includes(first) ? 'canvas' : 'index';
 }
 
 export const DEFAULTS: Record<PageKind, SidebarState> = { index: 'full', canvas: 'rail' };

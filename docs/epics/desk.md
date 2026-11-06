@@ -149,7 +149,7 @@ without it. The done tasks below say "list", "task" and "subtask", as they were 
 
 **Done as:** `setStarred` (and `isStarred`) set the task's `starred` field; a subtask is refused here and by the server's validator (tested both ways). The star is `StarButton`, **its own click target**: a button, pressed or not (`aria-pressed`, named _Star_ or _Remove the star_), which opens nothing and does not start a drag of its row. It is on every row and in the detail, and a subtask has none. The design system has no star icon, so the glyph is text (`☆` and `★`) and a star icon is for `@sovereignfs/ui` to offer; nothing was forked. Tests: 2 for the action, one for the validator, and in Chromium and WebKit a star that does not open the task, is on the server, survives a reload and shows in the detail, and a subtask with none. Not done: the Starred view across lists, which is 6.1.
 
-#### 📋 3.12 — The Desk in the new shell
+#### ✅ 3.12 — The Desk in the new shell
 
 **Goal:** the Desk at `/desk`, in the Tusk shell, looking like the Sovereign Tasks screenshot, with lists of any colour and cards dragged by their row.
 
@@ -169,6 +169,8 @@ without it. The done tasks below say "list", "task" and "subtask", as they were 
 
 **Accepts when:** `/` signed in shows the Desk at `/desk`; every Desk test passes at the new addresses; a list's colour picked freely shows on its dot and
 survives a reload and a second device; a row drags from anywhere but its controls, and a click opens it.
+
+**Done as:** the Desk's pages are `app/(app)/desk/page.tsx` (the first list, `DeskScreen`) and `app/(app)/desk/[id]/page.tsx`; `/home` and `/lists/<id>` are gone, from `routes.ts` and the tests too, and the proxy shows the Desk at `/` for a session cookie (the address stays `/`, which the sidebar treats as the Desk). The lists column is headed _Desk_ with its +. A list's colour is any `#rrggbb` in lower case: `src/lists/colors.ts` is the one definition (`HEX_COLOR`, nine `SWATCHES` the picker suggests, a neutral `DEFAULT_COLOR`, `colorOf`), the validator takes only that for a list's `color`, and the six named colours and their tokens are gone (they were never released). `ListColour` is the dot beside the list's name; it opens the design system's `ColorPicker` in a `Popover`, writes a suggestion at once, and writes a colour dragged for in the native picker once it has settled for 400 ms, so that it is one change and not one per pixel. The card row is the drag source: the pointer's listeners are on the row and the keyboard's stay on the link, which is still the one thing a keyboard focuses (Space lifts, Enter opens); a click on the row's free space opens the card as the link does, and the box and star keep their own clicks. That click handler is the one lint suppression in the change, with its reason beside it: nothing is reachable only through it. Tests: the colour module and its agreement with the server's validator; two browser tests, in Chromium and WebKit (a suggestion and a colour of one's own are written, shown, the same after a reload and on the server; a card is dragged from the ring of its checklist, and a click on the ring opens it); the existing drag tests (by the title, by keyboard) pass unchanged. **Not as the epic said:** the Desk's three columns are still `Frame` inside the app's layout and not in the Desk's own pages, which a second page of the Desk will want and nothing needs yet; and the lists column's own rows are still dragged by their link, not by the whole row.
 
 #### 📋 3.13 — In progress
 

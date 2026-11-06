@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { LocalRow } from '../local/rows';
-import { LIST_COLORS, colorToken } from '../lists/colors';
+import { DEFAULT_COLOR, SWATCHES } from '../lists/colors';
 import { colourOf, plain, text } from './fields';
 
 const list = (
@@ -27,11 +27,12 @@ describe('reading fields for a screen', () => {
     expect(text(list({ title: { v: 5, s: 1 } }), 'title', 'not text')).toBe('not text');
   });
 
-  it("shows a list's colour as its token, and black for anything else", () => {
-    for (const name of LIST_COLORS)
-      expect(colourOf(list({ color: { v: name, s: 1 } }))).toBe(colorToken(name));
-    expect(colourOf(list({ color: { v: 'purple', s: 1 } }))).toBe(colorToken('black'));
-    expect(colourOf(list({ color: { c: 'YWdl', s: 1 } }))).toBe(colorToken('black'));
-    expect(colourOf(list({}))).toBe(colorToken('black'));
+  it("shows a list's colour as it was picked, any #rrggbb, and the neutral one for anything else", () => {
+    for (const swatch of SWATCHES)
+      expect(colourOf(list({ color: { v: swatch.value, s: 1 } }))).toBe(swatch.value);
+    expect(colourOf(list({ color: { v: '#13579b', s: 1 } }))).toBe('#13579b');
+    expect(colourOf(list({ color: { v: 'purple', s: 1 } }))).toBe(DEFAULT_COLOR);
+    expect(colourOf(list({ color: { c: 'YWdl', s: 1 } }))).toBe(DEFAULT_COLOR);
+    expect(colourOf(list({}))).toBe(DEFAULT_COLOR);
   });
 });

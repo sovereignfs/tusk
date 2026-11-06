@@ -61,7 +61,7 @@ test('a list is made from the +, appears at once, and opens', async ({ page, bas
   await expect(page).toHaveURL(/\/$/);
 
   await row.click();
-  await expect(page).toHaveURL(/\/lists\/[0-9a-f-]{36}$/);
+  await expect(page).toHaveURL(/\/desk\/[0-9a-f-]{36}$/);
   await expect(page.getByRole('heading', { name })).toBeVisible();
   await expect(row).toHaveAttribute('aria-current', 'page');
 
@@ -174,7 +174,7 @@ test('a list that is not there says so and leads back, whether it never was or t
 }) => {
   await signedIn(page);
   for (const id of [crypto.randomUUID(), 'not-an-id']) {
-    await page.goto(`/lists/${id}`);
+    await page.goto(`/desk/${id}`);
     await expect(page.getByRole('heading', { name: 'That list is not here' })).toBeVisible();
     await page.getByRole('link', { name: 'Go to your lists' }).click();
     await expect(page).toHaveURL(/\/$/);

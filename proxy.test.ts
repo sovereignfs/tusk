@@ -25,13 +25,13 @@ describe('the proxy', () => {
 
   it('makes a new nonce for every request', () => {
     const nonces = new Set(
-      Array.from({ length: 50 }, () => forwarded(proxy(request('/lists/1')), 'x-nonce')),
+      Array.from({ length: 50 }, () => forwarded(proxy(request('/desk/1')), 'x-nonce')),
     );
     expect(nonces.size).toBe(50);
   });
 
   it('puts the policy on every kind of page: the landing page, a list, a missing route and sign-in', () => {
-    for (const path of ['/', '/lists/abc', '/no-such-page', '/sign-in', '/settings']) {
+    for (const path of ['/', '/desk/abc', '/no-such-page', '/sign-in', '/settings']) {
       expect(proxy(request(path)).headers.get('content-security-policy'), path).toContain(
         "script-src 'self' 'nonce-",
       );
@@ -58,7 +58,7 @@ describe('the proxy', () => {
       const signedIn = new NextRequest('https://tusk.example.com/', {
         headers: { cookie: `${name}=anything` },
       });
-      expect(rewrite(proxy(signedIn)), name).toMatch(/\/home$/);
+      expect(rewrite(proxy(signedIn)), name).toMatch(/\/desk$/);
     }
     vi.stubEnv('TUSK_AUTH_LOCAL', '1');
     // Only for the front address, and only for a cookie that is there: not for another page, an empty value, or a cookie of another name.
@@ -144,7 +144,7 @@ describe('what the proxy looks at', () => {
   const matches = (path: string) => new RegExp(`^${matcher?.source}$`).test(path);
 
   it('is every request but the build’s static files and the icon, which cannot carry a nonce', () => {
-    for (const path of ['/', '/lists/1', '/api/health', '/sign-in', '/sw.js']) {
+    for (const path of ['/', '/desk/1', '/api/health', '/sign-in', '/sw.js']) {
       expect(matches(path), path).toBe(true);
     }
     for (const path of ['/_next/static/chunks/a.js', '/_next/image', '/favicon.ico', '/icon.svg']) {

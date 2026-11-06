@@ -25,7 +25,7 @@ import { colourOf, text } from './fields';
 import styles from './Sidebar.module.css';
 
 /**
- * The left column (DESIGN.md §15.2): the views, pinned, then the person's lists with a dot and a count, a + to add one, and a drag to put them in
+ * The Desk's lists column (DESIGN.md §17.4): the views, pinned, then the person's lists with a dot and a count, a + to add one, and a drag to put them in
  * order. **It reads the working copy and nothing else**: a list made on this device is here before the server has heard of it, and a new device shows
  * what has arrived so far.
  *
@@ -74,7 +74,7 @@ export function Sidebar() {
   );
 }
 
-/** "My lists" and the + beside it, which turns into a field to name the new list: Enter makes it, Escape or leaving it empty does not. */
+/** "Desk" and the + beside it, which turns into a field to name the new list: Enter makes it, Escape or leaving it empty does not. */
 function AddList({ lists }: { lists: readonly LocalRow[] }) {
   const client = useSync();
   const toast = useToast();
@@ -118,7 +118,7 @@ function AddList({ lists }: { lists: readonly LocalRow[] }) {
   return (
     <>
       <div className={styles.heading}>
-        <span>My lists</span>
+        <span>Desk</span>
         <button
           type="button"
           className={styles.add}
@@ -203,7 +203,7 @@ function Lists({
               key={list.id}
               list={list}
               count={counts?.get(list.id) ?? 0}
-              current={pathname === `/lists/${list.id}`}
+              current={pathname === `/desk/${list.id}`}
             />
           ))}
         </ul>
@@ -239,7 +239,7 @@ function ListRow({ list, count, current }: { list: LocalRow; count: number; curr
         {...attributes}
         role={undefined}
         {...listeners}
-        href={`/lists/${list.id}`}
+        href={`/desk/${list.id}`}
         className={styles.row}
         aria-current={current ? 'page' : undefined}
         // A link can be dragged by the browser too, and one dropped on the page is followed: that is a navigation in the middle of a reorder.

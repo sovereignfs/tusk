@@ -21,10 +21,10 @@ interface Entry {
 
 export const ENTRIES: readonly Entry[] = [
   {
-    href: '/home',
+    href: '/desk',
     label: 'Desk',
     icon: 'layout-dashboard',
-    under: ['/', '/home', '/desk', '/lists'],
+    under: ['/', '/desk'],
   },
 ];
 

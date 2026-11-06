@@ -11,7 +11,7 @@ import {
 
 describe('the kind of page', () => {
   it('is a canvas for the Desk and a board, and an index for everything else', () => {
-    for (const path of ['/', '/home', '/desk', '/desk/abc', '/lists/abc', '/b/abc', '/b/abc/c/def'])
+    for (const path of ['/', '/desk', '/desk/abc', '/b/abc', '/b/abc/c/def'])
       expect(pageKind(path), path).toBe('canvas');
     for (const path of ['/boards', '/w/abc', '/inbox', '/planner', '/account', '/bogus'])
       expect(pageKind(path), path).toBe('index');
@@ -19,7 +19,7 @@ describe('the kind of page', () => {
 
   it('does not take a page whose name only starts like one of them', () => {
     expect(pageKind('/boards')).toBe('index');
-    expect(pageKind('/homework')).toBe('index');
+    expect(pageKind('/deskwork')).toBe('index');
   });
 });
 

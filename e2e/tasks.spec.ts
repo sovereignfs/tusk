@@ -425,6 +425,38 @@ test.describe('putting tasks in order', () => {
     await expect(page).toHaveURL(/\?card=/);
   });
 
+  test('a card is dragged from anywhere on its row, here the ring of its checklist, and a click on that free space opens it', async ({
+    page,
+  }) => {
+    const [first, second, third] = await threeTasks(page);
+    // The last card gets a checklist item, which gives its row a ring that is not the link.
+    await page.getByRole('link', { name: third as string }).click();
+    const detail = page.getByRole('region', { name: 'Card', exact: true });
+    await detail.getByLabel('Add an item').fill('One');
+    await detail.getByLabel('Add an item').press('Enter');
+    await expect(detail.getByRole('textbox', { name: 'Item: One' })).toBeVisible();
+    await detail.getByRole('button', { name: 'Close' }).click();
+    await expect(page).not.toHaveURL(/\?card=/);
+
+    const ring = page.getByRole('img', { name: '0 of 1 items done' });
+    await expect(ring).toBeVisible();
+    // A click on the ring opens the card, as a click on the title does.
+    await ring.click();
+    await expect(page).toHaveURL(/\?card=/);
+    await detail.getByRole('button', { name: 'Close' }).click();
+
+    const from = await ring.boundingBox();
+    const to = await page.getByRole('link', { name: first as string }).boundingBox();
+    if (!from || !to) throw new Error('the row is not on the page');
+    await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2 - 8, { steps: 4 });
+    await page.mouse.move(to.x + to.width / 2, to.y + 2, { steps: 12 });
+    await page.mouse.up();
+    await expect.poll(() => titles(page)).toEqual([third, first, second]);
+    await expect(page).not.toHaveURL(/\?card=/);
+  });
+
   test('a subtask is dragged by its handle, and the order holds after a reload', async ({
     page,
   }) => {
@@ -509,6 +541,49 @@ test.describe('seeing a list the way one wants', () => {
     }[];
     return rows.find((r) => r.table === 'desk_list' && r.fields.title?.v === name)?.fields;
   }
+
+  test('a list takes any colour: a suggestion is written at once, a colour of one’s own too, and both are the same after a reload and on the server', async ({
+    page,
+    baseURL,
+  }) => {
+    const { name } = await openNewList(page);
+    const swatch = (hex: string) =>
+      page
+        .getByRole('navigation', { name: 'Lists' })
+        .getByRole('link', { name: new RegExp(`^${name}`) })
+        .locator('span[aria-hidden]')
+        .first()
+        .evaluate((el, expected) => {
+          const probe = document.createElement('i');
+          probe.style.background = expected;
+          document.body.append(probe);
+          const want = getComputedStyle(probe).backgroundColor;
+          probe.remove();
+          return getComputedStyle(el).backgroundColor === want;
+        }, hex);
+
+    await page.getByRole('button', { name: `Colour of ${name}` }).click();
+    await page.getByRole('radio', { name: 'Blue' }).click();
+    await expect.poll(() => swatch('#2563eb')).toBe(true);
+    await expect
+      .poll(async () => (await listFields(page, baseURL, name))?.color?.v)
+      .toBe('#2563eb');
+
+    // Any colour at all, not only a suggestion: the native picker is given one, and it is written once it settles.
+    await page.getByRole('button', { name: `Colour of ${name}` }).click();
+    await page.getByLabel('Pick any colour').evaluate((input: HTMLInputElement) => {
+      const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+      set?.call(input, '#13579b');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await expect
+      .poll(async () => (await listFields(page, baseURL, name))?.color?.v)
+      .toBe('#13579b');
+
+    await page.reload();
+    await expect.poll(() => swatch('#13579b')).toBe(true);
+  });
 
   test('a sort other than Custom orders the tasks, takes away the handle so a drag does nothing, and is the same after a reload and on the server', async ({
     page,

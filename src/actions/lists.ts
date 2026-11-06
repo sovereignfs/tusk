@@ -1,5 +1,5 @@
 import { text as textParser } from '../access/parse';
-import { DEFAULT_COLOR, type ListColor, isListColor } from '../lists/colors';
+import { DEFAULT_COLOR, isListColor } from '../lists/colors';
 import { isSort } from '../lists/sort';
 import type { LocalRow } from '../local/rows';
 import { after, first } from '../position';
@@ -37,7 +37,7 @@ const mutationOf = (ids: Ids, changes: Mutation['changes']): ActionResult => ({
 /** A new list at the bottom of the sidebar. `lists` includes those that are deleted and not yet removed, which count against the limit. */
 export function createList(
   lists: readonly LocalRow[],
-  input: { title: string; color?: ListColor },
+  input: { title: string; color?: string },
   ids: Ids,
   all: readonly LocalRow[] = lists,
 ): ActionResult {

@@ -1,4 +1,4 @@
-import { LIST_COLORS } from '../lists/colors';
+import { HEX_COLOR } from '../lists/colors';
 import {
   type Parsed,
   type Parser,
@@ -47,6 +47,10 @@ const ok = <T>(value: T): Parsed<T> => ({ ok: true, value });
 const MAX_EPOCH_MS = 8_640_000_000_000_000;
 const epochMs = integer(0, MAX_EPOCH_MS);
 
+/** A colour: `#rrggbb` in lower case, which is what the colour picker writes (`src/lists/colors.ts`). */
+const color: Parser<string> = (value) =>
+  typeof value === 'string' && HEX_COLOR.test(value) ? ok(value) : no('not a colour');
+
 /** The four orders a list can be shown in (§10.5); its colours are `lists/colors.ts`'s. */
 const SORTS = ['custom', 'created', 'due', 'title'] as const;
 
@@ -75,7 +79,7 @@ const short = (plain: Parser<Scalar>): FieldSpec => ({ plain, chars: SHORT });
 const FIELDS: Record<SyncTable, Record<string, FieldSpec>> = {
   desk_list: {
     title: TITLE,
-    color: short(oneOf(...LIST_COLORS)),
+    color: short(color),
     sort: short(oneOf(...SORTS)),
     showCompleted: short(bool),
   },

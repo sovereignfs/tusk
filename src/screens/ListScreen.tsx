@@ -20,6 +20,7 @@ import {
   useReorderSensors,
 } from '../ui/dnd';
 import { AddCard } from './AddCard';
+import { ListColour } from './ListColour';
 import { CardRow, SortableCardRow } from './CardRow';
 import { useUndo } from './Undo';
 import { plain, text } from './fields';
@@ -212,7 +213,10 @@ function ListCards({ list }: { list: LocalRow }) {
   return (
     <section aria-label={text(list, 'title', 'List')}>
       <div className={styles.header}>
-        <h1 className={styles.title}>{text(list, 'title', 'Untitled list')}</h1>
+        <div className={styles.heading}>
+          <ListColour list={list} />
+          <h1 className={styles.title}>{text(list, 'title', 'Untitled list')}</h1>
+        </div>
         <div className={styles.controls}>
           <SegmentedControl<Filter>
             aria-label="Show"

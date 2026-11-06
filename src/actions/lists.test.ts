@@ -72,17 +72,17 @@ describe('making a list', () => {
     const change = mutationOf(result).changes[0];
     expect(change).toMatchObject({
       table: 'desk_list',
-      fields: { title: { v: 'Garden' }, color: { v: 'black' } },
+      fields: { title: { v: 'Garden' }, color: { v: '#6b7280' } },
     });
     expect((change as { position: string }).position > 'a1').toBe(true);
     expect(mutationOf(result).mutationId).not.toBe(change?.id);
   });
 
   it('is the first position in an empty sidebar, and takes a colour', () => {
-    const result = createList([], { title: 'Work', color: 'blue' }, counting());
+    const result = createList([], { title: 'Work', color: '#2563eb' }, counting());
     expect(mutationOf(result).changes[0]).toMatchObject({
       position: first(),
-      fields: { color: { v: 'blue' } },
+      fields: { color: { v: '#2563eb' } },
     });
   });
 
@@ -117,27 +117,27 @@ describe('making a list', () => {
 
 describe('renaming and recolouring', () => {
   it('change that field of that list and nothing else', () => {
-    const list = row(A, 'a0', { color: { v: 'black', s: 1 } });
+    const list = row(A, 'a0', { color: { v: '#6b7280', s: 1 } });
     const renamed = renameList(list, ' Errands ', counting());
     accepted(renamed);
     expect(mutationOf(renamed).changes).toEqual([
       { table: 'desk_list', id: A, fields: { title: { v: 'Errands' } } },
     ]);
-    const coloured = setColor(list, 'red', counting());
+    const coloured = setColor(list, '#dc2626', counting());
     accepted(coloured);
     expect(mutationOf(coloured).changes).toEqual([
-      { table: 'desk_list', id: A, fields: { color: { v: 'red' } } },
+      { table: 'desk_list', id: A, fields: { color: { v: '#dc2626' } } },
     ]);
   });
 
   it('do nothing when nothing changes, and refuse a bad title or colour, and a list that is not there', () => {
-    const list = row(A, 'a0', { color: { v: 'green', s: 1 }, title: { v: 'Home', s: 1 } });
+    const list = row(A, 'a0', { color: { v: '#16a34a', s: 1 }, title: { v: 'Home', s: 1 } });
     expect(renameList(list, 'Home', counting())).toEqual({ ok: false, reason: 'nothing' });
     expect(renameList(list, '  ', counting())).toEqual({ ok: false, reason: 'title' });
-    expect(setColor(list, 'green', counting())).toEqual({ ok: false, reason: 'nothing' });
+    expect(setColor(list, '#16a34a', counting())).toEqual({ ok: false, reason: 'nothing' });
     expect(setColor(list, 'purple', counting())).toEqual({ ok: false, reason: 'nothing' });
     expect(renameList(undefined, 'x', counting())).toEqual({ ok: false, reason: 'missing' });
-    expect(setColor(undefined, 'red', counting())).toEqual({ ok: false, reason: 'missing' });
+    expect(setColor(undefined, '#dc2626', counting())).toEqual({ ok: false, reason: 'missing' });
   });
 });
 

@@ -1,4 +1,4 @@
-import { DEFAULT_COLOR, colorToken } from '../lists/colors';
+import { DEFAULT_COLOR, colorOf } from '../lists/colors';
 import type { LocalRow } from '../local/rows';
 
 /**
@@ -19,7 +19,7 @@ export function text(row: LocalRow | undefined, name: string, fallback = ''): st
   return typeof value === 'string' ? value : fallback;
 }
 
-/** The colour of a list's dot, as a token. */
+/** The colour of a list's dot: `#rrggbb`, the one the person picked. */
 export function colourOf(row: LocalRow | undefined): string {
-  return colorToken(text(row, 'color', DEFAULT_COLOR));
+  return colorOf(text(row, 'color', DEFAULT_COLOR));
 }

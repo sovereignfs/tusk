@@ -30,7 +30,7 @@ async function seed(request: APIRequestContext, origin: string) {
               table: 'desk_list',
               id: list,
               position: 'a0',
-              fields: { title: { v: name }, color: { v: 'green' } },
+              fields: { title: { v: name }, color: { v: '#16a34a' } },
             },
             {
               table: 'desk_card',
@@ -86,7 +86,7 @@ test('a list made on another device is in the sidebar after the first load, with
 
   const row = page.getByRole('link', { name });
   await expect(row).toBeVisible();
-  await expect(row).toHaveAttribute('href', `/lists/${list}`);
+  await expect(row).toHaveAttribute('href', `/desk/${list}`);
   await expect(row).toContainText('1');
 });
 
@@ -100,8 +100,8 @@ test('the right column is there only while a task is open, is 360px, shows the t
   await page.reload();
   await expect(page.getByRole('link', { name })).toBeVisible();
 
-  const home = new URL('/home', page.url()).toString();
-  await page.goto(`/home?card=${task}`);
+  const desk = new URL('/desk', page.url()).toString();
+  await page.goto(`/desk?card=${task}`);
   const detail = page.getByRole('region', { name: 'Card', exact: true });
   await expect(detail).toBeVisible();
   await expect(detail.getByLabel('Title')).toHaveValue('Buy oat milk');
@@ -114,14 +114,14 @@ test('the right column is there only while a task is open, is 360px, shows the t
   const entries = await page.evaluate(() => history.length);
   await detail.getByRole('button', { name: 'Close' }).click();
   await expect(page.getByRole('region', { name: 'Card', exact: true })).toHaveCount(0);
-  expect(page.url()).toBe(home);
+  expect(page.url()).toBe(desk);
   // Replaced, not pushed: closing a task does not add a step to go back through.
   expect(await page.evaluate(() => history.length)).toBe(entries);
 });
 
 test('a task that is not there says so, and can be closed', async ({ page }) => {
   await signedIn(page);
-  await page.goto(`/home?card=${crypto.randomUUID()}`);
+  await page.goto(`/desk?card=${crypto.randomUUID()}`);
   const detail = page.getByRole('region', { name: 'Card', exact: true });
   await expect(detail).toBeVisible();
   await detail.getByRole('button', { name: 'Close' }).click();

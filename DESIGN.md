@@ -215,7 +215,7 @@ What was built as Tasks becomes the Desk, and the app is renamed. The roadmap's 
   field needs no migration, and a new column gets one of its own. The sync protocol is version 2, so that a device holding the Tasks version is told
   to update, and the database in the browser is made again.
 - **The first list is _Backlog_**, not _My tasks_, with the same derived id.
-- **The routes move:** `/home` and `/lists/<id>` become `/desk` and `/desk/<listId>`.
+- **The routes move:** `/home` and `/lists/<id>` become `/desk` and `/desk/<listId>` (done by 3.12, which also made a list's colour any `#rrggbb`).
 - **The shell is the new one** (§17.2), with the Desk inside it.
 
 ## 6. Authentication
