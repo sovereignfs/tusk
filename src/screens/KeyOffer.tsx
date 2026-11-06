@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { createIdentity, keyFile, parseIdentity, type Identity } from '../cipher/identity';
+import { allLists, cardCount } from '../local/store';
+import { useLocal } from '../sync/react';
 import { Alert, Button, Checkbox, Textarea } from '../ui';
 import { useKey } from './KeyContext';
 import styles from './KeyOffer.module.css';
@@ -38,6 +40,11 @@ function download(text: string) {
  */
 export function KeyOffer() {
   const key = useKey();
+  // A Desk that already has things in it is moved to a key of its own by Settings (task 14.4), not made over by this offer.
+  const content = useLocal(async (db) => ({
+    lists: (await allLists(db)).length,
+    cards: await cardCount(db),
+  }));
   const [step, setStep] = useState<'ask' | 'create' | 'upload'>('ask');
   const [made, setMade] = useState<Identity | undefined>(undefined);
   const [saved, setSaved] = useState(false);
@@ -46,7 +53,8 @@ export function KeyOffer() {
   const [problem, setProblem] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
 
-  if (key.status !== 'offer') return null;
+  if (key.status !== 'offer' || content === undefined) return null;
+  const empty = content.lists === 0 && content.cards === 0;
 
   async function begin() {
     setMade(await createIdentity());
@@ -81,7 +89,20 @@ export function KeyOffer() {
         server can read them.
       </p>
       {problem ? <Alert variant="error">{problem}</Alert> : null}
-      {step === 'ask' ? (
+      {step === 'ask' && !empty ? (
+        <>
+          <p>
+            Your Desk already has things in it, and it stays plain text for now. Moving it to a key
+            of your own is done from Settings, in a later update.
+          </p>
+          <div className={styles.row}>
+            <Button variant="secondary" onClick={() => void key.skip()}>
+              Skip
+            </Button>
+          </div>
+        </>
+      ) : null}
+      {step === 'ask' && empty ? (
         <div className={styles.row}>
           <Button onClick={() => void begin()}>Create a key</Button>
           <Button variant="secondary" onClick={() => setStep('upload')}>

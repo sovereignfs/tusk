@@ -12,6 +12,8 @@ import {
 } from 'react';
 import { parseIdentity } from '../cipher/identity';
 import { forgetKey, keepIdentity, loadIdentity } from '../cipher/vault';
+import { DeskCipher } from '../local/seal';
+import { useSync } from '../sync/react';
 
 /**
  * Whether the Desk has a key of the person's own, and whether this device has it (DESIGN.md §9.1, §9.2). **`plain`**: no key, nothing is asked. **`offer`**:
@@ -30,6 +32,8 @@ export interface KeyApi {
   readonly status: KeyStatus;
   /** The public key the Desk is sealed to, if there is one. */
   readonly recipient: string | null;
+  /** Whether the Desk is sealed to a key (set up, or being moved to one), whether or not this device has it yet: what hides the Desk meanwhile. */
+  readonly sealed: boolean;
   /** Whether this server offers personal keys at all (not in the operator's mode). */
   readonly available: boolean;
   /** The key, as the thing that opens list keys, while unlocked. */
@@ -74,6 +78,7 @@ const Context = createContext<KeyApi | null>(null);
 /** A key situation of nothing: for a place that has no provider, which asks for nothing. */
 const NONE: KeyApi = {
   status: 'plain',
+  sealed: false,
   recipient: null,
   available: false,
   identity: undefined,
@@ -88,6 +93,7 @@ export function useKey(): KeyApi {
 }
 
 export function KeyProvider({ accountId, children }: { accountId: string; children: ReactNode }) {
+  const client = useSync();
   const [server, setServer] = useState<Server | undefined>(() => undefined);
   const [identity, setIdentity] = useState<string | CryptoKey | undefined>(undefined);
   const [loaded, setLoaded] = useState(false);
@@ -97,6 +103,7 @@ export function KeyProvider({ accountId, children }: { accountId: string; childr
     async (known: Server) => {
       setServer(known);
       if (known.mode === 'none' || known.recipient === null) {
+        client.setCipher(undefined);
         setIdentity(undefined);
         return setLoaded(true);
       }
@@ -107,19 +114,24 @@ export function KeyProvider({ accountId, children }: { accountId: string; childr
       } catch {
         valid = undefined;
       }
+      // The working copy seals and opens with the key from here on, or with none (DESIGN.md §9.2).
+      client.setCipher(valid ? new DeskCipher(valid, known.recipient) : undefined);
       setIdentity(valid);
       setLoaded(true);
     },
-    [accountId],
+    [accountId, client],
   );
 
   const refresh = useCallback(async (): Promise<void> => {
+    // What this device last knew is enough to hide a sealed Desk before the server has answered.
+    const known = readCache(accountId);
+    if (known) setServer((have) => have ?? known);
     try {
       const reply = await fetch('/api/encryption', { cache: 'no-store' });
       if (!reply.ok) throw new Error('not ok');
-      const known = (await reply.json()) as Server;
-      writeCache(accountId, known);
-      await settle(known);
+      const answered = (await reply.json()) as Server;
+      writeCache(accountId, answered);
+      await settle(answered);
     } catch {
       // Offline, or the server is unwell: what this device last knew. With nothing known it does not guess that the Desk is plain: it stays undecided and
       // asks again, so that a failed request is never taken for an answer.
@@ -145,6 +157,7 @@ export function KeyProvider({ accountId, children }: { accountId: string; childr
           : 'locked';
     return {
       status,
+      sealed: server !== undefined && server.mode !== 'none',
       recipient: server?.recipient ?? null,
       available: server?.available ?? false,
       identity,
@@ -191,10 +204,11 @@ export function KeyProvider({ accountId, children }: { accountId: string; childr
       },
       async lock() {
         await forgetKey(accountId);
+        client.setCipher(undefined);
         setIdentity(undefined);
       },
     };
-  }, [accountId, identity, loaded, refresh, server]);
+  }, [accountId, client, identity, loaded, refresh, server]);
 
   return <Context.Provider value={api}>{children}</Context.Provider>;
 }

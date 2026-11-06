@@ -31,6 +31,9 @@ import type { LocalRow } from '../local/rows';
 import { byPosition } from '../local/rows';
 import { getRow, occurrencesOf, outboxSize } from '../local/store';
 import { addDays } from '../time';
+import { createIdentity } from '../cipher/identity';
+import { cipherOf, DeskCipher } from '../local/seal';
+import { allDeskRows } from '../local/store';
 import { type Device, type Harness, everything, harness, settleAll } from './sim-support';
 import { account, makeStore } from './test-support';
 
@@ -344,12 +347,18 @@ function deviceView(rows: readonly LocalRow[]) {
   return out;
 }
 
-export async function simulate(seed: number): Promise<void> {
+export async function simulate(seed: number, options: { sealed?: boolean } = {}): Promise<void> {
   const r = new Random(seed);
   const owner = account();
   const count = 2 + r.next(3);
   const all: Device[] = [];
-  for (let i = 0; i < count; i++) all.push(await devices.device(owner));
+  // With a key of its own (DESIGN.md §9): every device has the same one, the server takes no plain content, and what they end with is compared sealed.
+  const key = options.sealed ? await createIdentity() : undefined;
+  for (let i = 0; i < count; i++) {
+    const d = await devices.device(owner, key ? { plain: 'refuse' } : {});
+    if (key) d.client.setCipher(new DeskCipher(key.identity, key.recipient));
+    all.push(d);
+  }
   const refusals: string[] = [];
   for (const d of all) d.client.onRefused((x) => refusals.push(...x.map((y) => y.code)));
 
@@ -383,12 +392,41 @@ export async function simulate(seed: number): Promise<void> {
   }
   await settleAll(all, 14);
 
-  const fail = (what: string) => `seed ${seed} (${leg}): ${what}\n  ${trace.join(' ')}`;
+  const fail = (what: string) =>
+    `seed ${seed}${options.sealed ? ' sealed' : ''} (${leg}): ${what}\n  ${trace.join(' ')}`;
   const views = await Promise.all(all.map(everything));
   const reference = deviceView(views[0] ?? []);
   for (let i = 1; i < views.length; i++)
     expect(deviceView(views[i] ?? []), fail(`device ${i} is not device 0`)).toEqual(reference);
   expect(reference, fail('devices are not the server')).toEqual(await serverView(owner));
+  if (options.sealed) {
+    // What the server holds is ciphertext in every field but a list's key, and what the devices read of it is the same on all of them.
+    for (const [row, view] of Object.entries(
+      reference as Record<string, { fields: Record<string, unknown> }>,
+    ))
+      for (const [name, value] of Object.entries(view.fields))
+        if (name !== 'key')
+          expect(String(value), fail(`${row}.${name} is not ciphertext`)).toMatch(
+            /^[A-Za-z0-9_-]{30,}$/,
+          );
+    const opened = await Promise.all(
+      all.map(async (d) => {
+        const rows = await d.client.read(allDeskRows);
+        return deviceView(
+          [...rows.lists, ...rows.cards, ...rows.checks, ...rows.series].sort((a, b) =>
+            a.id < b.id ? -1 : 1,
+          ),
+        );
+      }),
+    );
+    for (let i = 1; i < opened.length; i++)
+      expect(opened[i], fail(`device ${i} reads something else than device 0`)).toEqual(opened[0]);
+    for (const d of all)
+      expect(
+        d.client.db && cipherOf(d.client.db)?.unreadable.size,
+        fail('a row could not be read'),
+      ).toBe(0);
+  }
   for (const [i, d] of all.entries())
     expect(await outboxSize(d.client.db), fail(`device ${i} still has something to send`)).toBe(0);
   expect(refusals, fail('the server refused something a device made')).toEqual([]);
@@ -414,6 +452,17 @@ describe(`devices converge (${leg})`, () => {
   it(`${runs} random runs, from seed ${from}, end with every device holding the server's rows`, async () => {
     for (let seed = from; seed < from + runs; seed++) {
       await simulate(seed);
+      await devices.dispose();
+    }
+  }, 3_600_000);
+});
+
+describe(`devices converge, with a key of their own (${leg})`, () => {
+  const runs = Number(process.env.TUSK_SIM_SEEDS ?? 30);
+  const from = Number(process.env.TUSK_SIM_FIRST ?? 1);
+  it(`${Math.max(5, Math.floor(runs / 2))} random runs, from seed ${from}, end alike, sealed on the server and read alike by every device`, async () => {
+    for (let seed = from; seed < from + Math.max(5, Math.floor(runs / 2)); seed++) {
+      await simulate(seed, { sealed: true });
       await devices.dispose();
     }
   }, 3_600_000);

@@ -1,11 +1,12 @@
 import { deleteCard } from '../actions/cards';
 import { duplicateOccurrences } from '../actions/series';
 import type { LocalDatabase } from '../local/db';
-import type { LocalRow } from '../local/rows';
+import { type DeskCipher, attachCipher, cipherOf } from '../local/seal';
 import {
   type Refusal,
   type Settled,
   allChecksOf,
+  allDeskRows,
   commitMutation,
   lastSyncedAt,
   outboxSize,
@@ -83,8 +84,26 @@ export class SyncClient {
   async commit(mutation: unknown): Promise<void> {
     const parsed = parseMutation(mutation);
     if (!parsed.ok) throw new InvalidMutation(parsed.reason);
-    await commitMutation(this.options.db, parsed.value, this.now());
+    // A Desk with a key of its own is sealed on its way in (DESIGN.md §9.2): what is written to the working copy and queued is what the server will hold,
+    // and a mutation that cannot be sealed throws before anything is written, so nothing is ever kept or sent in the clear.
+    const cipher = cipherOf(this.options.db);
+    const parts = cipher ? await cipher.seal(this.options.db, parsed.value) : [parsed.value];
+    if (cipher)
+      for (const part of parts) {
+        const sealed = parseMutation(part, { plain: 'refuse' });
+        if (!sealed.ok) throw new InvalidMutation(sealed.reason);
+      }
+    for (const part of parts) await commitMutation(this.options.db, part, this.now());
     this.announce('write');
+  }
+
+  /**
+   * Gives this working copy the key to seal and open with, or takes it away. What is shown is read again: the same rows that were blank ciphertext a
+   * moment ago are the Desk.
+   */
+  setCipher(cipher: DeskCipher | undefined): void {
+    attachCipher(this.options.db, cipher);
+    this.emit();
   }
 
   /** Calls `listener` when the working copy changes, in this tab or in another. Returns the way to stop. */
@@ -166,7 +185,10 @@ export class SyncClient {
       );
       this.announce('synced');
       // What was pulled can hold two open occurrences of one series (§8.4); this device deletes the later, as every device does.
-      if (response.pull.rows.length > 0) await this.resolveOccurrences();
+      if (response.pull.rows.length > 0) {
+        await this.resolveOccurrences();
+        await this.heal();
+      }
       if (settled.refused.length > 0)
         for (const listener of this.refusalListeners) listener(settled.refused);
 
@@ -179,13 +201,32 @@ export class SyncClient {
   }
 
   /**
+   * A row that opened only under another list's key (see `DeskCipher.stale`) is sealed again under its own, so that it reads on its own key for as long as
+   * it lives. Every device that sees it does the same, to the same values, and when they have all done it none sees a stale row and it stops.
+   */
+  private async heal(): Promise<void> {
+    const db = this.options.db;
+    const cipher = cipherOf(db);
+    if (!cipher || cipher.stale.size === 0) return;
+    for (const key of [...cipher.stale]) {
+      const change = await cipher.heal(db, key);
+      if (!change) continue;
+      try {
+        await this.commit({ mutationId: crypto.randomUUID(), changes: [change] });
+      } catch {
+        // A row whose list has no key cannot be sealed again, and is left as it is.
+      }
+    }
+  }
+
+  /**
    * **Two open occurrences of one series** arrive when two devices complete the same one on different days (DESIGN.md §8.4, §12.1). Whichever sees both
    * deletes the later by the rule in `duplicateOccurrences`, which every device applies alike, so they end with the same one. A card deleted that way can be
    * brought back like any other.
    */
   private async resolveOccurrences(): Promise<void> {
     const db = this.options.db;
-    const cards = (await db.getAll('desk_card')) as LocalRow[];
+    const cards = (await allDeskRows(db)).cards;
     const ids = { newId: () => crypto.randomUUID() };
     for (const id of duplicateOccurrences(cards)) {
       const card = cards.find((each) => each.id === id);

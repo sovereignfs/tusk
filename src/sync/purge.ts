@@ -66,7 +66,8 @@ export async function purge(database: Database, now: number): Promise<PurgeResul
           AND NOT EXISTS (
             SELECT 1 FROM ${tableOf(database, 'desk_card')} c
             WHERE c.owner_id = s.owner_id AND c.fields LIKE '%' || s.id || '%'
-          )`,
+          )
+          AND NOT EXISTS (${sealed(database)})`,
   );
   const owners = new Set([...due, ...lonely].map((row) => row.owner));
   for (const owner of owners) {
@@ -175,6 +176,14 @@ async function purgeAccount(
  * is text in a column, so the card is looked for by the series' id appearing in its fields: an id is 36 characters of a kind that nothing else a person
  * writes is likely to hold, and a card that has it by chance only keeps a useless series a while longer.
  */
+/**
+ * Whether the series' owner has a key of their own, or is moving to one (`s` is the series): then a card's `seriesId` is ciphertext, no card is found to name
+ * any series, and every series would look like one nothing points at. **The server cannot tell, so it removes none**; a series goes with its list, or when the
+ * device that can read it deletes it.
+ */
+const sealed = (database: Database) =>
+  sql`SELECT 1 FROM ${schema(database).accountSettings} k WHERE k.account_id = s.owner_id AND k.encryption <> 'none'`;
+
 const orphans = (database: Database, owner: string, cutoff: number) =>
   ids(
     database,
@@ -184,6 +193,7 @@ const orphans = (database: Database, owner: string, cutoff: number) =>
             SELECT 1 FROM ${tableOf(database, 'desk_card')} c
             WHERE c.owner_id = s.owner_id AND c.fields LIKE '%' || s.id || '%'
           )
+          AND NOT EXISTS (${sealed(database)})
         LIMIT ${BATCH}`,
   );
 

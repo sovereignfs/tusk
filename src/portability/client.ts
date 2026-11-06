@@ -1,5 +1,5 @@
 import type { SyncClient } from '../sync/client';
-import type { LocalRow } from '../local/rows';
+import { allDeskRows } from '../local/store';
 import {
   type TuskExport,
   type WorkspacePart,
@@ -17,12 +17,7 @@ import {
 export async function deskFile(client: SyncClient, now = new Date()): Promise<TuskExport> {
   // Online, what other devices wrote comes first; offline, `sync` answers `offline` and the copy is what there is.
   if (typeof navigator === 'undefined' || navigator.onLine !== false) await client.sync();
-  const rows = await client.read(async (db) => ({
-    lists: (await db.getAll('desk_list')) as LocalRow[],
-    cards: (await db.getAll('desk_card')) as LocalRow[],
-    checks: (await db.getAll('desk_check')) as LocalRow[],
-    series: (await db.getAll('desk_series')) as LocalRow[],
-  }));
+  const rows = await client.read(allDeskRows);
   return envelope('desk', { desk: buildDesk(rows) }, now);
 }
 

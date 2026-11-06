@@ -10,6 +10,7 @@ import {
 } from '../sync/format';
 import type { LocalDatabase, LocalSchema, OutboxEntry } from './db';
 import { type LocalRow, applyChange, byPosition, mergePulled } from './rows';
+import { openAll } from './seal';
 
 /**
  * Reading and writing the working copy (DESIGN.md §8.1, §8.3). Everything that changes more than one store does it in **one IndexedDB
@@ -299,7 +300,9 @@ const live = (row: LocalRow): boolean => row.deletedAt === null;
 
 /** The lists, in order. */
 export async function listsOf(db: LocalDatabase): Promise<LocalRow[]> {
-  const rows = (await db.getAll('desk_list')).filter(live) as (LocalRow & { position: string })[];
+  const rows = (await openAll(db, (await db.getAll('desk_list')).filter(live))) as (LocalRow & {
+    position: string;
+  })[];
   return rows.sort(byPosition);
 }
 
@@ -307,13 +310,15 @@ export async function listsOf(db: LocalDatabase): Promise<LocalRow[]> {
 export async function cardsOf(db: LocalDatabase, listId: string): Promise<LocalRow[]> {
   const range = IDBKeyRange.bound([listId, ''], [listId, '￿']);
   const rows = await db.getAllFromIndex('desk_card', 'byListPosition', range);
-  return (rows.filter(live) as (LocalRow & { position: string })[]).sort(byPosition);
+  const opened = (await openAll(db, rows.filter(live))) as (LocalRow & { position: string })[];
+  return opened.sort(byPosition);
 }
 
 /** A card's checklist, in order. */
 export async function checksOf(db: LocalDatabase, cardId: string): Promise<LocalRow[]> {
   const rows = await db.getAllFromIndex('desk_check', 'byCard', cardId);
-  return (rows.filter(live) as (LocalRow & { position: string })[]).sort(byPosition);
+  const opened = (await openAll(db, rows.filter(live))) as (LocalRow & { position: string })[];
+  return opened.sort(byPosition);
 }
 
 export async function getRow(
@@ -321,7 +326,8 @@ export async function getRow(
   table: SyncTable,
   id: string,
 ): Promise<LocalRow | undefined> {
-  return (await db.get(table, id)) as LocalRow | undefined;
+  const row = (await db.get(table, id)) as LocalRow | undefined;
+  return row ? (await openAll(db, [row]))[0] : undefined;
 }
 
 /**
@@ -331,22 +337,19 @@ export async function getRow(
  */
 export async function openCounts(db: LocalDatabase): Promise<Map<string, number>> {
   const counts = new Map<string, number>();
-  let cursor = await db.transaction('desk_card').store.openCursor();
-  while (cursor) {
-    const row = cursor.value;
-    if (row.table === 'desk_card' && row.deletedAt === null) {
-      const done = row.fields.completedAt;
-      const completed = done !== undefined && 'v' in done && done.v !== null;
-      if (!completed) counts.set(row.listId, (counts.get(row.listId) ?? 0) + 1);
-    }
-    cursor = await cursor.continue();
+  const cards = (await db.getAll('desk_card')).filter(live);
+  for (const row of await openAll(db, cards)) {
+    if (row.table !== 'desk_card') continue;
+    const done = row.fields.completedAt;
+    const completed = done !== undefined && 'v' in done && done.v !== null;
+    if (!completed) counts.set(row.listId, (counts.get(row.listId) ?? 0) + 1);
   }
   return counts;
 }
 
 /** Every list row the device has, deleted ones too, for deciding whether an account has ever had a list. */
 export async function allLists(db: LocalDatabase): Promise<LocalRow[]> {
-  return db.getAll('desk_list');
+  return openAll(db, await db.getAll('desk_list'));
 }
 
 /** How many card rows the device has, deleted ones too, which count against the account's limit until they are removed for good. */
@@ -367,27 +370,24 @@ export async function checkCounts(
   db: LocalDatabase,
 ): Promise<Map<string, { done: number; total: number }>> {
   const counts = new Map<string, { done: number; total: number }>();
-  let cursor = await db.transaction('desk_check').store.openCursor();
-  while (cursor) {
-    const row = cursor.value;
-    if (row.table === 'desk_check' && row.deletedAt === null) {
-      const have = counts.get(row.cardId) ?? { done: 0, total: 0 };
-      const completed = row.fields.completedAt;
-      counts.set(row.cardId, {
-        total: have.total + 1,
-        done:
-          have.done +
-          (completed !== undefined && 'v' in completed && typeof completed.v === 'number' ? 1 : 0),
-      });
-    }
-    cursor = await cursor.continue();
+  const items = (await db.getAll('desk_check')).filter(live);
+  for (const row of await openAll(db, items)) {
+    if (row.table !== 'desk_check') continue;
+    const have = counts.get(row.cardId) ?? { done: 0, total: 0 };
+    const completed = row.fields.completedAt;
+    counts.set(row.cardId, {
+      total: have.total + 1,
+      done:
+        have.done +
+        (completed !== undefined && 'v' in completed && typeof completed.v === 'number' ? 1 : 0),
+    });
   }
   return counts;
 }
 
 /** Every item a card has, **deleted ones too**: what restoring a card needs, to find those that were deleted with it. */
 export async function allChecksOf(db: LocalDatabase, cardId: string): Promise<LocalRow[]> {
-  return (await db.getAllFromIndex('desk_check', 'byCard', cardId)) as LocalRow[];
+  return openAll(db, (await db.getAllFromIndex('desk_check', 'byCard', cardId)) as LocalRow[]);
 }
 
 /**
@@ -398,7 +398,7 @@ export async function occurrencesOf(
   db: LocalDatabase,
   seriesId: string,
 ): Promise<{ card: LocalRow; items: LocalRow[] }[]> {
-  const cards = ((await db.getAll('desk_card')) as LocalRow[]).filter((card) => {
+  const cards = (await openAll(db, (await db.getAll('desk_card')) as LocalRow[])).filter((card) => {
     const field = card.fields.seriesId;
     return card.deletedAt === null && field !== undefined && 'v' in field && field.v === seriesId;
   });
@@ -414,10 +414,10 @@ export async function visibleCards(db: LocalDatabase): Promise<LocalRow[]> {
   const lists = new Set(
     (await db.getAll('desk_list')).filter((list) => list.deletedAt === null).map((list) => list.id),
   );
-  const cards = (await db.getAll('desk_card')) as LocalRow[];
-  return cards.filter(
+  const cards = ((await db.getAll('desk_card')) as LocalRow[]).filter(
     (card) => card.table === 'desk_card' && card.deletedAt === null && lists.has(card.listId),
   );
+  return openAll(db, cards);
 }
 
 /**
@@ -432,7 +432,7 @@ export async function searchable(
   const checks = ((await db.getAll('desk_check')) as LocalRow[]).filter(
     (item) => item.table === 'desk_check' && item.deletedAt === null && shown.has(item.cardId),
   );
-  return { cards, checks };
+  return { cards, checks: await openAll(db, checks) };
 }
 
 /**
@@ -455,4 +455,19 @@ export async function deskSummary(
     if (due !== undefined && 'v' in due && due.v === today) dueToday += 1;
   }
   return { open, dueToday };
+}
+
+/** Every row of the Desk's four tables, deleted ones too, opened: what an export is made from, and what a screen that needs the whole Desk reads. */
+export async function allDeskRows(db: LocalDatabase): Promise<{
+  lists: LocalRow[];
+  cards: LocalRow[];
+  checks: LocalRow[];
+  series: LocalRow[];
+}> {
+  return {
+    lists: await openAll(db, (await db.getAll('desk_list')) as LocalRow[]),
+    cards: await openAll(db, (await db.getAll('desk_card')) as LocalRow[]),
+    checks: await openAll(db, (await db.getAll('desk_check')) as LocalRow[]),
+    series: await openAll(db, (await db.getAll('desk_series')) as LocalRow[]),
+  };
 }

@@ -288,6 +288,34 @@ describe(`the purge (${leg})`, () => {
       expect(await ids(owner)).toEqual([named.id]);
     });
 
+    it('is never taken from an account with a key of its own: its cards name their series in ciphertext, so none looks named, and nothing would be left', async () => {
+      const [sealed, moving, plain] = [account(), account(), account()];
+      const settings =
+        database.dialect === 'postgres'
+          ? postgresSchema.accountSettings
+          : sqliteSchema.accountSettings;
+      const lists: Record<string, ReturnType<typeof series>> = {};
+      for (const [owner, mode] of [
+        [sealed, 'personal'],
+        [moving, 'moving'],
+        [plain, 'none'],
+      ] as const) {
+        const l = list();
+        const s = series(l.id);
+        lists[owner] = s;
+        await apply(owner, mutation(l, s));
+        await dbAll(
+          database,
+          sql`UPDATE ${settings} SET encryption = ${mode} WHERE account_id = ${owner} RETURNING account_id`,
+        );
+      }
+      await purge(database, T0 + 30 * DAY);
+      expect(await ids(sealed)).toEqual([lists[sealed]?.id]);
+      expect(await ids(moving)).toEqual([lists[moving]?.id]);
+      // The same, on a Desk that is plain, goes.
+      expect(await ids(plain)).toEqual([]);
+    });
+
     it('is not taken while a card of the same account still has it, and another account’s are not looked at', async () => {
       const [ada, grace] = [account(), account()];
       const [la, lg] = [list(), list()];

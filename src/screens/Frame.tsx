@@ -26,7 +26,8 @@ export function Frame({ children }: { children: ReactNode }) {
   const key = useKey();
   const onDesk = usePathname().startsWith('/desk');
   // A Desk that is sealed to a key this device does not have shows nothing of itself (DESIGN.md §9.1): not its lists, not its cards, not a first list.
-  const locked = key.status === 'locked';
+  // Hidden too while a sealed Desk's key is being looked for: what a device last knew is enough, and nothing blank is shown meanwhile.
+  const locked = key.status === 'locked' || (key.sealed && key.status === 'loading');
 
   return (
     <UndoProvider>

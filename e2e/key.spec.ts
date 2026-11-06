@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { copyFile, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
+import { PROTOCOL_VERSION } from '../src/sync/format';
 import { EMAIL, PASSWORD, ensureAccount, signOut, trySignIn } from './helpers';
 
 /**
@@ -62,6 +63,21 @@ test('a key is made here, saved and said to be saved, and turns on a Desk that w
   await page.getByLabel('Add a card').fill(secret);
   await page.getByLabel('Add a card').press('Enter');
   await expect(page.getByRole('link', { name: secret, exact: true })).toBeVisible();
+
+  // What the server holds is sealed: it is asked for everything of the account, as a new device would, and neither the card nor the list is in it.
+  await expect
+    .poll(async () => {
+      const reply = await page.request.post('/api/sync', {
+        headers: { origin: 'http://localhost:3997' },
+        data: { protocol: PROTOCOL_VERSION, cursor: 0, mutations: [] },
+      });
+      const text = await reply.text();
+      if (text.includes('Secret plan') || text.includes('Backlog')) return 'in the clear';
+      return (JSON.parse(text) as { pull: { rows: unknown[] } }).pull.rows.length >= 2
+        ? 'sealed'
+        : 'not yet';
+    })
+    .toBe('sealed');
 
   // Settings says so.
   await page.goto('/account?section=data');

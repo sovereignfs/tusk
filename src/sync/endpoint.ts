@@ -24,7 +24,7 @@ export interface SyncDeps {
   database: Database;
   limiter: Limiter;
   now(): number;
-  /** `refuse` for an account with a key of its own (§9.4). Until personal keys exist (task 14.2) every account is `check`. */
+  /** `refuse` for an account with a key of its own (§9.4); the route reads which it is. */
   plain?: 'check' | 'refuse';
   /** Smaller limits for a test. */
   limits?: { lists: number; cards: number; checks?: number };

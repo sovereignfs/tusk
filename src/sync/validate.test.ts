@@ -34,6 +34,7 @@ const SAMPLE: Record<SyncTable, Record<string, unknown>> = {
     sort: 'due',
     showCompleted: true,
     filter: 'starred',
+    key: 'K'.repeat(330),
   },
   desk_card: {
     title: 'Water the plants',
@@ -593,5 +594,47 @@ describe('a due time', () => {
     // A time that is cleared needs no date, and a sealed date is taken to be there.
     expect(parseStructure(card({ dueTime: { v: null } })).ok).toBe(true);
     expect(parseStructure(card({ dueDate: { c: 'YWdl' }, dueTime: { v: '09:30' } })).ok).toBe(true);
+  });
+});
+
+describe('a list’s key', () => {
+  const list = (fields: Record<string, unknown>) => ({
+    table: 'desk_list',
+    id: ID(),
+    position: 'a1',
+    fields,
+  });
+  const WRAPPED = 'K'.repeat(330);
+
+  it('is plain on every account, and never ciphertext: it is already sealed, and the server keeps it for a new device', () => {
+    for (const plain of ['check', 'refuse'] as const) {
+      expect(parseStructure(list({ key: { v: WRAPPED } }), { plain }).ok, plain).toBe(true);
+      expect(parseStructure(list({ key: { c: WRAPPED } }), { plain }).ok, plain).toBe(false);
+    }
+  });
+
+  it('is a wrapped key in form and size, and nothing else', () => {
+    for (const bad of [
+      '',
+      'short',
+      'K'.repeat(99),
+      'K'.repeat(601),
+      `${'K'.repeat(200)} ${'K'.repeat(200)}`,
+      5,
+      null,
+      true,
+    ])
+      expect(parseField('desk_list', 'key', { v: bad }).ok, JSON.stringify(bad)).toBe(false);
+  });
+
+  it('does not make the rest of the list plain on an account that takes none', () => {
+    expect(
+      parseStructure(list({ key: { v: WRAPPED }, title: { v: 'Home' } }), { plain: 'refuse' }).ok,
+    ).toBe(false);
+    expect(
+      parseStructure(list({ key: { v: WRAPPED }, title: { c: 'AAAAAAAAAAAAAAAAAAAAAAAA' } }), {
+        plain: 'refuse',
+      }).ok,
+    ).toBe(true);
   });
 });

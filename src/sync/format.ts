@@ -42,7 +42,9 @@ export type Fields = Readonly<Record<string, FieldValue>>;
  * is the one a new row cannot do without.
  */
 export const FIELD_NAMES = {
-  desk_list: ['title', 'color', 'sort', 'showCompleted', 'filter'],
+  // `key` is the list's key, wrapped to the person's age recipient (§9.2, §23.3): structure, and always plain, since it is already sealed and the server must
+  // keep it for a device that is new. It is set when the list is made and not again.
+  desk_list: ['title', 'color', 'sort', 'showCompleted', 'filter', 'key'],
   // `startedAt` and `completedAt` are a card's status (§10.2): Done if `completedAt`, In progress if only `startedAt`, else Open. Phase 2 adds the fields
   // of Today and Review (`reviewedAt`, `dismissedOn`, §25.3).
   desk_card: [

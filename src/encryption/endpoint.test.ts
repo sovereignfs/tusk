@@ -11,7 +11,7 @@ import { testTarget } from '../db/test-support';
 import { RateLimiter } from '../limits/rate';
 import { makeStore } from '../sync/test-support';
 import { type EncryptionDeps, encryptionSetup, encryptionSkip, encryptionStatus } from './endpoint';
-import { readEncryption, setUpPersonalKey, skipKeyOffer } from './state';
+import { plainFor, readEncryption, setUpPersonalKey, skipKeyOffer } from './state';
 
 /**
  * `/api/encryption` (DESIGN.md §9.1) with two real accounts: who may call it, that a key is set up once and one way, that the server holds a public key and
@@ -195,5 +195,11 @@ describe(`the Desk’s key (${leg})`, () => {
     for (let n = 0; n < 25; n += 1)
       last = (await limited.skip(post(t.grace, '/api/encryption/skip'))).status;
     expect(last).toBe(429);
+  });
+
+  it('takes no plain content from an account with a key of its own, and both while it is moving to one', () => {
+    expect(plainFor('none')).toBe('check');
+    expect(plainFor('moving')).toBe('check');
+    expect(plainFor('personal')).toBe('refuse');
   });
 });

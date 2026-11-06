@@ -100,3 +100,7 @@ export async function skipKeyOffer(
   );
   return readEncryption(database, accountId);
 }
+
+/** What the sync endpoint takes of an account in this mode (DESIGN.md §9.4): an account with a key of its own sends no plain content, and one being moved to it sends both. */
+export const plainFor = (mode: EncryptionMode): 'check' | 'refuse' =>
+  mode === 'personal' ? 'refuse' : 'check';

@@ -76,6 +76,23 @@ interface FieldSpec {
 const ruleText: Parser<Scalar> = (value) =>
   typeof value === 'string' && isRule(value) ? ok(value) : no('not a repeat rule');
 
+/** The text of a wrapped list key: base64url, and short. It is the one field that is never ciphertext. */
+const WRAPPED_KEY_CHARS = 600;
+const wrappedKey: Parser<Scalar> = (value) =>
+  typeof value === 'string' &&
+  value.length >= 100 &&
+  value.length <= WRAPPED_KEY_CHARS &&
+  /^[A-Za-z0-9_-]+$/.test(value)
+    ? ok(value)
+    : no('not a wrapped key');
+
+/** The fields that are structure and not content (§9.2): plain on every account, because they are what the server and a new device need to read. */
+export const STRUCTURAL_FIELDS: Partial<Record<SyncTable, readonly string[]>> = {
+  desk_list: ['key'],
+};
+const isStructural = (table: SyncTable, name: string): boolean =>
+  STRUCTURAL_FIELDS[table]?.includes(name) === true;
+
 const TITLE: FieldSpec = { plain: text(1, LIMITS.titleChars), chars: LIMITS.titleChars };
 /** A field whose value is short whatever it holds: a flag, a date, a time, an id, a word, a number. */
 const SHORT = 64;
@@ -89,6 +106,8 @@ const FIELDS: Record<SyncTable, Record<string, FieldSpec>> = {
     sort: short(oneOf(...SORTS)),
     showCompleted: short(bool),
     filter: short(oneOf(...FILTERS)),
+    // A list key wrapped to an age recipient (§9.2): an age file as base64url, about 330 characters.
+    key: { plain: wrappedKey, chars: WRAPPED_KEY_CHARS },
   },
   desk_card: {
     title: TITLE,
@@ -147,6 +166,7 @@ function parseShape(table: SyncTable, name: string, value: unknown): Parsed<Fiel
   if (keys.length !== 1) return no('a field is { v } or { c }, and not both');
 
   if (keys[0] === 'c') {
+    if (isStructural(table, name)) return no('a structural field is never ciphertext');
     const cipher = value.c;
     if (typeof cipher !== 'string') return no('ciphertext is text');
     if (cipher.length === 0) return no('ciphertext is empty');
@@ -236,14 +256,15 @@ export function parseStructure(value: unknown, options: ChangeOptions = {}): Par
   if (Object.hasOwn(value, 'fields')) {
     if (!isRecord(value.fields)) return no('fields: not an object');
     for (const name of Object.keys(value.fields)) {
+      // A structural field is plain whatever the account takes, and held to its rule.
       const shaped =
-        plain === 'refuse'
+        plain === 'refuse' && !isStructural(kind, name)
           ? parseShape(kind, name, value.fields[name])
           : parseField(kind, name, value.fields[name]);
       // A name is repeated in the reason only if it is one of ours: a device chose the others, and they are not ours to echo.
       const label = specOf(kind, name) ? name : 'fields';
       if (!shaped.ok) return no(`${label}: ${shaped.reason}`);
-      if (plain === 'refuse' && 'v' in shaped.value)
+      if (plain === 'refuse' && 'v' in shaped.value && !isStructural(kind, name))
         return no(`${name}: this account sends no plain content`);
       fields[name] = shaped.value;
     }
