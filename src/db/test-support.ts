@@ -7,6 +7,7 @@ import { SQLiteTable, getTableConfig } from 'drizzle-orm/sqlite-core';
 import { type Env, processEnv } from '../config/env';
 import * as sqliteApp from './schema/sqlite/app';
 import * as sqliteAuth from './schema/sqlite/auth';
+import * as sqliteWorkspaces from './schema/sqlite/workspaces';
 import { type Database, openDatabase } from './client';
 import {
   APP_STORE,
@@ -154,7 +155,10 @@ const namesIn = (module: Record<string, unknown>): string[] =>
     .sort();
 
 /** What the app store holds once it is migrated. */
-export const APP_TABLES: readonly string[] = namesIn(sqliteApp);
+export const APP_TABLES: readonly string[] = [
+  ...namesIn(sqliteApp),
+  ...namesIn(sqliteWorkspaces),
+].sort();
 
 /** What the auth store holds once it is migrated. */
 export const AUTH_TABLES: readonly string[] = namesIn(sqliteAuth);

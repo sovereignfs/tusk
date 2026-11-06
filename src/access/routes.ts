@@ -34,6 +34,8 @@ export const ROUTES: RouteRule[] = [
   // APIs
   // The one door nearly every write comes through (DESIGN.md §8.3): the account is the session's, and the server applies what a device sends only to it.
   { route: '/api/sync', methods: { POST: { kind: 'account' } } },
+  // The one door every write to a workspace comes through (DESIGN.md §7.3): the account is the session's, and the permission is in the statement.
+  { route: '/api/ops', methods: { POST: { kind: 'account' } } },
   { route: '/api/health', methods: { GET: { kind: 'public' } } },
   // better-auth's own: it checks `Origin` and the session cookie itself, and rate-limits sign-in (src/auth/auth.ts). Absent, with a 404, when sign-in is off.
   {

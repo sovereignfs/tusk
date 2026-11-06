@@ -37,6 +37,8 @@ Each release's section is also its GitHub release notes: the release workflow re
 
 ### Changed
 
+- The server has the tables of workspaces, boards and cards, and one door for writing to them, `POST /api/ops`: an operation with its permission in the statement that does the work, answered the same whether the thing is not there or is not yours. Nothing in the app uses it yet.
+
 - The app is called **Tusk**, not Tasks. Every setting is `TUSK_…` (it was `TASKS_…`), the databases are `tusk` and `tusk_auth` (files `tusk.db` and `tusk_auth.db`), the session cookie is `tusk.session_token`, the database kept in the browser is `tusk-desk-<account>`, and the image is `ghcr.io/sovereignfs/tusk`. Nothing was released under the old names, so there is no alias: set the new ones, and a database made under the old names starts again.
 - The Desk's data is four tables of its own, `desk_list`, `desk_card`, `desk_check` and `desk_series`: a card has a description (what were notes), and a checklist item is a row of its own and no longer a task with a parent. The sync protocol is version 2, so a device that speaks version 1 is told to update, and the database kept in the browser starts again. The database migrations are squashed into one; a development database made before this is made again (`pnpm seed` makes an account worth looking at).
 - A card is opened by `?card=` (it was `?task=`). The Desk is at `/desk` and `/desk/<list>` (it was `/home` and `/lists/<id>`).
