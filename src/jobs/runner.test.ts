@@ -329,8 +329,10 @@ describe('starting the jobs', () => {
     await runner?.stop();
   });
 
-  it('has the jobs the app has: the purge and the trim of notices, each hourly, from the start', () => {
-    expect(jobs.map((job) => job.name)).toEqual(['purge', 'trim-notices']);
-    for (const job of jobs) expect(job).toMatchObject({ everyMs: 3_600_000, runAtStart: true });
+  it('has the jobs the app has: the purge and the trim of notices, each hourly from the start, and the backups, every minute', () => {
+    expect(jobs.map((job) => job.name)).toEqual(['purge', 'trim-notices', 'backups']);
+    for (const job of jobs.filter((each) => each.name !== 'backups'))
+      expect(job).toMatchObject({ everyMs: 3_600_000, runAtStart: true });
+    expect(jobs.find((job) => job.name === 'backups')).toMatchObject({ everyMs: 60_000 });
   });
 });

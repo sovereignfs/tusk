@@ -9,7 +9,9 @@ import {
   disconnectRepository,
   readConnection,
 } from './connection';
+import { setSchedule } from './auto';
 import { RUN_MESSAGES, runBackup } from './run';
+import { type Frequency, type Mode, isFrequency, isMode } from './schedule';
 
 /**
  * `/api/backup/connection` (DESIGN.md §21.2): what is connected, connecting a repository with a token, and disconnecting. The route is wrapped in
@@ -40,6 +42,10 @@ function shown(
     createdAt: number;
     lastBackupAt: number | null;
     lastBackupPath: string | null;
+    lastCheckedAt: number | null;
+    mode: Mode;
+    frequency: Frequency;
+    nextBackupAt: number | null;
   },
   apiUrl: string,
 ) {
@@ -50,6 +56,10 @@ function shown(
     branch: connection.branch,
     kind: connection.kind,
     connectedAt: connection.createdAt,
+    mode: connection.mode,
+    frequency: connection.frequency,
+    nextBackupAt: connection.nextBackupAt,
+    lastCheckedAt: connection.lastCheckedAt,
     lastBackup:
       connection.lastBackupAt !== null && connection.lastBackupPath !== null
         ? {
@@ -112,6 +122,42 @@ export async function connectionConnect(
   });
 }
 
+/**
+ * `PATCH { mode?, frequency? }`: `manual` or `auto`, and how often `auto` looks (`hourly`, `6h`, `daily`, `weekly`). 200 with the connection; 400 for what is
+ * not one of those; 404 when this account has nothing connected.
+ */
+export async function connectionSchedule(
+  request: Request,
+  accountId: string,
+  deps: ConnectionDeps,
+): Promise<Response> {
+  const body = await readCapped(request, BODY_BYTES);
+  if (body === null) return json(413, { code: 'TOO_LARGE' });
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    return json(400, { code: 'BAD_REQUEST' });
+  }
+  const given = parsed as { mode?: unknown; frequency?: unknown } | null;
+  if (typeof given !== 'object' || given === null || Array.isArray(given))
+    return json(400, { code: 'BAD_REQUEST' });
+  const patch: { mode?: Mode; frequency?: Frequency } = {};
+  if (given.mode !== undefined) {
+    if (!isMode(given.mode)) return json(400, { code: 'BAD_REQUEST' });
+    patch.mode = given.mode;
+  }
+  if (given.frequency !== undefined) {
+    if (!isFrequency(given.frequency)) return json(400, { code: 'BAD_REQUEST' });
+    patch.frequency = given.frequency;
+  }
+  if (patch.mode === undefined && patch.frequency === undefined)
+    return json(400, { code: 'BAD_REQUEST' });
+  const connection = await setSchedule(deps.database, accountId, patch, deps.now());
+  if (!connection) return new Response(null, { status: 404 });
+  return json(200, { connection: shown(connection, deps.apiUrl) });
+}
+
 /** `DELETE`: disconnects. 404 when there is nothing connected for this account, as for anything that is not theirs. */
 export async function connectionDisconnect(
   accountId: string,
@@ -154,5 +200,7 @@ export async function runNow(accountId: string, deps: RunEndpointDeps): Promise<
         : { 'retry-after': String(Math.max(1, Math.ceil(result.retryAfterMs / 1000))) },
     );
   }
+  // A manual run always writes.
+  if (result.unchanged) return json(200, { unchanged: true, at: result.at });
   return json(200, { path: result.path, url: result.url, at: result.at });
 }

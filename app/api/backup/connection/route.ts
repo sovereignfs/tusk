@@ -2,6 +2,7 @@ import { accountRoute } from '@/src/access/route';
 import {
   connectionConnect,
   connectionDisconnect,
+  connectionSchedule,
   connectionStatus,
   type ConnectionDeps,
 } from '@/src/backup/endpoint';
@@ -27,6 +28,9 @@ async function deps(): Promise<ConnectionDeps> {
 export const GET = accountRoute(async ({ accountId }) => connectionStatus(accountId, await deps()));
 export const POST = accountRoute(async ({ request, accountId }) =>
   connectionConnect(request, accountId, await deps()),
+);
+export const PATCH = accountRoute(async ({ request, accountId }) =>
+  connectionSchedule(request, accountId, await deps()),
 );
 export const DELETE = accountRoute(async ({ accountId }) =>
   connectionDisconnect(accountId, await deps()),

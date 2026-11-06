@@ -53,7 +53,12 @@ export const ROUTES: RouteRule[] = [
   // The repository an account backs up to (DESIGN.md §21.2): the account is the session's, and the token is in one request and no response.
   {
     route: '/api/backup/connection',
-    methods: { GET: { kind: 'account' }, POST: { kind: 'account' }, DELETE: { kind: 'account' } },
+    methods: {
+      GET: { kind: 'account' },
+      POST: { kind: 'account' },
+      PATCH: { kind: 'account' },
+      DELETE: { kind: 'account' },
+    },
   },
   // Back up now (DESIGN.md §21.4): the account is the session's, at most once a minute.
   { route: '/api/backup/run', methods: { POST: { kind: 'account' } } },

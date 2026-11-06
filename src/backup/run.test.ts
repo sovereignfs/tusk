@@ -84,7 +84,7 @@ describe(`making a backup (${leg})`, () => {
     });
     const before = await fake.files(ref);
     const result = await runBackup(deps(), account, NOW, 'manual');
-    if (!result.ok) throw new Error(result.problem);
+    if (!result.ok || result.unchanged) throw new Error('not written');
     expect(result.path).toBe('tusk/2026-11-06_14-30-00.json');
     const after = await fake.files(ref);
     // Nothing else of the repository was touched, fjord.json included.
@@ -103,7 +103,7 @@ describe(`making a backup (${leg})`, () => {
   it('writes a file that imports: it is a valid export, with the Desk in it', async () => {
     const { account, ref } = await connected();
     const result = await runBackup(deps(), account, NOW, 'manual');
-    if (!result.ok) throw new Error(result.problem);
+    if (!result.ok || result.unchanged) throw new Error('not written');
     const content = (await fake.files(ref))[result.path] ?? '';
     const read = validateFile(content);
     if (!read.ok) throw new Error(read.error);
@@ -130,7 +130,7 @@ describe(`making a backup (${leg})`, () => {
     );
     expect(connect.ok).toBe(true);
     const mine = await runBackup(deps(), owner, NOW, 'manual');
-    if (!mine.ok) throw new Error(mine.problem);
+    if (!mine.ok || mine.unchanged) throw new Error('not written');
     const file = validateFile((await fake.files(ref))[mine.path] ?? '');
     if (!file.ok) throw new Error(file.error);
     expect(file.file.workspaces?.length).toBe(1);
@@ -145,7 +145,7 @@ describe(`making a backup (${leg})`, () => {
       TOKEN,
     );
     const theirs = await runBackup(deps(), world.accounts.member, NOW, 'manual');
-    if (!theirs.ok) throw new Error(theirs.problem);
+    if (!theirs.ok || theirs.unchanged) throw new Error('not written');
     const theirFile = validateFile((await fake.files(memberRef))[theirs.path] ?? '');
     if (!theirFile.ok) throw new Error(theirFile.error);
     expect(theirFile.file.workspaces ?? []).toEqual([]);
@@ -159,7 +159,7 @@ describe(`making a backup (${leg})`, () => {
       lastFingerprint: null,
     });
     const result = await runBackup(deps(), account, NOW, 'manual');
-    if (!result.ok) throw new Error(result.problem);
+    if (!result.ok || result.unchanged) throw new Error('not written');
     const connection = await readConnection(database, account);
     expect(connection).toMatchObject({ lastBackupAt: NOW, lastBackupPath: result.path });
     const snapshot = await takeSnapshot(database, directory, account, new Date(NOW));
@@ -170,7 +170,7 @@ describe(`making a backup (${leg})`, () => {
     const { account, ref } = await connected();
     const first = await runBackup(deps(), account, NOW, 'manual');
     const second = await runBackup(deps(), account, NOW + 61_000, 'manual');
-    if (!first.ok || !second.ok) throw new Error('failed');
+    if (!first.ok || first.unchanged || !second.ok || second.unchanged) throw new Error('failed');
     const files = await fake.files(ref);
     expect(
       Object.keys(files)
@@ -211,7 +211,7 @@ describe(`making a backup (${leg})`, () => {
       };
     };
     const result = await runBackup(deps({ makeProvider: racing }), account, NOW, 'manual');
-    if (!result.ok) throw new Error(result.problem);
+    if (!result.ok || result.unchanged) throw new Error('not written');
     const files = await fake.files(ref);
     expect(files['theirs.txt']).toBe('theirs');
     expect(files[result.path]).toBeDefined();

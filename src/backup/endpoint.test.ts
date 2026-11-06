@@ -13,6 +13,7 @@ import {
   type ConnectionDeps,
   connectionConnect,
   connectionDisconnect,
+  connectionSchedule,
   connectionStatus,
   runNow,
 } from './endpoint';
@@ -57,6 +58,10 @@ const routes = (extra: Partial<ConnectionDeps> = {}) => ({
   GET: accountRoute(({ accountId }) => connectionStatus(accountId, deps(extra)), t.deps),
   POST: accountRoute(
     ({ request, accountId }) => connectionConnect(request, accountId, deps(extra)),
+    t.deps,
+  ),
+  PATCH: accountRoute(
+    ({ request, accountId }) => connectionSchedule(request, accountId, deps(extra)),
     t.deps,
   ),
   DELETE: accountRoute(({ accountId }) => connectionDisconnect(accountId, deps(extra)), t.deps),
@@ -127,8 +132,12 @@ describe(`/api/backup/connection (${leg})`, () => {
     expect(Object.keys(body.connection).sort()).toEqual([
       'branch',
       'connectedAt',
+      'frequency',
       'kind',
       'lastBackup',
+      'lastCheckedAt',
+      'mode',
+      'nextBackupAt',
       'repository',
       'url',
     ]);
@@ -326,6 +335,92 @@ describe(`/api/backup/connection (${leg})`, () => {
       expect(await response.json()).toMatchObject({ code: 'public' });
       expect(everything).toMatch(/public now/);
       await routes().DELETE(t.request(t.grace, path, { method: 'DELETE' }));
+    });
+  });
+
+  describe('how it is run', () => {
+    beforeEach(async () => {
+      for (const who of [t.ada, t.grace])
+        await routes().DELETE(t.request(who, path, { method: 'DELETE' }));
+    });
+    const open = { take: async () => ({ ok: true as const }) };
+    const connect = async (who: typeof t.ada) => {
+      const ref = await repo();
+      await routes({ limiter: open }).POST(
+        t.request(who, path, {
+          method: 'POST',
+          body: { repository: `${ref.owner}/${ref.name}`, token: TOKEN },
+        }),
+      );
+      return ref;
+    };
+    const patch = (who: typeof t.ada | null, body: unknown, extra: Partial<ConnectionDeps> = {}) =>
+      routes(extra).PATCH(t.request(who, path, { method: 'PATCH', body }));
+
+    it('is for someone signed in and from the app, and a 404 where nothing is connected', async () => {
+      expect((await patch(null, { mode: 'auto' })).status).toBe(401);
+      expect(
+        (
+          await routes().PATCH(
+            t.request(t.ada, path, {
+              method: 'PATCH',
+              body: { mode: 'auto' },
+              headers: { origin: 'https://evil.example' },
+            }),
+          )
+        ).status,
+      ).toBe(403);
+      expect((await patch(t.grace, { mode: 'auto' })).status).toBe(404);
+    });
+
+    it('chooses auto and how often, shows the next time, and clears it for manual', async () => {
+      await connect(t.ada);
+      const now = 1_800_000_000_000;
+      const auto = await (
+        await patch(t.ada, { mode: 'auto', frequency: '6h' }, { now: () => now })
+      ).json();
+      expect(auto.connection).toMatchObject({ mode: 'auto', frequency: '6h' });
+      expect(auto.connection.nextBackupAt).toBeGreaterThanOrEqual(now + 6 * 3_600_000);
+      expect(auto.connection.nextBackupAt).toBeLessThan(now + 6 * 3_600_000 + 36 * 60_000);
+      const status = await (await routes().GET(t.request(t.ada, path))).json();
+      expect(status.connection).toMatchObject({ mode: 'auto', frequency: '6h' });
+      const manual = await (await patch(t.ada, { mode: 'manual' })).json();
+      expect(manual.connection).toMatchObject({ mode: 'manual', nextBackupAt: null });
+    });
+
+    it('keeps one account’s choice from another’s', async () => {
+      await connect(t.ada);
+      await connect(t.grace);
+      await patch(t.ada, { mode: 'auto', frequency: 'hourly' });
+      const grace = await (await routes().GET(t.request(t.grace, path))).json();
+      expect(grace.connection).toMatchObject({ mode: 'manual', frequency: 'daily' });
+    });
+
+    it('refuses what is not a mode or a frequency', async () => {
+      await connect(t.ada);
+      for (const body of [
+        {},
+        { mode: 'sometimes' },
+        { frequency: 'monthly' },
+        { mode: 5 },
+        { frequency: null },
+        [],
+        null,
+        'auto',
+      ])
+        expect((await patch(t.ada, body)).status, JSON.stringify(body)).toBe(400);
+      const raw = new Request(t.request(t.ada, path).url, {
+        method: 'PATCH',
+        headers: {
+          origin: new URL(t.request(t.ada, path).url).origin,
+          cookie: t.ada.client.cookieHeader(),
+        },
+        body: '{no',
+      });
+      expect((await routes().PATCH(raw)).status).toBe(400);
+      expect((await (await routes().GET(t.request(t.ada, path))).json()).connection.mode).toBe(
+        'manual',
+      );
     });
   });
 });

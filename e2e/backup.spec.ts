@@ -95,6 +95,21 @@ test('a repository is connected with a token, a public one is refused in words, 
   );
   expect(await page.content()).not.toContain('E2E_PLANTED');
 
+  // Automatic backups: chosen, how often, kept after a reload, and put back to manual.
+  const how = page
+    .getByRole('group', { name: 'How backups are made' })
+    .or(page.getByLabel('How backups are made'));
+  await expect(how).toBeVisible();
+  await page.getByText('Automatically', { exact: true }).click();
+  await expect(page.getByText(/Next check:/)).toBeVisible();
+  await page.getByLabel('How often').selectOption('weekly');
+  await page.reload();
+  await expect(page.getByLabel('How often')).toHaveValue('weekly');
+  await expect(page.getByText(/Next check:/)).toBeVisible();
+  await page.getByText('Only when I ask', { exact: true }).click();
+  await expect(page.getByText(/Next check:/)).toHaveCount(0);
+  await expect(page.getByLabel('How often')).toHaveCount(0);
+
   await page.getByRole('button', { name: 'Disconnect' }).click();
   await expect(page.getByLabel('Token')).toBeVisible();
   await expect(page.getByText(/^Connected to/)).toHaveCount(0);

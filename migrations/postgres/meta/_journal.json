@@ -50,6 +50,13 @@
       "when": 1794001167211,
       "tag": "0006_backup_record",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794001982059,
+      "tag": "0007_backup_schedule",
+      "breakpoints": true
     }
   ]
 }

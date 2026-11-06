@@ -1,11 +1,14 @@
+import { authDirectory } from '../auth/directory';
+import { runDueBackups } from '../backup/auto';
 import type { Config } from '../config';
-import { getDatabase } from '../db/boot';
+import { getConfig } from '../config/current';
+import { getAuthDatabase, getDatabase } from '../db/boot';
 import { purge } from '../sync/purge';
 import { trimNotices } from '../workspaces/inbox';
 import { JobRunner, realDeps, type JobDefinition, type RunnerDeps } from './runner';
 
 /**
- * Every job the app has. Each task that has one adds it here: the purge (13.7, here), the reminders (8.5, 8.6) and the backups (10.5).
+ * Every job the app has. Each task that has one adds it here: the purge (13.7, here), the reminders (8.5, 8.6) and the backups (10.5, here).
  */
 export const jobs: readonly JobDefinition[] = [
   {
@@ -25,6 +28,31 @@ export const jobs: readonly JobDefinition[] = [
     runAtStart: true,
     run: async ({ now }) => {
       await trimNotices(await getDatabase(), now.getTime());
+    },
+  },
+  {
+    // The automatic backups that are due (DESIGN.md §21.4). Each is claimed by a conditional update, so any process may run this at any time and one runs
+    // each connection. Without an instance key nothing can have been connected.
+    name: 'backups',
+    everyMs: 60 * 1000,
+    run: async ({ now }) => {
+      const config = getConfig();
+      if (!config.encryption) return;
+      const summary = await runDueBackups(
+        {
+          database: await getDatabase(),
+          directory: authDirectory(await getAuthDatabase()),
+          ring: config.encryption,
+          apiUrl: config.githubApiUrl,
+        },
+        now.getTime(),
+        {},
+        (line) => console.info(line),
+      );
+      if (summary.claimed > 0)
+        console.info(
+          `[tusk] backup: ${summary.committed} written, ${summary.unchanged} unchanged, ${summary.failed} failed`,
+        );
     },
   },
 ];

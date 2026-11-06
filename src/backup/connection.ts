@@ -6,6 +6,7 @@ import { dbAll, dbGet } from '../db/exec';
 import { GitHubProvider } from '../providers/github';
 import { type Provider, ProviderError, type RepositoryRef } from '../providers/types';
 import { parseAddress, webHostsFor } from './address';
+import { DEFAULT_FREQUENCY, type Frequency, type Mode, isFrequency, isMode } from './schedule';
 import { backupConnectionTable } from './tables';
 
 /**
@@ -66,6 +67,12 @@ export interface Connection {
   readonly lastBackupAt: number | null;
   readonly lastBackupPath: string | null;
   readonly lastFingerprint: string | null;
+  /** When an automatic backup last looked, whether it wrote or found nothing changed. */
+  readonly lastCheckedAt: number | null;
+  readonly mode: Mode;
+  readonly frequency: Frequency;
+  /** When `auto` is next due; null for `manual`. */
+  readonly nextBackupAt: number | null;
 }
 
 /** What the credential is for, in the store. */
@@ -132,10 +139,15 @@ export async function readConnection(
     lastBackupAt: number | string | null;
     lastBackupPath: string | null;
     lastFingerprint: string | null;
+    lastCheckedAt: number | string | null;
+    mode: string;
+    frequency: string;
+    nextBackupAt: number | string | null;
   }>(
     database,
     sql`SELECT account_id AS "accountId", kind, repository, branch, credential_id AS "credentialId", created_at AS "createdAt",
-        last_backup_at AS "lastBackupAt", last_backup_path AS "lastBackupPath", last_fingerprint AS "lastFingerprint"
+        last_backup_at AS "lastBackupAt", last_backup_path AS "lastBackupPath", last_fingerprint AS "lastFingerprint",
+        last_checked_at AS "lastCheckedAt", mode, frequency, next_backup_at AS "nextBackupAt"
         FROM ${backupConnectionTable(database)} WHERE account_id = ${accountId}`,
   );
   return row
@@ -149,6 +161,10 @@ export async function readConnection(
         lastBackupAt: row.lastBackupAt === null ? null : Number(row.lastBackupAt),
         lastBackupPath: row.lastBackupPath,
         lastFingerprint: row.lastFingerprint,
+        lastCheckedAt: row.lastCheckedAt === null ? null : Number(row.lastCheckedAt),
+        mode: isMode(row.mode) ? row.mode : 'manual',
+        frequency: isFrequency(row.frequency) ? row.frequency : DEFAULT_FREQUENCY,
+        nextBackupAt: row.nextBackupAt === null ? null : Number(row.nextBackupAt),
       }
     : undefined;
 }
@@ -212,7 +228,8 @@ export async function connectRepository(
       sql`INSERT INTO ${backupConnectionTable(deps.database)} AS c (account_id, kind, repository, branch, credential_id, created_at)
           VALUES (${accountId}, 'token', ${`${ref.owner}/${ref.name}`}, ${branch}, ${credentialId}, ${now})
           ON CONFLICT (account_id) DO UPDATE SET
-            kind = 'token', repository = ${`${ref.owner}/${ref.name}`}, branch = ${branch}, credential_id = ${credentialId}, created_at = ${now}
+            kind = 'token', repository = ${`${ref.owner}/${ref.name}`}, branch = ${branch}, credential_id = ${credentialId}, created_at = ${now},
+            last_backup_at = NULL, last_backup_path = NULL, last_fingerprint = NULL, last_checked_at = NULL
           RETURNING account_id`,
     );
   } catch (error) {

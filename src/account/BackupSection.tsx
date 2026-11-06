@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Button, FormField, Input } from '../ui';
+import { Alert, Button, FormField, Input, SegmentedControl, Select } from '../ui';
 import styles from './Account.module.css';
 
 interface Connection {
@@ -9,7 +9,19 @@ interface Connection {
   url: string;
   branch: string;
   lastBackup: { at: number; path: string; url: string } | null;
+  mode: 'manual' | 'auto';
+  frequency: Frequency;
+  nextBackupAt: number | null;
+  lastCheckedAt: number | null;
 }
+
+type Frequency = 'hourly' | '6h' | 'daily' | 'weekly';
+const FREQUENCY_LABELS: Record<Frequency, string> = {
+  hourly: 'Every hour',
+  '6h': 'Every 6 hours',
+  daily: 'Every day',
+  weekly: 'Every week',
+};
 
 interface Status {
   canConnect: boolean;
@@ -97,6 +109,24 @@ export function BackupSection() {
     }
   }
 
+  async function schedule(patch: { mode?: 'manual' | 'auto'; frequency?: Frequency }) {
+    setWorking(true);
+    setProblem(null);
+    try {
+      const reply = await fetch('/api/backup/connection', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      if (!reply.ok) setProblem('That could not be changed.');
+      await read();
+    } catch {
+      setProblem('That needs a connection.');
+    } finally {
+      setWorking(false);
+    }
+  }
+
   async function disconnect() {
     setWorking(true);
     setProblem(null);
@@ -151,6 +181,49 @@ export function BackupSection() {
               'No backup has been made yet.'
             )}
           </p>
+          <div className={styles.row}>
+            <SegmentedControl<'manual' | 'auto'>
+              aria-label="How backups are made"
+              size="sm"
+              value={status.connection.mode}
+              onChange={(mode) => void schedule({ mode })}
+              options={[
+                { label: 'Only when I ask', value: 'manual' },
+                { label: 'Automatically', value: 'auto' },
+              ]}
+            />
+            {status.connection.mode === 'auto' ? (
+              <FormField label="How often">
+                {(field) => (
+                  <Select
+                    {...field}
+                    value={status.connection?.frequency ?? 'daily'}
+                    disabled={working}
+                    onChange={(event) =>
+                      void schedule({ frequency: event.target.value as Frequency })
+                    }
+                  >
+                    {(Object.keys(FREQUENCY_LABELS) as Frequency[]).map((each) => (
+                      <option key={each} value={each}>
+                        {FREQUENCY_LABELS[each]}
+                      </option>
+                    ))}
+                  </Select>
+                )}
+              </FormField>
+            ) : null}
+          </div>
+          {status.connection.mode === 'auto' ? (
+            <p className={styles.hint}>
+              Automatic backups only write a new file when something has changed since the last.
+              {status.connection.lastCheckedAt !== null
+                ? ` Last checked: ${new Date(status.connection.lastCheckedAt).toLocaleString()}.`
+                : ''}
+              {status.connection.nextBackupAt !== null
+                ? ` Next check: ${new Date(status.connection.nextBackupAt).toLocaleString()}.`
+                : ''}
+            </p>
+          ) : null}
           <div className={styles.row}>
             <Button disabled={working} onClick={() => void backUpNow()}>
               {working ? 'Working…' : 'Back up now'}

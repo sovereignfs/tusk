@@ -62,6 +62,7 @@ export type Trigger = 'manual' | 'auto';
 export type RunResult =
   | {
       readonly ok: true;
+      readonly unchanged: false;
       readonly trigger: Trigger;
       readonly path: string;
       readonly sha: string;
@@ -69,6 +70,13 @@ export type RunResult =
       readonly at: number;
       /** Where the file is on the web. */
       readonly url: string;
+    }
+  /** An automatic backup that found nothing changed since the last: it looked, and wrote nothing (§21.4). */
+  | {
+      readonly ok: true;
+      readonly unchanged: true;
+      readonly trigger: Trigger;
+      readonly at: number;
     }
   | { readonly ok: false; readonly problem: RunProblem; readonly retryAfterMs?: number };
 
@@ -144,6 +152,15 @@ export async function runBackup(
 
     // The rows, in a transaction that is over before the host is called again.
     const snapshot = await takeSnapshot(deps.database, deps.directory, accountId, when);
+    // An automatic backup writes only when something changed since the last one; Back up now always writes.
+    if (trigger === 'auto' && snapshot.fingerprint === connection.lastFingerprint) {
+      await dbAll(
+        deps.database,
+        sql`UPDATE ${backupConnectionTable(deps.database)} SET last_checked_at = ${now}
+            WHERE account_id = ${accountId} RETURNING account_id`,
+      );
+      return { ok: true, unchanged: true, trigger, at: now };
+    }
     const content = serialise(snapshot.file);
     const bytes = Buffer.byteLength(content, 'utf8');
     if (bytes > MAX_FILE_BYTES) return { ok: false, problem: 'too_large' };
@@ -169,11 +186,12 @@ export async function runBackup(
     await dbAll(
       deps.database,
       sql`UPDATE ${backupConnectionTable(deps.database)}
-          SET last_backup_at = ${now}, last_backup_path = ${path}, last_fingerprint = ${snapshot.fingerprint}
+          SET last_backup_at = ${now}, last_checked_at = ${now}, last_backup_path = ${path}, last_fingerprint = ${snapshot.fingerprint}
           WHERE account_id = ${accountId} RETURNING account_id`,
     );
     return {
       ok: true,
+      unchanged: false,
       trigger,
       path,
       sha: commit.sha,

@@ -190,15 +190,27 @@ export const credential = sqliteTable(
  * (`token`; `app` with task 10.7); `repository` is `owner/name` and `branch` the default branch it was found to have. The columns for the backups themselves
  * (mode, times, failures) are added by the tasks that make them.
  */
-export const backupConnection = sqliteTable('backup_connection', {
-  accountId: ref('account_id').primaryKey(),
-  kind: text('kind').notNull(),
-  repository: text('repository').notNull(),
-  branch: text('branch').notNull(),
-  credentialId: ref('credential_id').notNull(),
-  createdAt: epochMs('created_at').notNull(),
-  /** The last backup that was confirmed written (§21.4), when, to which file, and the fingerprint of what it held: all null until there is one. */
-  lastBackupAt: epochMs('last_backup_at'),
-  lastBackupPath: text('last_backup_path'),
-  lastFingerprint: text('last_fingerprint'),
-});
+export const backupConnection = sqliteTable(
+  'backup_connection',
+  {
+    accountId: ref('account_id').primaryKey(),
+    kind: text('kind').notNull(),
+    repository: text('repository').notNull(),
+    branch: text('branch').notNull(),
+    credentialId: ref('credential_id').notNull(),
+    createdAt: epochMs('created_at').notNull(),
+    /** The last backup that was confirmed written (§21.4), when, to which file, and the fingerprint of what it held: all null until there is one. */
+    lastBackupAt: epochMs('last_backup_at'),
+    lastBackupPath: text('last_backup_path'),
+    lastFingerprint: text('last_fingerprint'),
+    /** When an automatic backup last looked and found nothing changed, or made one: the "last checked" a person sees (§21.4). */
+    lastCheckedAt: epochMs('last_checked_at'),
+    /** `manual` (only on Back up now) or `auto` (§21.1). */
+    mode: text('mode').notNull().default('manual'),
+    /** `hourly`, `6h`, `daily` or `weekly`: how often `auto` looks. */
+    frequency: text('frequency').notNull().default('daily'),
+    /** When `auto` is next due; null for `manual`. A process claims a due connection by a conditional update on this (§21.4). */
+    nextBackupAt: epochMs('next_backup_at'),
+  },
+  (table) => [index('backup_connection_due_idx').on(table.nextBackupAt)],
+);
