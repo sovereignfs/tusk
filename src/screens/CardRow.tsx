@@ -17,6 +17,7 @@ import { ProgressRing } from './ProgressRing';
 import { dueOf } from '../actions/due';
 import { formatDue } from '../format-due';
 import { nowHere } from '../time';
+import { useSelection } from './selection';
 import { StarButton } from './StarButton';
 import styles from './ListScreen.module.css';
 
@@ -51,6 +52,8 @@ export function CardRow({
   const client = useSync();
   const pathname = usePathname();
   const router = useRouter();
+  const selection = useSelection();
+  const chosen = selection?.selected.has(card.id) ?? false;
   const done = isCompleted(card);
   const [asked, setAsked] = useState<boolean | null>(null);
   const checked = asked ?? done;
@@ -87,11 +90,23 @@ export function CardRow({
     // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions
     <li
       {...rowProps}
-      className={`${styles.row} ${checked ? styles.done : ''}`}
+      className={`${styles.row} ${checked ? styles.done : ''} ${chosen ? styles.chosen : ''}`}
       aria-current={open ? 'true' : undefined}
       onClick={(event) => {
+        const target = event.target as HTMLElement;
+        // Ctrl or cmd chooses the card (a click on its box already means done), and while any are chosen a click chooses and opens nothing: the link too,
+        // which does not go where it points. The box, the star and the other controls keep their own clicks.
+        if (
+          selection &&
+          !target.closest('button, input, label') &&
+          (event.ctrlKey || event.metaKey || selection.active)
+        ) {
+          event.preventDefault();
+          selection.toggle(card.id);
+          return;
+        }
         // The row's free space opens the card as the link does; the controls in it keep their own clicks.
-        if ((event.target as HTMLElement).closest('a, button, input, label')) return;
+        if (target.closest('a, button, input, label')) return;
         router.push(`${pathname}?card=${card.id}`, { scroll: false });
       }}
     >
@@ -107,6 +122,12 @@ export function CardRow({
         href={`${pathname}?card=${card.id}`}
         className={styles.name}
         scroll={false}
+        // Choosing a card is not opening it: the link does not go where it points while ctrl or cmd is held or any card is chosen. The row's own handler
+        // does the choosing; this is what keeps the link from navigating first.
+        onClick={(event) => {
+          if (selection && (event.ctrlKey || event.metaKey || selection.active))
+            event.preventDefault();
+        }}
         // A link can be dragged by the browser too, and one dropped on the page is followed: that is a navigation in the middle of a reorder.
         draggable={false}
       >
@@ -123,6 +144,7 @@ export function CardRow({
         <ProgressRing done={progress.done} total={progress.total} />
       ) : null}
       <StarButton card={card} />
+      {chosen ? <span className={styles.srOnly}>Chosen</span> : null}
     </li>
   );
 }

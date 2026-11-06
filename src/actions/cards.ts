@@ -258,7 +258,8 @@ export type ManyResult = { ok: true; mutations: Mutation[] } | { ok: false; reas
 /** Most changes in one mutation: well under the server's limit, so that a group, which is never split, has room. */
 const CHUNK = 400;
 
-function chunked(
+/** Mutations of the groups of changes, none of which is split: a group is a card and what goes with it, and stays whole in one mutation. */
+export function chunked(
   ids: Ids,
   groups: readonly (readonly Mutation['changes'][number][])[],
 ): ManyResult {

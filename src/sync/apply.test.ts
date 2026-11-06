@@ -346,6 +346,46 @@ describe(`applying a mutation (${leg})`, () => {
       expect(await accountSeq(database, ada)).toBe(1);
     });
 
+    it('refuses a mutation of many cards whole when one of them is another account’s, and none of her own is touched', async () => {
+      const [ada, grace] = [account(), account()];
+      const aList = list();
+      const aTask = card(aList.id);
+      applied(await apply(ada, mutation(aList, aTask)));
+      const gList = list();
+      const own = [card(gList.id), card(gList.id), card(gList.id)];
+      applied(await apply(grace, mutation(gList, ...own)));
+
+      const before = await snapshot(database, grace);
+      const adaBefore = await snapshot(database, ada);
+      // What a bulk action sends: a change for each card chosen, here with one that is Ada's among Grace's own, in the middle.
+      for (const change of [
+        (c: { id: string }) => ({
+          table: 'desk_card' as const,
+          id: c.id,
+          fields: { completedAt: { v: 5 } },
+        }),
+        (c: { id: string }) => ({ table: 'desk_card' as const, id: c.id, deleted: true }),
+        (c: { id: string }) => ({
+          table: 'desk_card' as const,
+          id: c.id,
+          listId: gList.id,
+          position: 'a5',
+        }),
+      ]) {
+        const result = await apply(
+          grace,
+          mutation(
+            change(own[0] as { id: string }),
+            change(aTask),
+            change(own[1] as { id: string }),
+          ),
+        );
+        expect(result).toEqual({ status: 'refused', code: 'unavailable' });
+        expect(await snapshot(database, grace)).toEqual(before);
+        expect(await snapshot(database, ada)).toEqual(adaBefore);
+      }
+    });
+
     it('is the answer for every one of those: unavailable, which says nothing of whose it is', async () => {
       const ada = account();
       const grace = account();

@@ -176,3 +176,40 @@
 .overdue {
   color: var(--sv-color-error-text);
 }
+
+/* The cards that are chosen to be acted on together (DESIGN.md §10.6). */
+.bulk {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sv-space-2);
+  margin-bottom: var(--sv-space-3);
+  padding: var(--sv-space-2) var(--sv-space-3);
+  border: var(--sv-border-width-hairline) solid var(--sv-color-border-strong);
+  border-radius: var(--sv-radius-md);
+  background: var(--sv-color-surface-raised);
+}
+
+.bulkCount {
+  margin-right: auto;
+  font-weight: 600;
+}
+
+.chosen {
+  background: var(--sv-color-accent-subtle);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

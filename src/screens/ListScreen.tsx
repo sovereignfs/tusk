@@ -4,6 +4,7 @@ import { DndContext, closestCenter, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
+import { useState } from 'react';
 import { uuid } from '../access/parse';
 import { setFilter, setShowCompleted, setSort } from '../actions/lists';
 import { deleteMany, isCompleted, moveCard, restoreMany, type Group } from '../actions/cards';
@@ -37,6 +38,8 @@ import {
   useReorderSensors,
 } from '../ui/dnd';
 import { AddCard } from './AddCard';
+import { BulkBar } from './BulkBar';
+import { SelectionProvider } from './selection';
 import { ListColour } from './ListColour';
 import { CardRow, SortableCardRow } from './CardRow';
 import { useUndo } from './Undo';
@@ -70,7 +73,8 @@ export function ListScreen({ listId }: { listId: string }) {
       />
     );
   }
-  return <ListCards list={list} />;
+  // A choice of cards belongs to the list it was made in: another list starts with none.
+  return <ListCards key={list.id} list={list} />;
 }
 
 /**
@@ -182,6 +186,7 @@ function ListCards({ list }: { list: LocalRow }) {
   const cards = useLocal((db) => cardsOf(db, list.id), [list.id]);
   const counts = useLocal(checkCounts);
   const openId = useSearchParams().get('card');
+  const [chosen, setChosen] = useState<ReadonlySet<string>>(new Set());
   const filter = filterOf(list);
   const sort = sortOf(list);
   const showCompleted = (() => {
@@ -208,6 +213,22 @@ function ListCards({ list }: { list: LocalRow }) {
     const result = setSort(list, next, ids);
     if (result.ok) void client.commit(result.mutation);
   }
+
+  // What is chosen and is still here: a card that was deleted or moved on another device, or by the bar, is not.
+  const here = new Set([...open, ...done].map((card) => card.id));
+  const chosenCards = [...open, ...done].filter((card) => chosen.has(card.id));
+  const selection = {
+    selected: chosen,
+    active: chosenCards.length > 0,
+    toggle: (id: string) =>
+      setChosen((was) => {
+        const next = new Set([...was].filter((each) => here.has(each)));
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      }),
+    clear: () => setChosen(new Set()),
+  };
 
   function chooseFilter(next: Filter) {
     const result = setFilter(list, next, ids);
@@ -246,76 +267,81 @@ function ListCards({ list }: { list: LocalRow }) {
   }
 
   return (
-    <section aria-label={text(list, 'title', 'List')}>
-      <div className={styles.header}>
-        <div className={styles.heading}>
-          <ListColour list={list} />
-          <h1 className={styles.title}>{text(list, 'title', 'Untitled list')}</h1>
-        </div>
-        <div className={styles.controls}>
-          <SegmentedControl<Filter>
-            aria-label="Show"
-            size="sm"
-            value={filter}
-            onChange={chooseFilter}
-            options={FILTERS.map((value) => ({ label: FILTER_LABELS[value], value }))}
-          />
-          <Select
-            aria-label="Sort by"
-            size="sm"
-            value={sort}
-            onChange={(event) => choose(event.target.value)}
-          >
-            {SORTS.map((value) => (
-              <option key={value} value={value}>
-                {SORT_LABELS[value]}
-              </option>
-            ))}
-          </Select>
-        </div>
-      </div>
-      <AddCard listId={list.id} cards={open} />
-      {cards !== undefined && all.length === 0 ? (
-        <p className={styles.muted}>Nothing here yet.</p>
-      ) : null}
-      <OpenCards
-        open={open}
-        openId={openId}
-        counts={counts}
-        reorderable={canReorder(sort)}
-        pinNow={sort === 'custom' ? now : null}
-      />
-      {done.length > 0 && showsCompleted(filter) ? (
-        <div className={styles.completed}>
-          <div className={styles.completedBar}>
-            <button
-              type="button"
-              className={styles.completedHeading}
-              aria-expanded={showCompleted}
-              onClick={toggleCompleted}
+    <SelectionProvider value={selection}>
+      <section aria-label={text(list, 'title', 'List')}>
+        <div className={styles.header}>
+          <div className={styles.heading}>
+            <ListColour list={list} />
+            <h1 className={styles.title}>{text(list, 'title', 'Untitled list')}</h1>
+          </div>
+          <div className={styles.controls}>
+            <SegmentedControl<Filter>
+              aria-label="Show"
+              size="sm"
+              value={filter}
+              onChange={chooseFilter}
+              options={FILTERS.map((value) => ({ label: FILTER_LABELS[value], value }))}
+            />
+            <Select
+              aria-label="Sort by"
+              size="sm"
+              value={sort}
+              onChange={(event) => choose(event.target.value)}
             >
-              <span aria-hidden>{showCompleted ? '▾' : '▸'}</span> Completed ({done.length})
-            </button>
+              {SORTS.map((value) => (
+                <option key={value} value={value}>
+                  {SORT_LABELS[value]}
+                </option>
+              ))}
+            </Select>
+          </div>
+        </div>
+        {chosenCards.length > 0 ? (
+          <BulkBar chosen={chosenCards} listId={list.id} onDone={selection.clear} />
+        ) : null}
+        <AddCard listId={list.id} cards={open} />
+        {cards !== undefined && all.length === 0 ? (
+          <p className={styles.muted}>Nothing here yet.</p>
+        ) : null}
+        <OpenCards
+          open={open}
+          openId={openId}
+          counts={counts}
+          reorderable={canReorder(sort)}
+          pinNow={sort === 'custom' ? now : null}
+        />
+        {done.length > 0 && showsCompleted(filter) ? (
+          <div className={styles.completed}>
+            <div className={styles.completedBar}>
+              <button
+                type="button"
+                className={styles.completedHeading}
+                aria-expanded={showCompleted}
+                onClick={toggleCompleted}
+              >
+                <span aria-hidden>{showCompleted ? '▾' : '▸'}</span> Completed ({done.length})
+              </button>
+              {showCompleted ? (
+                <Button variant="secondary" onClick={() => void deleteCompleted()}>
+                  Delete completed
+                </Button>
+              ) : null}
+            </div>
             {showCompleted ? (
-              <Button variant="secondary" onClick={() => void deleteCompleted()}>
-                Delete completed
-              </Button>
+              <ul className={styles.cards}>
+                {done.map((card) => (
+                  <CardRow
+                    key={card.id}
+                    card={card}
+                    open={openId === card.id}
+                    progress={counts?.get(card.id)}
+                  />
+                ))}
+              </ul>
             ) : null}
           </div>
-          {showCompleted ? (
-            <ul className={styles.cards}>
-              {done.map((card) => (
-                <CardRow
-                  key={card.id}
-                  card={card}
-                  open={openId === card.id}
-                  progress={counts?.get(card.id)}
-                />
-              ))}
-            </ul>
-          ) : null}
-        </div>
-      ) : null}
-    </section>
+        ) : null}
+      </section>
+    </SelectionProvider>
   );
 }

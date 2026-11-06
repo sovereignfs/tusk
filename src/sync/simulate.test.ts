@@ -4,6 +4,7 @@ import {
   completeCard,
   createCard,
   deleteCard,
+  deleteMany,
   moveCard,
   restoreCard,
   setStarred,
@@ -21,6 +22,7 @@ import {
   untickItem,
 } from '../actions/checks';
 import { createList, deleteList, moveList, renameList, restoreList } from '../actions/lists';
+import { type Selected, completeMany, moveMany } from '../actions/bulk';
 import { moveOccurrence, reopenOccurrence } from '../actions/occurrences';
 import { seriesIdOf, setDueInSeries, setRepeat, stopRepeat } from '../actions/series';
 import type { Database } from '../db/client';
@@ -124,6 +126,32 @@ async function act(d: Device, r: Random): Promise<string> {
 
   let result;
   let name: string;
+  // Now and then a person chooses several cards and acts on them together (§10.6): each action is a few mutations, whole for each card.
+  if (r.chance(6)) {
+    const chosen = liveCards.filter(() => r.chance(35)).slice(0, 5);
+    const selected: Selected[] = [];
+    for (const each of chosen) {
+      const sid = seriesIdOf(each);
+      selected.push({
+        card: each,
+        items: itemsOf(each),
+        series: sid ? await getRow(db, 'desk_series', sid) : undefined,
+      });
+    }
+    const kind = r.next(3);
+    const to = r.pick(liveLists);
+    const many =
+      kind === 0
+        ? completeMany(selected, Date.now(), today, ids)
+        : kind === 1 && to
+          ? moveMany(selected, to.id, ordered(live(cards).filter((c) => c.listId === to.id)), ids)
+          : deleteMany(
+              chosen.map((each) => ({ card: each, items: itemsOf(each) })),
+              ids,
+            );
+    if (many.ok) for (const mutation of many.mutations) await d.client.commit(mutation);
+    return many.ok ? (['completeMany', 'moveMany', 'deleteMany'][kind] ?? '') : '';
+  }
   const roll = r.next(100);
   if (roll < 12) {
     name = 'createCard';
