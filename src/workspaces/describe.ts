@@ -93,5 +93,11 @@ export function describe(
       return `${actor} removed ${who} from the board`;
     case 'board.member_owner':
       return `${actor} made ${who} an owner of the board`;
+    case 'card.moved_out':
+      return `${actor} moved ${card} to the board ${q(details.to, 'another board')}`;
+    case 'card.moved_in':
+      return `${actor} moved ${card} here from the board ${q(details.from, 'another board')}`;
+    case 'card.cloned':
+      return `${actor} cloned ${q(details.from, 'a card')} as ${card}`;
   }
 }

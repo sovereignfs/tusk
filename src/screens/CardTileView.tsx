@@ -20,6 +20,7 @@ export function CardTileView({
   editable,
   labels,
   onArchive,
+  onClone,
   onOpen,
 }: {
   card: CardTile;
@@ -27,6 +28,7 @@ export function CardTileView({
   labels: readonly LabelRow[];
   editable: boolean;
   onArchive: () => void;
+  onClone: () => void;
   onOpen: () => void;
 }) {
   const sortable = useSortable({
@@ -83,7 +85,10 @@ export function CardTileView({
                 <Icon name="ellipsis-vertical" aria-hidden />
               </button>
             }
-            items={[{ label: 'Archive', icon: 'archive', onSelect: onArchive }]}
+            items={[
+              { label: 'Clone', icon: 'copy', onSelect: onClone },
+              { label: 'Archive', icon: 'archive', onSelect: onArchive },
+            ]}
           />
         </div>
       ) : null}

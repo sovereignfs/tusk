@@ -278,6 +278,31 @@ describe('cards on a board', () => {
     expect(next.cards.find((c) => c.id === 'y')?.comments).toBe(0);
   });
 
+  it('takes a card moved to another board off this one, and keeps the clone the server sends', () => {
+    const v = base();
+    const gone = showingBoard(v, {
+      op: 'card.moveToBoard',
+      id: 'x',
+      boardId: 'other',
+      listId: 'l',
+      position: 'a0',
+    });
+    expect(gone.cards.map((c) => c.id)).toEqual(['y', 'z']);
+    // The server says the card is on another board: it is not on this one, whatever was guessed.
+    const there = { ...(v.cards[0] as CardTile), boardId: 'other' };
+    expect(
+      settled(
+        v,
+        { op: 'card.moveToBoard', id: 'x', boardId: 'other', listId: 'l', position: 'a0' },
+        { card: there },
+      ).cards.map((c) => c.id),
+    ).toEqual(['y', 'z']);
+    const copy = { ...(v.cards[0] as CardTile), id: 'x2' };
+    expect(
+      settled(v, { op: 'card.clone', id: 'x', newId: 'x2' }, { card: copy }).cards.map((c) => c.id),
+    ).toContain('x2');
+  });
+
   it('finds the position among what is shown: the top, between two, and the end, in this list or another', () => {
     const v = base();
     expect(comparePositions(cardPositionFor(v.cards, 'y', 'a', 0), 'a0')).toBe(-1);

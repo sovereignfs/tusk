@@ -55,6 +55,7 @@ export const ROUTES: RouteRule[] = [
   { route: '/api/boards/[id]/activity', methods: { GET: { kind: 'account' } } },
   { route: '/api/cards/[id]/activity', methods: { GET: { kind: 'account' } } },
   { route: '/api/activity', methods: { GET: { kind: 'account' } } },
+  { route: '/api/boards/[id]/destinations', methods: { GET: { kind: 'account' } } },
   { route: '/api/boards/[id]/people', methods: { GET: { kind: 'account' } } },
   { route: '/api/boards/[id]/archived', methods: { GET: { kind: 'account' } } },
   { route: '/api/boards/[id]/version', methods: { GET: { kind: 'account' } } },

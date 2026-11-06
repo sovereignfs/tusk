@@ -4,6 +4,7 @@ import type { Database } from '../db/client';
 import { dbAll } from '../db/exec';
 import { testTarget } from '../db/test-support';
 import { makeStore } from '../sync/test-support';
+import { activityOfCard } from './activity-reads';
 import { applyOp } from './apply';
 import { boardsAdministeredBy, boardsEditableBy, boardsVisibleTo } from './can';
 import {
@@ -16,6 +17,7 @@ import {
 } from './format';
 import {
   archivedCards,
+  moveTargets,
   commentsOf,
   boardPeople,
   boardsIndex,
@@ -442,6 +444,25 @@ const OPERATIONS: Row[] = [
     op: 'comment.delete',
     build: (w) => ({ op: 'comment.delete', id: w.comments.byOwner }),
     may: ['boardOwner'],
+    otherwise: 'not_found',
+  },
+  {
+    // To a list of another board of the same workspace: the person must be a member of both. boardMember is; boardOwner is not on the private board.
+    op: 'card.moveToBoard',
+    build: (w) => ({
+      op: 'card.moveToBoard',
+      id: w.cards.open,
+      boardId: w.boards.privateBoard,
+      listId: w.lists.privateBoard,
+      position: 'a5',
+    }),
+    may: ['boardMember'],
+    otherwise: 'not_found',
+  },
+  {
+    op: 'card.clone',
+    build: (w) => ({ op: 'card.clone', id: w.cards.open, newId: id() }),
+    may: ['boardOwner', 'boardMember'],
     otherwise: 'not_found',
   },
   {
@@ -2527,6 +2548,254 @@ describe(`the roles (${leg})`, () => {
           cardId: w.cards.open,
           body: 'x',
         }),
+      ).toEqual({ status: 'refused', code: 'not_found' });
+    });
+  });
+
+  describe('moving a card to another board, and cloning it', () => {
+    const apply = (w: World, role: Role, op: Op) =>
+      applyOp(database, w.accounts[role], { opId: id(), ...op } as OpRequest, OPTIONS);
+    const t = () => tablesOf(database);
+    const move = (w: World, to = w.boards.privateBoard, list = w.lists.privateBoard): Op => ({
+      op: 'card.moveToBoard',
+      id: w.cards.open,
+      boardId: to,
+      listId: list,
+      position: 'a5',
+    });
+    const count = async (table: unknown, where: ReturnType<typeof sql>) =>
+      Number(
+        (
+          await dbAll<{ n: number | string }>(
+            database,
+            sql`SELECT COUNT(*) AS n FROM ${table as never} WHERE ${where}`,
+          )
+        )[0]?.n,
+      );
+
+    it('moves the card with its comments, checklist and history, matches its labels by name and colour, and drops assignees who are not on the other board', async () => {
+      const w = await seedWorld(database);
+      await apply(w, 'boardOwner', {
+        op: 'card.assign',
+        cardId: w.cards.open,
+        accountId: w.accounts.boardMember,
+      });
+      await apply(w, 'boardOwner', {
+        op: 'card.assign',
+        cardId: w.cards.open,
+        accountId: w.accounts.boardOwner,
+      });
+      await apply(w, 'boardMember', {
+        op: 'card.addLabel',
+        cardId: w.cards.open,
+        labelId: w.labels.publicBoard,
+      });
+      const sourceVersion = Number(
+        (await readBoard(database, w.accounts.boardMember, w.boards.publicBoard))?.board.version,
+      );
+      const targetVersion = Number(
+        (await readBoard(database, w.accounts.boardMember, w.boards.privateBoard))?.board.version,
+      );
+      const result = await apply(w, 'boardMember', move(w));
+      expect(result).toMatchObject({
+        status: 'applied',
+        rows: {
+          card: { id: w.cards.open, boardId: w.boards.privateBoard, listId: w.lists.privateBoard },
+        },
+      });
+      const there = await readBoard(database, w.accounts.boardMember, w.boards.privateBoard);
+      const moved = there?.cards.find((c) => c.id === w.cards.open);
+      expect(moved).toMatchObject({
+        boardId: w.boards.privateBoard,
+        assignees: [w.accounts.boardMember],
+        comments: 2,
+        checklist: { total: 1 },
+      });
+      // The label the other board lacked was made there, with the same name and colour, and is the one the card carries.
+      expect(there?.labels.map((l) => [l.name, l.color])).toEqual(
+        expect.arrayContaining([['Urgent', '#dc2626']]),
+      );
+      expect(moved?.labels).toEqual([there?.labels.find((l) => l.name === 'Urgent')?.id]);
+      // Gone from the first board, and both boards moved on.
+      const here = await readBoard(database, w.accounts.boardMember, w.boards.publicBoard);
+      expect(here?.cards.some((c) => c.id === w.cards.open)).toBe(false);
+      expect(Number(here?.board.version)).toBeGreaterThan(sourceVersion);
+      expect(Number(there?.board.version)).toBeGreaterThan(targetVersion);
+      // Everything that is the card's is the other board's now.
+      for (const table of [
+        t().comment,
+        t().checklistItem,
+        t().cardAssignee,
+        t().cardLabel,
+        t().activity,
+      ])
+        expect(
+          await count(
+            table,
+            sql`card_id = ${w.cards.open} AND board_id <> ${w.boards.privateBoard}`,
+          ),
+        ).toBe(0);
+      expect(await count(t().comment, sql`card_id = ${w.cards.open}`)).toBe(2);
+      // Both boards' history say so: the one it left without the card, the one it came to as the card's own.
+      expect(
+        await count(
+          t().activity,
+          sql`board_id = ${w.boards.publicBoard} AND kind = 'card.moved_out' AND card_id IS NULL`,
+        ),
+      ).toBe(1);
+      expect(
+        await count(
+          t().activity,
+          sql`board_id = ${w.boards.privateBoard} AND kind = 'card.moved_in' AND card_id = ${w.cards.open}`,
+        ),
+      ).toBe(1);
+    });
+
+    it('reuses a label the other board already has, by name and colour, and a second card finds the one the first made', async () => {
+      const w = await seedWorld(database);
+      const second = id();
+      await apply(w, 'boardMember', {
+        op: 'card.create',
+        id: second,
+        listId: w.lists.publicBoard,
+        title: 'Second',
+        position: 'a9',
+      });
+      for (const card of [w.cards.open, second])
+        await apply(w, 'boardMember', {
+          op: 'card.addLabel',
+          cardId: card,
+          labelId: w.labels.publicBoard,
+        });
+      await apply(w, 'boardMember', move(w));
+      await apply(w, 'boardMember', { ...move(w), id: second } as Op);
+      const labels = (
+        await readBoard(database, w.accounts.boardMember, w.boards.privateBoard)
+      )?.labels.filter((l) => l.name === 'Urgent');
+      expect(labels).toHaveLength(1);
+    });
+
+    it('refuses a board the person is not a member of, one of another workspace, a list of another board, the same board and an archived one, writing nothing', async () => {
+      const w = await seedWorld(database);
+      const other = await seedWorld(database);
+      // The person is on a board of that other workspace too, so it is the workspace and nothing else that keeps the card from going there.
+      await dbAll(
+        database,
+        sql`INSERT INTO ${t().workspaceMember} (workspace_id, account_id, role, added_by, created_at) VALUES (${other.workspace}, ${w.accounts.boardMember}, 'member', ${w.accounts.owner}, ${NOW}) RETURNING account_id`,
+      );
+      await dbAll(
+        database,
+        sql`INSERT INTO ${t().boardMember} (board_id, account_id, workspace_id, role, created_at) VALUES (${other.boards.publicBoard}, ${w.accounts.boardMember}, ${other.workspace}, 'member', ${NOW}) RETURNING account_id`,
+      );
+      const before = JSON.stringify(await countAll(database));
+      const refused = { status: 'refused', code: 'not_found' };
+      // boardOwner is not on the private board; they can see... nothing of it.
+      expect(await apply(w, 'boardOwner', move(w))).toEqual(refused);
+      expect(
+        await apply(w, 'boardMember', move(w, other.boards.publicBoard, other.lists.publicBoard)),
+      ).toEqual(refused);
+      expect(
+        await apply(w, 'boardMember', move(w, w.boards.privateBoard, w.lists.publicBoard)),
+      ).toEqual(refused);
+      expect(
+        await apply(w, 'boardMember', move(w, w.boards.publicBoard, w.lists.publicBoard)),
+      ).toEqual(refused);
+      expect(
+        await apply(w, 'boardMember', move(w, w.boards.archivedBoard, w.lists.archivedBoard)),
+      ).toEqual(refused);
+      expect(await apply(w, 'boardMember', { ...move(w), id: w.cards.archived } as Op)).toEqual(
+        refused,
+      );
+      expect(JSON.stringify(await countAll(database))).toBe(before);
+    });
+
+    it('offers the other boards of the workspace that the person can change, with their lists and people', async () => {
+      const w = await seedWorld(database);
+      const targets = await moveTargets(database, w.accounts.boardMember, w.boards.publicBoard);
+      expect(targets?.boards.map((b) => b.name)).toEqual(['Hiring']);
+      expect(targets?.boards[0]).toMatchObject({
+        lists: [{ id: w.lists.privateBoard, name: 'Backlog' }],
+        members: [w.accounts.boardMember],
+      });
+      // boardOwner is on the archived board only, which is read-only, and the private one is not theirs.
+      expect(
+        (await moveTargets(database, w.accounts.boardOwner, w.boards.publicBoard))?.boards,
+      ).toEqual([]);
+      expect(
+        await moveTargets(database, w.accounts.outsider, w.boards.publicBoard),
+      ).toBeUndefined();
+      expect(await moveTargets(database, w.accounts.member, w.boards.privateBoard)).toBeUndefined();
+    });
+
+    it('clones a card below the original with its title, description, due date, checklist unticked, labels and assignees, and not its comments', async () => {
+      const w = await seedWorld(database);
+      await apply(w, 'boardMember', {
+        op: 'card.describe',
+        id: w.cards.open,
+        description: 'Words',
+      });
+      await apply(w, 'boardMember', {
+        op: 'card.setDue',
+        id: w.cards.open,
+        dueDate: '2026-12-01',
+        dueTime: '09:00',
+      });
+      await apply(w, 'boardMember', {
+        op: 'card.addLabel',
+        cardId: w.cards.open,
+        labelId: w.labels.publicBoard,
+      });
+      await apply(w, 'boardOwner', {
+        op: 'card.assign',
+        cardId: w.cards.open,
+        accountId: w.accounts.boardMember,
+      });
+      await apply(w, 'boardMember', { op: 'item.tick', id: w.items.open });
+      const copy = id();
+      const result = await apply(w, 'boardMember', {
+        op: 'card.clone',
+        id: w.cards.open,
+        newId: copy,
+      });
+      expect(result).toMatchObject({
+        status: 'applied',
+        rows: {
+          card: {
+            id: copy,
+            title: 'Open one',
+            dueDate: '2026-12-01',
+            dueTime: '09:00',
+            hasDescription: true,
+            labels: [w.labels.publicBoard],
+            assignees: [w.accounts.boardMember],
+            checklist: { done: 0, total: 1 },
+            comments: 0,
+          },
+        },
+      });
+      const cards =
+        (await readBoard(database, w.accounts.member, w.boards.publicBoard))?.cards ?? [];
+      const mine = cards.find((c) => c.id === copy);
+      const original = cards.find((c) => c.id === w.cards.open);
+      expect(mine?.listId).toBe(original?.listId);
+      expect(mine && original && mine.position > original.position).toBe(true);
+      // The original keeps its tick and its comments; the copy has new items of its own.
+      expect(original).toMatchObject({ checklist: { done: 1, total: 1 }, comments: 2 });
+      const items = await dbAll<{ id: string }>(
+        database,
+        sql`SELECT id FROM ${t().checklistItem} WHERE card_id = ${copy}`,
+      );
+      expect(items).toHaveLength(1);
+      expect(items[0]?.id).not.toBe(w.items.open);
+      expect(
+        (await activityOfCard(database, directory, w.accounts.member, copy))?.activity[0]?.text,
+      ).toMatch(/cloned Open one as Open one/);
+      // Nothing for an archived card, and not an id in use.
+      expect(
+        await apply(w, 'boardMember', { op: 'card.clone', id: w.cards.archived, newId: id() }),
+      ).toEqual({ status: 'refused', code: 'not_found' });
+      expect(
+        await apply(w, 'boardMember', { op: 'card.clone', id: w.cards.open, newId: copy }),
       ).toEqual({ status: 'refused', code: 'not_found' });
     });
   });

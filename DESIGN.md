@@ -853,6 +853,9 @@ Cards are dragged within a list and between lists (§17.8). A right-click on a c
   activity. The copy's activity says what it was cloned from.
 - **Archive**, and for an archived card, **Restore** and **Delete**.
 
+**As built (task 18.7):** moving to another board is `card.moveToBoard` and cloning is `card.clone`; the two boards' history are `card.moved_out` and `card.moved_in`. A card's comments, checklist,
+assignments, history and notices are rewritten to the new `board_id`.
+
 ### 15.8 Archive, and delete
 
 A card's status is Open or Archived. **Archive** takes it off the board, keeping its list and position, so restoring puts it back where it was. The

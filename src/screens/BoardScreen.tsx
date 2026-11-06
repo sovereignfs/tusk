@@ -388,6 +388,13 @@ export function BoardScreen({
                     onArchiveCard={(card) =>
                       void store.perform({ op: 'card.archive', id: card.id })
                     }
+                    onCloneCard={(card) =>
+                      void store.perform({
+                        op: 'card.clone',
+                        id: card.id,
+                        newId: crypto.randomUUID(),
+                      })
+                    }
                     onOpenCard={(card) => router.push(`/b/${view.board.id}/c/${card.id}`)}
                   />
                 ))}

@@ -59,6 +59,8 @@ describe('an operation', () => {
       'comment.add',
       'comment.edit',
       'comment.delete',
+      'card.moveToBoard',
+      'card.clone',
     ]);
   });
 
@@ -301,6 +303,24 @@ describe('an operation', () => {
       { op: 'comment.edit', id: a, body: '   ' },
       { op: 'comment.add', id: a, body: 'x' },
       { op: 'comment.delete', id: a, authorId: 'me' },
+    ])
+      expect(parseOp({ opId: ID(), ...bad }).ok, JSON.stringify(bad)).toBe(false);
+  });
+
+  it('takes moving to a board and cloning whole, and refuses a missing board, a bad position or a stray key', () => {
+    const [a, b, c] = [ID(), ID(), ID()];
+    expect(
+      parseOp({ opId: ID(), op: 'card.moveToBoard', id: a, boardId: b, listId: c, position: 'a0' })
+        .ok,
+    ).toBe(true);
+    expect(parseOp({ opId: ID(), op: 'card.clone', id: a, newId: b }).ok).toBe(true);
+    for (const bad of [
+      { op: 'card.moveToBoard', id: a, listId: c, position: 'a0' },
+      { op: 'card.moveToBoard', id: a, boardId: b, listId: c, position: '' },
+      { op: 'card.moveToBoard', id: a, boardId: b, listId: c, position: 'a0', labels: [] },
+      { op: 'card.clone', id: a },
+      { op: 'card.clone', id: a, newId: 'x' },
+      { op: 'card.clone', id: a, newId: b, comments: true },
     ])
       expect(parseOp({ opId: ID(), ...bad }).ok, JSON.stringify(bad)).toBe(false);
   });

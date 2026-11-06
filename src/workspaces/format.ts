@@ -57,6 +57,8 @@ export const OPS = [
   'comment.add',
   'comment.edit',
   'comment.delete',
+  'card.moveToBoard',
+  'card.clone',
 ] as const;
 export type OpName = (typeof OPS)[number];
 
@@ -199,7 +201,20 @@ export type Op =
   /** Its author's. */
   | { readonly op: 'comment.edit'; readonly id: string; readonly body: string }
   /** Its author's, or a board owner's. */
-  | { readonly op: 'comment.delete'; readonly id: string };
+  | { readonly op: 'comment.delete'; readonly id: string }
+  /**
+   * To a list of another board of the same workspace that the person is a member of, at a position the device chose (DESIGN.md §15.7). Labels are matched
+   * there by name and colour and made if missing; assignees who are not members there are dropped; comments, checklist and history go with the card.
+   */
+  | {
+      readonly op: 'card.moveToBoard';
+      readonly id: string;
+      readonly boardId: string;
+      readonly listId: string;
+      readonly position: string;
+    }
+  /** A copy below it in its list, as a card of its own under `newId`: title, description, due date, checklist unticked, labels and assignees; not comments. */
+  | { readonly op: 'card.clone'; readonly id: string; readonly newId: string };
 
 export type Visibility = 'public' | 'private';
 
@@ -567,6 +582,9 @@ export const ACTIVITY_KINDS = [
   'board.member_added',
   'board.member_removed',
   'board.member_owner',
+  'card.moved_out',
+  'card.moved_in',
+  'card.cloned',
 ] as const;
 export type ActivityKind = (typeof ACTIVITY_KINDS)[number];
 
@@ -589,3 +607,13 @@ export interface ActivityPage {
 
 /** A page of activity (DESIGN.md §15.6). */
 export const ACTIVITY_PAGE = 50;
+
+/** Where a card can be moved to: the boards of the same workspace that the person can change, with their lists and who is on them. */
+export interface MoveTargets {
+  readonly boards: readonly {
+    readonly id: string;
+    readonly name: string;
+    readonly lists: readonly { readonly id: string; readonly name: string }[];
+    readonly members: readonly string[];
+  }[];
+}

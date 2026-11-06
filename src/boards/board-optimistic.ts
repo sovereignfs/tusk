@@ -188,6 +188,7 @@ export function showingBoard(view: BoardView, op: Op): BoardView {
           each.id === op.id ? { ...each, hasDescription: op.description.trim() !== '' } : each,
         ),
       };
+    case 'card.moveToBoard':
     case 'card.archive':
     case 'card.delete':
       return { ...view, cards: view.cards.filter((each) => each.id !== op.id) };
@@ -204,6 +205,8 @@ export function settled(view: BoardView, op: Op, rows: OpRows): BoardView {
   // An archived card is not an open one: the board holds the open cards only, and a restored card joins them.
   if (card && card.boardId === view.board.id && op.op !== 'card.archive')
     cards = [...cards.filter((each) => each.id !== card.id), card];
+  // A card that is now on another board is not on this one.
+  if (card && card.boardId !== view.board.id) cards = cards.filter((each) => each.id !== card.id);
   if (op.op === 'card.archive') cards = cards.filter((each) => each.id !== op.id);
   // The board's own row, once the server has said so: an archived board is read-only for everyone, so it can no longer be edited.
   const board = rows.board && rows.board.id === view.board.id ? rows.board : null;

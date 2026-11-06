@@ -846,3 +846,84 @@ test('a board’s activity is a dialog from its menu, a card’s is a tab of its
   await page.goto(`/b/${board}`);
   await cleanUp(page, workspace);
 });
+
+test('a card is cloned below itself, and moved to a list of another board of the workspace with its comments and labels', async ({
+  page,
+}) => {
+  await signedIn(page);
+  const { workspace } = await makeBoard(page);
+  const first = new URL(page.url()).pathname.split('/')[2] ?? '';
+  const workspaceUrl =
+    (await page.getByRole('link', { name: workspace, exact: true }).first().getAttribute('href')) ??
+    '';
+  await addCard(page, 'Backlog', 'Original');
+  // Cloned from the tile's menu: a copy below it, with the same title.
+  await page.getByRole('button', { name: 'Card options for Original' }).click();
+  await page.getByRole('menuitem', { name: 'Clone' }).click();
+  await expect.poll(() => cardsOf(page, 'Backlog')).toEqual(['Original', 'Original']);
+
+  // A second board in the same workspace, with its own list.
+  await page.goto(workspaceUrl);
+  await page.getByRole('button', { name: 'Create board' }).click();
+  await page.getByRole('dialog', { name: 'Create board' }).getByLabel('Name').fill('Elsewhere');
+  await page
+    .getByRole('dialog', { name: 'Create board' })
+    .getByRole('button', { name: 'Create board' })
+    .click();
+  await expect(page).toHaveURL(/\/b\/[0-9a-f-]{36}$/);
+  const second = new URL(page.url()).pathname.split('/')[2] ?? '';
+  expect(second).not.toBe(first);
+
+  // Back on the first board: a comment and a label on a card, then Move.
+  await page.goto(`/b/${first}`);
+  await page
+    .locator('section[aria-label="Backlog"]')
+    .getByLabel('Original', { exact: true })
+    .first()
+    .click();
+  const dialog = page.getByRole('dialog', { name: 'Original' });
+  await dialog.getByLabel('Write a comment').fill('Goes along');
+  await dialog.getByRole('button', { name: 'Comment', exact: true }).click();
+  await expect(dialog.getByText('Goes along')).toBeVisible();
+  await dialog.getByRole('button', { name: 'Labels' }).click();
+  await page.getByLabel('Label name').fill('Travels');
+  await page.getByRole('button', { name: 'Add label' }).click();
+  await page.getByRole('checkbox', { name: 'Label Travels' }).check();
+  await dialog.getByRole('button', { name: 'Labels' }).click();
+  await dialog.getByRole('button', { name: 'Move', exact: true }).click();
+  const move = page.getByRole('dialog', { name: 'Move card' });
+  await move.getByLabel('Board').selectOption({ label: 'Elsewhere' });
+  await move.getByRole('button', { name: 'Move', exact: true }).click();
+
+  // It is on the other board with its comment and a label of the same name, and gone from this one.
+  await expect(page).toHaveURL(new RegExp(`/b/${first}$`));
+  await expect.poll(() => cardsOf(page, 'Backlog')).toEqual(['Original']);
+  const there = (await (await page.request.get(`/api/boards/${second}`)).json()) as {
+    cards: { id: string; comments: number; labels: string[] }[];
+    labels: { name: string }[];
+  };
+  expect(there.cards).toHaveLength(1);
+  expect(there.cards[0]?.comments).toBe(1);
+  expect(there.labels.map((l) => l.name)).toEqual(['Travels']);
+  expect(there.cards[0]?.labels).toHaveLength(1);
+
+  // The door refuses a list that is not the other board's.
+  const refused = await page.request.post('/api/ops', {
+    headers: { origin: new URL(page.url()).origin },
+    data: {
+      opId: crypto.randomUUID(),
+      op: 'card.moveToBoard',
+      id: there.cards[0]?.id,
+      boardId: first,
+      listId: crypto.randomUUID(),
+      position: 'a0',
+    },
+  });
+  expect(await refused.json()).toEqual({ status: 'refused', code: 'not_found' });
+  await page.goto(workspaceUrl);
+  await page.getByRole('button', { name: 'Workspace settings' }).click();
+  await page.getByRole('button', { name: 'Delete workspace' }).click();
+  const wd = page.getByRole('dialog', { name: 'Delete workspace' });
+  await wd.getByLabel('Type the name to confirm').fill(workspace);
+  await wd.getByRole('button', { name: 'Delete this workspace' }).click();
+});

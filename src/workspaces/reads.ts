@@ -14,6 +14,7 @@ import {
 } from './can';
 import {
   type ArchivedCard,
+  type MoveTargets,
   type CommentPage,
   type CommentRow,
   type ChecklistItem,
@@ -600,4 +601,51 @@ export async function commentsOf(
     canDelete: editable && (row.authorId === accountId || owned),
   }));
   return { comments, more: rows.length > page };
+}
+
+/**
+ * Where a card of this board can be moved to (DESIGN.md §15.7): the other boards of the same workspace that the asker is a member of and that are open,
+ * with their lists and the accounts on them, so that the dialog can say who would be dropped before it moves. `undefined` for a board that is not theirs.
+ */
+export async function moveTargets(
+  database: Database,
+  accountId: string,
+  boardId: string,
+): Promise<MoveTargets | undefined> {
+  const t = tablesOf(database);
+  const here = await dbGet<{ workspaceId: string }>(
+    database,
+    sql`SELECT workspace_id AS "workspaceId" FROM ${t.board} WHERE id = ${boardId} AND id IN ${boardsVisibleTo(database, accountId)}`,
+  );
+  if (!here) return undefined;
+  const boards = await dbAll<{ id: string; name: string }>(
+    database,
+    sql`SELECT id, name FROM ${t.board}
+        WHERE workspace_id = ${here.workspaceId} AND id <> ${boardId} AND id IN ${boardsEditableBy(database, accountId)}
+        ORDER BY name, id LIMIT ${WORKSPACE_LIMITS.boardsPerWorkspace}`,
+  );
+  if (boards.length === 0) return { boards: [] };
+  const lists = await dbAll<{ id: string; boardId: string; name: string }>(
+    database,
+    sql`SELECT id, board_id AS "boardId", name FROM ${t.boardList}
+        WHERE board_id IN (SELECT id FROM ${t.board} WHERE workspace_id = ${here.workspaceId} AND id <> ${boardId} AND id IN ${boardsEditableBy(database, accountId)})
+        ORDER BY board_id, position, id`,
+  );
+  const members = await dbAll<{ boardId: string; accountId: string }>(
+    database,
+    sql`SELECT board_id AS "boardId", account_id AS "accountId" FROM ${t.boardMember}
+        WHERE board_id IN (SELECT id FROM ${t.board} WHERE workspace_id = ${here.workspaceId} AND id <> ${boardId} AND id IN ${boardsEditableBy(database, accountId)})`,
+  );
+  return {
+    boards: boards.map((board) => ({
+      id: board.id,
+      name: board.name,
+      lists: lists
+        .filter((list) => list.boardId === board.id)
+        .map((list) => ({ id: list.id, name: list.name })),
+      members: members
+        .filter((member) => member.boardId === board.id)
+        .map((member) => member.accountId),
+    })),
+  };
 }

@@ -4,7 +4,7 @@ import { dbAll, dbGet, transaction } from '../db/exec';
 import * as postgresApp from '../db/schema/postgres/app';
 import * as sqliteApp from '../db/schema/sqlite/app';
 import type { Directory } from '../auth/directory';
-import { first } from '../position';
+import { between, first } from '../position';
 import {
   boardsAdministeredBy,
   boardsEditableBy,
@@ -862,6 +862,187 @@ async function run(
       return request.op === 'comment.delete'
         ? { deletedComment: request.id, card, version }
         : { card, version };
+    }
+    case 'card.moveToBoard': {
+      // The card, with the permission in its statement: a member of its board, which is open, and the card is not archived.
+      const taken = await dbAll<{ boardId: string; workspaceId: string }>(
+        tx,
+        sql`UPDATE ${t.card} SET updated_at = ${now}
+            WHERE id = ${request.id} AND board_id IN ${boardsEditableBy(tx, accountId)} AND archived_at IS NULL
+            RETURNING board_id AS "boardId", (SELECT workspace_id FROM ${t.board} WHERE id = ${t.card}.board_id) AS "workspaceId"`,
+      );
+      const source = taken[0];
+      if (!source || source.boardId === request.boardId) throw new Refused('not_found');
+      // The other board: of the same workspace, and one the person is a member of (and open), and the list is its own.
+      const sameWorkspace = await dbGet<{ one: number }>(
+        tx,
+        sql`SELECT 1 AS one FROM ${t.board} WHERE id = ${request.boardId} AND workspace_id = ${source.workspaceId}`,
+      );
+      if (!sameWorkspace) throw new Refused('not_found');
+      const version = await touchBoard(
+        tx,
+        request.boardId,
+        boardsEditableBy(tx, accountId),
+        now,
+        true,
+      );
+      await touchBoard(tx, source.boardId, boardsEditableBy(tx, accountId), now, true);
+      const listThere = await dbGet<{ name: string }>(
+        tx,
+        sql`SELECT name FROM ${t.boardList} WHERE id = ${request.listId} AND board_id = ${request.boardId}`,
+      );
+      if (!listThere) throw new Refused('not_found');
+      const count = await dbGet<{ n: number | string }>(
+        tx,
+        sql`SELECT COUNT(*) AS n FROM ${t.card} WHERE board_id = ${request.boardId}`,
+      );
+      if (Number(count?.n ?? 0) >= WORKSPACE_LIMITS.cardsPerBoard) throw new Refused('limit');
+      // Labels: matched there by name and colour, and made if the board lacks them.
+      const carried = await dbAll<{ id: string; name: string; color: string }>(
+        tx,
+        sql`SELECT l.id AS id, l.name AS name, l.color AS color FROM ${t.cardLabel} cl JOIN ${t.label} l ON l.id = cl.label_id
+            WHERE cl.card_id = ${request.id} ORDER BY l.created_at, l.id`,
+      );
+      await dbAll(
+        tx,
+        sql`DELETE FROM ${t.cardLabel} WHERE card_id = ${request.id} RETURNING 1 AS one`,
+      );
+      for (const label of carried) {
+        let there = (
+          await dbAll<{ id: string }>(
+            tx,
+            sql`SELECT id FROM ${t.label} WHERE board_id = ${request.boardId} AND name = ${label.name} AND color = ${label.color} ORDER BY created_at, id LIMIT 1`,
+          )
+        )[0]?.id;
+        if (!there) {
+          const have = await dbGet<{ n: number | string }>(
+            tx,
+            sql`SELECT COUNT(*) AS n FROM ${t.label} WHERE board_id = ${request.boardId}`,
+          );
+          if (Number(have?.n ?? 0) >= WORKSPACE_LIMITS.labelsPerBoard) throw new Refused('limit');
+          there = crypto.randomUUID();
+          await dbAll(
+            tx,
+            sql`INSERT INTO ${t.label} (id, board_id, name, color, created_at) VALUES (${there}, ${request.boardId}, ${label.name}, ${label.color}, ${now}) RETURNING id`,
+          );
+        }
+        await dbAll(
+          tx,
+          sql`INSERT INTO ${t.cardLabel} (card_id, label_id, board_id) VALUES (${request.id}, ${there}, ${request.boardId})
+              ON CONFLICT (card_id, label_id) DO NOTHING RETURNING card_id`,
+        );
+      }
+      // Assignees who are not members there are dropped; the rest go with the card.
+      await dbAll(
+        tx,
+        sql`DELETE FROM ${t.cardAssignee} WHERE card_id = ${request.id}
+            AND account_id NOT IN (SELECT account_id FROM ${t.boardMember} WHERE board_id = ${request.boardId}) RETURNING 1 AS one`,
+      );
+      // The card and everything that is its own go to the other board: its checklist, its comments and its history.
+      const before = await dbGet<{ title: string; boardName: string }>(
+        tx,
+        sql`SELECT c.title AS title, b.name AS "boardName" FROM ${t.card} c JOIN ${t.board} b ON b.id = c.board_id WHERE c.id = ${request.id}`,
+      );
+      await dbAll(
+        tx,
+        sql`UPDATE ${t.card} SET board_id = ${request.boardId}, list_id = ${request.listId}, position = ${request.position}, updated_at = ${now}
+            WHERE id = ${request.id} RETURNING id`,
+      );
+      for (const table of [t.checklistItem, t.comment, t.cardAssignee, t.activity, t.notice])
+        await dbAll(
+          tx,
+          sql`UPDATE ${table} SET board_id = ${request.boardId} WHERE card_id = ${request.id} RETURNING 1 AS one`,
+        );
+      const target = await dbGet<{ name: string }>(
+        tx,
+        sql`SELECT name FROM ${t.board} WHERE id = ${request.boardId}`,
+      );
+      // Both boards' history say so: the one it left (with no card, since the card is no longer there), and the one it came to (as part of the card's own).
+      await dbAll(
+        tx,
+        sql`INSERT INTO ${t.activity} (id, board_id, card_id, actor_id, kind, details, created_at)
+            VALUES (${crypto.randomUUID()}, ${source.boardId}, NULL, ${accountId}, 'card.moved_out',
+                    ${JSON.stringify({ title: before?.title ?? '', to: target?.name ?? '' })}, ${now}) RETURNING id`,
+      );
+      await dbAll(
+        tx,
+        sql`INSERT INTO ${t.activity} (id, board_id, card_id, actor_id, kind, details, created_at)
+            VALUES (${crypto.randomUUID()}, ${request.boardId}, ${request.id}, ${accountId}, 'card.moved_in',
+                    ${JSON.stringify({ title: before?.title ?? '', from: before?.boardName ?? '' })}, ${now}) RETURNING id`,
+      );
+      return { card: await cardTile(tx, request.id), version };
+    }
+    case 'card.clone': {
+      const taken = await dbAll<{
+        boardId: string;
+        listId: string;
+        title: string;
+        description: string | null;
+        dueDate: string | null;
+        dueTime: string | null;
+        position: string;
+      }>(
+        tx,
+        sql`UPDATE ${t.card} SET updated_at = ${now}
+            WHERE id = ${request.id} AND board_id IN ${boardsEditableBy(tx, accountId)} AND archived_at IS NULL
+            RETURNING board_id AS "boardId", list_id AS "listId", title, description, due_date AS "dueDate", due_time AS "dueTime", position`,
+      );
+      const original = taken[0];
+      if (!original) throw new Refused('not_found');
+      const version = await touchBoard(
+        tx,
+        original.boardId,
+        boardsEditableBy(tx, accountId),
+        now,
+        true,
+      );
+      const count = await dbGet<{ n: number | string }>(
+        tx,
+        sql`SELECT COUNT(*) AS n FROM ${t.card} WHERE board_id = ${original.boardId}`,
+      );
+      if (Number(count?.n ?? 0) >= WORKSPACE_LIMITS.cardsPerBoard) throw new Refused('limit');
+      // Below it: between its position and the next card's in the same list.
+      const next = await dbGet<{ position: string }>(
+        tx,
+        sql`SELECT position FROM ${t.card} WHERE list_id = ${original.listId} AND archived_at IS NULL AND position > ${original.position}
+            ORDER BY position, id LIMIT 1`,
+      );
+      const made = await dbAll<{ id: string }>(
+        tx,
+        sql`INSERT INTO ${t.card} (id, board_id, list_id, title, description, due_date, due_time, position, created_by, created_at, updated_at)
+            VALUES (${request.newId}, ${original.boardId}, ${original.listId}, ${original.title}, ${original.description}, ${original.dueDate},
+                    ${original.dueTime}, ${between(original.position, next?.position ?? null)}, ${accountId}, ${now}, ${now})
+            ON CONFLICT (id) DO NOTHING RETURNING id`,
+      );
+      if (made.length === 0) throw new Refused('not_found');
+      // Its checklist, unticked; its labels and its assignees. Not its comments or its history.
+      await dbAll(
+        tx,
+        sql`INSERT INTO ${t.cardLabel} (card_id, label_id, board_id)
+            SELECT ${request.newId}, label_id, board_id FROM ${t.cardLabel} WHERE card_id = ${request.id} RETURNING card_id`,
+      );
+      await dbAll(
+        tx,
+        sql`INSERT INTO ${t.cardAssignee} (card_id, account_id, board_id, assigned_by, created_at)
+            SELECT ${request.newId}, account_id, board_id, ${accountId}, ${now} FROM ${t.cardAssignee} WHERE card_id = ${request.id} RETURNING card_id`,
+      );
+      const items = await dbAll<{ title: string; position: string }>(
+        tx,
+        sql`SELECT title, position FROM ${t.checklistItem} WHERE card_id = ${request.id} ORDER BY position, id`,
+      );
+      for (const item of items)
+        await dbAll(
+          tx,
+          sql`INSERT INTO ${t.checklistItem} (id, card_id, board_id, title, completed_at, position, created_at)
+              VALUES (${crypto.randomUUID()}, ${request.newId}, ${original.boardId}, ${item.title}, NULL, ${item.position}, ${now}) RETURNING id`,
+        );
+      await dbAll(
+        tx,
+        sql`INSERT INTO ${t.activity} (id, board_id, card_id, actor_id, kind, details, created_at)
+            VALUES (${crypto.randomUUID()}, ${original.boardId}, ${request.newId}, ${accountId}, 'card.cloned',
+                    ${JSON.stringify({ title: original.title, from: original.title })}, ${now}) RETURNING id`,
+      );
+      return { card: await cardTile(tx, request.newId), version };
     }
     case 'workspace.rename': {
       // The permission is in the statement: only an owner's workspace is a row it can reach.

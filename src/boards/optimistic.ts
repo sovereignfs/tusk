@@ -56,6 +56,8 @@ export function showing(
     case 'comment.add':
     case 'comment.edit':
     case 'comment.delete':
+    case 'card.moveToBoard':
+    case 'card.clone':
     case 'board.update':
     case 'board.archive':
     case 'board.restore':

@@ -70,6 +70,8 @@ const ARGUMENTS: Record<OpName, readonly string[]> = {
   'comment.add': ['id', 'cardId', 'body'],
   'comment.edit': ['id', 'body'],
   'comment.delete': ['id'],
+  'card.moveToBoard': ['id', 'boardId', 'listId', 'position'],
+  'card.clone': ['id', 'newId'],
 };
 
 /** A comment is text with its line breaks, kept as written; a blank one is not a comment. */
@@ -527,6 +529,31 @@ export function parseOp(value: unknown): Parsed<OpRequest> {
       const id = uuid(value.id);
       if (!id.ok) return no('id: not an id');
       return { ok: true, value: { opId: opId.value, op: kind, id: id.value } };
+    }
+    case 'card.moveToBoard': {
+      const id = uuid(value.id);
+      const boardId = uuid(value.boardId);
+      const listId = uuid(value.listId);
+      if (!id.ok || !boardId.ok || !listId.ok) return no('not an id');
+      const position = POSITION(value.position);
+      if (!position.ok) return no('position: not a position');
+      return {
+        ok: true,
+        value: {
+          opId: opId.value,
+          op: kind,
+          id: id.value,
+          boardId: boardId.value,
+          listId: listId.value,
+          position: position.value,
+        },
+      };
+    }
+    case 'card.clone': {
+      const id = uuid(value.id);
+      const newId = uuid(value.newId);
+      if (!id.ok || !newId.ok) return no('not an id');
+      return { ok: true, value: { opId: opId.value, op: kind, id: id.value, newId: newId.value } };
     }
   }
 }

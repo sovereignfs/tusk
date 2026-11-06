@@ -20,6 +20,7 @@ import {
 import { CardChecklist } from './CardChecklist';
 import { ActivityList } from './ActivityList';
 import { CardComments } from './CardComments';
+import { MoveCardDialog } from './MoveCardDialog';
 import { LabelChip, LabelsEditor } from './LabelsEditor';
 import { type CardDetail, WORKSPACE_LIMITS } from '../workspaces/format';
 import styles from './CardDialog.module.css';
@@ -43,6 +44,7 @@ export function CardDialog({ detail: first }: { detail: CardDetail }) {
   const [description, setDescription] = useState(first.description ?? '');
   const [pickingLabels, setPickingLabels] = useState(false);
   const [pickingPeople, setPickingPeople] = useState(false);
+  const [moving, setMoving] = useState(false);
   const [tab, setTab] = useState<'comments' | 'activity'>('comments');
   const people = useBoardPeople();
   // What the server last said, which a blank title goes back to and which a draft is compared with.
@@ -112,6 +114,13 @@ export function CardDialog({ detail: first }: { detail: CardDetail }) {
       saved.current.description = was;
       setDescription(was);
     }
+  }
+
+  async function clone() {
+    // The copy is a card of its own and is opened: it is below this one, and the dialog follows it.
+    const copy = crypto.randomUUID();
+    if (await store.perform({ op: 'card.clone', id: detail.id, newId: copy }))
+      router.replace(`/b/${detail.boardId}/c/${copy}`);
   }
 
   async function archive() {
@@ -310,12 +319,26 @@ export function CardDialog({ detail: first }: { detail: CardDetail }) {
         </div>
         {editable ? (
           <aside className={styles.side} aria-label="Actions">
+            <Button variant="secondary" onClick={() => setMoving(true)}>
+              Move
+            </Button>
+            <Button variant="secondary" onClick={() => void clone()}>
+              Clone
+            </Button>
             <Button variant="secondary" onClick={() => void archive()}>
               Archive
             </Button>
           </aside>
         ) : null}
       </div>
+      {moving ? (
+        <MoveCardDialog
+          cardId={detail.id}
+          assignees={tile?.assignees ?? []}
+          store={store}
+          onClose={() => setMoving(false)}
+        />
+      ) : null}
     </Dialog>
   );
 }
