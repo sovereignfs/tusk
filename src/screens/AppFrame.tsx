@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import { Shortcuts } from '../keys/Shortcuts';
 import { AppSidebar } from './AppSidebar';
 import styles from './AppFrame.module.css';
 
@@ -11,6 +12,7 @@ import styles from './AppFrame.module.css';
 export function AppFrame({ children }: { children: ReactNode }) {
   return (
     <div className={styles.frame}>
+      <Shortcuts />
       <AppSidebar />
       <div className={styles.page}>{children}</div>
     </div>

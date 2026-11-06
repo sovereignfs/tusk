@@ -66,6 +66,7 @@ export function CardTileView({
         }}
         aria-label={card.title}
         aria-roledescription="sortable card"
+        data-shortcut-card=""
       >
         <TileBody card={card} labels={labels} />
       </div>

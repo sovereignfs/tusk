@@ -121,6 +121,7 @@ export function CardRow({
         {...linkProps}
         href={`${pathname}?card=${card.id}`}
         className={styles.name}
+        data-shortcut-card=""
         scroll={false}
         // Choosing a card is not opening it: the link does not go where it points while ctrl or cmd is held or any card is chosen. The row's own handler
         // does the choosing; this is what keeps the link from navigating first.

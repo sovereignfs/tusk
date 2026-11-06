@@ -68,7 +68,7 @@ card dialog is full-screen. A slot in `AppShell` for a footer, empty in phase 1.
 **Accepts when:** every page of §17.11 is usable at 375px in Chromium and WebKit, by a browser test of each; the iOS Simulator by hand for the Desk and a
 board, stated in the PR; no route differs by width.
 
-#### 📋 7.6 — Keyboard
+#### ✅ 7.6 — Keyboard
 
 **Goal:** the common actions without a mouse, on the Desk and on a board.
 
@@ -80,6 +80,8 @@ cards, `e` to complete a Desk card, `Enter` to open, `Esc` to close, `?` for a l
 
 **Accepts when:** a Playwright test does the capture and complete journey on the Desk, and moves a card between lists on a board, with the keyboard
 alone; typing an `n` in a title adds nothing.
+
+**Done as:** `src/keys/rules.ts` (pure) decides what a key asks for, and `src/keys/Shortcuts.tsx`, mounted in the signed-in frame, does it. **The rules:** `n` a new card, `/` search, `j` and `k` the next and previous card (the down and up arrows too, but only once a card has the focus, so the page still scrolls), `e` completes the card in focus, `Esc` closes, `?` lists them, and Enter opens the card in focus, which the link or tile does itself. **Nothing counts while typing** (an input, a textarea, a select or an editable region), **or with ctrl, cmd or alt** held, or with shift but for `?`; a key something has already handled is not looked at again; and **a card lifted by the keyboard keeps the arrows, Space and Escape for its drag** (dnd-kit marks its handle as pressed). Escape in a field **leaves the field** and the next one closes; it closes the card's detail on the Desk (`?card=`) only when nothing else has an Escape of its own open (a dialog, a menu, a list of choices, a picker in the detail, the bar of chosen cards). **The page finds things by marks, so a screen takes part by carrying them:** `data-shortcut="new-card"` (the Desk's add field; a board's "Add a card" button, which `n` presses, so the first list's) and `data-shortcut="search"` (the lists column's field; the board's search, whose own `/` handler is gone), and `data-shortcut-card` on a Desk row's link and a board's tile, in the order they are in. `e` ticks the box of the card's row and moves the focus to the card that takes its place. The help (`?`) is a dialog listing the keys. Tests: the rules for every key, in and out of a field, with each modifier, on and off a card, during a drag, and the help listing; and in Chromium and WebKit, **with no mouse**: on the Desk, `n`, typing (an `n` and a title with several in it are only letters), Enter, a second card, `j`, `k` and the arrows, `e` completing with the focus going on, Enter opening the card, `e` and `n` typed in its title being letters, Escape leaving the field and then closing the card, `?` and Escape, `/` into the search and Escape; on a board, `n` adding a card to the first list ("banana"), `j` taking it, and Space, the right arrow and Space moving it to the next list, kept after a reload. **Not as the epic said:** "a visible focus ring moving between cards" is the browser's focus ring on the link or tile that takes the focus, and was looked for in the tests only as the focus moving; `e` is the Desk's and does nothing on a board.
 
 #### 📋 7.7 — Accessibility pass
 

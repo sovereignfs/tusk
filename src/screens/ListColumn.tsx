@@ -175,7 +175,12 @@ export function ListColumn({
             />
           </form>
         ) : (
-          <button type="button" className={styles.addCardButton} onClick={() => setAdding(true)}>
+          <button
+            type="button"
+            className={styles.addCardButton}
+            data-shortcut="new-card"
+            onClick={() => setAdding(true)}
+          >
             <Icon name="plus" aria-hidden /> Add a card
           </button>
         )

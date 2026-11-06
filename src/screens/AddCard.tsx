@@ -58,6 +58,7 @@ export function AddCard({ listId, cards }: { listId: string; cards: readonly Loc
       <Input
         ref={field}
         aria-label="Add a card"
+        data-shortcut="new-card"
         placeholder="Add a card…"
         maxLength={500}
         autoComplete="off"

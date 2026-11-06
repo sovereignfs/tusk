@@ -102,6 +102,7 @@ function SearchBox() {
         type="search"
         className={styles.input}
         aria-label="Search the Desk"
+        data-shortcut="search"
         placeholder="Search"
         maxLength={200}
         value={value}
