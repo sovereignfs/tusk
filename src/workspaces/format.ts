@@ -48,6 +48,12 @@ export const OPS = [
   'card.removeLabel',
   'card.assign',
   'card.unassign',
+  'item.add',
+  'item.rename',
+  'item.tick',
+  'item.untick',
+  'item.move',
+  'item.delete',
 ] as const;
 export type OpName = (typeof OPS)[number];
 
@@ -165,7 +171,21 @@ export type Op =
   | { readonly op: 'card.removeLabel'; readonly cardId: string; readonly labelId: string }
   /** The person must be a member of the card's board (DESIGN.md §15.3). Assigning someone else raises a notice for them; assigning oneself raises none. */
   | { readonly op: 'card.assign'; readonly cardId: string; readonly accountId: string }
-  | { readonly op: 'card.unassign'; readonly cardId: string; readonly accountId: string };
+  | { readonly op: 'card.unassign'; readonly cardId: string; readonly accountId: string }
+  /** An item of a card's checklist (DESIGN.md §15.4): a title, a tick and an order. A new one goes after the last, at a position the device chose. */
+  | {
+      readonly op: 'item.add';
+      readonly id: string;
+      readonly cardId: string;
+      readonly title: string;
+      readonly position: string;
+    }
+  | { readonly op: 'item.rename'; readonly id: string; readonly title: string }
+  | { readonly op: 'item.tick'; readonly id: string }
+  | { readonly op: 'item.untick'; readonly id: string }
+  /** One row, whatever the distance. */
+  | { readonly op: 'item.move'; readonly id: string; readonly position: string }
+  | { readonly op: 'item.delete'; readonly id: string };
 
 export type Visibility = 'public' | 'private';
 
@@ -198,6 +218,8 @@ export const WORKSPACE_LIMITS = {
   /** Labels on a board, and the length of a label's name (DESIGN.md §7.4). */
   labelsPerBoard: 50,
   labelNameChars: 50,
+  /** Checklist items on a card (DESIGN.md §7.4). */
+  itemsPerCard: 200,
   /** A position key, in characters. */
   positionChars: 64,
   /** A request body, in bytes: an operation is small. */
@@ -286,6 +308,21 @@ export interface LabelRow {
   readonly color: string;
 }
 
+/** An item of a card's checklist, as the card's dialog shows it. */
+export interface ChecklistItem {
+  readonly id: string;
+  readonly cardId: string;
+  readonly title: string;
+  readonly done: boolean;
+  readonly position: string;
+}
+
+/** A card's checklist progress, which its tile shows as "2/5". */
+export interface Progress {
+  readonly done: number;
+  readonly total: number;
+}
+
 /** A card as its tile shows it (DESIGN.md §15.1): what the board is sent of every open card. The badges of later tasks join it as they are built. */
 export interface CardTile {
   readonly id: string;
@@ -300,11 +337,14 @@ export interface CardTile {
   readonly labels: readonly string[];
   /** The accounts it is assigned to, in the order they were assigned. Always members of the board. */
   readonly assignees: readonly string[];
+  readonly checklist: Progress;
 }
 
 /** A card whole, for its dialog (DESIGN.md §17.6): what the tile shows and the description, and the list it is in. */
 export interface CardDetail extends CardTile {
   readonly listName: string;
+  /** Its checklist, in order. */
+  readonly items: readonly ChecklistItem[];
   readonly description: string | null;
   readonly archived: boolean;
   readonly createdAt: number;
@@ -337,6 +377,9 @@ export interface OpRows {
   readonly board?: BoardRow;
   readonly list?: ListRow;
   readonly card?: CardTile;
+  readonly item?: ChecklistItem;
+  /** An item that is gone. */
+  readonly deletedItem?: string;
   readonly label?: LabelRow;
   /** A label that is gone, and so off every card. */
   readonly deletedLabel?: string;

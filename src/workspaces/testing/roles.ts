@@ -41,6 +41,8 @@ export interface World {
   cards: { open: string; archived: string };
   /** A label on the public board, and one on the private board, to show that a label of another board is refused. */
   labels: { publicBoard: string; privateBoard: string };
+  /** A checklist item on the open card. */
+  items: { open: string };
 }
 
 const uuid = () => crypto.randomUUID();
@@ -53,6 +55,7 @@ export async function seedWorld(database: Database): Promise<World> {
   const lists = { publicBoard: uuid(), privateBoard: uuid(), archivedBoard: uuid() };
   const cards = { open: uuid(), archived: uuid() };
   const labels = { publicBoard: uuid(), privateBoard: uuid() };
+  const items = { open: uuid() };
   const now = 1_800_000_000_000;
 
   await dbRun(
@@ -115,7 +118,12 @@ export async function seedWorld(database: Database): Promise<World> {
       database,
       sql`INSERT INTO ${t.label} (id, board_id, name, color, created_at) VALUES (${labels[key]}, ${boards[key]}, ${key === 'publicBoard' ? 'Urgent' : 'Secret'}, '#dc2626', ${now})`,
     );
-  return { accounts, workspace, boards, lists, cards, labels };
+  await dbRun(
+    database,
+    sql`INSERT INTO ${t.checklistItem} (id, card_id, board_id, title, completed_at, position, created_at)
+        VALUES (${items.open}, ${cards.open}, ${boards.publicBoard}, 'First step', NULL, 'a0', ${now})`,
+  );
+  return { accounts, workspace, boards, lists, cards, labels, items };
 }
 
 /** The ids of the boards a permission reaches for an account, from the subquery itself. */

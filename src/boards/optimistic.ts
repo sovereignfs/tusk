@@ -47,6 +47,12 @@ export function showing(
     case 'card.removeLabel':
     case 'card.assign':
     case 'card.unassign':
+    case 'item.add':
+    case 'item.rename':
+    case 'item.tick':
+    case 'item.untick':
+    case 'item.move':
+    case 'item.delete':
     case 'board.update':
     case 'board.archive':
     case 'board.restore':

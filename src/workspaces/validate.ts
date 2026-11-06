@@ -61,6 +61,12 @@ const ARGUMENTS: Record<OpName, readonly string[]> = {
   'card.removeLabel': ['cardId', 'labelId'],
   'card.assign': ['cardId', 'accountId'],
   'card.unassign': ['cardId', 'accountId'],
+  'item.add': ['id', 'cardId', 'title', 'position'],
+  'item.rename': ['id', 'title'],
+  'item.tick': ['id'],
+  'item.untick': ['id'],
+  'item.move': ['id', 'position'],
+  'item.delete': ['id'],
 };
 
 /** A label's name may be empty: a colour alone is a label (DESIGN.md §15.2). */
@@ -446,6 +452,50 @@ export function parseOp(value: unknown): Parsed<OpRequest> {
         ok: true,
         value: { opId: opId.value, op: kind, cardId: cardId.value, accountId: accountId.value },
       };
+    }
+    case 'item.add': {
+      const id = uuid(value.id);
+      const cardId = uuid(value.cardId);
+      if (!id.ok || !cardId.ok) return no('not an id');
+      const title = TITLE(typeof value.title === 'string' ? value.title.trim() : value.title);
+      if (!title.ok) return no(`title: ${title.reason}`);
+      const position = POSITION(value.position);
+      if (!position.ok) return no('position: not a position');
+      return {
+        ok: true,
+        value: {
+          opId: opId.value,
+          op: kind,
+          id: id.value,
+          cardId: cardId.value,
+          title: title.value,
+          position: position.value,
+        },
+      };
+    }
+    case 'item.rename': {
+      const id = uuid(value.id);
+      if (!id.ok) return no('id: not an id');
+      const title = TITLE(typeof value.title === 'string' ? value.title.trim() : value.title);
+      if (!title.ok) return no(`title: ${title.reason}`);
+      return { ok: true, value: { opId: opId.value, op: kind, id: id.value, title: title.value } };
+    }
+    case 'item.move': {
+      const id = uuid(value.id);
+      if (!id.ok) return no('id: not an id');
+      const position = POSITION(value.position);
+      if (!position.ok) return no('position: not a position');
+      return {
+        ok: true,
+        value: { opId: opId.value, op: kind, id: id.value, position: position.value },
+      };
+    }
+    case 'item.tick':
+    case 'item.untick':
+    case 'item.delete': {
+      const id = uuid(value.id);
+      if (!id.ok) return no('id: not an id');
+      return { ok: true, value: { opId: opId.value, op: kind, id: id.value } };
     }
   }
 }

@@ -129,6 +129,7 @@ describe('cards on a board', () => {
     hasDescription: false,
     labels: [],
     assignees: [],
+    checklist: { done: 0, total: 0 },
   });
   const base = (): BoardView => ({
     ...view([list('a', 'a0'), list('b', 'a1')]),

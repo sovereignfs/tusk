@@ -36,8 +36,11 @@ export interface BoardStore {
   gone: boolean;
   /** Whether this board can be changed now: the person may, and the connection is there. */
   editable: boolean;
-  /** Shows the change at once and sends it. Resolves to whether the server kept it. */
-  perform(op: Op): Promise<boolean>;
+  /**
+   * Shows the change at once and sends it. Resolves to whether the server kept it. `show` is how the screen shows it before the server has answered, for
+   * a change the board cannot work out alone (a tick, which the board holds only the count of); the server's answer replaces it either way.
+   */
+  perform(op: Op, show?: (view: BoardView) => BoardView): Promise<boolean>;
 }
 
 export function useBoard(
@@ -131,14 +134,14 @@ export function useBoard(
   );
 
   const perform = useCallback(
-    (op: Op): Promise<boolean> => {
+    (op: Op, show?: (view: BoardView) => BoardView): Promise<boolean> => {
       // An administrator who is not on the board (and a board that is archived) changes nothing in it, but archives, restores, edits and deletes it.
       if (offline || gone || !(view.can.edit || view.can.admin)) {
         if (offline) failed.current('offline');
         return Promise.resolve(false);
       }
       pending.current += 1;
-      setView((now) => showingBoard(now, op));
+      setView((now) => (show ? show(now) : showingBoard(now, op)));
       const mine = epoch.current;
       const run = queue.current.then(() => send(op, mine));
       queue.current = run;

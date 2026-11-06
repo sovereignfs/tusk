@@ -19,6 +19,7 @@ import {
   type OpRequest,
   type OpResult,
   type CardTile,
+  type ChecklistItem,
   type LabelRow,
   type ListRow,
   type Role,
@@ -685,6 +686,61 @@ async function run(
         );
       return { card: await cardTile(tx, request.cardId), version };
     }
+    case 'item.add': {
+      const taken = await dbAll<{ boardId: string }>(
+        tx,
+        sql`UPDATE ${t.card} SET updated_at = ${now}
+            WHERE id = ${request.cardId} AND board_id IN ${boardsEditableBy(tx, accountId)} AND archived_at IS NULL
+            RETURNING board_id AS "boardId"`,
+      );
+      const boardId = taken[0]?.boardId;
+      if (!boardId) throw new Refused('not_found');
+      const version = await touchBoard(tx, boardId, boardsEditableBy(tx, accountId), now, true);
+      const count = await dbGet<{ n: number | string }>(
+        tx,
+        sql`SELECT COUNT(*) AS n FROM ${t.checklistItem} WHERE card_id = ${request.cardId}`,
+      );
+      if (Number(count?.n ?? 0) >= WORKSPACE_LIMITS.itemsPerCard) throw new Refused('limit');
+      const made = await dbAll<{ id: string }>(
+        tx,
+        sql`INSERT INTO ${t.checklistItem} (id, card_id, board_id, title, completed_at, position, created_at)
+            VALUES (${request.id}, ${request.cardId}, ${boardId}, ${request.title}, NULL, ${request.position}, ${now})
+            ON CONFLICT (id) DO NOTHING RETURNING id`,
+      );
+      if (made.length === 0) throw new Refused('not_found');
+      return {
+        item: await itemRow(tx, request.id),
+        card: await cardTile(tx, request.cardId),
+        version,
+      };
+    }
+    case 'item.rename':
+    case 'item.tick':
+    case 'item.untick':
+    case 'item.move':
+    case 'item.delete': {
+      // The item's own statement carries the permission; the board and the card are the item's.
+      const where = sql`id = ${request.id} AND board_id IN ${boardsEditableBy(tx, accountId)}`;
+      const changed = await dbAll<{ boardId: string; cardId: string }>(
+        tx,
+        request.op === 'item.rename'
+          ? sql`UPDATE ${t.checklistItem} SET title = ${request.title} WHERE ${where} RETURNING board_id AS "boardId", card_id AS "cardId"`
+          : request.op === 'item.tick'
+            ? sql`UPDATE ${t.checklistItem} SET completed_at = ${now} WHERE ${where} RETURNING board_id AS "boardId", card_id AS "cardId"`
+            : request.op === 'item.untick'
+              ? sql`UPDATE ${t.checklistItem} SET completed_at = NULL WHERE ${where} RETURNING board_id AS "boardId", card_id AS "cardId"`
+              : request.op === 'item.move'
+                ? sql`UPDATE ${t.checklistItem} SET position = ${request.position} WHERE ${where} RETURNING board_id AS "boardId", card_id AS "cardId"`
+                : sql`DELETE FROM ${t.checklistItem} WHERE ${where} RETURNING board_id AS "boardId", card_id AS "cardId"`,
+      );
+      const row = changed[0];
+      if (!row) throw new Refused('not_found');
+      const version = await touchBoard(tx, row.boardId, boardsEditableBy(tx, accountId), now, true);
+      const card = await cardTile(tx, row.cardId);
+      return request.op === 'item.delete'
+        ? { deletedItem: request.id, card, version }
+        : { item: await itemRow(tx, request.id), card, version };
+    }
     case 'workspace.rename': {
       // The permission is in the statement: only an owner's workspace is a row it can reach.
       const changed = await dbAll<{ createdAt: number | string }>(
@@ -756,6 +812,28 @@ async function takeOffBoard(
   );
 }
 
+/** A checklist item as the transaction now has it. */
+async function itemRow(tx: Database, id: string): Promise<ChecklistItem> {
+  const row = await dbGet<{
+    id: string;
+    cardId: string;
+    title: string;
+    completedAt: number | string | null;
+    position: string;
+  }>(
+    tx,
+    sql`SELECT id, card_id AS "cardId", title, completed_at AS "completedAt", position FROM ${tablesOf(tx).checklistItem} WHERE id = ${id}`,
+  );
+  if (!row) throw new Refused('not_found');
+  return {
+    id: row.id,
+    cardId: row.cardId,
+    title: row.title,
+    done: row.completedAt !== null,
+    position: row.position,
+  };
+}
+
 /** A card as its tile shows it, as the transaction now has it. */
 async function cardTile(tx: Database, id: string): Promise<CardTile> {
   const t = tablesOf(tx);
@@ -784,11 +862,17 @@ async function cardTile(tx: Database, id: string): Promise<CardTile> {
     tx,
     sql`SELECT account_id AS id FROM ${t.cardAssignee} WHERE card_id = ${id} ORDER BY created_at, account_id`,
   );
+  const progress = await dbGet<{ total: number | string; done: number | string | null }>(
+    tx,
+    sql`SELECT COUNT(*) AS total, SUM(CASE WHEN completed_at IS NULL THEN 0 ELSE 1 END) AS done
+        FROM ${t.checklistItem} WHERE card_id = ${id}`,
+  );
   return {
     ...row,
     hasDescription: row.hasDescription === true || Number(row.hasDescription) === 1,
     labels: labels.map((each) => each.id),
     assignees: assignees.map((each) => each.id),
+    checklist: { done: Number(progress?.done ?? 0), total: Number(progress?.total ?? 0) },
   };
 }
 

@@ -119,7 +119,7 @@ export function TileBody({ card, labels }: { card: CardTile; labels: readonly La
         </span>
       ) : null}
       <span className={styles.cardTitle}>{card.title}</span>
-      {card.dueDate || card.hasDescription || assigned.length > 0 ? (
+      {card.dueDate || card.hasDescription || card.checklist.total > 0 || assigned.length > 0 ? (
         <span className={styles.badges}>
           {due ? (
             <span className={`${styles.badge} ${due.overdue ? styles.overdue : ''}`}>
@@ -137,6 +137,14 @@ export function TileBody({ card, labels }: { card: CardTile; labels: readonly La
               {assigned.length > 3 ? (
                 <span className={styles.badge}>+{assigned.length - 3}</span>
               ) : null}
+            </span>
+          ) : null}
+          {card.checklist.total > 0 ? (
+            <span
+              className={styles.badge}
+              aria-label={`${card.checklist.done} of ${card.checklist.total} checklist items done`}
+            >
+              <Icon name="check" aria-hidden /> {card.checklist.done}/{card.checklist.total}
             </span>
           ) : null}
           {card.hasDescription ? (

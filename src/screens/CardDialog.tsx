@@ -7,6 +7,7 @@ import { DuePicker } from '../dates/DuePicker';
 import { formatDue } from '../format-due';
 import { browserZone, todayFor } from '../time';
 import { Avatar, Button, Checkbox, Dialog, FormField, Input, Popover, Textarea } from '../ui';
+import { CardChecklist } from './CardChecklist';
 import { LabelChip, LabelsEditor } from './LabelsEditor';
 import { type CardDetail, WORKSPACE_LIMITS } from '../workspaces/format';
 import styles from './CardDialog.module.css';
@@ -258,7 +259,14 @@ export function CardDialog({ detail: first }: { detail: CardDetail }) {
             </div>
           )}
 
-          {/* The checklist, and Comments and Activity as tabs, go here. */}
+          <CardChecklist
+            cardId={detail.id}
+            initial={first.items}
+            editable={editable}
+            store={store}
+          />
+
+          {/* Comments and Activity as tabs go here. */}
         </div>
         {editable ? (
           <aside className={styles.side} aria-label="Actions">

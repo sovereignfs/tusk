@@ -104,7 +104,7 @@ What makes a board worth running as a team. **Done when** a team runs a board fo
 | 46  | [4.2](docs/epics/dates.md)         | Due date and time  | P1       | 4.1, 15.2, 18.2  | ✅     |
 | 47  | [18.3](docs/epics/cards.md)        | Labels             | P1       | 18.2             | ✅     |
 | 48  | [18.4](docs/epics/cards.md)        | Assignees          | P1       | 17.3, 18.2       | ✅     |
-| 49  | [18.5](docs/epics/cards.md)        | Checklist          | P1       | 18.2             | 📋     |
+| 49  | [18.5](docs/epics/cards.md)        | Checklist          | P1       | 18.2             | ✅     |
 | 50  | [18.6](docs/epics/cards.md)        | Comments           | P1       | 18.2             | 📋     |
 | 51  | [8.1](docs/epics/notifications.md) | The Inbox          | P1       | 16.3, 18.4, 18.6 | 📋     |
 | 52  | [17.6](docs/epics/boards.md)       | Activity           | P1       | 17.1, 18.2       | 📋     |

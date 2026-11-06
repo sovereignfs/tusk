@@ -652,3 +652,70 @@ test('a card is assigned to a member of the board from its dialog, shown as an a
   await again.getByRole('button', { name: 'Close' }).click();
   await cleanUp(page, workspace);
 });
+
+test('a checklist is added to in a card’s dialog, ticked, reordered and deleted from, the tile’s count following, and kept after a reload', async ({
+  page,
+}) => {
+  await signedIn(page);
+  const { workspace } = await makeBoard(page);
+  await addCard(page, 'Backlog', 'With steps');
+  const column = page.locator('section[aria-label="Backlog"]');
+  await column.getByLabel('With steps', { exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'With steps' });
+  const checklist = dialog.getByRole('region', { name: 'Checklist' });
+
+  // "Add an item" keeps the cursor: three items typed one after another.
+  const field = checklist.getByLabel('Add an item');
+  for (const title of ['One', 'Two', 'Three']) {
+    await field.fill(title);
+    await field.press('Enter');
+    await expect(checklist.getByLabel(`Item: ${title}`)).toBeVisible();
+  }
+  await expect(field).toBeFocused();
+  await expect(column.getByLabel('0 of 3 checklist items done')).toBeVisible();
+
+  // Reordered with the keyboard from the item's handle: Three goes to the top, one row written.
+  const order = () =>
+    checklist
+      .getByRole('textbox', { name: /^Item:/ })
+      .evaluateAll((els) => els.map((el) => (el as HTMLInputElement).value));
+  // A frame, and more, between the keys: the drag measures the list after each, and a loaded machine is slower than a quiet one.
+  await checklist.getByRole('button', { name: 'Move Three' }).focus();
+  for (const key of ['Space', 'ArrowUp', 'ArrowUp', 'Space']) {
+    await page.keyboard.press(key);
+    await page.waitForTimeout(600);
+  }
+  await expect.poll(order).toEqual(['Three', 'One', 'Two']);
+
+  // Ticking shows on the tile at once.
+  await checklist.getByRole('checkbox', { name: 'Done: Two' }).check();
+  await expect(column.getByLabel('1 of 3 checklist items done')).toBeVisible();
+  await expect(checklist.getByLabel('1 of 3 done')).toBeVisible();
+
+  // Renamed as it is left, and deleted.
+  await checklist.getByLabel('Item: Three').fill('Three!');
+  await checklist.getByLabel('Item: Three').press('Enter');
+  await expect(checklist.getByLabel('Item: Three!')).toBeVisible();
+  await checklist.getByRole('button', { name: 'Delete item One' }).click();
+  await expect(column.getByLabel('1 of 2 checklist items done')).toBeVisible();
+
+  // Kept in order after a reload.
+  await page.reload();
+  const again = page
+    .getByRole('dialog', { name: 'With steps' })
+    .getByRole('region', { name: 'Checklist' });
+  await expect(again.getByRole('textbox', { name: /^Item:/ })).toHaveCount(2);
+  const titles = await again
+    .getByRole('textbox', { name: /^Item:/ })
+    .evaluateAll((els) => els.map((el) => (el as HTMLInputElement).value));
+  expect(titles).toEqual(['Three!', 'Two']);
+  await expect(again.getByRole('checkbox', { name: 'Done: Two' })).toBeChecked();
+  await page
+    .getByRole('dialog', { name: 'With steps' })
+    .getByRole('button', { name: 'Close' })
+    .click();
+  await expect(
+    page.locator('section[aria-label="Backlog"]').getByLabel('1 of 2 checklist items done'),
+  ).toBeVisible();
+  await cleanUp(page, workspace);
+});

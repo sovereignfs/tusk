@@ -65,6 +65,7 @@ export function showingBoard(view: BoardView, op: Op): BoardView {
             hasDescription: false,
             labels: [],
             assignees: [],
+            checklist: { done: 0, total: 0 },
           },
         ],
       };

@@ -2,7 +2,7 @@
 
 ## Status
 
-✅ Done: 18.1, 18.2, 18.3 and 18.4.
+✅ Done: 18.1 to 18.5.
 
 ## Overview
 
@@ -78,7 +78,7 @@ member is unassigned from the board's cards.
 
 **Done as:** `card.assign` and `card.unassign` are operations like the others: a member of an open board, on a card that is not archived, the permission in the card's own statement and the board's version moved on. **The person assigned must be a member of the card's board,** or the answer is `invalid` with the reason `not_on_board` and nothing is written (someone else in the workspace, an outsider and an id that is nothing alike); assigning twice is harmless. **The `assigned` notice is written in the operation's transaction** (`notice` row: the person assigned, the one who did it, the workspace, board and card, and the card's title as it was, as JSON in `details`), once, and only when the assignment is new and the person is not the one who made it: assigning oneself tells nobody, and the same assignment sent again tells nobody again. Unassigning writes none. Taking a person off a board or out of a workspace already unassigned them (17.3, 16.3), which a test shows for the board. The board read carries each card's assignees (account ids, in the order assigned) and the card read the same; the board's people (names, from the accounts) are offered with the board's store, so a tile draws up to three avatars with a count (named for a screen reader) and a card's dialog shows each as a chip with the name, and has an _Assignees_ button with a tick for each of the board's people. Tests: the matrix has both; the data layer for an assignment shown on the tile and the card with exactly one notice of the right shape, none for oneself and one for a repeat, the reason given for someone not on the board with nothing written, an archived card refused, an unassignment that is silent and a removed member off the cards; the validators; the pure rules; and in Chromium and WebKit a card assigned from its dialog, shown as an avatar, kept after a reload, unassigned, and `not_on_board` for someone who is not on the board. The membership check, the rule against telling oneself and the rule against telling twice were each removed in turn and the tests failed. **Not as the epic said:** the Inbox that reads these notices is 8.1; the instance has one account, so the notice for someone else is shown by the data layer and not by a browser.
 
-#### 📋 18.5 — Checklist
+#### ✅ 18.5 — Checklist
 
 **Goal:** a card's checklist, added to, ticked, ordered and deleted in its dialog.
 
@@ -89,6 +89,8 @@ checklist in the dialog, with a progress bar, items dragged into order, and "Add
 activity.
 
 **Accepts when:** items keep their order across a reload and between two people; a viewer cannot tick one; the tile's count follows at once.
+
+**Done as:** six operations through the door on `checklist_item`: `item.add` (a title and a position the device chose, after the last; 200 items a card; an id in use is `not_found`; not on an archived card), `item.rename`, `item.tick`, `item.untick`, `item.move` (one row) and `item.delete`. Each is a member's of an open board, with the permission in the item's own statement (`board_id IN boardsEditableBy`), the board's version moved on, and the card's tile as the answer, so that the tile's count is the server's after each. A card's tile carries its progress (`checklist: { done, total }`, read for the whole board in one grouped statement) and shows it as a badge "2/5"; the card's read carries the items in order. **In the dialog** the checklist (`CardChecklist`) holds the items, shows each change at once, tells the board the new count (`withProgress`, passed to the store as how to show the change, since the board holds only the count and could not tell a tick from an untick), and sends the operation through the board's store, putting the items back as the server last said if it was refused. It has a progress bar, a tick, a title edited in place and saved as it is left, a handle that is dragged (or picked up with Space, moved with the arrows and put down with Space) to put an item in order by writing one row, _Delete_, and _Add an item_, which keeps the cursor for the next; someone who may not change the board sees the list, the ticks and the bar and changes nothing. Archiving a card does nothing to its checklist; deleting it takes its items. Tests: the matrix has all six; the data layer for adding in order with the count on the card and the board, ticking, unticking, renaming, one row for a move (the neighbour untouched) and deleting with the count following, the limit of 200, an id in use, an archived card and an archived board refused, and the items kept through archiving and gone with deleting; the validators; the pure rules; and in Chromium and WebKit three items typed one after another with the cursor kept, one moved to the top by the keyboard, a tick shown on the tile at once, a rename, a deletion, and all of it in order after a reload. **Not as the epic said:** ticking writes no activity (17.6 adds it to these operations); the dialog's items are read when it is opened and not again while it is open, so another person's change to the checklist shows on reopening.
 
 #### 📋 18.6 — Comments
 

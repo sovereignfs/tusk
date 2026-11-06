@@ -50,6 +50,12 @@ describe('an operation', () => {
       'card.removeLabel',
       'card.assign',
       'card.unassign',
+      'item.add',
+      'item.rename',
+      'item.tick',
+      'item.untick',
+      'item.move',
+      'item.delete',
     ]);
   });
 
@@ -250,6 +256,28 @@ describe('an operation', () => {
       { op: 'card.assign', cardId: a, accountId: '' },
       { op: 'card.assign', cardId: 'x', accountId: 'account-1' },
       { op: 'card.unassign', cardId: a, accountId: 'account-1', notify: false },
+    ])
+      expect(parseOp({ opId: ID(), ...bad }).ok, JSON.stringify(bad)).toBe(false);
+  });
+
+  it('takes the checklist operations whole, and refuses a blank title or a position that is not one', () => {
+    const [a, b] = [ID(), ID()];
+    for (const good of [
+      { op: 'item.add', id: a, cardId: b, title: ' Step ', position: 'a0' },
+      { op: 'item.rename', id: a, title: 'New' },
+      { op: 'item.tick', id: a },
+      { op: 'item.untick', id: a },
+      { op: 'item.move', id: a, position: 'a1' },
+      { op: 'item.delete', id: a },
+    ])
+      expect(parseOp({ opId: ID(), ...good }).ok, good.op).toBe(true);
+    for (const bad of [
+      { op: 'item.add', id: a, cardId: b, title: '  ', position: 'a0' },
+      { op: 'item.add', id: a, cardId: b, title: 'x', position: '' },
+      { op: 'item.add', id: a, title: 'x', position: 'a0' },
+      { op: 'item.rename', id: a, title: 'x'.repeat(501) },
+      { op: 'item.move', id: a, position: 'a b' },
+      { op: 'item.tick', id: a, done: true },
     ])
       expect(parseOp({ opId: ID(), ...bad }).ok, JSON.stringify(bad)).toBe(false);
   });

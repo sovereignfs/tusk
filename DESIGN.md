@@ -814,6 +814,9 @@ card's title as it was. The Inbox that reads it is §16's, task 8.1.
 As the Desk's (§10.3), in a table of its own: items with a title, a tick and an order, added, renamed, ticked, dragged into order and deleted in the
 detail. A tile shows progress as "2/5". Archiving a card does nothing to its checklist.
 
+**As built (task 18.5):** the board holds only the count of a card's items; the dialog holds the items and tells the board the new count, so that the tile follows at once. The operations are
+`item.add`, `item.rename`, `item.tick`, `item.untick`, `item.move` and `item.delete`.
+
 ### 15.5 Comments
 
 At the foot of a card's detail, newest first, each with its author's avatar and name and when it was written ("edited" if it was). A member writes one;

@@ -13,6 +13,7 @@ import {
 } from './can';
 import {
   type ArchivedCard,
+  type ChecklistItem,
   type LabelRow,
   type BoardPeople,
   type BoardPerson,
@@ -217,6 +218,18 @@ export async function readBoard(
     database,
     sql`SELECT card_id AS "cardId", account_id AS "accountId" FROM ${t.cardAssignee} WHERE board_id = ${boardId} ORDER BY created_at, account_id`,
   );
+  const counts = await dbAll<{
+    cardId: string;
+    total: number | string;
+    done: number | string | null;
+  }>(
+    database,
+    sql`SELECT card_id AS "cardId", COUNT(*) AS total, SUM(CASE WHEN completed_at IS NULL THEN 0 ELSE 1 END) AS done
+        FROM ${t.checklistItem} WHERE board_id = ${boardId} GROUP BY card_id`,
+  );
+  const progressOf = new Map(
+    counts.map((row) => [row.cardId, { done: Number(row.done ?? 0), total: Number(row.total) }]),
+  );
   const assigneesOf = new Map<string, string[]>();
   for (const row of assigned)
     assigneesOf.set(row.cardId, [...(assigneesOf.get(row.cardId) ?? []), row.accountId]);
@@ -229,6 +242,7 @@ export async function readBoard(
       hasDescription: card.hasDescription === true || Number(card.hasDescription) === 1,
       labels: byCard.get(card.id) ?? [],
       assignees: assigneesOf.get(card.id) ?? [],
+      checklist: progressOf.get(card.id) ?? { done: 0, total: 0 },
     })),
     workspace: { id: raw.workspaceId, name: raw.workspaceName },
     lists: lists.map((list) => ({ ...list, cards: Number(list.cards) })),
@@ -404,8 +418,28 @@ export async function cardDetail(
     database,
     sql`SELECT account_id AS id FROM ${t.cardAssignee} WHERE card_id = ${cardId} ORDER BY created_at, account_id`,
   );
+  const itemRows = await dbAll<{
+    id: string;
+    cardId: string;
+    title: string;
+    completedAt: number | string | null;
+    position: string;
+  }>(
+    database,
+    sql`SELECT id, card_id AS "cardId", title, completed_at AS "completedAt", position FROM ${t.checklistItem}
+        WHERE card_id = ${cardId} ORDER BY position, id LIMIT ${WORKSPACE_LIMITS.itemsPerCard}`,
+  );
+  const items: ChecklistItem[] = itemRows.map((each) => ({
+    id: each.id,
+    cardId: each.cardId,
+    title: each.title,
+    done: each.completedAt !== null,
+    position: each.position,
+  }));
   return {
     id: row.id,
+    items,
+    checklist: { done: items.filter((each) => each.done).length, total: items.length },
     labels: carried.map((each) => each.id),
     assignees: assignedTo.map((each) => each.id),
     boardId: row.boardId,

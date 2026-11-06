@@ -382,6 +382,48 @@ const OPERATIONS: Row[] = [
     otherwise: 'not_found',
   },
   {
+    op: 'item.add',
+    build: (w) => ({
+      op: 'item.add',
+      id: id(),
+      cardId: w.cards.open,
+      title: 'Next step',
+      position: 'a5',
+    }),
+    may: ['boardOwner', 'boardMember'],
+    otherwise: 'not_found',
+  },
+  {
+    op: 'item.rename',
+    build: (w) => ({ op: 'item.rename', id: w.items.open, title: 'Renamed' }),
+    may: ['boardOwner', 'boardMember'],
+    otherwise: 'not_found',
+  },
+  {
+    op: 'item.tick',
+    build: (w) => ({ op: 'item.tick', id: w.items.open }),
+    may: ['boardOwner', 'boardMember'],
+    otherwise: 'not_found',
+  },
+  {
+    op: 'item.untick',
+    build: (w) => ({ op: 'item.untick', id: w.items.open }),
+    may: ['boardOwner', 'boardMember'],
+    otherwise: 'not_found',
+  },
+  {
+    op: 'item.move',
+    build: (w) => ({ op: 'item.move', id: w.items.open, position: 'a9' }),
+    may: ['boardOwner', 'boardMember'],
+    otherwise: 'not_found',
+  },
+  {
+    op: 'item.delete',
+    build: (w) => ({ op: 'item.delete', id: w.items.open }),
+    may: ['boardOwner', 'boardMember'],
+    otherwise: 'not_found',
+  },
+  {
     // Anyone in it may leave (there is another owner in this world); an outsider has nothing to leave.
     op: 'member.leave',
     build: (w) => ({ op: 'member.leave', workspaceId: w.workspace }),
@@ -523,10 +565,11 @@ describe(`the roles (${leg})`, () => {
       expect(gone('card')).toBe(3);
       // The world's two labels and the one the contents add.
       expect(gone('label')).toBe(3);
+      // The world's item and the one the contents add.
+      expect(gone('checklist_item')).toBe(2);
       for (const name of [
         'card_label',
         'card_assignee',
-        'checklist_item',
         'comment',
         'activity',
         'publication',
@@ -1016,14 +1059,9 @@ describe(`the roles (${leg})`, () => {
       });
       const after = await countAll(database);
       const gone = (name: string) => (before[name] ?? 0) - (after[name] ?? 0);
-      for (const name of [
-        'board_list',
-        'card_label',
-        'card_assignee',
-        'checklist_item',
-        'comment',
-        'activity',
-      ])
+      // The world's item and the contents' own.
+      expect(gone('checklist_item')).toBe(2);
+      for (const name of ['board_list', 'card_label', 'card_assignee', 'comment', 'activity'])
         expect(gone(name), name).toBe(1);
       // The world's two cards and the one with contents were on it.
       expect(gone('card')).toBe(3);
@@ -1575,10 +1613,11 @@ describe(`the roles (${leg})`, () => {
       expect(gone('card')).toBe(3);
       // The world's label of this board and the one the contents add.
       expect(gone('label')).toBe(2);
+      // The world's item on the open card and the contents' own.
+      expect(gone('checklist_item')).toBe(2);
       for (const name of [
         'card_label',
         'card_assignee',
-        'checklist_item',
         'comment',
         'activity',
         'publication',
@@ -2115,6 +2154,122 @@ describe(`the roles (${leg})`, () => {
         accountId: w.accounts.boardMember,
       });
       expect(await assignees(w.cards.open)).toEqual([]);
+    });
+  });
+
+  describe('a card’s checklist', () => {
+    const apply = (w: World, role: Role, op: Op) =>
+      applyOp(database, w.accounts[role], { opId: id(), ...op } as OpRequest, OPTIONS);
+    const t = () => tablesOf(database);
+    const itemsOf = (cardId: string) =>
+      dbAll<{ id: string; title: string; done: number | boolean; position: string }>(
+        database,
+        sql`SELECT id, title, (completed_at IS NOT NULL) AS done, position FROM ${t().checklistItem} WHERE card_id = ${cardId} ORDER BY position, id`,
+      );
+    const progress = async (w: World, role: Role = 'member') =>
+      (await readBoard(database, w.accounts[role], w.boards.publicBoard))?.cards.find(
+        (c) => c.id === w.cards.open,
+      )?.checklist;
+
+    it('adds items in order, and the card and the board carry the count', async () => {
+      const w = await seedWorld(database);
+      expect(await progress(w)).toEqual({ done: 0, total: 1 });
+      const two = id();
+      expect(
+        await apply(w, 'boardMember', {
+          op: 'item.add',
+          id: two,
+          cardId: w.cards.open,
+          title: 'Second',
+          position: 'a1',
+        }),
+      ).toMatchObject({
+        status: 'applied',
+        rows: {
+          item: { id: two, title: 'Second', done: false, position: 'a1' },
+          card: { checklist: { done: 0, total: 2 } },
+        },
+      });
+      expect((await itemsOf(w.cards.open)).map((i) => i.title)).toEqual(['First step', 'Second']);
+      expect(
+        (await cardDetail(database, w.accounts.member, w.cards.open))?.items.map((i) => i.title),
+      ).toEqual(['First step', 'Second']);
+      expect(await progress(w)).toEqual({ done: 0, total: 2 });
+    });
+
+    it('ticks and unticks, renames, moves by one row, and deletes, the count following', async () => {
+      const w = await seedWorld(database);
+      const two = id();
+      await apply(w, 'boardMember', {
+        op: 'item.add',
+        id: two,
+        cardId: w.cards.open,
+        title: 'Second',
+        position: 'a1',
+      });
+      expect(await apply(w, 'boardMember', { op: 'item.tick', id: w.items.open })).toMatchObject({
+        rows: { item: { done: true }, card: { checklist: { done: 1, total: 2 } } },
+      });
+      expect(await progress(w)).toEqual({ done: 1, total: 2 });
+      await apply(w, 'boardMember', { op: 'item.untick', id: w.items.open });
+      expect(await progress(w)).toEqual({ done: 0, total: 2 });
+      await apply(w, 'boardMember', { op: 'item.rename', id: two, title: 'Renamed' });
+      const before = await itemsOf(w.cards.open);
+      await apply(w, 'boardMember', { op: 'item.move', id: two, position: 'Zz' });
+      const after = await itemsOf(w.cards.open);
+      expect(after.map((i) => i.id)).toEqual([two, w.items.open]);
+      // The other item was not written.
+      expect(after.find((i) => i.id === w.items.open)).toEqual(
+        before.find((i) => i.id === w.items.open),
+      );
+      expect(await apply(w, 'boardMember', { op: 'item.delete', id: two })).toMatchObject({
+        rows: { deletedItem: two },
+      });
+      expect(await progress(w)).toEqual({ done: 0, total: 1 });
+    });
+
+    it('holds 200 items a card, takes no id that is used, and none on an archived board or card', async () => {
+      const w = await seedWorld(database);
+      const make = (itemId: string, n = 0): Op => ({
+        op: 'item.add',
+        id: itemId,
+        cardId: w.cards.open,
+        title: 'x',
+        position: `b${String(n).padStart(3, '0')}`,
+      });
+      expect(await apply(w, 'boardMember', make(w.items.open))).toEqual({
+        status: 'refused',
+        code: 'not_found',
+      });
+      for (let i = 1; i < WORKSPACE_LIMITS.itemsPerCard; i++)
+        expect((await apply(w, 'boardMember', make(id(), i))).status).toBe('applied');
+      expect(await apply(w, 'boardMember', make(id(), 999))).toEqual({
+        status: 'refused',
+        code: 'limit',
+      });
+      expect(
+        await apply(w, 'boardMember', {
+          op: 'item.add',
+          id: id(),
+          cardId: w.cards.archived,
+          title: 'x',
+          position: 'a0',
+        }),
+      ).toEqual({ status: 'refused', code: 'not_found' });
+      await apply(w, 'owner', { op: 'board.archive', id: w.boards.publicBoard });
+      expect(await apply(w, 'boardOwner', { op: 'item.tick', id: w.items.open })).toEqual({
+        status: 'refused',
+        code: 'not_found',
+      });
+    });
+
+    it('keeps a deleted card’s items with the card’s own deletion, and not another card’s', async () => {
+      const w = await seedWorld(database);
+      const before = (await itemsOf(w.cards.open)).length;
+      await apply(w, 'boardMember', { op: 'card.archive', id: w.cards.open });
+      expect((await itemsOf(w.cards.open)).length).toBe(before);
+      await apply(w, 'boardMember', { op: 'card.delete', id: w.cards.open });
+      expect((await itemsOf(w.cards.open)).length).toBe(0);
     });
   });
 
