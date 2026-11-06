@@ -106,6 +106,7 @@ export function useBoard(
         } else {
           const result = (await reply.json()) as OpResult;
           if (result.status === 'applied') {
+            setOffline(false);
             confirmed.current = settled(showingBoard(confirmed.current, op), op, result.rows);
             pending.current -= 1;
             // These change what the person may do here (archiving, joining, leaving, being given a role, a board made private), which only the server
@@ -136,8 +137,11 @@ export function useBoard(
   const perform = useCallback(
     (op: Op, show?: (view: BoardView) => BoardView): Promise<boolean> => {
       // An administrator who is not on the board (and a board that is archived) changes nothing in it, but archives, restores, edits and deletes it.
-      if (offline || gone || !(view.can.edit || view.can.admin)) {
-        if (offline) failed.current('offline');
+      // "Offline" was a failed request, which a blip also makes: the browser's own word decides whether to try, so that one lost poll does not stop a person
+      // changing the board for the twenty seconds before the next.
+      const noNetwork = offline && typeof navigator !== 'undefined' && navigator.onLine === false;
+      if (noNetwork || gone || !(view.can.edit || view.can.admin)) {
+        if (noNetwork) failed.current('offline');
         return Promise.resolve(false);
       }
       pending.current += 1;

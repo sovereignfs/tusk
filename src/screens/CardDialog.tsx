@@ -6,8 +6,19 @@ import { useBoardPeople, useBoardStore } from '../boards/context';
 import { DuePicker } from '../dates/DuePicker';
 import { formatDue } from '../format-due';
 import { browserZone, todayFor } from '../time';
-import { Avatar, Button, Checkbox, Dialog, FormField, Input, Popover, Textarea } from '../ui';
+import {
+  Avatar,
+  Button,
+  Checkbox,
+  Dialog,
+  FormField,
+  Input,
+  Popover,
+  SegmentedControl,
+  Textarea,
+} from '../ui';
 import { CardChecklist } from './CardChecklist';
+import { ActivityList } from './ActivityList';
 import { CardComments } from './CardComments';
 import { LabelChip, LabelsEditor } from './LabelsEditor';
 import { type CardDetail, WORKSPACE_LIMITS } from '../workspaces/format';
@@ -32,6 +43,7 @@ export function CardDialog({ detail: first }: { detail: CardDetail }) {
   const [description, setDescription] = useState(first.description ?? '');
   const [pickingLabels, setPickingLabels] = useState(false);
   const [pickingPeople, setPickingPeople] = useState(false);
+  const [tab, setTab] = useState<'comments' | 'activity'>('comments');
   const people = useBoardPeople();
   // What the server last said, which a blank title goes back to and which a draft is compared with.
   const saved = useRef({ title: first.title, description: first.description ?? '' });
@@ -42,9 +54,16 @@ export function CardDialog({ detail: first }: { detail: CardDetail }) {
   const version = store.view.board.version;
   // Counts every change to what is typed, so that a read that began before a keystroke is not allowed to put the old text back over it.
   const touched = useRef(0);
-  useEffect(() => {
+  // Counted in the handler that changes what is typed, **at that moment**, and not in an effect after the next render: a read that finishes between the
+  // keystroke and that render would otherwise see nothing typed and put the old text back over it.
+  const typeTitle = (next: string) => {
     touched.current += 1;
-  }, [title, description]);
+    setTitle(next);
+  };
+  const typeDescription = (next: string) => {
+    touched.current += 1;
+    setDescription(next);
+  };
   useEffect(() => {
     const untouched = title === saved.current.title && description === saved.current.description;
     if (!untouched) return;
@@ -110,7 +129,7 @@ export function CardDialog({ detail: first }: { detail: CardDetail }) {
                   {...field}
                   value={title}
                   maxLength={WORKSPACE_LIMITS.cardTitleChars}
-                  onChange={(event) => setTitle(event.target.value)}
+                  onChange={(event) => typeTitle(event.target.value)}
                   onBlur={() => void leaveTitle()}
                   onKeyDown={(event) => {
                     if (event.key === 'Enter') event.currentTarget.blur();
@@ -244,7 +263,7 @@ export function CardDialog({ detail: first }: { detail: CardDetail }) {
                   value={description}
                   rows={6}
                   maxLength={WORKSPACE_LIMITS.descriptionChars}
-                  onChange={(event) => setDescription(event.target.value)}
+                  onChange={(event) => typeDescription(event.target.value)}
                   onBlur={() => void leaveDescription()}
                 />
               )}
@@ -267,9 +286,27 @@ export function CardDialog({ detail: first }: { detail: CardDetail }) {
             store={store}
           />
 
-          <CardComments cardId={detail.id} editable={editable} store={store} />
-
-          {/* Activity, as a tab beside the comments, goes here. */}
+          <SegmentedControl<'comments' | 'activity'>
+            aria-label="Comments or activity"
+            size="sm"
+            value={tab}
+            onChange={setTab}
+            options={[
+              { label: 'Comments', value: 'comments' },
+              { label: 'Activity', value: 'activity' },
+            ]}
+          />
+          {tab === 'comments' ? (
+            <CardComments cardId={detail.id} editable={editable} store={store} />
+          ) : (
+            // What happened to this card, read again when the board moves on, since each change is a row.
+            <section aria-label="Activity">
+              <ActivityList
+                url={`/api/cards/${detail.id}/activity`}
+                refresh={store.view.board.version}
+              />
+            </section>
+          )}
         </div>
         {editable ? (
           <aside className={styles.side} aria-label="Actions">

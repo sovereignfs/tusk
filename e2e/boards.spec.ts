@@ -779,3 +779,70 @@ test('a comment is written in a card’s dialog, shown as text with its line bre
     .click();
   await cleanUp(page, workspace);
 });
+
+test('a board’s activity is a dialog from its menu, a card’s is a tab of its dialog, and Settings has one’s own', async ({
+  page,
+}) => {
+  await signedIn(page);
+  const { workspace } = await makeBoard(page);
+  await addCard(page, 'Backlog', 'Watched');
+  const column = page.locator('section[aria-label="Backlog"]');
+  await column.getByLabel('Watched', { exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Watched' });
+  await dialog.getByLabel('Title').fill('Watched closely');
+  await dialog.getByLabel('Description').click();
+
+  // The card's own activity, as a tab: made, then renamed.
+  await dialog.getByRole('radio', { name: 'Activity' }).click();
+  const own = dialog.getByRole('region', { name: 'Activity' });
+  await expect(own.getByText('Ada renamed Watched to Watched closely')).toBeVisible();
+  await expect(own.getByText('Ada added Watched to Backlog')).toBeVisible();
+  await dialog.getByRole('button', { name: 'Close' }).click();
+
+  // The board's, from its menu, with the list and the card in it, newest first.
+  await openFromMenu(page, 'Activity');
+  const all = page.getByRole('dialog', { name: 'Board activity' });
+  const rows = all.getByRole('listitem');
+  await expect(rows.first()).toHaveText(/Ada renamed Watched to Watched closely/);
+  await expect(all.getByText('Ada created the board')).toBeVisible();
+  await all.getByRole('button', { name: 'Close' }).click();
+
+  // Kept as it was after the card is deleted for good; the API still reads it.
+  const board = new URL(page.url()).pathname.split('/')[2] ?? '';
+  const view = (await (await page.request.get(`/api/boards/${board}`)).json()) as {
+    cards: { id: string }[];
+  };
+  const cardId = view.cards[0]?.id ?? '';
+  const origin = new URL(page.url()).origin;
+  for (const op of [
+    { op: 'card.archive', id: cardId },
+    { op: 'card.delete', id: cardId },
+  ])
+    await page.request.post('/api/ops', {
+      headers: { origin },
+      data: { opId: crypto.randomUUID(), ...op },
+    });
+  const after = (await (await page.request.get(`/api/cards/${cardId}/activity`)).json()) as {
+    activity: { text: string }[];
+  };
+  expect(after.activity.map((a) => a.text)).toEqual([
+    'Ada deleted Watched closely',
+    'Ada archived Watched closely',
+    'Ada renamed Watched to Watched closely',
+    'Ada added Watched to Backlog',
+  ]);
+
+  // Settings has one's own activity, on the boards one can still see.
+  await page.goto('/account?section=activity');
+  await expect(page.getByRole('heading', { name: 'Activity', level: 2 })).toBeVisible();
+  await expect(page.getByText('Ada deleted Watched closely').first()).toBeVisible();
+
+  // The routes are for the signed-in, and a cursor is a time and an id.
+  expect((await page.request.get('/api/activity?beforeAt=abc&beforeId=x')).status()).toBe(400);
+  expect((await page.request.get(`/api/boards/${crypto.randomUUID()}/activity`)).status()).toBe(
+    404,
+  );
+  expect((await page.request.get(`/api/cards/${crypto.randomUUID()}/activity`)).status()).toBe(404);
+  await page.goto(`/b/${board}`);
+  await cleanUp(page, workspace);
+});

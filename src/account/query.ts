@@ -1,9 +1,15 @@
 /**
  * Which part of Settings an address asks for (DESIGN.md §19): `/account?section=security`. Pure, so that what a stray or hostile address does is tested
- * with no browser. Only sections that exist can be asked for: Activity joins with the task that fills it (17.6), and an address that
- * names it, or nothing, opens Profile.
+ * with no browser. Only sections that exist can be asked for; an address that names another, or nothing, opens Profile.
  */
-export const SECTIONS = ['profile', 'security', 'preferences', 'notifications', 'data'] as const;
+export const SECTIONS = [
+  'profile',
+  'security',
+  'preferences',
+  'notifications',
+  'activity',
+  'data',
+] as const;
 export type AccountSection = (typeof SECTIONS)[number];
 
 export interface AccountQuery {

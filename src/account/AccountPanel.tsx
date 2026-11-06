@@ -1,6 +1,7 @@
 import { requireSession } from '../auth/session';
 import { authSettings } from '../auth/server';
 import { AccountShell } from './AccountShell';
+import { ActivitySection } from './ActivitySection';
 import { DataSection } from './DataSection';
 import { NotificationsSection } from './NotificationsSection';
 import { PreferencesSection } from './PreferencesSection';
@@ -23,6 +24,7 @@ export async function AccountPanel({ query }: { query: AccountQuery }) {
         security: <SecuritySection passwordMinLength={minLength} />,
         preferences: <PreferencesSection />,
         notifications: <NotificationsSection />,
+        activity: <ActivitySection />,
         data: <DataSection />,
       }}
     />

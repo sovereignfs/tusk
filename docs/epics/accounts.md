@@ -114,7 +114,7 @@ address later becomes. Fjord's `web-1a.md` 1a.4 is the list of tests. In Setting
 `app/@modal/(.)account`, with a section list beside the content. **Profile:** name, email, avatar (what workspaces see). **Security:** password (asks
 for the old one, ends other sessions), signed-in devices with sign-out elsewhere, and the places 2.4 and 2.6 fill. An account that came through
 Sovereign has no password, two-factor or passkey parts, and says so. **Preferences:** theme, first day of the week, the sort of My workspaces (16.4).
-**Notifications:** filled by 8.1. **Data:** last synced, and the places 9.1, 10.3, 14.2, 17.5 and 2.8 fill. **Activity:** filled by 17.6, and the
+**Notifications:** filled by 8.1. **Data:** last synced, and the places 9.1, 10.3, 14.2, 17.5 and 2.8 fill. **Activity:** filled by 17.6 (the person's own activity, on the boards they can still see), and the
 devices' last sign-in. `UserMenu` opens it: a header of name and email, Settings, Sign out, and a way back to the instance when a core is set. Each
 section says when it needs a network. `account_settings` gains `first_day_of_week` and `workspace_sort`, saved through `PATCH /api/settings`.
 

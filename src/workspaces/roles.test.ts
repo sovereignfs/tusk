@@ -1079,7 +1079,9 @@ describe(`the roles (${leg})`, () => {
       expect(gone('checklist_item')).toBe(2);
       // The world's two comments and the contents' own.
       expect(gone('comment')).toBe(3);
-      for (const name of ['board_list', 'card_label', 'card_assignee', 'activity'])
+      // Its activity stays (DESIGN.md §15.6): the history of the work outlives the list and its cards.
+      expect(gone('activity')).toBe(-1);
+      for (const name of ['board_list', 'card_label', 'card_assignee'])
         expect(gone(name), name).toBe(1);
       // The world's two cards and the one with contents were on it.
       expect(gone('card')).toBe(3);
@@ -1356,7 +1358,12 @@ describe(`the roles (${leg})`, () => {
       for (const name of ['card', 'card_label', 'card_assignee', 'checklist_item', 'comment'])
         expect(gone(name), name).toBe(1);
       // The history of the work stays, and so do the board's labels and the other cards.
-      expect(gone('activity')).toBe(0);
+      // Its history stays, and the deletion is added to it.
+      expect(gone('activity')).toBe(-1);
+      expect(
+        (await dbAll(database, sql`SELECT 1 FROM ${t().activity} WHERE card_id = ${contentsCard}`))
+          .length,
+      ).toBeGreaterThanOrEqual(2);
       expect(gone('label')).toBe(0);
       expect(await cardRow(w.cards.open)).toBeDefined();
     });

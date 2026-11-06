@@ -7,7 +7,7 @@ describe('the section an address asks for', () => {
   });
 
   it('is Profile for nothing, for a section that does not exist yet, and for what an object inherits', () => {
-    for (const section of [undefined, '', 'activity', 'SECURITY', 'toString', '__proto__'])
+    for (const section of [undefined, '', 'billing', 'SECURITY', 'toString', '__proto__'])
       expect(sectionOf({ section }), String(section)).toBe('profile');
   });
 

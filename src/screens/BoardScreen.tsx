@@ -47,6 +47,7 @@ import {
 import { TileBody } from './CardTileView';
 import { BoardSettingsDialog, DeleteBoardDialog } from './BoardSettings';
 import { ShareDialog } from './ShareDialog';
+import { ActivityList } from './ActivityList';
 import { ListColumn } from './ListColumn';
 import styles from './BoardScreen.module.css';
 
@@ -90,7 +91,7 @@ export function BoardScreen({
   const [dragging, setDragging] = useState<CardTile | null>(null);
   const [archivedOpen, setArchivedOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [dialog, setDialog] = useState<'settings' | 'delete' | 'share' | null>(null);
+  const [dialog, setDialog] = useState<'settings' | 'delete' | 'share' | 'activity' | null>(null);
   const [people, setPeople] = useState<BoardPeople | null>(null);
   const boardId = view.board.id;
   const version = view.board.version;
@@ -244,6 +245,11 @@ export function BoardScreen({
                     ]
                   : []),
                 {
+                  label: 'Activity',
+                  icon: 'activity' as const,
+                  onSelect: () => setDialog('activity'),
+                },
+                {
                   label: 'Archived cards',
                   icon: 'archive' as const,
                   onSelect: () => setArchivedOpen(true),
@@ -305,6 +311,19 @@ export function BoardScreen({
               refresh={readPeople}
               onClose={() => setDialog(null)}
             />
+          ) : null}
+          {dialog === 'activity' ? (
+            <Dialog
+              open
+              onClose={() => setDialog(null)}
+              aria-label="Board activity"
+              title="Activity"
+              size="md"
+            >
+              <div className={styles.dialog}>
+                <ActivityList url={`/api/boards/${view.board.id}/activity`} />
+              </div>
+            </Dialog>
           ) : null}
           {dialog === 'delete' ? (
             <DeleteBoardDialog

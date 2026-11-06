@@ -535,3 +535,57 @@ export const NOTICE_LIMITS = {
   keptMs: 90 * 24 * 60 * 60 * 1000,
   assignedListed: 200,
 } as const;
+
+/** What happened on a board (DESIGN.md §15.6). Each kind has a sentence in `describe.ts`. */
+export const ACTIVITY_KINDS = [
+  'card.created',
+  'card.renamed',
+  'card.moved',
+  'card.archived',
+  'card.restored',
+  'card.deleted',
+  'card.due_set',
+  'card.due_cleared',
+  'card.label_added',
+  'card.label_removed',
+  'card.assigned',
+  'card.unassigned',
+  'card.item_added',
+  'card.item_ticked',
+  'card.commented',
+  'list.created',
+  'list.renamed',
+  'list.moved',
+  'list.deleted',
+  'board.created',
+  'board.renamed',
+  'board.visibility',
+  'board.archived',
+  'board.restored',
+  'board.joined',
+  'board.left',
+  'board.member_added',
+  'board.member_removed',
+  'board.member_owner',
+] as const;
+export type ActivityKind = (typeof ACTIVITY_KINDS)[number];
+
+/** A row of activity, with its sentence already made (`describe.ts`), the actor's name read from the account when it is shown. */
+export interface ActivityRow {
+  readonly id: string;
+  readonly kind: ActivityKind;
+  readonly actorName: string;
+  readonly text: string;
+  readonly boardId: string;
+  readonly boardName?: string;
+  readonly cardId: string | null;
+  readonly createdAt: number;
+}
+
+export interface ActivityPage {
+  readonly activity: readonly ActivityRow[];
+  readonly more: boolean;
+}
+
+/** A page of activity (DESIGN.md §15.6). */
+export const ACTIVITY_PAGE = 50;

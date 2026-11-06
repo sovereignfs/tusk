@@ -839,6 +839,9 @@ What happened on a board, by whom and when, written by the server in the same tr
   boards, is in Settings > Activity (§19).
 - **Kept** for as long as the board is. It is not edited, and not deleted except with its board or its workspace.
 
+**As built (task 17.6):** activity is written by `capture` and `record` (`src/workspaces/activity.ts`) in `applyOp`'s transaction, shown in sentences made by `describe.ts`, and read a page at a time
+after a cursor of time and id. Deleting a card or a list does not delete its activity.
+
 ### 15.7 Moving and cloning
 
 Cards are dragged within a list and between lists (§17.8). A right-click on a card, or its detail's menu, offers:

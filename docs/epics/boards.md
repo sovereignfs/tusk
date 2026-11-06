@@ -2,7 +2,7 @@
 
 ## Status
 
-✅ Done: 17.1, 17.2 and 17.3.
+✅ Done: 17.1, 17.2, 17.3 and 17.6.
 
 ## Overview
 
@@ -100,7 +100,7 @@ address, 404 for an unknown token. Listed in the Share dialog with Copy and Unpu
 **Accepts when:** a published board is readable signed out; no name, email or comment of anyone appears in its HTML; unpublishing makes the address
 404 at once, and publishing again makes a different one; a deleted board's address is a 404.
 
-#### 📋 17.6 — Activity
+#### ✅ 17.6 — Activity
 
 **Goal:** see what happened on a board, and on a card.
 
@@ -113,3 +113,5 @@ person's own, by `actor_id`, across the boards they can still see.
 
 **Accepts when:** every kind of 16.1 has a sentence, tested with no screen; activity reads the same after its card is renamed or deleted; paging returns
 each row once; an outsider cannot read a board's.
+
+**Done as:** **activity is written by the server in the transaction of the change.** `src/workspaces/activity.ts` has `capture`, which reads the names a change is about to take away (a card's title and list before it is renamed or moved, a list's, a label's, who was assigned), and `record`, which after the operation has succeeded writes its row from that and from what it answered; both are called by `applyOp` inside the transaction, so a refused operation writes no row, and a change that changed nothing (the same title, a move within a list, an assignment that was already so) writes none either. The kinds are 29 (`ACTIVITY_KINDS`): a card created, renamed, moved between lists, archived, restored, deleted, its due date set or cleared, a label put on or taken off, a person assigned or unassigned, a checklist item added or ticked, a comment; a list created, renamed, moved or deleted; the board created, renamed, its visibility changed, archived, restored; a person joining, leaving, added, removed or made an owner (publishing joins with 17.5). **Each row keeps the names its sentence needs as they were,** as JSON in `details`, and the card's id, which may point at nothing: **deleting a card, or a list with its cards, no longer deletes its activity** (a list's deletion did, from 17.1; the deletion is now a row of it), and only the board's or the workspace's deletion takes it. `src/workspaces/describe.ts` is pure: one sentence for each kind from the kind and the names ("Ana moved Fix login from Backlog to Doing"), with a person named in a row read from the accounts when shown and "Deleted account" for one that is gone. `activity-reads.ts` has the three reads, each newest first in pages of 50 after a cursor of time and id (`src/access/cursor.ts`, shared with the Inbox) with every statement holding the rows to boards the asker can see: `GET /api/boards/<id>/activity` (the same 404 as the board for what is not theirs), `GET /api/cards/<id>/activity` (**true of a deleted card too**: what is asked is "this card's, on a board I can see"), and `GET /api/activity`, the person's own across the boards they can still see, each with its board's name. The board's menu has an **Activity** dialog, a card's dialog has Comments and **Activity** as two tabs of one control, and **Settings > Activity** lists the person's own. Tests: a sentence for every kind with no database and no screen (every kind's words, none of them undefined even when the row kept nothing, a person that is gone, markup in a name staying words); the data layer for a run of changes read back as sentences in order, nothing written for a refusal or for no change, a card renamed and then deleted reading the same with its own history still readable, the changes of due dates, labels, checklists, comments, lists and the board all written, paging each row once, an outsider and a private board's non-members reading nothing, a person's own across boards until they are taken off one, and "Deleted account"; and in Chromium and WebKit the card's tab, the board's dialog, the history of a deleted card read by its API, and Settings > Activity. The board's visibility, the person's, and the card's reads were each removed in turn and the tests failed. **Not as the epic said:** the reads return the sentence made by the server and not the row to be made one by the browser, so that the one `describe` serves them all; publishing and unpublishing are 17.5's to add.

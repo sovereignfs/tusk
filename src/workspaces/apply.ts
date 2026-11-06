@@ -13,6 +13,7 @@ import {
   workspacesOf,
   workspacesOwnedBy,
 } from './can';
+import { capture, record } from './activity';
 import { raise } from './notices';
 import { boardRowOf } from './reads';
 import {
@@ -80,7 +81,9 @@ export async function applyOp(
       );
       if (fresh.length === 0) return { status: 'applied', replay: true, rows: {} } as const;
 
+      const before = await capture(tx, request);
       const rows = await run(tx, accountId, request, options.now, target);
+      await record(tx, accountId, request, before, rows, options.now);
       return { status: 'applied', replay: false, rows } as const;
     });
   } catch (error) {
@@ -305,7 +308,7 @@ async function run(
       if (!boardId) throw new Refused('not_found');
       // The cards that were on it, and everything on them: by `board_id` and the list's own id, children before parents.
       const cards = sql`card_id IN (SELECT id FROM ${t.card} WHERE list_id = ${request.id} AND board_id = ${boardId})`;
-      for (const table of [t.comment, t.checklistItem, t.cardAssignee, t.cardLabel, t.activity])
+      for (const table of [t.comment, t.checklistItem, t.cardAssignee, t.cardLabel])
         await dbAll(
           tx,
           sql`DELETE FROM ${table} WHERE board_id = ${boardId} AND ${cards} RETURNING 1 AS one`,

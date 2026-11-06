@@ -1,4 +1,4 @@
-import { uuid } from '@/src/access/parse';
+import { parseCursor } from '@/src/access/cursor';
 import { accountRoute } from '@/src/access/route';
 import { authDirectory } from '@/src/auth/directory';
 import { getAuthDatabase, getDatabase } from '@/src/db/boot';
@@ -9,19 +9,13 @@ import { inboxOf } from '@/src/workspaces/inbox';
 export const dynamic = 'force-dynamic';
 
 export const GET = accountRoute(async ({ request, accountId }) => {
-  const url = new URL(request.url);
-  const at = url.searchParams.get('beforeAt');
-  const id = uuid(url.searchParams.get('beforeId'));
-  let before: { createdAt: number; id: string } | undefined;
-  if (at !== null || url.searchParams.has('beforeId')) {
-    if (at === null || !/^\d{1,16}$/.test(at) || !id.ok) return new Response(null, { status: 400 });
-    before = { createdAt: Number(at), id: id.value };
-  }
+  const cursor = parseCursor(new URL(request.url).searchParams);
+  if (!cursor.ok) return new Response(null, { status: 400 });
   const inbox = await inboxOf(
     await getDatabase(),
     authDirectory(await getAuthDatabase()),
     accountId,
-    before,
+    cursor.before,
   );
   return new Response(JSON.stringify(inbox), {
     headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
