@@ -85,6 +85,29 @@ describe('loadConfig', () => {
     });
   });
 
+  describe('TUSK_GITHUB_API_URL', () => {
+    it('is GitHub itself unless it names another, and keeps the path of an Enterprise Server', () => {
+      expect(loadConfig({})).toMatchObject({ config: { githubApiUrl: 'https://api.github.com' } });
+      expect(loadConfig({ TUSK_GITHUB_API_URL: 'https://ghe.example.com/api/v3/' })).toMatchObject({
+        config: { githubApiUrl: 'https://ghe.example.com/api/v3' },
+      });
+      expect(loadConfig({ TUSK_GITHUB_API_URL: 'http://localhost:4010' })).toMatchObject({
+        config: { githubApiUrl: 'http://localhost:4010' },
+      });
+    });
+
+    it.each([
+      'http://api.github.com',
+      'https://user:pass@ghe.example.com',
+      'https://ghe.example.com?x=1',
+      'not an address',
+    ])('stops the server on %s, naming the setting and not the address', (value) => {
+      const result = problems(loadConfig({ TUSK_GITHUB_API_URL: value })).join(' ');
+      expect(result).toContain('TUSK_GITHUB_API_URL');
+      expect(result).not.toContain(value);
+    });
+  });
+
   describe('settings that go together', () => {
     it.each([
       ['TUSK_CORE_URL', 'Sovereign sign-in'],

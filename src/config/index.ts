@@ -1,6 +1,8 @@
 import { resolveAuth, type AuthSettings } from '../auth/config';
 import { type KeyRing, parseKey, ringOf } from '../crypto/keys';
 import { DatabaseConfigError, resolveDatabaseSettings, type DatabaseSettings } from '../db/config';
+import { checkApiUrl, DEFAULT_API_URL } from '../providers/github/provider';
+import { ProviderError } from '../providers/types';
 import { readSetting, SettingFileError, type Env, type ReadFile } from './env';
 
 /** What the app was told, once it has been checked. It grows as the tasks that read a setting are built. */
@@ -15,6 +17,8 @@ export interface Config {
   readonly database: DatabaseSettings;
   /** The instance key, and the one it replaces while credentials are moved to it; absent when there is none, and nothing that needs one is offered (DESIGN.md §21.2). */
   readonly encryption: KeyRing | undefined;
+  /** Where GitHub's API is: `https://api.github.com`, or an Enterprise Server's. https, or http on this machine alone (DESIGN.md §21.5). */
+  readonly githubApiUrl: string;
 }
 
 /** One thing that is wrong, in words that name the setting and never its value. */
@@ -161,6 +165,20 @@ export function loadConfig(env: Env, readFile?: ReadFile): LoadResult {
     problems,
   );
 
+  // The address of GitHub's API: an address that would send a token over plain http to another machine stops the server, naming the setting.
+  let githubApiUrl = DEFAULT_API_URL;
+  const rawGithubApi = read('TUSK_GITHUB_API_URL');
+  if (rawGithubApi !== undefined) {
+    try {
+      githubApiUrl = checkApiUrl(rawGithubApi);
+    } catch (error) {
+      if (!(error instanceof ProviderError)) throw error;
+      problems.push(
+        'TUSK_GITHUB_API_URL is an https address with no user, query or fragment (http only for localhost).',
+      );
+    }
+  }
+
   // Mail is optional, but a host with no sender would send nothing anyone could answer, so it stops here rather than at the first message.
   if (read('TUSK_SMTP_HOST') !== undefined && read('TUSK_SMTP_FROM') === undefined) {
     problems.push('TUSK_SMTP_HOST is set, and mail needs TUSK_SMTP_FROM as well.');
@@ -180,5 +198,8 @@ export function loadConfig(env: Env, readFile?: ReadFile): LoadResult {
   }
 
   if (problems.length > 0 || database === undefined) return { ok: false, problems };
-  return { ok: true, config: { url, auth, worker: rawWorker !== 'off', database, encryption } };
+  return {
+    ok: true,
+    config: { url, auth, worker: rawWorker !== 'off', database, encryption, githubApiUrl },
+  };
 }
