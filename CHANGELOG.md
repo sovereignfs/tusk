@@ -37,6 +37,7 @@ Each release's section is also its GitHub release notes: the release workflow re
 
 ### Changed
 
+- Workspaces: made from the + in the sidebar, listed under _My workspaces_ (and _Shared with me_, for those a person is in), renamed by an owner, and deleted by typing the name, which takes every board and card in it. A workspace that is not yours is the page for what is not here.
 - The server has the tables of workspaces, boards and cards, and one door for writing to them, `POST /api/ops`: an operation with its permission in the statement that does the work, answered the same whether the thing is not there or is not yours. Nothing in the app uses it yet.
 
 - The app is called **Tusk**, not Tasks. Every setting is `TUSK_…` (it was `TASKS_…`), the databases are `tusk` and `tusk_auth` (files `tusk.db` and `tusk_auth.db`), the session cookie is `tusk.session_token`, the database kept in the browser is `tusk-desk-<account>`, and the image is `ghcr.io/sovereignfs/tusk`. Nothing was released under the old names, so there is no alias: set the new ones, and a database made under the old names starts again.

@@ -6,13 +6,13 @@ const ID = () => crypto.randomUUID();
 
 describe('an operation', () => {
   it('is accepted whole, with its name trimmed, and comes back the same through JSON', () => {
-    for (const op of ['workspace.create', 'workspace.rename'] as const) {
+    for (const op of ['workspace.create', 'workspace.rename', 'workspace.delete'] as const) {
       const request = { opId: ID(), op, id: ID(), name: '  Acme  ' };
       const parsed = parseOp(JSON.parse(JSON.stringify(request)));
       expect(parsed.ok).toBe(true);
       if (parsed.ok) expect(parsed.value).toEqual({ ...request, name: 'Acme' });
     }
-    expect(OPS).toEqual(['workspace.create', 'workspace.rename']);
+    expect(OPS).toEqual(['workspace.create', 'workspace.rename', 'workspace.delete']);
   });
 
   it('is refused for every shape that is not one', () => {

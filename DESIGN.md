@@ -277,7 +277,7 @@ UPDATE card SET title = ?, updated_at = ?
 ```
 
 No row affected means the row is not there for this account, and the answer is the same whether it does not exist, belongs to someone else, or is on an
-archived board: **a refusal reads as "not found"** (`404`), since whether a board exists is itself something only its members may know.
+archived board: **a refusal reads as "not found"** (the page for what is not here; its status line is `200`, as for any page that streams behind the root loading state, and `404` for an API), since whether a board exists is itself something only its members may know.
 
 This closes the tasks plugin's most serious flaw. There, an action took `(taskId, listId)`, checked the caller owned `listId`, and then updated by
 `taskId` alone, so anyone who knew another person's task id could change it. The same shape was in eleven of its actions.

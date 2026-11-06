@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { AccountMenu } from '@/src/auth/screens/AccountMenu';
 import { requireSession } from '@/src/auth/session';
 import { AppFrame } from '@/src/screens/AppFrame';
+import { WorkspacesProvider } from '@/src/boards/workspaces';
 import { Frame } from '@/src/screens/Frame';
 import { site } from '@/src/site';
 import { SyncProvider } from '@/src/sync/react';
@@ -23,23 +24,25 @@ export default async function AppLayout({
   const session = await requireSession();
   return (
     <SyncProvider accountId={session.user.id}>
-      <AppShell
-        name={site.name}
-        toolbar={<SidebarToggle />}
-        account={
-          <AccountMenu
-            accountId={session.user.id}
-            name={session.user.name}
-            email={session.user.email}
-          />
-        }
-      >
-        <AppFrame>
-          {/* The Desk's own columns; they move into the Desk's pages with task 3.12. */}
-          <Frame>{children}</Frame>
-        </AppFrame>
-        {modal}
-      </AppShell>
+      <WorkspacesProvider>
+        <AppShell
+          name={site.name}
+          toolbar={<SidebarToggle />}
+          account={
+            <AccountMenu
+              accountId={session.user.id}
+              name={session.user.name}
+              email={session.user.email}
+            />
+          }
+        >
+          <AppFrame>
+            {/* The Desk's own columns; they move into the Desk's pages with task 3.12. */}
+            <Frame>{children}</Frame>
+          </AppFrame>
+          {modal}
+        </AppShell>
+      </WorkspacesProvider>
     </SyncProvider>
   );
 }

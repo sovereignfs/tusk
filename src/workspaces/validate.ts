@@ -15,6 +15,7 @@ const NAME = text(1, WORKSPACE_LIMITS.nameChars);
 const ARGUMENTS: Record<OpName, readonly string[]> = {
   'workspace.create': ['id', 'name'],
   'workspace.rename': ['id', 'name'],
+  'workspace.delete': ['id', 'name'],
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
@@ -37,7 +38,8 @@ export function parseOp(value: unknown): Parsed<OpRequest> {
 
   switch (kind) {
     case 'workspace.create':
-    case 'workspace.rename': {
+    case 'workspace.rename':
+    case 'workspace.delete': {
       const id = uuid(value.id);
       if (!id.ok) return no('id: not an id');
       // A name is what is written, trimmed: a blank one is no name.

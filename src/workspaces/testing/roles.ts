@@ -99,3 +99,75 @@ export async function reachable(
   );
   return rows.map((row) => row.id);
 }
+
+/** One row of every table below a board, on the public board, and a notice about the workspace: what deleting a workspace must leave nothing of. */
+export async function seedBoardContents(database: Database, world: World): Promise<void> {
+  const t = tablesOf(database);
+  const board = world.boards.publicBoard;
+  const list = uuid();
+  const card = uuid();
+  const label = uuid();
+  const now = 1_800_000_000_000;
+  const who = world.accounts.boardOwner;
+  const run = (query: ReturnType<typeof sql>) => dbRun(database, query);
+  await run(
+    sql`INSERT INTO ${t.boardList} (id, board_id, name, position, created_at, updated_at) VALUES (${list}, ${board}, 'Backlog', 'a0', ${now}, ${now})`,
+  );
+  await run(
+    sql`INSERT INTO ${t.card} (id, board_id, list_id, title, position, created_by, created_at, updated_at) VALUES (${card}, ${board}, ${list}, 'First', 'a0', ${who}, ${now}, ${now})`,
+  );
+  await run(
+    sql`INSERT INTO ${t.label} (id, board_id, name, color, created_at) VALUES (${label}, ${board}, 'Bug', '#dc2626', ${now})`,
+  );
+  await run(
+    sql`INSERT INTO ${t.cardLabel} (card_id, label_id, board_id) VALUES (${card}, ${label}, ${board})`,
+  );
+  await run(
+    sql`INSERT INTO ${t.cardAssignee} (card_id, account_id, board_id, assigned_by, created_at) VALUES (${card}, ${who}, ${board}, ${who}, ${now})`,
+  );
+  await run(
+    sql`INSERT INTO ${t.checklistItem} (id, card_id, board_id, title, position, created_at) VALUES (${uuid()}, ${card}, ${board}, 'Step', 'a0', ${now})`,
+  );
+  await run(
+    sql`INSERT INTO ${t.comment} (id, card_id, board_id, author_id, body, created_at) VALUES (${uuid()}, ${card}, ${board}, ${who}, 'Hello', ${now})`,
+  );
+  await run(
+    sql`INSERT INTO ${t.activity} (id, board_id, card_id, actor_id, kind, details, created_at) VALUES (${uuid()}, ${board}, ${card}, ${who}, 'card.created', '{}', ${now})`,
+  );
+  await run(
+    sql`INSERT INTO ${t.publication} (board_id, token, created_by, created_at) VALUES (${board}, ${uuid()}, ${who}, ${now})`,
+  );
+  await run(
+    sql`INSERT INTO ${t.notice} (id, account_id, kind, actor_id, workspace_id, board_id, details, created_at) VALUES (${uuid()}, ${world.accounts.member}, 'added_to_workspace', ${who}, ${world.workspace}, ${board}, '{}', ${now})`,
+  );
+}
+
+/** How many rows there are in every workspace table, by table, for comparing before and after. */
+export async function countAll(database: Database): Promise<Record<string, number>> {
+  const t = tablesOf(database);
+  const names = {
+    workspace: t.workspace,
+    workspace_member: t.workspaceMember,
+    board: t.board,
+    board_member: t.boardMember,
+    board_list: t.boardList,
+    card: t.card,
+    label: t.label,
+    card_label: t.cardLabel,
+    card_assignee: t.cardAssignee,
+    checklist_item: t.checklistItem,
+    comment: t.comment,
+    activity: t.activity,
+    publication: t.publication,
+    notice: t.notice,
+  };
+  const out: Record<string, number> = {};
+  for (const [name, table] of Object.entries(names)) {
+    const row = await dbAll<{ n: number | string }>(
+      database,
+      sql`SELECT COUNT(*) AS n FROM ${table}`,
+    );
+    out[name] = Number(row[0]?.n ?? 0);
+  }
+  return out;
+}

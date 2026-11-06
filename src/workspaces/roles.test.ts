@@ -7,8 +7,17 @@ import { makeStore } from '../sync/test-support';
 import { applyOp } from './apply';
 import { boardsAdministeredBy, boardsEditableBy, boardsVisibleTo } from './can';
 import { OPS, type OpRefusal, type OpRequest } from './format';
+import { listWorkspaces, workspaceOf } from './reads';
 import { tablesOf } from './tables';
-import { type Role, ROLES, type World, reachable, seedWorld } from './testing/roles';
+import {
+  type Role,
+  ROLES,
+  type World,
+  countAll,
+  reachable,
+  seedBoardContents,
+  seedWorld,
+} from './testing/roles';
 
 /**
  * The matrix of roles (DESIGN.md §7.2, §24 Testing): six people in six roles, every operation and every permission, and what each of them gets, **written
@@ -19,6 +28,7 @@ const { leg } = testTarget();
 
 let database: Database;
 let close: () => Promise<void>;
+/** The world the permissions are read in, which nothing changes. Every operation below gets a world of its own, since one that is allowed changes it. */
 let world: World;
 beforeAll(async () => {
   ({ database, close } = await makeStore());
@@ -45,6 +55,13 @@ const OPERATIONS: Row[] = [
     otherwise: 'not_found',
   },
   {
+    // Only an owner, and only by typing its name: a shared space is not deleted by accident.
+    op: 'workspace.delete',
+    build: (w) => ({ op: 'workspace.delete', id: w.workspace, name: 'Acme' }),
+    may: ['owner', 'coOwner'],
+    otherwise: 'not_found',
+  },
+  {
     // Anyone may make a workspace of their own, and a new id is nothing of anyone else's.
     op: 'workspace.create',
     build: () => ({ op: 'workspace.create', id: id(), name: 'Mine' }),
@@ -61,24 +78,28 @@ describe(`the roles (${leg})`, () => {
     for (const role of ROLES) {
       const allowed = may.includes(role);
       it(`${allowed ? 'lets' : 'refuses'} ${role}${allowed ? '' : `, as ${otherwise}, changing nothing`}`, async () => {
-        const request = { opId: id(), ...build(world) } as OpRequest;
-        const before = JSON.stringify([
+        const mine = await seedWorld(database);
+        const request = { opId: id(), ...build(mine) } as OpRequest;
+        const before = JSON.stringify(await countAll(database));
+        const beforeRows = JSON.stringify([
           await row(tablesOf(database).workspace),
           await row(tablesOf(database).workspaceMember),
         ]);
-        const result = await applyOp(database, world.accounts[role], request, { now: NOW });
+        const result = await applyOp(database, mine.accounts[role], request, { now: NOW });
         if (allowed) {
           expect(result.status).toBe('applied');
         } else {
           expect(result).toEqual({ status: 'refused', code: otherwise });
-          const after = JSON.stringify([
-            await row(tablesOf(database).workspace),
-            await row(tablesOf(database).workspaceMember),
-          ]);
-          expect(after).toBe(before);
+          expect(JSON.stringify(await countAll(database))).toBe(before);
+          expect(
+            JSON.stringify([
+              await row(tablesOf(database).workspace),
+              await row(tablesOf(database).workspaceMember),
+            ]),
+          ).toBe(beforeRows);
           // And nothing was recorded as done: the same `opId` can be tried again by someone who may.
-          const retry = await applyOp(database, world.accounts.owner, request, { now: NOW });
-          if (request.op === 'workspace.rename') expect(retry.status).toBe('applied');
+          const retry = await applyOp(database, mine.accounts.owner, request, { now: NOW });
+          if (request.op !== 'workspace.create') expect(retry.status).toBe('applied');
         }
       });
     }
@@ -151,6 +172,100 @@ describe(`the roles (${leg})`, () => {
         );
       });
     }
+  });
+
+  describe('deleting a workspace', () => {
+    it('leaves nothing of it in any table, and nothing of another workspace touched', async () => {
+      const [doomed, kept] = [await seedWorld(database), await seedWorld(database)];
+      await seedBoardContents(database, doomed);
+      await seedBoardContents(database, kept);
+      const before = await countAll(database);
+      const result = await applyOp(
+        database,
+        doomed.accounts.owner,
+        { opId: id(), op: 'workspace.delete', id: doomed.workspace, name: 'Acme' },
+        { now: NOW },
+      );
+      expect(result).toMatchObject({ status: 'applied', rows: { deleted: doomed.workspace } });
+      const after = await countAll(database);
+      // One workspace's worth of every table is gone: the world has 1 workspace, 5 members, 3 boards, 4 board members, and one row of each below a board.
+      const gone = (name: string) => (before[name] ?? 0) - (after[name] ?? 0);
+      expect(gone('workspace')).toBe(1);
+      expect(gone('workspace_member')).toBe(5);
+      expect(gone('board')).toBe(3);
+      expect(gone('board_member')).toBe(4);
+      for (const name of [
+        'board_list',
+        'card',
+        'label',
+        'card_label',
+        'card_assignee',
+        'checklist_item',
+        'comment',
+        'activity',
+        'publication',
+        'notice',
+      ])
+        expect(gone(name), name).toBe(1);
+      // The other one is whole.
+      const t = tablesOf(database);
+      const remaining = await dbAll<{ n: number | string }>(
+        database,
+        sql`SELECT COUNT(*) AS n FROM ${t.board} WHERE workspace_id = ${kept.workspace}`,
+      );
+      expect(Number(remaining[0]?.n)).toBe(3);
+    });
+
+    it('needs the name as it is, typed: another name deletes nothing and says it is invalid', async () => {
+      const mine = await seedWorld(database);
+      const before = await countAll(database);
+      for (const name of ['acme', 'Acme ', 'Other']) {
+        expect(
+          await applyOp(
+            database,
+            mine.accounts.owner,
+            { opId: id(), op: 'workspace.delete', id: mine.workspace, name },
+            { now: NOW },
+          ),
+          name,
+        ).toEqual({ status: 'refused', code: 'invalid' });
+      }
+      expect(await countAll(database)).toEqual(before);
+    });
+
+    it('is safe to send again: a repeat is answered as applied and the workspace is still gone', async () => {
+      const mine = await seedWorld(database);
+      const request: OpRequest = {
+        opId: id(),
+        op: 'workspace.delete',
+        id: mine.workspace,
+        name: 'Acme',
+      };
+      expect((await applyOp(database, mine.accounts.owner, request, { now: NOW })).status).toBe(
+        'applied',
+      );
+      expect(await applyOp(database, mine.accounts.owner, request, { now: NOW })).toMatchObject({
+        status: 'applied',
+        replay: true,
+      });
+    });
+  });
+
+  describe('reading', () => {
+    it('lists a person’s workspaces by name with their own role, and none for an outsider', async () => {
+      const mine = await seedWorld(database);
+      expect(await listWorkspaces(database, mine.accounts.owner)).toMatchObject([
+        { id: mine.workspace, role: 'owner', name: 'Acme' },
+      ]);
+      expect(await listWorkspaces(database, mine.accounts.member)).toMatchObject([
+        { id: mine.workspace, role: 'member' },
+      ]);
+      expect(await listWorkspaces(database, mine.accounts.outsider)).toEqual([]);
+      expect(await workspaceOf(database, mine.accounts.outsider, mine.workspace)).toBeUndefined();
+      expect(await workspaceOf(database, mine.accounts.member, mine.workspace)).toMatchObject({
+        role: 'member',
+      });
+    });
   });
 
   it('has a row for every operation the door takes', () => {

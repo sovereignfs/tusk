@@ -29,6 +29,7 @@ export const ROUTES: RouteRule[] = [
   // Settings (DESIGN.md §19): a page of its own, and a dialog over another page by an intercepting route at the same address.
   { route: '/account', page: { kind: 'account' } },
   { route: '/desk', page: { kind: 'account' } },
+  { route: '/w/[id]', page: { kind: 'account' } },
   { route: '/desk/[id]', page: { kind: 'account' } },
 
   // APIs
@@ -36,6 +37,7 @@ export const ROUTES: RouteRule[] = [
   { route: '/api/sync', methods: { POST: { kind: 'account' } } },
   // The one door every write to a workspace comes through (DESIGN.md §7.3): the account is the session's, and the permission is in the statement.
   { route: '/api/ops', methods: { POST: { kind: 'account' } } },
+  { route: '/api/workspaces', methods: { GET: { kind: 'account' } } },
   { route: '/api/health', methods: { GET: { kind: 'public' } } },
   // better-auth's own: it checks `Origin` and the session cookie itself, and rate-limits sign-in (src/auth/auth.ts). Absent, with a 404, when sign-in is off.
   {

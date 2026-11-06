@@ -87,6 +87,17 @@ async function run(tx: Database, accountId: string, request: OpRequest, now: num
         },
       };
     }
+    case 'workspace.delete': {
+      // Only an owner's workspace is a row it can reach, and only when the name typed is the name it has: a shared space is not deleted by accident.
+      const found = await dbGet<{ name: string }>(
+        tx,
+        sql`SELECT name FROM ${t.workspace} WHERE id = ${request.id} AND id IN ${workspacesOwnedBy(tx, accountId)}`,
+      );
+      if (!found) throw new Refused('not_found');
+      if (found.name !== request.name) throw new Refused('invalid');
+      await deleteWorkspace(tx, request.id);
+      return { deleted: request.id };
+    }
     case 'workspace.rename': {
       // The permission is in the statement: only an owner's workspace is a row it can reach.
       const changed = await dbAll<{ createdAt: number | string }>(
@@ -108,4 +119,40 @@ async function run(tx: Database, accountId: string, request: OpRequest, now: num
       };
     }
   }
+}
+
+/**
+ * Everything of a workspace, by name and in one transaction (DESIGN.md §23.1: no cascades): the rows below its boards by `board_id`, the boards, the
+ * people, the notices about it, and the workspace. Children before parents, so that a run that stopped never leaves a card whose board is gone.
+ */
+async function deleteWorkspace(tx: Database, workspaceId: string): Promise<void> {
+  const t = tablesOf(tx);
+  const inBoards = sql`board_id IN (SELECT id FROM ${t.board} WHERE workspace_id = ${workspaceId})`;
+  for (const table of [
+    t.activity,
+    t.comment,
+    t.checklistItem,
+    t.cardAssignee,
+    t.cardLabel,
+    t.label,
+    t.card,
+    t.boardList,
+    t.publication,
+    t.boardMember,
+  ]) {
+    await dbAll(tx, sql`DELETE FROM ${table} WHERE ${inBoards} RETURNING 1 AS one`);
+  }
+  await dbAll(
+    tx,
+    sql`DELETE FROM ${t.board} WHERE workspace_id = ${workspaceId} RETURNING 1 AS one`,
+  );
+  await dbAll(
+    tx,
+    sql`DELETE FROM ${t.notice} WHERE workspace_id = ${workspaceId} RETURNING 1 AS one`,
+  );
+  await dbAll(
+    tx,
+    sql`DELETE FROM ${t.workspaceMember} WHERE workspace_id = ${workspaceId} RETURNING 1 AS one`,
+  );
+  await dbAll(tx, sql`DELETE FROM ${t.workspace} WHERE id = ${workspaceId} RETURNING 1 AS one`);
 }

@@ -10,12 +10,14 @@
  * An `opId` makes a retry harmless: the server records it, and an operation it has applied is answered as applied and not done twice. There is no
  * `accountId` in an operation: who is asking is the session's, and the permission is in the statement that does the work (§7.1).
  */
-export const OPS = ['workspace.create', 'workspace.rename'] as const;
+export const OPS = ['workspace.create', 'workspace.rename', 'workspace.delete'] as const;
 export type OpName = (typeof OPS)[number];
 
 export type Op =
   | { readonly op: 'workspace.create'; readonly id: string; readonly name: string }
-  | { readonly op: 'workspace.rename'; readonly id: string; readonly name: string };
+  | { readonly op: 'workspace.rename'; readonly id: string; readonly name: string }
+  /** `name` is the workspace's name as it is, typed by the person: deleting a shared space is not done by accident (DESIGN.md §13.1). */
+  | { readonly op: 'workspace.delete'; readonly id: string; readonly name: string };
 
 export type OpRequest = Op & { readonly opId: string };
 
@@ -24,6 +26,8 @@ export const WORKSPACE_LIMITS = {
   nameChars: 100,
   /** Workspaces one account may have made. */
   workspacesPerAccount: 50,
+  /** Workspaces an account is in: the sidebar and the boards index read them all. */
+  workspacesListed: 200,
   /** A request body, in bytes: an operation is small. */
   bodyBytes: 64 * 1024,
 } as const;
@@ -50,6 +54,8 @@ export interface WorkspaceRow {
 
 export interface OpRows {
   readonly workspace?: WorkspaceRow;
+  /** The id of a workspace that is gone. */
+  readonly deleted?: string;
 }
 
 export type OpResult =

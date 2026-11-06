@@ -1,0 +1,62 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sv-space-4);
+  max-width: 720px;
+  padding: var(--sv-space-6);
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sv-space-3);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--sv-font-size-2xl);
+  font-weight: var(--sv-font-weight-semibold);
+}
+
+.role {
+  color: var(--sv-color-text-muted);
+  font-size: var(--sv-font-size-sm);
+}
+
+.muted {
+  margin: 0;
+  color: var(--sv-color-text-muted);
+}
+
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sv-space-4);
+  padding-top: var(--sv-space-4);
+  border-top: var(--sv-border-width-hairline) solid var(--sv-color-border);
+}
+
+.settings h2 {
+  margin: 0;
+  font-size: var(--sv-font-size-lg);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sv-space-3);
+  max-width: 420px;
+}
+
+.dialog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sv-space-4);
+  padding: var(--sv-space-6);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sv-space-2);
+}
