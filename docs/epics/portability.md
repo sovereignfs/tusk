@@ -2,7 +2,7 @@
 
 ## Status
 
-📋 Planned
+⏳ In progress: 9.1 is done.
 
 ## Overview
 
@@ -16,7 +16,7 @@ first.
 
 ## Tasks
 
-#### 📋 9.1 — Export
+#### ✅ 9.1 — Export
 
 **Goal:** download the Desk, a board, a workspace or everything as one file.
 
@@ -34,6 +34,8 @@ first.
 
 **Accepts when:** two exports of unchanged data differ only in `exportedAt`; deleted rows are absent, archived ones present; the file holds no id of a
 person, key, publication token or credential; a viewer can export a public board and an outsider cannot; the Desk's export works offline.
+
+**Done as:** **`src/portability/format.ts`** (pure) is version 1 of the file (`"format": "tusk"`, `"version": 1`, `exportedAt`, `scope`) with its types, `envelope`, `fileNameOf` (`tusk-<scope>-<date>.json`), `serialise` (indented, one trailing newline) and **`buildDesk(rows, open?)`**: lists in order, each with its cards and each card its checklist, and the series; what was deleted is left out, and so is what hangs on it (a deleted list's cards, a deleted card's items, a series of a deleted list), and a card's pointer to a series that is not in the file is written as none. A card carries its text, star, date and time, series, start and completion; a list its title, colour, sort and position. Everything is in order by position, then id, so the same rows in any order are the same file; a field that is ciphertext is written empty unless `open` reads it (14.3's), as search does. **`src/workspaces/export.ts`** is the server's (in `src/workspaces/` with the other reads, since only that directory touches the workspace tables): `exportBoard` (the board; its lists, cards **archived ones included and marked**, labels, checklist, assignees, comments and activity), `exportWorkspace` (its people and every board, private and archived ones too) and `exportOwned` (every workspace the person owns, the server's half of "everything"). **Every statement names the asker** as every read does: a board only if `boardsVisibleTo` them, a workspace only if `workspacesOwnedBy` them, and anything else is `undefined`, the same answer as for what is not there. People are named by name and address and **never by id**; one whose account is gone is "Deleted account" with no address; **an activity row's details are stripped of any key that is `id` or ends in `Id`** at any depth (it keeps the names its sentence needs, and may keep ids), and no publication token, key, connection or credential is read at all. `GET /api/export?scope=board|workspace&id=` and `?scope=owned` (an account route, in `routes.ts`) answer `404` for what is not theirs or an id that is not one, `400` for no scope or one it does not know, and name the download in `Content-Disposition`; `no-store`. **The Desk is made in the browser** (`src/portability/client.ts`): synced first when the browser says it is online, then read from the working copy, so it works with the network off; **everything** joins that to `owned` and **throws if the server cannot be reached**, since a file that said "everything" and was not would lie. Entry points: Settings > Data (_Export my Desk_, _Export everything_, with what is in it said), a board's menu (_Export_) and an owner's workspace settings (_Export workspace_). Tests: the builder (order, everything of a card, deletions and what hangs on them, the same file from rows in any order and two files differing only in `exportedAt`, a sealed field, the envelope and the name); the server on the real database in the role world (who may export a board: a member, a viewer, a workspace owner and not an outsider or a board that is not theirs, a private board for its members and the workspace's owners; who may export a workspace: its owners and no one else; what is in a board; no id of a person and no publication token anywhere; a missing account named as such; ids taken out of activity; the same text twice); and in Chromium and WebKit the route over HTTP (the owner's downloads and their names, no id in the files, the refusals) and Settings downloading the Desk **with the network off** (a done card, a card with a description and a checklist item, and no deleted card) and refusing everything offline with a line saying so. **Breaking the board's visibility check, the id stripping or the workspace's ownership check fails the tests.** **Not as the epic said:** who may export what is held by the role matrix on the real database and not over HTTP, since sign-up is closed on the browser-test server (one account), so a second person cannot be made there; the warning on an encrypted Desk is 14.3's, since there is no encrypted Desk yet.
 
 #### 📋 9.2 — Import
 

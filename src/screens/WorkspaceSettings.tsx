@@ -187,6 +187,16 @@ export function WorkspaceSettings({
               Leave workspace
             </Button>
             {owner ? (
+              <Button
+                variant="secondary"
+                onClick={() =>
+                  window.location.assign(`/api/export?scope=workspace&id=${workspace.id}`)
+                }
+              >
+                Export workspace
+              </Button>
+            ) : null}
+            {owner ? (
               <Button variant="secondary" onClick={onDelete}>
                 Delete workspace
               </Button>

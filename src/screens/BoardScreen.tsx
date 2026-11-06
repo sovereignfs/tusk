@@ -285,6 +285,13 @@ export function BoardScreen({
                   icon: 'archive' as const,
                   onSelect: () => setArchivedOpen(true),
                 },
+                {
+                  label: 'Export',
+                  icon: 'download' as const,
+                  // The server makes the file (DESIGN.md §20.1) and names it; the browser saves what comes.
+                  onSelect: () =>
+                    window.location.assign(`/api/export?scope=board&id=${view.board.id}`),
+                },
                 ...(view.can.admin
                   ? [
                       { type: 'separator' as const },

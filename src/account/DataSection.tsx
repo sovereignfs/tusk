@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { lastSyncedAt } from '../local/store';
 import { addressOf } from '../screens/PublishingSection';
-import { useLocal } from '../sync/react';
+import { deskFile, everythingFile, save } from '../portability/client';
+import { useLocal, useSync } from '../sync/react';
 import { Button } from '../ui';
 import type { Publication } from '../workspaces/format';
 import styles from './Account.module.css';
@@ -14,6 +15,9 @@ import styles from './Account.module.css';
  * build them (9.1, 10.3, 14.2, 2.8).
  */
 export function DataSection() {
+  const client = useSync();
+  const [exporting, setExporting] = useState<'desk' | 'everything' | null>(null);
+  const [exportFailed, setExportFailed] = useState(false);
   const at = useLocal(async (db) => ({ at: await lastSyncedAt(db) }));
   const [published, setPublished] = useState<readonly Publication[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -31,6 +35,19 @@ export function DataSection() {
   useEffect(() => {
     void read();
   }, [read]);
+
+  /** Saves the Desk, or the Desk and every workspace the person owns, as one file (DESIGN.md §20.1). */
+  async function exportAs(scope: 'desk' | 'everything') {
+    setExporting(scope);
+    setExportFailed(false);
+    try {
+      save(scope === 'desk' ? await deskFile(client) : await everythingFile(client));
+    } catch {
+      setExportFailed(true);
+    } finally {
+      setExporting(null);
+    }
+  }
 
   async function unpublish(boardId: string) {
     try {
@@ -60,6 +77,35 @@ export function DataSection() {
           Your Desk is kept on this device and sent to the server in the background. Nothing in it
           waits for a connection.
         </p>
+      </div>
+      <div className={styles.group}>
+        <h2>Export</h2>
+        <p>
+          Your Desk is made from this device, so it works with no connection. Everything adds the
+          workspaces you own, which are read from the server. The file is JSON, has no one's id in
+          it (people are named by name and address), and holds no key, link or password.
+        </p>
+        <div className={styles.row}>
+          <Button
+            variant="secondary"
+            disabled={exporting !== null}
+            onClick={() => void exportAs('desk')}
+          >
+            Export my Desk
+          </Button>
+          <Button
+            variant="secondary"
+            disabled={exporting !== null}
+            onClick={() => void exportAs('everything')}
+          >
+            Export everything
+          </Button>
+        </div>
+        {exportFailed ? (
+          <p className={styles.muted}>
+            That needs a connection. Your Desk can be exported without one; everything cannot.
+          </p>
+        ) : null}
       </div>
       <div className={styles.group}>
         <h2>Published boards</h2>
