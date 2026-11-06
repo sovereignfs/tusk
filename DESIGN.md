@@ -1151,7 +1151,7 @@ One JSON file, from Settings > Data, or from a workspace's or board's menu, eith
   it found ("1 workspace, 4 boards, 312 cards") and asks before writing.
 - **People are matched by email** to accounts on this server: someone who is a member of the destination workspace is assigned and kept on the board;
   anyone else is dropped, and the summary says how many. Importing a workspace does not add people to it.
-- **Comments and activity are not imported:** the file keeps them as a record, and a new board's history starts with its import.
+- **Comments and activity are not imported:** the file keeps them as a record, and a new board's history starts with its import (one row, "imported this board from a file"). An archived card stays archived; the board is made open.
 - **A file that fails validation changes nothing.** 50 MB at most, and every field within its limits (§7.1). It goes to the server as one request and one
   transaction, the Desk's part encrypted first on an encrypted Desk.
 - **It reads the tasks plugin's file too,** `{ pluginId: "fs.sovereign.tasks", schemaVersion: 1, data }`, into the Desk: lists become lists, tasks

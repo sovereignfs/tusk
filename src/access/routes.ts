@@ -61,6 +61,8 @@ export const ROUTES: RouteRule[] = [
   { route: '/api/publications', methods: { GET: { kind: 'account' } } },
   // The server's part of an export (DESIGN.md §20.1): a board for anyone who may see it, a workspace for its owners, and the workspaces the person owns.
   { route: '/api/export', methods: { GET: { kind: 'account' } } },
+  // The server's part of an import (DESIGN.md §20.2): into a workspace the person is in, or as workspaces of their own; one transaction, checked again here.
+  { route: '/api/import', methods: { POST: { kind: 'account' } } },
   // A published board (DESIGN.md §14.6): anyone with the address. It changes nothing, shows the work and no people, and is limited per address.
   { route: '/p/[token]', methods: { GET: { kind: 'public' } } },
   { route: '/api/boards/[id]/destinations', methods: { GET: { kind: 'account' } } },

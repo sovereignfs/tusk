@@ -4,6 +4,7 @@ import { before, first } from '../position';
 import { LIMITS, type Mutation } from '../sync/format';
 import type { ActionResult, Ids } from './lists';
 import { neighboursAfterMove, positionBetween } from './order';
+import { chunkedChanges } from './import';
 import { nextOccurrenceChanges } from './series';
 
 /**
@@ -255,24 +256,12 @@ export interface Group {
 
 export type ManyResult = { ok: true; mutations: Mutation[] } | { ok: false; reason: 'nothing' };
 
-/** Most changes in one mutation: well under the server's limit, so that a group, which is never split, has room. */
-const CHUNK = 400;
-
 /** Mutations of the groups of changes, none of which is split: a group is a card and what goes with it, and stays whole in one mutation. */
 export function chunked(
   ids: Ids,
   groups: readonly (readonly Mutation['changes'][number][])[],
 ): ManyResult {
-  const mutations: Mutation[] = [];
-  let current: Mutation['changes'][number][] = [];
-  for (const group of groups) {
-    if (current.length > 0 && current.length + group.length > CHUNK) {
-      mutations.push({ mutationId: ids.newId(), changes: current });
-      current = [];
-    }
-    current.push(...group);
-  }
-  if (current.length > 0) mutations.push({ mutationId: ids.newId(), changes: current });
+  const mutations = chunkedChanges(ids, groups);
   return mutations.length === 0 ? { ok: false, reason: 'nothing' } : { ok: true, mutations };
 }
 

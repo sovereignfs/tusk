@@ -155,6 +155,8 @@ describe('what the proxy looks at', () => {
       '/icon.svg',
       '/sw.js',
       '/manifest.webmanifest',
+      // An import's body may be far larger than the proxy buffers; the route adds the one header the proxy would.
+      '/api/import',
     ]) {
       expect(matches(path), path).toBe(false);
     }

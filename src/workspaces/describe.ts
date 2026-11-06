@@ -73,6 +73,8 @@ export function describe(
       return `${actor} deleted the list ${q(details.name, 'a list')}`;
     case 'board.created':
       return `${actor} created the board ${q(details.name, 'a board')}`;
+    case 'board.imported':
+      return `${actor} imported this board from a file`;
     case 'board.renamed':
       return `${actor} renamed the board ${q(details.from, 'a board')} to ${q(details.to, 'a new name')}`;
     case 'board.visibility':

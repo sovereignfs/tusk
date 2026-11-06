@@ -122,7 +122,7 @@ export async function capture(tx: Database, request: OpRequest): Promise<Before>
   return before;
 }
 
-async function write(
+export async function write(
   tx: Database,
   actorId: string,
   boardId: string,

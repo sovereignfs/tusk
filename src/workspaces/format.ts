@@ -597,6 +597,7 @@ export const ACTIVITY_KINDS = [
   'card.cloned',
   'board.published',
   'board.unpublished',
+  'board.imported',
 ] as const;
 export type ActivityKind = (typeof ACTIVITY_KINDS)[number];
 

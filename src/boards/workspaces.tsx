@@ -28,6 +28,8 @@ interface Workspaces {
   ready: boolean;
   workspaces: readonly WorkspaceRow[];
   perform(request: Op): Promise<Performed>;
+  /** Reads the workspaces again, for a change that was not made through `perform` (an import). */
+  reload(): Promise<boolean>;
 }
 
 const Context = createContext<Workspaces | null>(null);
@@ -112,7 +114,10 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
     [refresh, set],
   );
 
-  const value = useMemo(() => ({ ready, workspaces, perform }), [ready, workspaces, perform]);
+  const value = useMemo(
+    () => ({ ready, workspaces, perform, reload: refresh }),
+    [ready, workspaces, perform, refresh],
+  );
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
 

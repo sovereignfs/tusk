@@ -5,6 +5,7 @@ import { lastSyncedAt } from '../local/store';
 import { addressOf } from '../screens/PublishingSection';
 import { deskFile, everythingFile, save } from '../portability/client';
 import { useLocal, useSync } from '../sync/react';
+import { ImportSection } from './ImportSection';
 import { Button } from '../ui';
 import type { Publication } from '../workspaces/format';
 import styles from './Account.module.css';
@@ -107,6 +108,7 @@ export function DataSection() {
           </p>
         ) : null}
       </div>
+      <ImportSection />
       <div className={styles.group}>
         <h2>Published boards</h2>
         {failed ? <p className={styles.muted}>This needs a connection.</p> : null}
