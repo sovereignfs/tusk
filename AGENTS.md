@@ -148,7 +148,7 @@ pnpm lint / lint:fix             # ESLint
 pnpm typecheck                   # next typegen && tsc --noEmit
 pnpm db:generate <name>          # migrations for both dialects, from the schemas
 pnpm db:dev sqld | postgres      # a local database in Docker (not needed: a file: URL works)
-pnpm seed [--reset|--remove]      # a realistic account on a database on this machine (task 11.1)
+pnpm seed [--reset|--remove]      # a realistic account, and a shared workspace with a second one, on a database on this machine (tasks 11.1, 11.6)
 pnpm boot-check                  # after pnpm build: a fresh instance boots on the database in the environment
 pnpm e2e                         # after pnpm build: browser tests (pnpm exec playwright install chromium webkit once)
 scripts/deploy-check.sh          # every setup of deploy/, from nothing (needs the image: see deploy/README.md)

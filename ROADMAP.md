@@ -2,7 +2,7 @@
 
 The order of work. **This file tracks progress; it does not define behaviour.** [`DESIGN.md`](DESIGN.md) says what Tusk does, and where it disagrees with this file, this file is stale and should be corrected. The detail of every task, with its technical notes and what makes it done, is in [`docs/epics/`](docs/epics/). How a task is run is in [`AGENTS.md`](AGENTS.md).
 
-State as of 2026-11-06: **Milestones A and B are done,** built as Tasks. On 2026-11-06 Tasks became **Tusk**, one app for a person's Desk and shared kanban boards (`DESIGN.md` §1, §5.2, §27), and this roadmap was replanned from row 30. **Milestone C makes the turn in the code: the name (15.1) and the Desk's tables (15.2) are done, the Tusk shell (7.8) and the Desk in it (3.12) are done, In progress (3.13) and Settings (2.7) are done: **Milestone C is done**, and so is the door for workspace writes (16.1): workspaces (16.2), their people (16.3) and a board with its lists (17.1) and the boards index (16.4) are done, cards in lists (18.1) the card dialog (18.2) and a board's settings (17.2) are done, and visibility, membership and joining (17.3) are done. **Milestone D is done** apart from search on a board (17.4), which waits for labels and assignees.** The developer assigns each task; the first row not done, with its dependencies met, is what the order recommends.
+State as of 2026-11-06: **Milestones A and B are done,** built as Tasks. On 2026-11-06 Tasks became **Tusk**, one app for a person's Desk and shared kanban boards (`DESIGN.md` §1, §5.2, §27), and this roadmap was replanned from row 30. **Milestone C makes the turn in the code: the name (15.1) and the Desk's tables (15.2) are done, the Tusk shell (7.8) and the Desk in it (3.12) are done, In progress (3.13) and Settings (2.7) are done: **Milestone C is done**, and so is the door for workspace writes (16.1): workspaces (16.2), their people (16.3) and a board with its lists (17.1) and the boards index (16.4) are done, cards in lists (18.1) the card dialog (18.2) and a board's settings (17.2) are done, and visibility, membership and joining (17.3) are done. **Milestones D and E are done** (labels, assignees, checklists, comments, the Inbox, activity, moving and cloning, search, publishing, and a seeded workspace); **Milestone F, the Desk, daily, is next.** The developer assigns each task; the first row not done, with its dependencies met, is what the order recommends.
 
 _Status key: ✅ Done · ⏳ In progress · 📋 Planned · 🚧 Waits on a decision · ➖ Superseded_
 
@@ -111,7 +111,7 @@ What makes a board worth running as a team. **Done when** a team runs a board fo
 | 53  | [18.7](docs/epics/cards.md)        | Moving and cloning | P1       | 18.3, 18.4, 18.5 | ✅     |
 | 54  | [17.4](docs/epics/boards.md)       | Search on a board  | P2       | 17.1, 18.3, 18.4 | ✅     |
 | 55  | [17.5](docs/epics/boards.md)       | Publishing         | P1       | 17.3, 18.5       | ✅     |
-| 56  | [11.6](docs/epics/release.md)      | A seeded workspace | P1       | 17.5, 18.7       | 📋     |
+| 56  | [11.6](docs/epics/release.md)      | A seeded workspace | P1       | 17.5, 18.7       | ✅     |
 
 ### Milestone F — The Desk, daily
 

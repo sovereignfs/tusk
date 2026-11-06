@@ -15,6 +15,7 @@ import type { Change, Mutation, SyncTable } from '../src/sync/format';
 import { tableOf } from '../src/sync/tables';
 import { TUSK_NAMESPACE, uuid5 } from '../src/uuid5';
 import { firstListId } from '../src/actions/lists';
+import { removeWorkspaceSeed, seedWorkspace } from './seed-workspace';
 
 /**
  * A realistic account for development (task 11.1). It goes **through the store**: the same `applyMutation` the sync endpoint uses, so that what it
@@ -31,6 +32,9 @@ export const SEED_EMAIL = 'seed@example.test';
 /** A password for a development database on this machine, and for nothing else. */
 export const SEED_PASSWORD = 'tusk-development-only';
 export const SEED_NAME = 'Seed';
+/** The second account (task 11.6): a member of the seeded workspace, with the same development-only password. */
+export const SEED2_EMAIL = 'seed2@example.test';
+export const SEED2_NAME = 'Seed Two';
 
 /** Whether a database is on this machine: a file always is, and a service is when its host is. */
 export function isLocalDatabase(config: DatabaseConfig): boolean {
@@ -195,36 +199,67 @@ export function planSeed(accountId: string): Plan {
 export interface SeedResult {
   accountId: string;
   created: boolean;
+  /** The second account, and the shared workspace's steps (task 11.6). */
+  secondAccountId: string;
+  workspace: { created: boolean; steps: number };
   lists: number;
   cards: number;
   checks: number;
 }
 
 /** The account's id, if it exists. */
-async function findUser(auth: Database): Promise<string | undefined> {
+async function findUser(auth: Database, email = SEED_EMAIL): Promise<string | undefined> {
   const user = schema(auth).user;
-  return (
-    await dbGet<{ id: string }>(auth, sql`SELECT id FROM ${user} WHERE email = ${SEED_EMAIL}`)
-  )?.id;
+  return (await dbGet<{ id: string }>(auth, sql`SELECT id FROM ${user} WHERE email = ${email}`))
+    ?.id;
 }
 
 /** Makes the account through better-auth, with sign-up open for this one call whatever the instance says: it is making a development account. */
-async function makeUser(auth: Database, settings: AuthSettings): Promise<string> {
+async function makeUser(
+  auth: Database,
+  settings: AuthSettings,
+  email = SEED_EMAIL,
+  name = SEED_NAME,
+): Promise<string> {
   const instance = createAuth({
     settings: { ...settings, signUp: 'open' },
     name: 'Tusk',
     database: auth,
   });
   const made = await instance.api.signUpEmail({
-    body: { name: SEED_NAME, email: SEED_EMAIL, password: SEED_PASSWORD },
+    body: { name, email, password: SEED_PASSWORD },
   });
   return made.user.id;
+}
+
+/** Takes an account away: its settings row, its sessions and the account itself. */
+async function removeUser(
+  stores: { app: Database; auth: Database },
+  accountId: string,
+): Promise<void> {
+  const a = schema(stores.auth);
+  await dbRun(
+    stores.app,
+    sql`DELETE FROM ${schema(stores.app).accountSettings} WHERE account_id = ${accountId}`,
+  );
+  await dbRun(stores.auth, sql`DELETE FROM ${a.session} WHERE user_id = ${accountId}`);
+  await dbRun(stores.auth, sql`DELETE FROM ${a.account} WHERE user_id = ${accountId}`);
+  await dbRun(stores.auth, sql`DELETE FROM ${a.user} WHERE id = ${accountId}`);
 }
 
 /** Deletes what the seed made, and the account, and nothing else. */
 export async function removeSeed(stores: { app: Database; auth: Database }): Promise<boolean> {
   const accountId = await findUser(stores.auth);
-  if (!accountId) return false;
+  const second = await findUser(stores.auth, SEED2_EMAIL);
+  // The shared workspace first, by deleting it through the door, so that what is below it goes with it and nothing is left pointing at the accounts.
+  if (accountId)
+    await removeWorkspaceSeed(
+      stores.app,
+      { one: accountId, ...(second ? { two: second } : {}) },
+      Date.now(),
+    );
+  if (second) await removeUser(stores, second);
+  if (!accountId) return second !== undefined;
   const { app, auth } = stores;
   const plan = planSeed(accountId);
   const tables = schema(app);
@@ -261,11 +296,20 @@ export async function runSeed(
   accountId ??= await makeUser(stores.auth, settings);
 
   const now = options.now ?? Date.now();
+  const secondAccountId =
+    (await findUser(stores.auth, SEED2_EMAIL)) ??
+    (await makeUser(stores.auth, settings, SEED2_EMAIL, SEED2_NAME));
   for (const mutation of planSeed(accountId).mutations) {
     const result = await applyMutation(stores.app, accountId, mutation, { now });
     if (result.status === 'refused')
       throw new Error(`the seed was refused (${result.code}) for mutation ${mutation.mutationId}`);
   }
+  const workspace = await seedWorkspace(
+    stores.app,
+    stores.auth,
+    { one: accountId, two: secondAccountId },
+    { now },
+  );
   const count = async (name: SyncTable) =>
     Number(
       (
@@ -278,6 +322,8 @@ export async function runSeed(
   return {
     accountId,
     created,
+    secondAccountId,
+    workspace,
     lists: await count('desk_list'),
     cards: await count('desk_card'),
     checks: await count('desk_check'),
@@ -317,7 +363,10 @@ export async function main(argv: string[]): Promise<number> {
     console.log(
       `${result.created ? 'Made' : 'Found'} ${SEED_EMAIL}; it has ${result.lists} lists, ${result.cards} cards and ${result.checks} checklist items.`,
     );
-    console.log(`Sign in with that address and the password in scripts/seed.ts (SEED_PASSWORD).`);
+    console.log(
+      `${SEED2_EMAIL} is a member of the workspace "Seed Studio" (${result.workspace.steps} steps ${result.workspace.created ? 'made' : 'found done'}): a public board, a private one, an archived one and a published one.`,
+    );
+    console.log(`Sign in with either address and the password in scripts/seed.ts (SEED_PASSWORD).`);
     return 0;
   } finally {
     await stores.close();

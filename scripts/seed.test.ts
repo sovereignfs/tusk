@@ -12,7 +12,13 @@ import { applyMutation } from '../src/sync/apply';
 import { LIMITS } from '../src/sync/format';
 import { account, card, id, list, mutation, snapshot } from '../src/sync/test-support';
 import { parseMutation } from '../src/sync/validate';
-import { SEED_EMAIL, isLocalDatabase, planSeed, removeSeed, runSeed } from './seed';
+import { authDirectory } from '../src/auth/directory';
+import { inboxOf } from '../src/workspaces/inbox';
+import { readPublished, publicationsOf } from '../src/workspaces/published';
+import { boardsOfWorkspace, readBoard } from '../src/workspaces/reads';
+import { countAll } from '../src/workspaces/testing/roles';
+import { SEED2_EMAIL, SEED_EMAIL, isLocalDatabase, planSeed, removeSeed, runSeed } from './seed';
+import { WORKSPACE_NAME, workspaceIds } from './seed-workspace';
 
 const { leg, config } = testTarget();
 
@@ -214,5 +220,101 @@ describe(`running it (${leg})`, () => {
     expect(result.created).toBe(true);
     expect(result.lists).toBeGreaterThanOrEqual(6);
     expect(id()).toBeTruthy();
+  });
+});
+
+describe(`the shared workspace (${leg})`, () => {
+  const twoAccounts = async () => {
+    const result = await runSeed(stores(), auth.settings, { now: 1_800_000_000_000 });
+    return { one: result.accountId, two: result.secondAccountId, result };
+  };
+  const names = async (account: string) =>
+    ((await boardsOfWorkspace(app, account, workspaceIds().workspace)) ?? []).map((b) => b.name);
+
+  it('makes a second account, a member of a workspace the first owns, with a board of every kind', async () => {
+    const { one, two, result } = await twoAccounts();
+    expect(one).not.toBe(two);
+    expect(result.workspace.steps).toBeGreaterThan(50);
+    // The owner sees all four: the public, the private, the archived and the published. The member does not see the private one.
+    expect(await names(one)).toEqual(['Hiring', 'Last year', 'Marketing site', 'Product roadmap']);
+    expect(await names(two)).toEqual(['Last year', 'Marketing site', 'Product roadmap']);
+    const { boards } = workspaceIds();
+    expect(await readBoard(app, two, boards.hiring)).toBeUndefined();
+    expect((await readBoard(app, one, boards.hiring))?.board.visibility).toBe('private');
+    expect((await readBoard(app, two, boards.lastYear))?.board.archived).toBe(true);
+    // The public board has cards at every state: labelled, assigned, due, with checklists and comments, and one archived.
+    const roadmap = await readBoard(app, two, boards.roadmap);
+    expect(roadmap?.lists.map((l) => l.name)).toEqual(['Backlog', 'Doing', 'Done']);
+    const cards = roadmap?.cards ?? [];
+    expect(cards.some((c) => c.labels.length > 1)).toBe(true);
+    expect(cards.some((c) => c.assignees.length === 2)).toBe(true);
+    expect(cards.some((c) => c.dueDate !== null && c.dueDate < '2026-11-01')).toBe(true);
+    expect(cards.some((c) => c.checklist.total > 0 && c.checklist.done === c.checklist.total)).toBe(
+      true,
+    );
+    expect(cards.some((c) => c.checklist.total > 0 && c.checklist.done === 0)).toBe(true);
+    expect(cards.some((c) => c.comments >= 2)).toBe(true);
+    expect(cards.some((c) => c.title === 'An old idea')).toBe(false);
+  });
+
+  it('has a published board that opens signed out, with the work and none of the people', async () => {
+    const { one } = await twoAccounts();
+    const published = await publicationsOf(app, one);
+    expect(published.map((p) => p.boardName)).toEqual(['Marketing site']);
+    const board = await readPublished(app, published[0]?.token ?? '');
+    expect(board?.lists.flatMap((l) => l.cards).map((c) => c.title)).toEqual([
+      'Write the home page',
+      'Pricing page',
+    ]);
+    expect(JSON.stringify(board)).not.toMatch(/seed|example\.test/i);
+  });
+
+  it('told the member what the owner did, through the door: they were added, assigned and spoken to', async () => {
+    const { two } = await twoAccounts();
+    const inbox = await inboxOf(app, authDirectory(auth.database), two);
+    const kinds = new Set(inbox.notices.map((n) => n.kind));
+    for (const kind of ['added_to_workspace', 'added_to_board', 'assigned', 'comment'])
+      expect(kinds, kind).toContain(kind);
+    expect(inbox.notices.every((n) => n.actorName === 'Seed')).toBe(true);
+    expect(inbox.assigned.length).toBeGreaterThanOrEqual(2);
+    // And there is activity, written as the app writes it.
+    const rows = await dbAll<{ n: number | string }>(
+      app,
+      sql`SELECT COUNT(*) AS n FROM ${app.dialect === 'postgres' ? postgresSchema.activity : sqliteSchema.activity}`,
+    );
+    expect(Number(rows[0]?.n)).toBeGreaterThan(40);
+  });
+
+  it('does not double when it is run again: not a row of any table changes', async () => {
+    await twoAccounts();
+    const before = JSON.stringify(await countAll(app));
+    const again = await runSeed(stores(), auth.settings);
+    expect(again.workspace.created).toBe(false);
+    expect(JSON.stringify(await countAll(app))).toBe(before);
+  });
+
+  it('is reset by removing it and making it again, and removing leaves nothing of the workspace or the second account', async () => {
+    const { two } = await twoAccounts();
+    const before = await countAll(app);
+    expect(await removeSeed(stores())).toBe(true);
+    const gone = await countAll(app);
+    for (const [table, n] of Object.entries(gone)) expect(n, table).toBe(0);
+    expect(
+      (
+        await dbAll(
+          auth.database,
+          sql`SELECT 1 FROM ${auth.database.dialect === 'postgres' ? postgresSchema.user : sqliteSchema.user} WHERE email = ${SEED2_EMAIL}`,
+        )
+      ).length,
+    ).toBe(0);
+    expect(await inboxOf(app, authDirectory(auth.database), two).then((i) => i.notices)).toEqual(
+      [],
+    );
+    const reset = await runSeed(stores(), auth.settings, { now: 1_800_000_000_000 });
+    expect(reset.workspace.created).toBe(true);
+    const after = await countAll(app);
+    // The same rows, bar the address a board is published at, which is new.
+    expect(after).toEqual(before);
+    expect(WORKSPACE_NAME).toBe('Seed Studio');
   });
 });
