@@ -192,7 +192,7 @@ once they exist, this list is where they are written, and `verify` means all of 
 ## Not in place yet
 
 Each is a task in `ROADMAP.md`, not a thing to assume exists. What is built is Tasks' half, now named Tusk: the settings, the database, the jobs, the shell, the security
-headers, local sign-in, the access rules, and the Desk as lists, cards and checklists over sync, in the Tusk shell. **Not built:** In progress (3.13), Settings (2.7), workspaces, boards, cards, the Inbox and publishing (D and E), and everything after. Add them in their own `chore/` or
+headers, local sign-in, the access rules, and the Desk as lists, cards and checklists over sync, in the Tusk shell. **Not built:** Settings (2.7), workspaces, boards, cards, the Inbox and publishing (D and E), and everything after. Add them in their own `chore/` or
 `feat/` branches, and move the line out of this section as each lands. Sign-in is tested against a fake Sovereign, never a real instance, as Fjord Web
 does.
 

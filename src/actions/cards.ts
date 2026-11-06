@@ -31,6 +31,20 @@ export function isCompleted(row: LocalRow): boolean {
   return typeof done === 'number';
 }
 
+export type Status = 'open' | 'in_progress' | 'done';
+
+/**
+ * A card's status (DESIGN.md §10.2), worked out from two times: **Done** if it has a completion time, whatever else it has; **In progress** if it has
+ * only a start time; otherwise **Open**. Two fields and not one, so that two devices that disagree end at the same status, and so that Done is never lost
+ * to an "in progress" written later on a device that had not heard (§8.4). A time that is ciphertext cannot be read, and counts as not set until the keys
+ * are in place.
+ */
+export function statusOf(card: LocalRow): Status {
+  if (typeof plainOf(card, 'completedAt') === 'number') return 'done';
+  if (typeof plainOf(card, 'startedAt') === 'number') return 'in_progress';
+  return 'open';
+}
+
 /** A new card at the top of its list. `allCount` is every card row of the account, which counts against the limit (a deleted one until it is removed). */
 export function createCard(
   listId: string,
@@ -116,8 +130,58 @@ export function reopenCard(card: LocalRow | undefined, ids: Ids): ActionResult {
   if (!card || card.table !== 'desk_card') return { ok: false, reason: 'missing' };
   if (!isCompleted(card)) return { ok: false, reason: 'nothing' };
   return mutationOf(ids, [
-    { table: 'desk_card', id: card.id, fields: { completedAt: { v: null } } },
+    {
+      table: 'desk_card',
+      id: card.id,
+      // Reopening clears both times (DESIGN.md §10.2); the start time is only sent when there is one to clear.
+      fields: {
+        completedAt: { v: null },
+        ...(statusOf(card) === 'done' && typeof plainOf(card, 'startedAt') === 'number'
+          ? { startedAt: { v: null } }
+          : {}),
+      },
+    },
   ]);
+}
+
+/**
+ * Marks a card in progress at `now` (DESIGN.md §10.2). **On an open card only the start time is written**, so that a completion that another device made
+ * meanwhile still stands (Done wins, §8.4). On a card that is done it is a reopening, and clears the completion time too. One already in progress is left alone.
+ */
+export function startCard(card: LocalRow | undefined, now: number, ids: Ids): ActionResult {
+  if (!card || card.table !== 'desk_card') return { ok: false, reason: 'missing' };
+  const status = statusOf(card);
+  if (status === 'in_progress') return { ok: false, reason: 'nothing' };
+  return mutationOf(ids, [
+    {
+      table: 'desk_card',
+      id: card.id,
+      fields: {
+        startedAt: { v: now },
+        ...(status === 'done' ? { completedAt: { v: null } } : {}),
+      },
+    },
+  ]);
+}
+
+/**
+ * Sets a card's status: the choice in its detail. Open reopens (both times cleared), In progress starts it, and Done completes it with its open checklist
+ * items (`items`, as `completeCard` takes them). The status it already has is nothing to do.
+ */
+export function setStatus(
+  card: LocalRow | undefined,
+  status: Status,
+  now: number,
+  ids: Ids,
+  items: readonly LocalRow[] = [],
+): ActionResult {
+  if (!card || card.table !== 'desk_card') return { ok: false, reason: 'missing' };
+  if (statusOf(card) === status) return { ok: false, reason: 'nothing' };
+  if (status === 'done') return completeCard(card, now, ids, items);
+  if (status === 'in_progress') return startCard(card, now, ids);
+  // Open: from done it is a reopening; from in progress only the start time goes.
+  if (statusOf(card) === 'done') return reopenCard(card, ids);
+  return mutationOf(ids, [{ table: 'desk_card', id: card.id, fields: { startedAt: { v: null } } }]);
 }
 
 /**

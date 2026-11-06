@@ -5,6 +5,7 @@ import { testTarget } from '../db/test-support';
 import { type LocalDatabase, deleteLocal, openLocal } from '../local/db';
 import { cardsOf, checksOf, getRow, listsOf, outboxSize } from '../local/store';
 import type { LocalRow } from '../local/rows';
+import { statusOf } from '../actions/cards';
 import { type SyncDeps, handleSync } from './endpoint';
 import { SyncClient } from './client';
 import { type Transport, fetchTransport } from './transport';
@@ -142,6 +143,56 @@ describe(`devices of one account against the server (${leg})`, () => {
     expect(await outboxSize(a.client.db)).toBe(0);
     expect(await everything(a)).toEqual(await everything(b));
     expect((await cardsOf(b.client.db, l.id)).length).toBe(2);
+  });
+
+  describe('a card’s status, on two devices', () => {
+    async function pair() {
+      const owner = account();
+      const [a, b] = [await device(owner), await device(owner)];
+      const l = newList();
+      const t = newTask(l.id);
+      await a.client.commit(mutation(l, t));
+      await settleAll(a, b);
+      a.online = false;
+      b.online = false;
+      return { a, b, l, t };
+    }
+    const started = (cardId: string, at = 5) =>
+      mutation({ table: 'desk_card', id: cardId, fields: { startedAt: { v: at } } });
+    const done = (cardId: string, at = 9) =>
+      mutation({ table: 'desk_card', id: cardId, fields: { completedAt: { v: at } } });
+
+    it('one starts it and the other finishes it, whichever arrives last: it is Done, on both', async () => {
+      for (const startedArrivesLast of [true, false]) {
+        const { a, b, t } = await pair();
+        await a.client.commit(started(t.id));
+        await b.client.commit(done(t.id));
+        const [first, second] = startedArrivesLast ? [b, a] : [a, b];
+        first.online = true;
+        await first.client.sync();
+        second.online = true;
+        await settleAll(a, b);
+        for (const d of [a, b]) {
+          const row = await getRow(d.client.db, 'desk_card', t.id);
+          expect(statusOf(row as LocalRow), String(startedArrivesLast)).toBe('done');
+        }
+        expect(await everything(a)).toEqual(await everything(b));
+      }
+    });
+
+    it('both start it: it is in progress, on both, and they agree', async () => {
+      const { a, b, t } = await pair();
+      await a.client.commit(started(t.id, 5));
+      await b.client.commit(started(t.id, 6));
+      a.online = true;
+      b.online = true;
+      await settleAll(a, b);
+      for (const d of [a, b])
+        expect(statusOf((await getRow(d.client.db, 'desk_card', t.id)) as LocalRow)).toBe(
+          'in_progress',
+        );
+      expect(await everything(a)).toEqual(await everything(b));
+    });
   });
 
   describe('a card’s checklist, on two devices', () => {

@@ -4,12 +4,13 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { type HTMLAttributes, useEffect, useState } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
-import { completeCard, isCompleted, reopenCard } from '../actions/cards';
+import { completeCard, isCompleted, reopenCard, statusOf } from '../actions/cards';
 import type { LocalRow } from '../local/rows';
 import { checksOf } from '../local/store';
 import { useSync } from '../sync/react';
 import { Checkbox } from '../ui';
 import { text } from './fields';
+import { InProgressMark } from './InProgressMark';
 import { ProgressRing } from './ProgressRing';
 import { StarButton } from './StarButton';
 import styles from './ListScreen.module.css';
@@ -93,6 +94,7 @@ export function CardRow({
       >
         {title}
       </Link>
+      {statusOf(card) === 'in_progress' ? <InProgressMark className={styles.started} /> : null}
       {progress && progress.total > 0 ? (
         <ProgressRing done={progress.done} total={progress.total} />
       ) : null}

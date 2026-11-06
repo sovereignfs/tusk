@@ -3,18 +3,18 @@
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
-  completeCard,
   deleteCard,
-  isCompleted,
   moveToList,
-  reopenCard,
   restoreCard,
+  setStatus,
+  statusOf,
+  type Status,
   updateCard,
 } from '../actions/cards';
 import type { LocalRow } from '../local/rows';
 import { allChecksOf, cardsOf, checksOf, getRow, listsOf } from '../local/store';
 import { useLocal, useSync } from '../sync/react';
-import { Button, Checkbox, FormField, Input, Select, Textarea } from '../ui';
+import { Button, FormField, Input, SegmentedControl, Select, Textarea } from '../ui';
 import { text } from './fields';
 import styles from './CardDetail.module.css';
 import { StarButton } from './StarButton';
@@ -59,7 +59,7 @@ function Fields({ card, onDeleted }: { card: LocalRow; onDeleted: () => void }) 
   const [draftTitle, setDraftTitle] = useState(title);
   const [draftDescription, setDraftDescription] = useState(description);
   const [editing, setEditing] = useState<'title' | 'description' | null>(null);
-  const done = isCompleted(card);
+  const status = statusOf(card);
 
   // What another device or a sync changed shows here, unless the person is in the middle of typing in that field.
   useEffect(() => {
@@ -76,10 +76,10 @@ function Fields({ card, onDeleted }: { card: LocalRow; onDeleted: () => void }) 
     else if (result.reason === 'title') setDraftTitle(title);
   }
 
-  async function tick(next: boolean) {
-    // A card ticked off takes its open checklist items with it, in one mutation; reopening reopens nothing else.
-    const items = next ? await client.read((db) => checksOf(db, card.id)) : [];
-    const result = next ? completeCard(card, Date.now(), ids, items) : reopenCard(card, ids);
+  async function choose(next: Status) {
+    // Done takes the card's open checklist items with it, in one mutation, so they are read first; the others touch the card alone.
+    const items = next === 'done' ? await client.read((db) => checksOf(db, card.id)) : [];
+    const result = setStatus(card, next, Date.now(), ids, items);
     if (result.ok) void client.commit(result.mutation);
   }
 
@@ -104,11 +104,16 @@ function Fields({ card, onDeleted }: { card: LocalRow; onDeleted: () => void }) 
   return (
     <>
       <div className={styles.bar}>
-        <Checkbox
-          id={`detail-tick-${card.id}`}
-          label="Done"
-          checked={done}
-          onChange={(next) => void tick(next)}
+        <SegmentedControl<Status>
+          aria-label="Status"
+          size="sm"
+          value={status}
+          onChange={(next) => void choose(next)}
+          options={[
+            { label: 'Open', value: 'open' },
+            { label: 'In progress', value: 'in_progress' },
+            { label: 'Done', value: 'done' },
+          ]}
         />
         <StarButton card={card} />
       </div>

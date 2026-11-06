@@ -283,7 +283,7 @@ test.describe('subtasks', () => {
     await expect.poll(async () => (await completedAt()).Two).not.toBeNull();
     const twoDoneAt = (await completedAt()).Two;
 
-    await detail.getByRole('checkbox', { name: 'Done' }).first().click();
+    await detail.getByRole('radio', { name: 'Done', exact: true }).click();
     await expect.poll(async () => (await completedAt())[title]).not.toBeNull();
     await expect.poll(async () => (await completedAt()).One).not.toBeNull();
     const after = await completedAt();
@@ -292,7 +292,7 @@ test.describe('subtasks', () => {
     expect(after.Two).toBe(twoDoneAt);
 
     // Reopening the parent reopens none of them.
-    await detail.getByRole('checkbox', { name: 'Done' }).first().click();
+    await detail.getByRole('radio', { name: 'Open', exact: true }).click();
     await expect.poll(async () => (await completedAt())[title]).toBeNull();
     const reopened = await completedAt();
     expect(reopened.One).not.toBeNull();
@@ -306,7 +306,10 @@ test.describe('subtasks', () => {
     await addSub(detail, 'Only');
     const subs = detail.getByRole('region', { name: 'Checklist' });
     await subs.getByRole('checkbox', { name: 'Done: Only' }).click();
-    await expect(detail.getByRole('checkbox', { name: 'Done' }).first()).not.toBeChecked();
+    await expect(detail.getByRole('radio', { name: 'Done', exact: true })).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
 
     await subs.getByRole('button', { name: 'Delete item: Only' }).click();
     await expect(subs.getByRole('textbox', { name: 'Item: Only' })).toHaveCount(0);
@@ -479,6 +482,12 @@ test.describe('putting tasks in order', () => {
 
     const handle = detail.getByRole('button', { name: 'Move item: Three' });
     const target = detail.getByRole('textbox', { name: 'Item: One' });
+    // The rows are measured once they have stopped moving: three were just added, and the column is still settling under a busy machine.
+    await expect
+      .poll(async () => JSON.stringify([await handle.boundingBox(), await target.boundingBox()]), {
+        intervals: [150],
+      })
+      .toBe(JSON.stringify([await handle.boundingBox(), await target.boundingBox()]));
     const from = await handle.boundingBox();
     const to = await target.boundingBox();
     if (!from || !to) throw new Error('rows are not on the page');
@@ -679,6 +688,58 @@ test.describe('seeing a list the way one wants', () => {
     await bar.getByRole('button', { name: 'Undo' }).click();
     await expect(page.getByRole('button', { name: /Completed \(2\)/ })).toBeVisible();
   });
+});
+
+test('a card is marked in progress from its detail: a small mark by its title, on the server, after a reload, and Done wins over it', async ({
+  page,
+  baseURL,
+}) => {
+  await openNewList(page);
+  const title = unique('Underway');
+  await add(page, title);
+  await page.getByRole('link', { name: title }).click();
+  const detail = page.getByRole('region', { name: 'Card', exact: true });
+  const radio = (name: string) => detail.getByRole('radio', { name, exact: true });
+  await expect(radio('Open')).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByRole('img', { name: 'In progress' })).toHaveCount(0);
+
+  await radio('In progress').click();
+  await expect(radio('In progress')).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByRole('img', { name: 'In progress' })).toHaveCount(1);
+
+  const times = async () => {
+    const reply = await page.request.post('/api/sync', {
+      headers: { origin: new URL(baseURL ?? 'http://localhost').origin },
+      data: { protocol: 2, cursor: 0, mutations: [], limit: 2000 },
+    });
+    const rows = (await reply.json()).pull.rows as {
+      table: string;
+      fields: Record<string, { v: unknown }>;
+    }[];
+    const row = rows.find((r) => r.table === 'desk_card' && r.fields.title?.v === title);
+    return {
+      started: row?.fields.startedAt?.v ?? null,
+      completed: row?.fields.completedAt?.v ?? null,
+    };
+  };
+  await expect.poll(async () => (await times()).started).not.toBeNull();
+  expect((await times()).completed).toBeNull();
+
+  await page.reload();
+  await expect(page.getByRole('img', { name: 'In progress' })).toHaveCount(1);
+
+  // Done, then back to In progress: the completion time goes, the mark comes back.
+  await radio('Done').click();
+  await expect.poll(async () => (await times()).completed).not.toBeNull();
+  await expect(page.getByRole('img', { name: 'In progress' })).toHaveCount(0);
+  await radio('In progress').click();
+  await expect.poll(async () => (await times()).completed).toBeNull();
+  await expect(page.getByRole('img', { name: 'In progress' })).toHaveCount(1);
+
+  // Open clears both.
+  await radio('Open').click();
+  await expect.poll(async () => (await times()).started).toBeNull();
+  await expect(page.getByRole('img', { name: 'In progress' })).toHaveCount(0);
 });
 
 test.describe('moving a task and starring it', () => {

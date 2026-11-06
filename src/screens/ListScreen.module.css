@@ -139,3 +139,22 @@
   gap: var(--sv-space-2);
   min-width: 0;
 }
+
+/* The mark of a card in progress: small, in the muted text colour, turning slowly unless motion is reduced. */
+.started {
+  flex-shrink: 0;
+  color: var(--sv-color-text-muted);
+  animation: turn 2.4s linear infinite;
+}
+
+@keyframes turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .started {
+    animation: none;
+  }
+}

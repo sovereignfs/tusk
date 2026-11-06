@@ -18,6 +18,9 @@ import {
   reopenCard,
   restoreCard,
   setStarred,
+  setStatus,
+  startCard,
+  statusOf,
   updateCard,
 } from './cards';
 
@@ -558,5 +561,87 @@ describe('starring a card', () => {
       ],
     };
     expect(parseMutation(forced).ok).toBe(false);
+  });
+});
+
+describe('the status of a card', () => {
+  const started = (extra: Record<string, { v: unknown; s: number }> = {}) =>
+    card(T1, 'a0', { startedAt: { v: 1_000, s: 2 }, ...extra });
+
+  it('is Done if there is a completion time, In progress if there is only a start time, and Open otherwise', () => {
+    expect(statusOf(card(T1, 'a0'))).toBe('open');
+    expect(statusOf(started())).toBe('in_progress');
+    expect(statusOf(card(T1, 'a0', { completedAt: { v: 5, s: 2 } }))).toBe('done');
+    // Done wins over a start time, whichever was written later.
+    expect(statusOf(started({ completedAt: { v: 5, s: 1 } }))).toBe('done');
+    // A time that was cleared is not a time, and one that is ciphertext cannot be read.
+    expect(statusOf(card(T1, 'a0', { startedAt: { v: null, s: 2 } }))).toBe('open');
+    expect(
+      statusOf({ ...card(T1, 'a0'), fields: { startedAt: { c: 'YWdl', s: 1 } } } as LocalRow),
+    ).toBe('open');
+  });
+
+  it('is started with only the start time on an open card, so that a completion made meanwhile elsewhere still stands', () => {
+    const result = startCard(card(T1, 'a0'), 7_000, counting());
+    accepted(result);
+    expect(mutationOf(result).changes).toEqual([
+      { table: 'desk_card', id: T1, fields: { startedAt: { v: 7_000 } } },
+    ]);
+  });
+
+  it('is started from done as a reopening: the completion time goes too', () => {
+    const done = card(T1, 'a0', { completedAt: { v: 5, s: 2 } });
+    expect(mutationOf(startCard(done, 7_000, counting())).changes).toEqual([
+      { table: 'desk_card', id: T1, fields: { startedAt: { v: 7_000 }, completedAt: { v: null } } },
+    ]);
+    expect(startCard(started(), 8_000, counting())).toEqual({ ok: false, reason: 'nothing' });
+    expect(startCard(undefined, 1, counting())).toEqual({ ok: false, reason: 'missing' });
+  });
+
+  it('clears both times on a reopening, but only sends the start time when there is one', () => {
+    const both = started({ completedAt: { v: 5, s: 2 } });
+    expect(mutationOf(reopenCard(both, counting())).changes).toEqual([
+      { table: 'desk_card', id: T1, fields: { completedAt: { v: null }, startedAt: { v: null } } },
+    ]);
+    const onlyDone = card(T1, 'a0', { completedAt: { v: 5, s: 2 } });
+    expect(mutationOf(reopenCard(onlyDone, counting())).changes).toEqual([
+      { table: 'desk_card', id: T1, fields: { completedAt: { v: null } } },
+    ]);
+  });
+
+  it('is set from the detail to any of the three, each as the right change, and the one it has is nothing', () => {
+    const open = card(T1, 'a0');
+    const items = [
+      {
+        table: 'desk_check',
+        id: S1,
+        cardId: T1,
+        position: 'a0',
+        deletedAt: null,
+        seq: 1,
+        createdAt: 1,
+        fields: { title: { v: 'x', s: 1 } },
+      } as LocalRow,
+    ];
+    const done = mutationOf(setStatus(open, 'done', 9, counting(), items)).changes;
+    expect(done.map((c) => c.id)).toEqual([T1, S1]);
+    expect(mutationOf(setStatus(open, 'in_progress', 9, counting())).changes).toEqual([
+      { table: 'desk_card', id: T1, fields: { startedAt: { v: 9 } } },
+    ]);
+    expect(mutationOf(setStatus(started(), 'open', 9, counting())).changes).toEqual([
+      { table: 'desk_card', id: T1, fields: { startedAt: { v: null } } },
+    ]);
+    expect(
+      mutationOf(setStatus(card(T1, 'a0', { completedAt: { v: 5, s: 2 } }), 'open', 9, counting()))
+        .changes,
+    ).toEqual([{ table: 'desk_card', id: T1, fields: { completedAt: { v: null } } }]);
+    expect(setStatus(open, 'open', 9, counting())).toEqual({ ok: false, reason: 'nothing' });
+    expect(setStatus(started(), 'in_progress', 9, counting())).toEqual({
+      ok: false,
+      reason: 'nothing',
+    });
+    expect(setStatus(undefined, 'done', 9, counting())).toEqual({ ok: false, reason: 'missing' });
+    for (const status of ['done', 'in_progress', 'open'] as const)
+      accepted(setStatus(status === 'open' ? started() : open, status, 9, counting()));
   });
 });
