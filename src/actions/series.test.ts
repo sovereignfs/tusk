@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { LocalRow } from '../local/rows';
 import { TUSK_NAMESPACE, uuid5 } from '../uuid5';
-import { completeCard, setStatus } from './cards';
+import { completeCard, setStatus, updateCard } from './cards';
 import {
   duplicateOccurrences,
   nextOccurrenceChanges,
   readSeries,
   seriesIdOf,
+  setDueInSeries,
   setRepeat,
   stopRepeat,
 } from './series';
@@ -379,5 +380,189 @@ describe('"Does not repeat"', () => {
     const detached = repeating({ seriesId: null });
     const weekly = series('FREQ=DAILY', '2026-11-06');
     expect(nextOccurrenceChanges(detached, [], weekly, TODAY)).toEqual([]);
+  });
+});
+
+/** Editing a card that repeats (DESIGN.md §12.4): this occurrence and every later one change, with no prompt and no new row. */
+describe('editing a recurring card', () => {
+  const MONDAY = '2026-11-09';
+  const weeklyMonday = series('FREQ=WEEKLY;BYDAY=MO', MONDAY);
+  const onMonday = () => repeating({ dueDate: MONDAY, dueTime: null });
+
+  /** The rows once a mutation has been laid over them: enough of the working copy's own rule for these tests. */
+  function laid(rows: LocalRow[], changes: readonly object[]): LocalRow[] {
+    return rows.map((row) => {
+      const change = changes.find((each) => (each as { id: string }).id === row.id) as
+        { fields?: Record<string, { v: unknown }> } | undefined;
+      if (!change?.fields) return row;
+      return {
+        ...row,
+        fields: {
+          ...row.fields,
+          ...Object.fromEntries(Object.entries(change.fields).map(([k, f]) => [k, { ...f, s: 2 }])),
+        },
+      } as LocalRow;
+    });
+  }
+
+  it('moves the series with the date: the anchor is the new date, and a weekly rule on one weekday goes to its weekday', () => {
+    const result = setDueInSeries(
+      onMonday(),
+      weeklyMonday,
+      { date: '2026-11-10', time: null },
+      ids(),
+    );
+    expect(result.ok && result.mutation.changes).toEqual([
+      expect.objectContaining({ table: 'desk_card', id: 'c1' }),
+      {
+        table: 'desk_series',
+        id: SERIES,
+        fields: { anchor: { v: '2026-11-10' }, rule: { v: 'FREQ=WEEKLY;BYDAY=TU' } },
+      },
+    ]);
+  });
+
+  it('makes later occurrences follow: moved to a Tuesday, the next is a Tuesday', () => {
+    const moved = setDueInSeries(
+      onMonday(),
+      weeklyMonday,
+      { date: '2026-11-10', time: null },
+      ids(),
+    );
+    if (!moved.ok) throw new Error('refused');
+    const [card2, series2] = laid([onMonday(), weeklyMonday], moved.mutation.changes);
+    const done = made(
+      completeCard(card2 as LocalRow, 5, ids(), [], { series: series2, today: '2026-11-10' }),
+    );
+    const next = done.rest[0] as unknown as { fields: { dueDate: { v: string } } };
+    expect(next.fields.dueDate.v).toBe('2026-11-17');
+  });
+
+  it('leaves a rule that is not one weekday as it was, and only moves the anchor', () => {
+    const daily = series('FREQ=DAILY', '2026-11-01');
+    const result = setDueInSeries(
+      repeating({ dueDate: '2026-11-03' }),
+      daily,
+      { date: '2026-11-08', time: null },
+      ids(),
+    );
+    expect(result.ok && result.mutation.changes[1]).toEqual({
+      table: 'desk_series',
+      id: SERIES,
+      fields: { anchor: { v: '2026-11-08' } },
+    });
+  });
+
+  it('writes nothing to the series for a change of the time alone, or a date that is the anchor already', () => {
+    const time = setDueInSeries(onMonday(), weeklyMonday, { date: MONDAY, time: '08:00' }, ids());
+    expect(time.ok && time.mutation.changes).toHaveLength(1);
+    const same = setDueInSeries(
+      repeating({ dueDate: '2026-11-16' }),
+      weeklyMonday,
+      { date: MONDAY, time: null },
+      ids(),
+    );
+    expect(same.ok && same.mutation.changes).toHaveLength(1);
+    const unchanged = setDueInSeries(onMonday(), weeklyMonday, { date: MONDAY, time: null }, ids());
+    expect(unchanged).toEqual({ ok: false, reason: 'nothing' });
+  });
+
+  it('clearing the date detaches the card as a one-off and the series ends, with its time cleared as before', () => {
+    const result = setDueInSeries(
+      repeating({ dueDate: MONDAY }),
+      weeklyMonday,
+      { date: null, time: null },
+      ids(),
+    );
+    expect(result.ok && result.mutation.changes).toEqual([
+      {
+        table: 'desk_card',
+        id: 'c1',
+        fields: { dueDate: { v: null }, dueTime: { v: null } },
+      },
+      { table: 'desk_card', id: 'c1', fields: { seriesId: { v: null } } },
+    ]);
+    // Detached, completing it makes no next.
+    const [card2, series2] = laid([repeating({ dueDate: MONDAY })], []);
+    expect(card2).toBeDefined();
+    expect(series2).toBeUndefined();
+  });
+
+  it('is only the ordinary change for a card that does not repeat, or a series that is not its own', () => {
+    const plain = card('c9', { title: 'x', dueDate: MONDAY });
+    const ordinary = setDueInSeries(plain, weeklyMonday, { date: '2026-11-10', time: null }, ids());
+    expect(ordinary.ok && ordinary.mutation.changes).toHaveLength(1);
+    const foreign = setDueInSeries(
+      repeating({ seriesId: '22222222-2222-4222-8222-222222222222', dueDate: MONDAY }),
+      weeklyMonday,
+      { date: '2026-11-10', time: null },
+      ids(),
+    );
+    expect(foreign.ok && foreign.mutation.changes).toHaveLength(1);
+  });
+
+  it('never writes a completed occurrence’s series or detaches it: a done card is changed as any card is', () => {
+    const done = repeating({ dueDate: MONDAY, completedAt: 5 });
+    const moved = setDueInSeries(done, weeklyMonday, { date: '2026-11-10', time: null }, ids());
+    expect(moved.ok && moved.mutation.changes.map((c) => c.table)).toEqual(['desk_card']);
+    const cleared = setDueInSeries(done, weeklyMonday, { date: null, time: null }, ids());
+    expect(cleared.ok && JSON.stringify(cleared.mutation.changes)).not.toContain('seriesId');
+    expect(stopRepeat(done, ids())).toEqual({ ok: false, reason: 'nothing' });
+    expect(setRepeat(done, weeklyMonday, 'FREQ=DAILY', TODAY, ids())).toEqual({
+      ok: false,
+      reason: 'nothing',
+    });
+  });
+
+  it('makes the next occurrence from the new name, and the occurrences already done keep theirs', () => {
+    const original = onMonday();
+    const first = made(
+      completeCard(original, 5, ids(), [], { series: weeklyMonday, today: MONDAY }),
+    );
+    const nextId = (first.rest[0] as { id: string }).id;
+    // The next is renamed, then completed: the one after has the new name; the first card was never written.
+    const renamed = updateCard(
+      { ...original, id: nextId, fields: { ...original.fields } } as LocalRow,
+      { title: 'Water everything' },
+      ids(),
+    );
+    expect(renamed.ok && renamed.mutation.changes).toEqual([
+      { table: 'desk_card', id: nextId, fields: { title: { v: 'Water everything' } } },
+    ]);
+    const next = {
+      ...original,
+      id: nextId,
+      fields: {
+        ...original.fields,
+        title: { v: 'Water everything', s: 2 },
+        dueDate: { v: '2026-11-16', s: 1 },
+      },
+    } as LocalRow;
+    const second = made(
+      completeCard(next, 9, ids(), [], { series: weeklyMonday, today: '2026-11-16' }),
+    );
+    expect((second.rest[0] as unknown as { fields: { title: { v: string } } }).fields.title.v).toBe(
+      'Water everything',
+    );
+    expect(
+      first.all.some((c) => c.id === original.id && JSON.stringify(c).includes('Water everything')),
+    ).toBe(false);
+  });
+
+  it('makes no row by any edit: every change names a row that was there', () => {
+    const there = new Set(['c1', SERIES]);
+    const results = [
+      setDueInSeries(onMonday(), weeklyMonday, { date: '2026-11-10', time: null }, ids()),
+      setDueInSeries(onMonday(), weeklyMonday, { date: null, time: null }, ids()),
+      setRepeat(onMonday(), weeklyMonday, 'FREQ=DAILY', TODAY, ids()),
+      stopRepeat(onMonday(), ids()),
+      updateCard(onMonday(), { title: 'New name', description: 'More' }, ids()),
+    ];
+    for (const result of results) {
+      expect(result.ok).toBe(true);
+      if (result.ok)
+        for (const change of result.mutation.changes)
+          expect(there.has(change.id), JSON.stringify(change)).toBe(true);
+    }
   });
 });

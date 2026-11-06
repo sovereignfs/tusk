@@ -22,9 +22,8 @@ import {
   tickItem,
   untickItem,
 } from '../actions/checks';
-import { setDue } from '../actions/due';
 import { createList, deleteList, moveList, renameList, restoreList } from '../actions/lists';
-import { seriesIdOf, setRepeat } from '../actions/series';
+import { seriesIdOf, setDueInSeries, setRepeat, stopRepeat } from '../actions/series';
 import type { Database } from '../db/client';
 import { testTarget } from '../db/test-support';
 import type { LocalRow } from '../local/rows';
@@ -145,13 +144,18 @@ async function act(d: Device, r: Random): Promise<string> {
     result = setStarred(card, r.chance(50), ids);
   } else if (roll < 27) {
     name = 'setDue';
-    result = setDue(
-      card,
-      r.chance(25)
-        ? { date: null, time: null }
-        : { date: DAY(r.next(14)), time: r.chance(30) ? '09:00' : null },
-      ids,
-    );
+    if (card) {
+      const sid = seriesIdOf(card);
+      const series = sid ? await getRow(db, 'desk_series', sid) : undefined;
+      result = setDueInSeries(
+        card,
+        series,
+        r.chance(25)
+          ? { date: null, time: null }
+          : { date: DAY(r.next(14)), time: r.chance(30) ? '09:00' : null },
+        ids,
+      );
+    }
   } else if (roll < 40) {
     name = 'complete';
     if (card) {
@@ -222,7 +226,9 @@ async function act(d: Device, r: Random): Promise<string> {
     if (card) {
       const sid = seriesIdOf(card);
       const series = sid ? await getRow(db, 'desk_series', sid) : undefined;
-      result = setRepeat(card, series, r.pick(RULES) ?? 'FREQ=DAILY', today, ids);
+      result = r.chance(15)
+        ? stopRepeat(card, ids)
+        : setRepeat(card, series, r.pick(RULES) ?? 'FREQ=DAILY', today, ids);
     }
   } else if (roll < 97) {
     name = 'createList';

@@ -17,8 +17,8 @@ import { useLocal, useSync } from '../sync/react';
 import { Button, FormField, Input, SegmentedControl, Select, Textarea } from '../ui';
 import { text } from './fields';
 import styles from './CardDetail.module.css';
-import { dueOf, setDue } from '../actions/due';
-import { readSeries, seriesIdOf, setRepeat, stopRepeat } from '../actions/series';
+import { dueOf } from '../actions/due';
+import { readSeries, seriesIdOf, setDueInSeries, setRepeat, stopRepeat } from '../actions/series';
 import { RepeatPicker } from '../dates/RepeatPicker';
 import { describe as describeRule } from '../recurrence';
 import { nowHere } from '../time';
@@ -141,7 +141,7 @@ function Fields({ card, onDeleted }: { card: LocalRow; onDeleted: () => void }) 
         <DuePicker
           value={dueOf(card)}
           onChange={(due) => {
-            const result = setDue(card, due, ids);
+            const result = setDueInSeries(card, series?.row, due, ids);
             if (result.ok) void client.commit(result.mutation);
           }}
         />

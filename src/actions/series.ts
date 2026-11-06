@@ -1,8 +1,8 @@
 import type { LocalRow } from '../local/rows';
 import { type Change, type FieldValue, type Mutation } from '../sync/format';
 import { TUSK_NAMESPACE, uuid5 } from '../uuid5';
-import { formatRule, firstOnOrAfter, nextOccurrence, parseRule } from '../recurrence';
-import { dueFields, dueOf } from './due';
+import { firstOnOrAfter, formatRule, nextOccurrence, parseRule, reanchor } from '../recurrence';
+import { type Due, dueFields, dueOf, setDue } from './due';
 import type { ActionResult, Ids } from './lists';
 
 /**
@@ -177,6 +177,8 @@ export function duplicateOccurrences(cards: readonly LocalRow[]): string[] {
 export function stopRepeat(card: LocalRow | undefined, ids: Ids): ActionResult {
   if (!card || card.table !== 'desk_card') return { ok: false, reason: 'missing' };
   if (seriesIdOf(card) === undefined) return { ok: false, reason: 'nothing' };
+  // A completed occurrence is history, and is never written by an edit of the series.
+  if (typeof plainOf(card, 'completedAt') === 'number') return { ok: false, reason: 'nothing' };
   return {
     ok: true,
     mutation: {
@@ -184,4 +186,35 @@ export function stopRepeat(card: LocalRow | undefined, ids: Ids): ActionResult {
       changes: [{ table: 'desk_card', id: card.id, fields: { seriesId: { v: null } } }],
     },
   };
+}
+
+/**
+ * Changes the due date of a card that may repeat (DESIGN.md §12.4): **this occurrence moves, and the series moves with it.** The anchor becomes the new
+ * date, and a weekly rule on one weekday goes to the new date's weekday (`reanchor`), so that "every Monday", moved to a Tuesday, is every Tuesday
+ * from then on. Clearing the date **detaches** the card: it stays as a one-off and the series ends. A change of the time alone moves nothing in the
+ * series. One mutation. **A completed occurrence is only itself:** its own date is changed as any card's is, and the series is not written, since the
+ * open occurrence is the series' to keep.
+ */
+export function setDueInSeries(
+  card: LocalRow | undefined,
+  series: LocalRow | undefined,
+  due: Due,
+  ids: Ids,
+): ActionResult {
+  const moved = setDue(card, due, ids);
+  if (!moved.ok || !card) return moved;
+  const read = readSeries(series);
+  if (!read || seriesIdOf(card) !== read.id) return moved;
+  if (typeof plainOf(card, 'completedAt') === 'number') return moved;
+
+  const changes: Change[] = [...moved.mutation.changes];
+  if (due.date === null) {
+    changes.push({ table: 'desk_card', id: card.id, fields: { seriesId: { v: null } } });
+  } else if (due.date !== read.anchor) {
+    const rule = formatRule(reanchor(read.rule, due.date));
+    const fields: Record<string, FieldValue> = { anchor: { v: due.date } };
+    if (plainOf(series as LocalRow, 'rule') !== rule) fields.rule = { v: rule };
+    changes.push({ table: 'desk_series', id: read.id, fields });
+  }
+  return { ok: true, mutation: { mutationId: moved.mutation.mutationId, changes } };
 }

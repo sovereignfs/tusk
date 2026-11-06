@@ -208,3 +208,93 @@ test('the repeat picker sets a preset from the keyboard, a custom rule, keeps we
     page.getByRole('region', { name: 'Card' }).getByRole('button', { name: /^Due Today/ }),
   ).toBeVisible();
 });
+
+test('editing a card that repeats: a rename and a new date apply from there on with no new row, done cards are left alone, and clearing the date ends it', async ({
+  page,
+  baseURL,
+}) => {
+  await signedIn(page);
+  // It is Friday 6 November in Berlin.
+  await page.clock.setFixedTime(new Date('2026-11-06T09:00:00+01:00'));
+  const origin = new URL(baseURL ?? 'http://localhost').origin;
+  const name = unique('Edits');
+  const [listId, cardId, seriesId] = [
+    crypto.randomUUID(),
+    crypto.randomUUID(),
+    crypto.randomUUID(),
+  ];
+  const sent = await page.request.post('/api/sync', {
+    headers: { origin },
+    data: {
+      protocol: 2,
+      cursor: 0,
+      mutations: [
+        {
+          mutationId: crypto.randomUUID(),
+          changes: [
+            { table: 'desk_list', id: listId, position: 'a0', fields: { title: { v: name } } },
+            {
+              table: 'desk_series',
+              id: seriesId,
+              listId,
+              fields: { rule: { v: 'FREQ=WEEKLY;BYDAY=FR' }, anchor: { v: '2026-11-06' } },
+            },
+            {
+              table: 'desk_card',
+              id: cardId,
+              listId,
+              position: 'a0',
+              fields: {
+                title: { v: 'Water the plants' },
+                dueDate: { v: '2026-11-06' },
+                seriesId: { v: seriesId },
+              },
+            },
+          ],
+        },
+      ],
+    },
+  });
+  expect(sent.status()).toBe(200);
+  await page.reload();
+  await page
+    .getByRole('navigation', { name: 'Lists' })
+    .getByRole('link', { name: new RegExp(`^${name}`) })
+    .click();
+  await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
+  const cards = (title: string) => page.getByRole('listitem').filter({ hasText: title });
+
+  // Done on Friday: the next is a week on, and has the name the card has.
+  await cards('Water the plants').getByRole('checkbox', { name: 'Done: Water the plants' }).click();
+  await expect(cards('Water the plants').filter({ hasText: 'Nov 13' })).toHaveCount(1);
+
+  // The next is renamed and moved to Saturday: the rule follows to Saturdays, and no card is added.
+  await cards('Water the plants').filter({ hasText: 'Nov 13' }).getByRole('link').click();
+  const detail = page.getByRole('region', { name: 'Card' });
+  await detail.getByLabel('Title').fill('Water everything');
+  await detail.getByLabel('Title').press('Enter');
+  await expect(cards('Water everything')).toHaveCount(1);
+  await detail.getByRole('button', { name: /^Due Nov 13/ }).click();
+  await page.getByRole('button', { name: 'Tomorrow' }).click();
+  await page.keyboard.press('Escape');
+  await expect(
+    detail.getByRole('button', { name: 'Repeats every week on Saturday' }),
+  ).toBeVisible();
+  await expect(page.getByRole('listitem').filter({ hasText: /Water/ })).toHaveCount(1);
+
+  // Done on Saturday: the one after is a Saturday, with the new name; the card done before keeps the name it had.
+  await cards('Water everything').getByRole('checkbox', { name: 'Done: Water everything' }).click();
+  await expect(cards('Water everything').filter({ hasText: 'Nov 14' })).toHaveCount(1);
+  await page.getByRole('button', { name: /Completed \(2\)/ }).click();
+  await expect(cards('Water the plants')).toHaveCount(1);
+  await expect(cards('Water everything')).toHaveCount(2);
+
+  // Clearing the date ends it: the card is a one-off.
+  await cards('Water everything').filter({ hasText: 'Nov 14' }).getByRole('link').click();
+  await detail.getByRole('button', { name: /^Due Nov 14/ }).click();
+  await page.getByRole('button', { name: 'Clear' }).click();
+  await page.keyboard.press('Escape');
+  await expect(detail.getByRole('button', { name: 'Set a repeat' })).toBeVisible();
+  // Only the occurrence done before still has the mark: it is history, and was never written.
+  await expect(cards('Water everything').getByLabel('Repeats')).toHaveCount(1);
+});
