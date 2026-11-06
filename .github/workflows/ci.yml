@@ -119,7 +119,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     strategy:
       # One database failing says something about it; the others still run, so the failure can be told apart from a bug that is not about
       # databases.
@@ -221,6 +221,13 @@ jobs:
       # TUSK_TEST_* names instead, because they drop whole schemas and namespaces and must never be pointed at a real database by the variables
       # a developer might have exported (src/db/test-support.ts).
       - run: pnpm test
+
+      # Devices that converge, over many more random runs than a pull request waits for (task 13.5): on the weekly schedule, on this leg's database.
+      - name: Convergence, over thousands of random runs
+        if: github.event_name == 'schedule'
+        run: pnpm test:converge
+        env:
+          TUSK_SIM_SEEDS: '1000'
 
       # What only a browser can show (task 1.9): the built app, in Chromium and in WebKit, on this leg's database. The server is the one built
       # above, started from the same variables.

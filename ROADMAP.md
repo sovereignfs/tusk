@@ -122,7 +122,7 @@ Everything that makes the Desk worth opening each day. **Done when** the Desk ca
 | 57  | [4.3](docs/epics/dates.md)       | Overdue, and pinning to the top            | P1       | 3.6, 3.9, 4.2  | ✅     |
 | 58  | [5.1](docs/epics/recurrence.md)  | The rule module                            | P1       | 4.1            | ✅     |
 | 59  | [5.2](docs/epics/recurrence.md)  | Series and completing                      | P1       | 4.2, 5.1, 15.2 | ✅     |
-| 60  | [13.5](docs/epics/sync.md)       | Convergence tests                          | P0       | 3.13, 5.2      | 📋     |
+| 60  | [13.5](docs/epics/sync.md)       | Convergence tests                          | P0       | 3.13, 5.2      | ✅     |
 | 61  | [5.3](docs/epics/recurrence.md)  | The repeat picker                          | P1       | 5.2            | 📋     |
 | 62  | [5.4](docs/epics/recurrence.md)  | Editing a recurring card                   | P1       | 5.2, 5.3       | 📋     |
 | 63  | [5.5](docs/epics/recurrence.md)  | Reopening, moving and deleting occurrences | P1       | 3.7, 3.8, 5.4  | 📋     |

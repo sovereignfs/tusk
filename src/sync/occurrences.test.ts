@@ -4,18 +4,15 @@ import { completeCard } from '../actions/cards';
 import { setRepeat } from '../actions/series';
 import type { Database } from '../db/client';
 import { testTarget } from '../db/test-support';
-import { type LocalDatabase, deleteLocal, openLocal } from '../local/db';
 import type { LocalRow } from '../local/rows';
 import { cardsOf, checksOf, getRow } from '../local/store';
-import { SyncClient } from './client';
-import { type SyncDeps, handleSync } from './endpoint';
-import { type Transport, fetchTransport } from './transport';
+import { type Device, type Harness, harness, settleAll as settleDevices } from './sim-support';
 import { account, id, makeStore } from './test-support';
 
 /**
  * A repeating card on two devices that were apart (DESIGN.md §8.4, §12.1), against the real server on whichever database the leg runs: completing it
  * makes one next occurrence, the same one on every device, and two devices that completed it on different days end with one open occurrence. The
- * harness is the small one of `devices.test.ts`; the convergence suite (task 13.5) joins them.
+ * harness is `sim-support.ts`, the one the convergence suite (`simulate.test.ts`) uses too.
  */
 const { leg } = testTarget();
 let database: Database;
@@ -25,36 +22,14 @@ beforeAll(async () => {
 });
 afterAll(async () => close());
 
-const open: LocalDatabase[] = [];
-const names: string[] = [];
-afterEach(async () => {
-  for (const db of open.splice(0)) db.close();
-  for (const name of names.splice(0)) await deleteLocal('', name);
+let devices: Harness;
+beforeAll(() => {
+  devices = harness(database);
 });
+afterEach(async () => devices.dispose());
 
-interface Device {
-  client: SyncClient;
-  online: boolean;
-}
-
-async function device(owner: string): Promise<Device> {
-  const name = `tusk-desk-${owner}-${id()}`;
-  names.push(name);
-  const db = await openLocal(owner, name);
-  open.push(db);
-  const self = { online: true, client: undefined as unknown as SyncClient };
-  const deps: SyncDeps = { database, limiter: { take: async () => ({ ok: true }) }, now: Date.now };
-  const transport: Transport = fetchTransport('/api/sync', async (_url, init) => {
-    if (!self.online) throw new TypeError('no network');
-    return handleSync(String(init?.body), owner, deps);
-  });
-  self.client = new SyncClient({ db, transport });
-  return self;
-}
-
-async function settleAll(...devices: Device[]) {
-  for (let round = 0; round < 6; round++) for (const d of devices) await d.client.sync();
-}
+const device = (owner: string) => devices.device(owner);
+const settleAll = (...all: Device[]) => settleDevices(all);
 
 const ids = { newId: () => crypto.randomUUID() };
 const everyCard = async (d: Device) =>
@@ -162,6 +137,8 @@ describe(`a repeating card on two devices (${leg})`, () => {
     await settleAll(a, b);
     expect(summary(await everyCard(a))).toEqual(['Water|2026-11-01|done', 'Water|2026-11-02|open']);
     expect(await everyCard(a)).toEqual(await everyCard(b));
+    // It is one row and not two with one deleted: both devices made the same id, so nothing had to be settled.
+    expect(await everyCard(a)).toHaveLength(2);
     // The next occurrence's checklist is two items, not four.
     const next = live(await everyCard(a)).find((c) => !plain(c, 'completedAt'));
     expect((await checksOf(a.client.db, next?.id ?? '')).length).toBe(2);

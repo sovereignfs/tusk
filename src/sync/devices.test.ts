@@ -400,6 +400,9 @@ describe(`devices of one account against the server (${leg})`, () => {
       const order = async (d: Device) => (await cardsOf(d.client.db, l.id)).map((r) => r.id);
       expect(await order(a)).toEqual(await order(b));
       expect(new Set(await order(a))).toEqual(new Set([t.id, x.id, y.id]));
+      // Equal keys break by id, ascending: the order is a rule and not an accident of which device asked.
+      const tied = (await order(a)).filter((each) => each === x.id || each === y.id);
+      expect(tied).toEqual([x.id, y.id].sort());
     });
   });
 

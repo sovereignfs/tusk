@@ -153,6 +153,7 @@ pnpm boot-check                  # after pnpm build: a fresh instance boots on t
 pnpm e2e                         # after pnpm build: browser tests (pnpm exec playwright install chromium webkit once)
 scripts/deploy-check.sh          # every setup of deploy/, from nothing (needs the image: see deploy/README.md)
 pnpm test                        # Vitest
+pnpm test:converge               # 2000 random runs of devices converging (src/sync/simulate.test.ts); TUSK_SIM_SEEDS sets how many
 pnpm manifest:check              # sovereign.manifest.json is a valid manifest
 pnpm build                       # next build (standalone)
 eval "docker build $(pnpm exec sovereign-manifest docker-args) -t tusk:ci ."   # the image, with its port and label from the manifest
