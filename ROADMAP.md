@@ -2,7 +2,7 @@
 
 The order of work. **This file tracks progress; it does not define behaviour.** [`DESIGN.md`](DESIGN.md) says what Tusk does, and where it disagrees with this file, this file is stale and should be corrected. The detail of every task, with its technical notes and what makes it done, is in [`docs/epics/`](docs/epics/). How a task is run is in [`AGENTS.md`](AGENTS.md).
 
-State as of 2026-11-06: **Milestones A and B are done,** built as Tasks. On 2026-11-06 Tasks became **Tusk**, one app for a person's Desk and shared kanban boards (`DESIGN.md` §1, §5.2, §27), and this roadmap was replanned from row 30. **Milestone C makes the turn in the code: the name (15.1) and the Desk's tables (15.2) are done, the Tusk shell (7.8) and the Desk in it (3.12) are done, In progress (3.13) and Settings (2.7) are done: **Milestone C is done**, and so is the door for workspace writes (16.1): workspaces (16.2) are done, and their people (16.3) are next.** The developer assigns each task; the first row not done, with its dependencies met, is what the order recommends.
+State as of 2026-11-06: **Milestones A and B are done,** built as Tasks. On 2026-11-06 Tasks became **Tusk**, one app for a person's Desk and shared kanban boards (`DESIGN.md` §1, §5.2, §27), and this roadmap was replanned from row 30. **Milestone C makes the turn in the code: the name (15.1) and the Desk's tables (15.2) are done, the Tusk shell (7.8) and the Desk in it (3.12) are done, In progress (3.13) and Settings (2.7) are done: **Milestone C is done**, and so is the door for workspace writes (16.1): workspaces (16.2) and their people (16.3) are done, and a board with its lists (17.1) is next.** The developer assigns each task; the first row not done, with its dependencies met, is what the order recommends.
 
 _Status key: ✅ Done · ⏳ In progress · 📋 Planned · 🚧 Waits on a decision · ➖ Superseded_
 
@@ -86,7 +86,7 @@ The shared half, at its smallest. **Done when** two people in a workspace share 
 | --- | -------------------------------- | -------------------------------------- | -------- | ---------- | ------ |
 | 36  | [16.1](docs/epics/workspaces.md) | Operations, and who may do them        | P0       | 3.1, 15.2  | ✅     |
 | 37  | [16.2](docs/epics/workspaces.md) | Workspaces                             | P1       | 7.8, 16.1  | ✅     |
-| 38  | [16.3](docs/epics/workspaces.md) | A workspace's people                   | P1       | 16.2       | 📋     |
+| 38  | [16.3](docs/epics/workspaces.md) | A workspace's people                   | P1       | 16.2       | ✅     |
 | 39  | [17.1](docs/epics/boards.md)     | A board and its lists                  | P1       | 16.2       | 📋     |
 | 40  | [16.4](docs/epics/workspaces.md) | The boards index                       | P1       | 16.3, 17.1 | 📋     |
 | 41  | [18.1](docs/epics/cards.md)      | Cards in lists                         | P1       | 17.1       | 📋     |

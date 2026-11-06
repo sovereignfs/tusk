@@ -31,6 +31,17 @@ describe('what a workspace operation shows before the server answers', () => {
     expect(showing(list, { op: 'workspace.delete', id: 'zz', name: 'x' }, 9)).toEqual(list);
   });
 
+  it('guesses nothing about people: leaving is not shown until the server has said yes', () => {
+    const workspaceId = 'a';
+    for (const request of [
+      { op: 'member.leave', workspaceId },
+      { op: 'member.add', workspaceId, email: 'a@b.c' },
+      { op: 'member.remove', workspaceId, accountId: 'x' },
+      { op: 'member.setRole', workspaceId, accountId: 'x', role: 'owner' },
+    ] as const)
+      expect(showing(list, request, 9), request.op).toEqual(list);
+  });
+
   it('does not change the list it was given', () => {
     const copy = JSON.stringify(list);
     showing(list, { op: 'workspace.create', id: 'b', name: 'B' }, 1);

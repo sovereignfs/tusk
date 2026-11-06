@@ -1,0 +1,71 @@
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sv-space-5);
+  padding: var(--sv-space-6);
+}
+
+.form,
+.add {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sv-space-3);
+  max-width: 420px;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sv-space-3);
+  padding-top: var(--sv-space-4);
+  border-top: var(--sv-border-width-hairline) solid var(--sv-color-border);
+}
+
+.heading {
+  margin: 0;
+  font-size: var(--sv-font-size-lg);
+}
+
+.people {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sv-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.person {
+  display: flex;
+  align-items: center;
+  gap: var(--sv-space-3);
+}
+
+.who {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.muted {
+  color: var(--sv-color-text-muted);
+  font-size: var(--sv-font-size-sm);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sv-space-2);
+}
+
+/* A select fills the width it is given, so the role has a width of its own and the name keeps the rest. */
+.role {
+  flex: none;
+  width: 8rem;
+}

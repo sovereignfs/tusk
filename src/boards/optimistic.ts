@@ -1,4 +1,4 @@
-import type { OpRequest, WorkspaceRow } from '../workspaces/format';
+import type { Op, WorkspaceRow } from '../workspaces/format';
 
 /**
  * What a screen shows of a workspace operation before the server has answered (DESIGN.md §14.7): the same change the server will make, to the list the
@@ -6,7 +6,7 @@ import type { OpRequest, WorkspaceRow } from '../workspaces/format';
  */
 export function showing(
   workspaces: readonly WorkspaceRow[],
-  request: Omit<OpRequest, 'opId'>,
+  request: Op,
   now: number,
 ): WorkspaceRow[] {
   switch (request.op) {
@@ -23,6 +23,13 @@ export function showing(
       );
     case 'workspace.delete':
       return workspaces.filter((each) => each.id !== request.id);
+    // Nothing about people is guessed. Leaving is *not* shown at once, as a delete is: it can be refused (the last owner may not leave), and the screen
+    // that is showing the workspace would have gone with it. The list is changed when the server has said yes.
+    case 'member.leave':
+    case 'member.add':
+    case 'member.setRole':
+    case 'member.remove':
+      return [...workspaces];
   }
 }
 

@@ -1,3 +1,4 @@
+import type { Directory } from '../auth/directory';
 import type { Database } from '../db/client';
 import type { Limiter, Rule } from '../limits/rate';
 import { readCapped } from '../sync/endpoint';
@@ -17,9 +18,14 @@ export interface OpsDeps {
   database: Database;
   limiter: Limiter;
   now(): number;
+  /** The accounts, to find the one an address belongs to. */
+  directory: Pick<Directory, 'idOfEmail'>;
 }
 
 export const OPS_RATE: Rule = { limit: 240, windowMs: 60_000 };
+
+/** Adding a person by address tells an owner whether the address has an account, so it is counted on its own, by account (DESIGN.md §13.2). */
+export const ADD_RATE: Rule = { limit: WORKSPACE_LIMITS.addsPerHour, windowMs: 60 * 60_000 };
 
 const json = (status: number, body: unknown, headers: Record<string, string> = {}): Response =>
   new Response(JSON.stringify(body), {
@@ -45,7 +51,20 @@ export async function handleOp(body: string, accountId: string, deps: OpsDeps): 
   const parsed = parseOp(request);
   // Not an operation: the request is refused, and says nothing of why that a device did not already know.
   if (!parsed.ok) return json(400, { code: 'BAD_REQUEST' });
-  const result = await applyOp(deps.database, accountId, parsed.value, { now: deps.now() });
+  if (parsed.value.op === 'member.add') {
+    const added = await deps.limiter.take(`member-add:${accountId}`, ADD_RATE);
+    if (!added.ok) {
+      return json(
+        429,
+        { code: 'RATE_LIMITED' },
+        { 'retry-after': String(Math.max(1, Math.ceil(added.retryAfterMs / 1000))) },
+      );
+    }
+  }
+  const result = await applyOp(deps.database, accountId, parsed.value, {
+    now: deps.now(),
+    directory: deps.directory,
+  });
   return json(200, result);
 }
 

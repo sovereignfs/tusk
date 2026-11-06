@@ -1,8 +1,11 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
+import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Database } from '../db/client';
+import { dbAll } from '../db/exec';
 import { testTarget } from '../db/test-support';
+import { tablesOf } from './tables';
 import type { Limiter } from '../limits/rate';
 import { makeStore } from '../sync/test-support';
 import { handleOp, opsResponse } from './endpoint';
@@ -23,7 +26,12 @@ beforeAll(async () => {
 afterAll(async () => close());
 
 const open: Limiter = { take: async () => ({ ok: true }) };
-const deps = (limiter: Limiter = open) => ({ database, limiter, now: () => 1_800_000_200_000 });
+const deps = (limiter: Limiter = open) => ({
+  database,
+  limiter,
+  now: () => 1_800_000_200_000,
+  directory: { idOfEmail: async () => undefined },
+});
 const id = () => crypto.randomUUID();
 const create = (extra: Record<string, unknown> = {}) =>
   JSON.stringify({ opId: id(), op: 'workspace.create', id: id(), name: 'Mine', ...extra });
@@ -90,6 +98,46 @@ describe(`POST /api/ops (${leg})`, () => {
       deps(),
     );
     expect(big.status).toBe(413);
+  });
+
+  it('counts adding a person by address on its own, by account, and says 429 with nothing added', async () => {
+    const owner = world.accounts.owner;
+    const add = JSON.stringify({
+      opId: id(),
+      op: 'member.add',
+      workspaceId: world.workspace,
+      email: 'someone@example.com',
+    });
+    const keys: string[] = [];
+    // Only the hourly rate for adding is full: an ordinary operation still goes through.
+    const hourly: Limiter = {
+      take: async (key) => {
+        keys.push(key);
+        return key.startsWith('member-add:') ? { ok: false, retryAfterMs: 90_000 } : { ok: true };
+      },
+    };
+    const found = { idOfEmail: async () => id() };
+    const refused = await handleOp(add, owner, { ...deps(hourly), directory: found });
+    expect(refused.status).toBe(429);
+    expect(refused.headers.get('retry-after')).toBe('90');
+    expect(keys).toContain(`member-add:${owner}`);
+    const members = async () =>
+      (
+        await dbAll(
+          database,
+          sql`SELECT 1 FROM ${tablesOf(database).workspaceMember} WHERE workspace_id = ${world.workspace}`,
+        )
+      ).length;
+    expect(await members()).toBe(5);
+    const fine = await handleOp(create(), owner, { ...deps(hourly), directory: found });
+    expect(fine.status).toBe(200);
+    // Under the rate, it is added, by the account the directory found.
+    const added = await handleOp(add, owner, { ...deps(), directory: found });
+    expect(await added.json()).toMatchObject({
+      status: 'applied',
+      rows: { member: { role: 'member' } },
+    });
+    expect(await members()).toBe(6);
   });
 
   it('refuses an account that has made as many workspaces as it may', async () => {

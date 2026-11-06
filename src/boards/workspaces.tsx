@@ -10,7 +10,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import type { OpRefusal, OpRequest, OpResult, WorkspaceRow } from '../workspaces/format';
+import type { Op, OpReason, OpRefusal, OpResult, WorkspaceRow } from '../workspaces/format';
 import { showing, sorted } from './optimistic';
 
 /**
@@ -18,16 +18,16 @@ import { showing, sorted } from './optimistic';
  * phase 1). A change shows at once and is sent through the one door (`POST /api/ops`); the server's answer replaces what the screen guessed, and a
  * refusal or a lost connection puts it back. Offline, the list that was held stays on the screen, and a change says it needs a connection.
  */
-export type Failure = OpRefusal | 'offline';
+export type Failure = OpRefusal | 'offline' | 'rate';
 export type Performed =
   | { ok: true; rows: Extract<OpResult, { status: 'applied' }>['rows'] }
-  | { ok: false; reason: Failure };
+  | { ok: false; reason: Failure; detail?: OpReason };
 
 interface Workspaces {
   /** Not read yet, or read. */
   ready: boolean;
   workspaces: readonly WorkspaceRow[];
-  perform(request: Omit<OpRequest, 'opId'>): Promise<Performed>;
+  perform(request: Op): Promise<Performed>;
 }
 
 const Context = createContext<Workspaces | null>(null);
@@ -67,7 +67,7 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
   }, [refresh]);
 
   const perform = useCallback(
-    async (request: Omit<OpRequest, 'opId'>): Promise<Performed> => {
+    async (request: Op): Promise<Performed> => {
       const before = held.current;
       set(showing(before, request, Date.now()));
       const undo = async () => {
@@ -83,7 +83,10 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
         });
         if (!reply.ok) {
           await undo();
-          return { ok: false, reason: reply.status === 400 ? 'invalid' : 'offline' };
+          return {
+            ok: false,
+            reason: reply.status === 400 ? 'invalid' : reply.status === 429 ? 'rate' : 'offline',
+          };
         }
         result = (await reply.json()) as OpResult;
       } catch {
@@ -92,10 +95,18 @@ export function WorkspacesProvider({ children }: { children: ReactNode }) {
       }
       if (result.status === 'refused') {
         await undo();
-        return { ok: false, reason: result.code };
+        return result.reason
+          ? { ok: false, reason: result.code, detail: result.reason }
+          : { ok: false, reason: result.code };
       }
       const row = result.rows.workspace;
       if (row) set(sorted([...held.current.filter((each) => each.id !== row.id), row]));
+      // A change to someone's role may have been one's own, and who was removed may have been oneself: the truth is cheap to read.
+      if (request.op === 'member.leave') {
+        const left = request.workspaceId;
+        set(held.current.filter((each) => each.id !== left));
+      }
+      if (request.op.startsWith('member.')) void refresh();
       return { ok: true, rows: result.rows };
     },
     [refresh, set],
@@ -112,12 +123,18 @@ export function useWorkspaces(): Workspaces {
 }
 
 /** What to tell a person when an operation did not happen. */
-export function failureMessage(reason: Failure): string {
+export function failureMessage(reason: Failure, detail?: OpReason): string {
+  if (detail === 'no_account') return 'No account with that address here.';
+  if (detail === 'already_in') return 'They are in this workspace already.';
+  if (detail === 'last_owner')
+    return 'A workspace keeps at least one owner. Make someone else an owner first, or delete the workspace.';
   switch (reason) {
+    case 'rate':
+      return 'That was tried too many times. Try again in a while.';
     case 'offline':
       return 'This needs a connection. Try again when you are back online.';
     case 'limit':
-      return 'You have as many workspaces as an account can hold.';
+      return 'An account can make 50 workspaces, and a workspace can hold 100 people.';
     case 'invalid':
       return 'That is not allowed.';
     case 'stale':

@@ -1,4 +1,4 @@
-import { type Parsed, text, uuid } from '../access/parse';
+import { type Parsed, oneOf, text, uuid } from '../access/parse';
 import { OPS, type OpName, type OpRequest, WORKSPACE_LIMITS } from './format';
 
 /**
@@ -16,7 +16,16 @@ const ARGUMENTS: Record<OpName, readonly string[]> = {
   'workspace.create': ['id', 'name'],
   'workspace.rename': ['id', 'name'],
   'workspace.delete': ['id', 'name'],
+  'member.add': ['workspaceId', 'email'],
+  'member.setRole': ['workspaceId', 'accountId', 'role'],
+  'member.remove': ['workspaceId', 'accountId'],
+  'member.leave': ['workspaceId'],
 };
+
+const ROLE = oneOf('owner', 'member');
+/** An address as a person types it: one @ with something either side, no space. Whether it belongs to an account is the server's to say. */
+const EMAIL = /^[^\s@]+@[^\s@]+$/;
+const EMAIL_MAX = 254;
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
@@ -47,6 +56,57 @@ export function parseOp(value: unknown): Parsed<OpRequest> {
       const parsed = NAME(trimmed);
       if (!parsed.ok) return no(`name: ${parsed.reason}`);
       return { ok: true, value: { opId: opId.value, op: kind, id: id.value, name: parsed.value } };
+    }
+    case 'member.add': {
+      const workspaceId = uuid(value.workspaceId);
+      if (!workspaceId.ok) return no('workspaceId: not an id');
+      // Trimmed and lower case, as accounts are looked up: an address is not told apart by its capitals.
+      const typed =
+        typeof value.email === 'string' ? value.email.trim().toLowerCase() : value.email;
+      if (typeof typed !== 'string' || typed.length > EMAIL_MAX || !EMAIL.test(typed))
+        return no('email: not an address');
+      return {
+        ok: true,
+        value: { opId: opId.value, op: kind, workspaceId: workspaceId.value, email: typed },
+      };
+    }
+    case 'member.setRole': {
+      const workspaceId = uuid(value.workspaceId);
+      if (!workspaceId.ok) return no('workspaceId: not an id');
+      const accountId = text(1, 128)(value.accountId);
+      if (!accountId.ok) return no('accountId: not an id');
+      const role = ROLE(value.role);
+      if (!role.ok) return no('role: not a role');
+      return {
+        ok: true,
+        value: {
+          opId: opId.value,
+          op: kind,
+          workspaceId: workspaceId.value,
+          accountId: accountId.value,
+          role: role.value,
+        },
+      };
+    }
+    case 'member.remove': {
+      const workspaceId = uuid(value.workspaceId);
+      if (!workspaceId.ok) return no('workspaceId: not an id');
+      const accountId = text(1, 128)(value.accountId);
+      if (!accountId.ok) return no('accountId: not an id');
+      return {
+        ok: true,
+        value: {
+          opId: opId.value,
+          op: kind,
+          workspaceId: workspaceId.value,
+          accountId: accountId.value,
+        },
+      };
+    }
+    case 'member.leave': {
+      const workspaceId = uuid(value.workspaceId);
+      if (!workspaceId.ok) return no('workspaceId: not an id');
+      return { ok: true, value: { opId: opId.value, op: kind, workspaceId: workspaceId.value } };
     }
   }
 }

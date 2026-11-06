@@ -28,8 +28,16 @@ async function make(page: Page, name: string) {
   await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
 }
 
+/** Opens the workspace's settings from its gear. */
+async function openSettings(page: Page) {
+  await page.getByRole('button', { name: 'Workspace settings' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Workspace settings' });
+  await expect(dialog).toBeVisible();
+  return dialog;
+}
+
 async function remove(page: Page, name: string) {
-  await page.getByRole('button', { name: 'Delete workspace' }).click();
+  await (await openSettings(page)).getByRole('button', { name: 'Delete workspace' }).click();
   const dialog = page.getByRole('dialog', { name: 'Delete workspace' });
   await dialog.getByLabel('Type the name to confirm').fill(name);
   await dialog.getByRole('button', { name: 'Delete this workspace' }).click();
@@ -59,19 +67,55 @@ test('an owner renames it and the sidebar follows; a name that is blank is not s
   const name = unique('Acme');
   await make(page, name);
   const renamed = unique('Renamed');
-  const settings = page.getByRole('region', { name: 'Workspace settings' });
+  const settings = await openSettings(page);
   await expect(settings.getByRole('button', { name: 'Save name' })).toBeDisabled();
   await settings.getByLabel('Name').fill('   ');
   await expect(settings.getByRole('button', { name: 'Save name' })).toBeDisabled();
   await settings.getByLabel('Name').fill(renamed);
   await settings.getByRole('button', { name: 'Save name' }).click();
   await expect(page.getByRole('heading', { level: 1, name: renamed })).toBeVisible();
+  await settings.getByRole('button', { name: 'Close' }).click();
   await expect(
     page.getByRole('region', { name: 'My workspaces' }).getByRole('link', { name: renamed }),
   ).toBeVisible();
   await page.reload();
   await expect(page.getByRole('heading', { level: 1, name: renamed })).toBeVisible();
   await remove(page, renamed);
+});
+
+test('the people of a workspace: the owner is listed with their address, an unknown address is refused, and the last owner cannot leave', async ({
+  page,
+}) => {
+  await signedIn(page);
+  const name = unique('People');
+  await make(page, name);
+  const dialog = await openSettings(page);
+  const people = dialog.getByRole('region', { name: 'People' });
+  await expect(people.getByRole('listitem')).toHaveCount(1);
+  await expect(people.getByText('(you)')).toBeVisible();
+  await expect(people.getByText(EMAIL)).toBeVisible();
+  // Not an address with an account here: it says so and adds nothing.
+  await people.getByLabel('Add a person by email').fill('nobody@example.com');
+  await people.getByRole('button', { name: 'Add person' }).click();
+  await expect(dialog.getByText('No account with that address here.')).toBeVisible();
+  await expect(people.getByRole('listitem')).toHaveCount(1);
+  // The owner's own address is an account that is in it already.
+  await people.getByLabel('Add a person by email').fill(EMAIL.toUpperCase());
+  await people.getByRole('button', { name: 'Add person' }).click();
+  await expect(dialog.getByText('They are in this workspace already.')).toBeVisible();
+  // The only owner cannot step down or leave.
+  await people.getByLabel('Role of Ada').selectOption('member');
+  await expect(dialog.getByText(/keeps at least one owner/)).toBeVisible();
+  await expect(people.getByLabel('Role of Ada')).toHaveValue('owner');
+  await dialog.getByRole('button', { name: 'Leave workspace' }).click();
+  await page
+    .getByRole('dialog', { name: 'Leave this workspace?' })
+    .getByRole('button', { name: 'Leave' })
+    .click();
+  await expect(dialog.getByText(/keeps at least one owner/)).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Close' }).click();
+  await remove(page, name);
 });
 
 test('deleting needs the name typed as it is, and takes it out of the sidebar and the server', async ({
@@ -81,7 +125,7 @@ test('deleting needs the name typed as it is, and takes it out of the sidebar an
   const name = unique('Doomed');
   await make(page, name);
   const address = page.url();
-  await page.getByRole('button', { name: 'Delete workspace' }).click();
+  await (await openSettings(page)).getByRole('button', { name: 'Delete workspace' }).click();
   const dialog = page.getByRole('dialog', { name: 'Delete workspace' });
   const confirm = dialog.getByRole('button', { name: 'Delete this workspace' });
   await expect(confirm).toBeDisabled();

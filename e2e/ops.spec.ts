@@ -99,3 +99,49 @@ test('the door is for the signed-in, and for a request from this app’s own add
   const missing = await request.post('/api/ops', { data: operation() });
   expect(missing.status()).toBe(403);
 });
+
+test('a workspace’s people are for the people in it: 401 without a session, and not found for what is not yours', async ({
+  playwright,
+  request,
+  baseURL,
+}) => {
+  const origin = new URL(baseURL ?? 'http://localhost').origin;
+  await signIn(request, origin);
+  const made = operation();
+  const done = await request.post('/api/ops', { headers: { origin }, data: made });
+  expect(((await done.json()) as { status: string }).status).toBe('applied');
+
+  const mine = await request.get(`/api/workspaces/${made.id}/members`);
+  expect(mine.status()).toBe(200);
+  const body = (await mine.json()) as {
+    people: { name: string; email?: string; role: string; you: boolean }[];
+  };
+  expect(body.people).toMatchObject([{ name: 'Ada', email: EMAIL, role: 'owner', you: true }]);
+
+  // A workspace that never was and an id that is not one are the same 404 as someone else's.
+  expect((await request.get(`/api/workspaces/${crypto.randomUUID()}/members`)).status()).toBe(404);
+  expect((await request.get('/api/workspaces/not-an-id/members')).status()).toBe(404);
+
+  const stranger = await playwright.request.newContext({ baseURL: baseURL ?? 'http://localhost' });
+  expect((await stranger.get(`/api/workspaces/${made.id}/members`)).status()).toBe(401);
+  await stranger.dispose();
+  // Adding by address is the owner's, and an address without an account is said so to them.
+  const unknown = await request.post('/api/ops', {
+    headers: { origin },
+    data: {
+      opId: crypto.randomUUID(),
+      op: 'member.add',
+      workspaceId: made.id,
+      email: 'nobody@example.com',
+    },
+  });
+  expect(await unknown.json()).toEqual({
+    status: 'refused',
+    code: 'invalid',
+    reason: 'no_account',
+  });
+  await request.post('/api/ops', {
+    headers: { origin },
+    data: { opId: crypto.randomUUID(), op: 'workspace.delete', id: made.id, name: 'Acme' },
+  });
+});

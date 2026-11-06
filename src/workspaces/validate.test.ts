@@ -12,7 +12,50 @@ describe('an operation', () => {
       expect(parsed.ok).toBe(true);
       if (parsed.ok) expect(parsed.value).toEqual({ ...request, name: 'Acme' });
     }
-    expect(OPS).toEqual(['workspace.create', 'workspace.rename', 'workspace.delete']);
+    expect([...OPS]).toEqual([
+      'workspace.create',
+      'workspace.rename',
+      'workspace.delete',
+      'member.add',
+      'member.setRole',
+      'member.remove',
+      'member.leave',
+    ]);
+  });
+
+  it('takes the operations on people whole, with an address trimmed and lower case', () => {
+    const workspaceId = ID();
+    const accountId = 'account-1';
+    const good = [
+      { op: 'member.add', workspaceId, email: ' Ada@Example.COM ' },
+      { op: 'member.setRole', workspaceId, accountId, role: 'owner' },
+      { op: 'member.remove', workspaceId, accountId },
+      { op: 'member.leave', workspaceId },
+    ];
+    for (const each of good) {
+      const parsed = parseOp(JSON.parse(JSON.stringify({ opId: ID(), ...each })));
+      expect(parsed.ok, each.op).toBe(true);
+      if (parsed.ok && parsed.value.op === 'member.add')
+        expect(parsed.value.email).toBe('ada@example.com');
+    }
+  });
+
+  it('refuses what is not an address, not a role, or says more than it takes', () => {
+    const workspaceId = ID();
+    const bad: unknown[] = [
+      { op: 'member.add', workspaceId, email: 'not an address' },
+      { op: 'member.add', workspaceId, email: 'a@b@c' },
+      { op: 'member.add', workspaceId, email: `${'a'.repeat(250)}@example.com` },
+      { op: 'member.add', workspaceId, email: 7 },
+      { op: 'member.add', workspaceId: 'x', email: 'a@b.c' },
+      { op: 'member.setRole', workspaceId, accountId: 'a', role: 'admin' },
+      { op: 'member.setRole', workspaceId, accountId: 'a' },
+      { op: 'member.remove', workspaceId, accountId: '' },
+      // Leaving is the asker's own: it names nobody.
+      { op: 'member.leave', workspaceId, accountId: 'someone-else' },
+    ];
+    for (const each of bad)
+      expect(parseOp({ opId: ID(), ...(each as object) }).ok, JSON.stringify(each)).toBe(false);
   });
 
   it('is refused for every shape that is not one', () => {

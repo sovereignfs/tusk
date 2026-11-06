@@ -681,6 +681,9 @@ reversible route.
 - **The people of a board come only from its workspace,** and the people a card is assigned to only from its board.
 - **Being added** raises a notice in their Inbox (§16), and the workspace appears in their sidebar under _Shared with me_.
 - **Leaving and removing** are §7.2's.
+- **As built (task 16.3):** a refusal an owner or a leaver is entitled to understand carries a reason beside its code (`no_account`, `already_in`, `last_owner`); anyone who may not have asked is told `not_found` and
+  nothing more, an unknown address included. Adding is limited to 30 an hour an account. Names are read from the accounts when the list is read (`src/auth/directory.ts`) and are never copied; the address is shown to an
+  owner only; avatars are initials, since a picture would be a request to another address (§17.1). The notice to the person added arrives with the Inbox (§16).
 
 ### 13.3 What a workspace shows
 

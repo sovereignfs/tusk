@@ -6,8 +6,8 @@ import { testTarget } from '../db/test-support';
 import { makeStore } from '../sync/test-support';
 import { applyOp } from './apply';
 import { boardsAdministeredBy, boardsEditableBy, boardsVisibleTo } from './can';
-import { OPS, type OpRefusal, type OpRequest } from './format';
-import { listWorkspaces, workspaceOf } from './reads';
+import { type Op, OPS, type OpRefusal, type OpRequest, WORKSPACE_LIMITS } from './format';
+import { listWorkspaces, peopleOf, workspaceOf } from './reads';
 import { tablesOf } from './tables';
 import {
   type Role,
@@ -37,12 +37,31 @@ beforeAll(async () => {
 afterAll(async () => close());
 
 const NOW = 1_800_000_100_000;
+/** The accounts, as a fake: one address belongs to an account, and no other does. The real directory over the auth store is tested with it (`directory.test.ts`). */
+const KNOWN_EMAIL = 'known@example.com';
+const KNOWN = '0b7e1c52-9c1e-4a8e-8d52-5a0c2f4f9a11';
+const directory = {
+  idOfEmail: async (email: string) => (email === KNOWN_EMAIL ? KNOWN : undefined),
+  profiles: async (ids: readonly string[]) =>
+    new Map(
+      ids.map((each) => [
+        each,
+        {
+          id: each,
+          name: `Name of ${each.slice(0, 4)}`,
+          email: `${each.slice(0, 4)}@example.com`,
+          image: null,
+        },
+      ]),
+    ),
+};
+const OPTIONS = { now: NOW, directory };
 const id = () => crypto.randomUUID();
 
 /** What each operation is for, and who may do it. `build` makes the request against the world; `may` are the roles that get `applied`, all others `not_found`. */
 interface Row {
   op: (typeof OPS)[number];
-  build(w: World): Omit<OpRequest, 'opId'>;
+  build(w: World): Op;
   may: readonly Role[];
   /** What anyone else is told. */
   otherwise: OpRefusal;
@@ -68,6 +87,37 @@ const OPERATIONS: Row[] = [
     may: ROLES,
     otherwise: 'not_found',
   },
+  {
+    // Only an owner adds a person, and an outsider is told what they are told for anything else, whatever the address.
+    op: 'member.add',
+    build: (w) => ({ op: 'member.add', workspaceId: w.workspace, email: KNOWN_EMAIL }),
+    may: ['owner', 'coOwner'],
+    otherwise: 'not_found',
+  },
+  {
+    op: 'member.setRole',
+    build: (w) => ({
+      op: 'member.setRole',
+      workspaceId: w.workspace,
+      accountId: w.accounts.member,
+      role: 'owner',
+    }),
+    may: ['owner', 'coOwner'],
+    otherwise: 'not_found',
+  },
+  {
+    op: 'member.remove',
+    build: (w) => ({ op: 'member.remove', workspaceId: w.workspace, accountId: w.accounts.member }),
+    may: ['owner', 'coOwner'],
+    otherwise: 'not_found',
+  },
+  {
+    // Anyone in it may leave (there is another owner in this world); an outsider has nothing to leave.
+    op: 'member.leave',
+    build: (w) => ({ op: 'member.leave', workspaceId: w.workspace }),
+    may: ['owner', 'coOwner', 'boardOwner', 'boardMember', 'member'],
+    otherwise: 'not_found',
+  },
 ];
 
 const row = (table: unknown) =>
@@ -85,7 +135,7 @@ describe(`the roles (${leg})`, () => {
           await row(tablesOf(database).workspace),
           await row(tablesOf(database).workspaceMember),
         ]);
-        const result = await applyOp(database, mine.accounts[role], request, { now: NOW });
+        const result = await applyOp(database, mine.accounts[role], request, OPTIONS);
         if (allowed) {
           expect(result.status).toBe('applied');
         } else {
@@ -98,7 +148,7 @@ describe(`the roles (${leg})`, () => {
             ]),
           ).toBe(beforeRows);
           // And nothing was recorded as done: the same `opId` can be tried again by someone who may.
-          const retry = await applyOp(database, mine.accounts.owner, request, { now: NOW });
+          const retry = await applyOp(database, mine.accounts.owner, request, OPTIONS);
           if (request.op !== 'workspace.create') expect(retry.status).toBe('applied');
         }
       });
@@ -110,13 +160,13 @@ describe(`the roles (${leg})`, () => {
       database,
       world.accounts.outsider,
       { opId: id(), op: 'workspace.rename', id: world.workspace, name: 'Mine now' },
-      { now: NOW },
+      OPTIONS,
     );
     const nothing = await applyOp(
       database,
       world.accounts.outsider,
       { opId: id(), op: 'workspace.rename', id: id(), name: 'Mine now' },
-      { now: NOW },
+      OPTIONS,
     );
     expect(theirs).toEqual(nothing);
   });
@@ -184,7 +234,7 @@ describe(`the roles (${leg})`, () => {
         database,
         doomed.accounts.owner,
         { opId: id(), op: 'workspace.delete', id: doomed.workspace, name: 'Acme' },
-        { now: NOW },
+        OPTIONS,
       );
       expect(result).toMatchObject({ status: 'applied', rows: { deleted: doomed.workspace } });
       const after = await countAll(database);
@@ -225,7 +275,7 @@ describe(`the roles (${leg})`, () => {
             database,
             mine.accounts.owner,
             { opId: id(), op: 'workspace.delete', id: mine.workspace, name },
-            { now: NOW },
+            OPTIONS,
           ),
           name,
         ).toEqual({ status: 'refused', code: 'invalid' });
@@ -241,10 +291,10 @@ describe(`the roles (${leg})`, () => {
         id: mine.workspace,
         name: 'Acme',
       };
-      expect((await applyOp(database, mine.accounts.owner, request, { now: NOW })).status).toBe(
+      expect((await applyOp(database, mine.accounts.owner, request, OPTIONS)).status).toBe(
         'applied',
       );
-      expect(await applyOp(database, mine.accounts.owner, request, { now: NOW })).toMatchObject({
+      expect(await applyOp(database, mine.accounts.owner, request, OPTIONS)).toMatchObject({
         status: 'applied',
         replay: true,
       });
@@ -265,6 +315,226 @@ describe(`the roles (${leg})`, () => {
       expect(await workspaceOf(database, mine.accounts.member, mine.workspace)).toMatchObject({
         role: 'member',
       });
+    });
+  });
+
+  describe('a workspace’s people', () => {
+    const apply = (w: World, role: Role, op: Op) =>
+      applyOp(database, w.accounts[role], { opId: id(), ...op } as OpRequest, OPTIONS);
+    const roleOf = async (w: World, account: string) => {
+      const rows = await dbAll<{ role: string }>(
+        database,
+        sql`SELECT role FROM ${tablesOf(database).workspaceMember} WHERE workspace_id = ${w.workspace} AND account_id = ${account}`,
+      );
+      return rows[0]?.role;
+    };
+    const countMembers = async (w: World) =>
+      (
+        await dbAll(
+          database,
+          sql`SELECT 1 FROM ${tablesOf(database).workspaceMember} WHERE workspace_id = ${w.workspace}`,
+        )
+      ).length;
+
+    it('adds an account by its address as a member, and moves the workspace on', async () => {
+      const w = await seedWorld(database);
+      const result = await apply(w, 'owner', {
+        op: 'member.add',
+        workspaceId: w.workspace,
+        email: KNOWN_EMAIL,
+      });
+      expect(result).toMatchObject({
+        status: 'applied',
+        rows: { member: { accountId: KNOWN, role: 'member' } },
+      });
+      expect(await roleOf(w, KNOWN)).toBe('member');
+      // The one added sees the workspace on their next read.
+      // (The same account is added in the worlds of other tests, so it is this workspace that is looked for.)
+      expect(
+        (await listWorkspaces(database, KNOWN)).filter((each) => each.id === w.workspace),
+      ).toMatchObject([{ role: 'member' }]);
+      const [row] = await dbAll<{ at: number | string }>(
+        database,
+        sql`SELECT updated_at AS at FROM ${tablesOf(database).workspace} WHERE id = ${w.workspace}`,
+      );
+      expect(Number(row?.at)).toBe(NOW);
+    });
+
+    it('says an address has no account to an owner, and adds nothing; an outsider is not told that', async () => {
+      const w = await seedWorld(database);
+      const before = await countMembers(w);
+      const unknown: Op = {
+        op: 'member.add',
+        workspaceId: w.workspace,
+        email: 'nobody@example.com',
+      };
+      expect(await apply(w, 'owner', unknown)).toEqual({
+        status: 'refused',
+        code: 'invalid',
+        reason: 'no_account',
+      });
+      expect(await countMembers(w)).toBe(before);
+      // To someone who may not ask, an address that has an account and one that has not are the same answer.
+      const known: Op = { op: 'member.add', workspaceId: w.workspace, email: KNOWN_EMAIL };
+      expect(await apply(w, 'member', unknown)).toEqual({ status: 'refused', code: 'not_found' });
+      expect(await apply(w, 'outsider', unknown)).toEqual(await apply(w, 'outsider', known));
+    });
+
+    it('does not add someone twice, and holds a hundred people', async () => {
+      const w = await seedWorld(database);
+      const add: Op = { op: 'member.add', workspaceId: w.workspace, email: KNOWN_EMAIL };
+      expect((await apply(w, 'owner', add)).status).toBe('applied');
+      expect(await apply(w, 'owner', add)).toEqual({
+        status: 'refused',
+        code: 'invalid',
+        reason: 'already_in',
+      });
+      const t = tablesOf(database);
+      for (let i = await countMembers(w); i < WORKSPACE_LIMITS.membersPerWorkspace; i++)
+        await dbAll(
+          database,
+          sql`INSERT INTO ${t.workspaceMember} (workspace_id, account_id, role, added_by, created_at) VALUES (${w.workspace}, ${id()}, 'member', ${w.accounts.owner}, ${NOW}) RETURNING account_id`,
+        );
+      const other = { ...add, email: KNOWN_EMAIL };
+      const full = await applyOp(
+        database,
+        w.accounts.owner,
+        { opId: id(), ...other } as OpRequest,
+        { now: NOW, directory: { idOfEmail: async () => id() } },
+      );
+      expect(full).toEqual({ status: 'refused', code: 'limit' });
+      expect(await countMembers(w)).toBe(WORKSPACE_LIMITS.membersPerWorkspace);
+    });
+
+    it('changes a role, and answers stale for someone who is not in it', async () => {
+      const w = await seedWorld(database);
+      const set = (account: string, role: 'owner' | 'member'): Op => ({
+        op: 'member.setRole',
+        workspaceId: w.workspace,
+        accountId: account,
+        role,
+      });
+      expect((await apply(w, 'owner', set(w.accounts.member, 'owner'))).status).toBe('applied');
+      expect(await roleOf(w, w.accounts.member)).toBe('owner');
+      expect((await apply(w, 'owner', set(w.accounts.coOwner, 'member'))).status).toBe('applied');
+      expect(await roleOf(w, w.accounts.coOwner)).toBe('member');
+      expect(await apply(w, 'owner', set(w.accounts.outsider, 'owner'))).toEqual({
+        status: 'refused',
+        code: 'stale',
+      });
+    });
+
+    it('keeps one owner: the last cannot step down, leave or be removed', async () => {
+      const w = await seedWorld(database);
+      const base = { workspaceId: w.workspace };
+      // The other owner steps down, and the one left is the last.
+      expect(
+        (
+          await apply(w, 'coOwner', {
+            op: 'member.setRole',
+            ...base,
+            accountId: w.accounts.coOwner,
+            role: 'member',
+          })
+        ).status,
+      ).toBe('applied');
+      const before = JSON.stringify(await countAll(database));
+      const refused = { status: 'refused', code: 'invalid', reason: 'last_owner' };
+      expect(
+        await apply(w, 'owner', {
+          op: 'member.setRole',
+          ...base,
+          accountId: w.accounts.owner,
+          role: 'member',
+        }),
+      ).toEqual(refused);
+      expect(await apply(w, 'owner', { op: 'member.leave', ...base })).toEqual(refused);
+      expect(
+        await apply(w, 'owner', { op: 'member.remove', ...base, accountId: w.accounts.owner }),
+      ).toEqual(refused);
+      expect(JSON.stringify(await countAll(database))).toBe(before);
+      expect(await roleOf(w, w.accounts.owner)).toBe('owner');
+      // Someone else made owner first, and they may go.
+      await apply(w, 'owner', {
+        op: 'member.setRole',
+        ...base,
+        accountId: w.accounts.member,
+        role: 'owner',
+      });
+      expect((await apply(w, 'owner', { op: 'member.leave', ...base })).status).toBe('applied');
+    });
+
+    it('lets only one of two owners who step down at once do it', async () => {
+      const w = await seedWorld(database);
+      const down = (role: 'owner' | 'coOwner'): Promise<unknown> =>
+        apply(w, role, {
+          op: 'member.setRole',
+          workspaceId: w.workspace,
+          accountId: w.accounts[role],
+          role: 'member',
+        });
+      const results = (await Promise.all([down('owner'), down('coOwner')])) as { status: string }[];
+      expect(results.map((each) => each.status).sort()).toEqual(['applied', 'refused']);
+      const owners = (
+        await dbAll(
+          database,
+          sql`SELECT 1 FROM ${tablesOf(database).workspaceMember} WHERE workspace_id = ${w.workspace} AND role = 'owner'`,
+        )
+      ).length;
+      expect(owners).toBe(1);
+    });
+
+    it('takes a removed or leaving person off every board and unassigns them, and leaves their comments', async () => {
+      for (const how of ['remove', 'leave'] as const) {
+        const w = await seedWorld(database);
+        await seedBoardContents(database, w);
+        const t = tablesOf(database);
+        const mine = (table: unknown, column = 'account_id') =>
+          dbAll(
+            database,
+            sql`SELECT 1 FROM ${table as never} WHERE ${sql.raw(column)} = ${w.accounts.boardOwner}`,
+          );
+        expect((await mine(t.boardMember)).length).toBe(2);
+        expect((await mine(t.cardAssignee)).length).toBe(1);
+        const result =
+          how === 'remove'
+            ? await apply(w, 'owner', {
+                op: 'member.remove',
+                workspaceId: w.workspace,
+                accountId: w.accounts.boardOwner,
+              })
+            : await apply(w, 'boardOwner', { op: 'member.leave', workspaceId: w.workspace });
+        expect(result).toMatchObject({
+          status: 'applied',
+          rows: { removed: { accountId: w.accounts.boardOwner } },
+        });
+        expect(await roleOf(w, w.accounts.boardOwner)).toBeUndefined();
+        expect((await mine(t.boardMember)).length, how).toBe(0);
+        expect((await mine(t.cardAssignee)).length, how).toBe(0);
+        // What they wrote stays, and the board is still the workspace's owners' to administer.
+        expect((await mine(t.comment, 'author_id')).length, how).toBe(1);
+        expect(await listWorkspaces(database, w.accounts.boardOwner)).toEqual([]);
+        expect(await reachable(database, boardsAdministeredBy, w.accounts.owner)).toHaveLength(3);
+        // Others' places are untouched.
+        expect((await mine(t.boardMember)).length).toBe(0);
+        expect(await roleOf(w, w.accounts.boardMember)).toBe('member');
+      }
+    });
+
+    it('lists the people owners first, with addresses for an owner only, and none for an outsider', async () => {
+      const w = await seedWorld(database);
+      const asOwner = await peopleOf(database, directory, w.accounts.owner, w.workspace);
+      expect(asOwner).toHaveLength(5);
+      expect(asOwner?.slice(0, 2).map((each) => each.role)).toEqual(['owner', 'owner']);
+      expect(asOwner?.every((each) => each.email !== undefined)).toBe(true);
+      expect(asOwner?.filter((each) => each.you).map((each) => each.accountId)).toEqual([
+        w.accounts.owner,
+      ]);
+      const asMember = await peopleOf(database, directory, w.accounts.member, w.workspace);
+      expect(asMember).toHaveLength(5);
+      expect(asMember?.some((each) => each.email !== undefined)).toBe(false);
+      expect(await peopleOf(database, directory, w.accounts.outsider, w.workspace)).toBeUndefined();
+      expect(await peopleOf(database, directory, w.accounts.owner, id())).toBeUndefined();
     });
   });
 
