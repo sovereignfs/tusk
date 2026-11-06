@@ -130,6 +130,7 @@ describe('cards on a board', () => {
     labels: [],
     assignees: [],
     checklist: { done: 0, total: 0 },
+    comments: 0,
   });
   const base = (): BoardView => ({
     ...view([list('a', 'a0'), list('b', 'a1')]),
@@ -268,6 +269,13 @@ describe('cards on a board', () => {
         (c) => c.id === 'x',
       )?.assignees,
     ).toEqual([]);
+  });
+
+  it('counts a comment added on the tile at once', () => {
+    const v = base();
+    const next = showingBoard(v, { op: 'comment.add', id: 'k', cardId: 'x', body: 'Hi' });
+    expect(next.cards.find((c) => c.id === 'x')?.comments).toBe(1);
+    expect(next.cards.find((c) => c.id === 'y')?.comments).toBe(0);
   });
 
   it('finds the position among what is shown: the top, between two, and the end, in this list or another', () => {

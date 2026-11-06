@@ -54,6 +54,9 @@ export const OPS = [
   'item.untick',
   'item.move',
   'item.delete',
+  'comment.add',
+  'comment.edit',
+  'comment.delete',
 ] as const;
 export type OpName = (typeof OPS)[number];
 
@@ -185,7 +188,18 @@ export type Op =
   | { readonly op: 'item.untick'; readonly id: string }
   /** One row, whatever the distance. */
   | { readonly op: 'item.move'; readonly id: string; readonly position: string }
-  | { readonly op: 'item.delete'; readonly id: string };
+  | { readonly op: 'item.delete'; readonly id: string }
+  /** Plain text, shown as written with its line breaks and never as HTML. Raises a `comment` notice for the card's assignees and its creator, never its author. */
+  | {
+      readonly op: 'comment.add';
+      readonly id: string;
+      readonly cardId: string;
+      readonly body: string;
+    }
+  /** Its author's. */
+  | { readonly op: 'comment.edit'; readonly id: string; readonly body: string }
+  /** Its author's, or a board owner's. */
+  | { readonly op: 'comment.delete'; readonly id: string };
 
 export type Visibility = 'public' | 'private';
 
@@ -220,6 +234,11 @@ export const WORKSPACE_LIMITS = {
   labelNameChars: 50,
   /** Checklist items on a card (DESIGN.md §7.4). */
   itemsPerCard: 200,
+  /** Comments on a card, and the length of one (DESIGN.md §7.4). */
+  commentsPerCard: 1000,
+  commentChars: 5000,
+  /** A page of comments. */
+  commentsPage: 20,
   /** A position key, in characters. */
   positionChars: 64,
   /** A request body, in bytes: an operation is small. */
@@ -323,6 +342,27 @@ export interface Progress {
   readonly total: number;
 }
 
+/** A comment, as the asker may see and use it. The author's name is read from the account when shown. */
+export interface CommentRow {
+  readonly id: string;
+  readonly cardId: string;
+  readonly authorId: string;
+  readonly authorName: string;
+  readonly body: string;
+  readonly createdAt: number;
+  readonly editedAt: number | null;
+  /** The asker wrote it (and the board is open), so they edit it. */
+  readonly canEdit: boolean;
+  /** The asker wrote it, or owns the board (and it is open), so they delete it. */
+  readonly canDelete: boolean;
+}
+
+/** A page of a card's comments, newest first, and whether there are older ones. */
+export interface CommentPage {
+  readonly comments: readonly CommentRow[];
+  readonly more: boolean;
+}
+
 /** A card as its tile shows it (DESIGN.md §15.1): what the board is sent of every open card. The badges of later tasks join it as they are built. */
 export interface CardTile {
   readonly id: string;
@@ -338,6 +378,8 @@ export interface CardTile {
   /** The accounts it is assigned to, in the order they were assigned. Always members of the board. */
   readonly assignees: readonly string[];
   readonly checklist: Progress;
+  /** How many comments it has. */
+  readonly comments: number;
 }
 
 /** A card whole, for its dialog (DESIGN.md §17.6): what the tile shows and the description, and the list it is in. */
@@ -377,6 +419,8 @@ export interface OpRows {
   readonly board?: BoardRow;
   readonly list?: ListRow;
   readonly card?: CardTile;
+  /** A comment that is gone. */
+  readonly deletedComment?: string;
   readonly item?: ChecklistItem;
   /** An item that is gone. */
   readonly deletedItem?: string;

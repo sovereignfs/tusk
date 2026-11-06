@@ -56,6 +56,9 @@ describe('an operation', () => {
       'item.untick',
       'item.move',
       'item.delete',
+      'comment.add',
+      'comment.edit',
+      'comment.delete',
     ]);
   });
 
@@ -278,6 +281,26 @@ describe('an operation', () => {
       { op: 'item.rename', id: a, title: 'x'.repeat(501) },
       { op: 'item.move', id: a, position: 'a b' },
       { op: 'item.tick', id: a, done: true },
+    ])
+      expect(parseOp({ opId: ID(), ...bad }).ok, JSON.stringify(bad)).toBe(false);
+  });
+
+  it('takes the comment operations whole, keeps the text as written, and refuses a blank or a long one', () => {
+    const [a, b] = [ID(), ID()];
+    const text = 'Line one\n\n  <b>two</b> ';
+    expect(parseOp({ opId: ID(), op: 'comment.add', id: a, cardId: b, body: text })).toMatchObject({
+      ok: true,
+      value: { body: text },
+    });
+    expect(parseOp({ opId: ID(), op: 'comment.edit', id: a, body: 'Changed' }).ok).toBe(true);
+    expect(parseOp({ opId: ID(), op: 'comment.delete', id: a }).ok).toBe(true);
+    for (const bad of [
+      { op: 'comment.add', id: a, cardId: b, body: '' },
+      { op: 'comment.add', id: a, cardId: b, body: ' \n ' },
+      { op: 'comment.add', id: a, cardId: b, body: 'x'.repeat(5001) },
+      { op: 'comment.edit', id: a, body: '   ' },
+      { op: 'comment.add', id: a, body: 'x' },
+      { op: 'comment.delete', id: a, authorId: 'me' },
     ])
       expect(parseOp({ opId: ID(), ...bad }).ok, JSON.stringify(bad)).toBe(false);
   });

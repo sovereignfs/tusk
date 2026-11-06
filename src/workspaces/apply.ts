@@ -8,6 +8,7 @@ import { first } from '../position';
 import {
   boardsAdministeredBy,
   boardsEditableBy,
+  boardsOwnedBy,
   boardsVisibleTo,
   workspacesOf,
   workspacesOwnedBy,
@@ -741,6 +742,81 @@ async function run(
         ? { deletedItem: request.id, card, version }
         : { item: await itemRow(tx, request.id), card, version };
     }
+    case 'comment.add': {
+      const taken = await dbAll<{
+        boardId: string;
+        title: string;
+        createdBy: string;
+        workspaceId: string;
+      }>(
+        tx,
+        sql`UPDATE ${t.card} SET updated_at = ${now}
+            WHERE id = ${request.cardId} AND board_id IN ${boardsEditableBy(tx, accountId)} AND archived_at IS NULL
+            RETURNING board_id AS "boardId", title, created_by AS "createdBy",
+                      (SELECT workspace_id FROM ${t.board} WHERE id = ${t.card}.board_id) AS "workspaceId"`,
+      );
+      const card = taken[0];
+      if (!card) throw new Refused('not_found');
+      const version = await touchBoard(
+        tx,
+        card.boardId,
+        boardsEditableBy(tx, accountId),
+        now,
+        true,
+      );
+      const count = await dbGet<{ n: number | string }>(
+        tx,
+        sql`SELECT COUNT(*) AS n FROM ${t.comment} WHERE card_id = ${request.cardId}`,
+      );
+      if (Number(count?.n ?? 0) >= WORKSPACE_LIMITS.commentsPerCard) throw new Refused('limit');
+      const made = await dbAll<{ id: string }>(
+        tx,
+        sql`INSERT INTO ${t.comment} (id, card_id, board_id, author_id, body, created_at, edited_at)
+            VALUES (${request.id}, ${request.cardId}, ${card.boardId}, ${accountId}, ${request.body}, ${now}, NULL)
+            ON CONFLICT (id) DO NOTHING RETURNING id`,
+      );
+      if (made.length === 0) throw new Refused('not_found');
+      // Told, in this transaction: the card's assignees and the person who made it (if they are still in the workspace), never the one who wrote it.
+      const told = await dbAll<{ id: string }>(
+        tx,
+        sql`SELECT account_id AS id FROM ${t.cardAssignee} WHERE card_id = ${request.cardId}
+            UNION SELECT account_id AS id FROM ${t.workspaceMember}
+                  WHERE workspace_id = ${card.workspaceId} AND account_id = ${card.createdBy}`,
+      );
+      for (const each of told) {
+        if (each.id === accountId) continue;
+        await dbAll(
+          tx,
+          sql`INSERT INTO ${t.notice} (id, account_id, kind, actor_id, workspace_id, board_id, card_id, details, created_at)
+              VALUES (${crypto.randomUUID()}, ${each.id}, 'comment', ${accountId}, ${card.workspaceId}, ${card.boardId}, ${request.cardId},
+                      ${JSON.stringify({ title: card.title })}, ${now})
+              RETURNING id`,
+        );
+      }
+      return { card: await cardTile(tx, request.cardId), version };
+    }
+    case 'comment.edit':
+    case 'comment.delete': {
+      // Its author's to edit, and its author's or the board owner's to delete: both are members of an open board, and the statement says which.
+      const changed = await dbAll<{ boardId: string; cardId: string }>(
+        tx,
+        request.op === 'comment.edit'
+          ? sql`UPDATE ${t.comment} SET body = ${request.body}, edited_at = ${now}
+                WHERE id = ${request.id} AND author_id = ${accountId} AND board_id IN ${boardsEditableBy(tx, accountId)}
+                RETURNING board_id AS "boardId", card_id AS "cardId"`
+          : sql`DELETE FROM ${t.comment}
+                WHERE id = ${request.id} AND board_id IN ${boardsEditableBy(tx, accountId)}
+                  AND (author_id = ${accountId} OR board_id IN ${boardsOwnedBy(tx, accountId)})
+                RETURNING board_id AS "boardId", card_id AS "cardId"`,
+      );
+      const row = changed[0];
+      if (!row) throw new Refused('not_found');
+      const version = await touchBoard(tx, row.boardId, boardsEditableBy(tx, accountId), now, true);
+      const card = await cardTile(tx, row.cardId);
+      return request.op === 'comment.delete'
+        ? { deletedComment: request.id, card, version }
+        : { card, version };
+    }
     case 'workspace.rename': {
       // The permission is in the statement: only an owner's workspace is a row it can reach.
       const changed = await dbAll<{ createdAt: number | string }>(
@@ -873,6 +949,14 @@ async function cardTile(tx: Database, id: string): Promise<CardTile> {
     labels: labels.map((each) => each.id),
     assignees: assignees.map((each) => each.id),
     checklist: { done: Number(progress?.done ?? 0), total: Number(progress?.total ?? 0) },
+    comments: Number(
+      (
+        await dbGet<{ n: number | string }>(
+          tx,
+          sql`SELECT COUNT(*) AS n FROM ${t.comment} WHERE card_id = ${id}`,
+        )
+      )?.n ?? 0,
+    ),
   };
 }
 

@@ -43,6 +43,8 @@ export interface World {
   labels: { publicBoard: string; privateBoard: string };
   /** A checklist item on the open card. */
   items: { open: string };
+  /** Comments on the open card: one by the board's owner, and one old one by its member. */
+  comments: { byOwner: string; old: string };
 }
 
 const uuid = () => crypto.randomUUID();
@@ -56,6 +58,7 @@ export async function seedWorld(database: Database): Promise<World> {
   const cards = { open: uuid(), archived: uuid() };
   const labels = { publicBoard: uuid(), privateBoard: uuid() };
   const items = { open: uuid() };
+  const comments = { byOwner: uuid(), old: uuid() };
   const now = 1_800_000_000_000;
 
   await dbRun(
@@ -123,7 +126,15 @@ export async function seedWorld(database: Database): Promise<World> {
     sql`INSERT INTO ${t.checklistItem} (id, card_id, board_id, title, completed_at, position, created_at)
         VALUES (${items.open}, ${cards.open}, ${boards.publicBoard}, 'First step', NULL, 'a0', ${now})`,
   );
-  return { accounts, workspace, boards, lists, cards, labels, items };
+  await dbRun(
+    database,
+    sql`INSERT INTO ${t.comment} (id, card_id, board_id, author_id, body, created_at) VALUES (${comments.byOwner}, ${cards.open}, ${boards.publicBoard}, ${accounts.boardOwner}, 'By the owner', ${now + 5})`,
+  );
+  await dbRun(
+    database,
+    sql`INSERT INTO ${t.comment} (id, card_id, board_id, author_id, body, created_at) VALUES (${comments.old}, ${cards.open}, ${boards.publicBoard}, ${accounts.boardMember}, 'An old comment', ${now})`,
+  );
+  return { accounts, workspace, boards, lists, cards, labels, items, comments };
 }
 
 /** The ids of the boards a permission reaches for an account, from the subquery itself. */

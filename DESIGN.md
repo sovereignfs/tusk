@@ -823,6 +823,9 @@ At the foot of a card's detail, newest first, each with its author's avatar and 
 its author edits or deletes it; a board owner deletes it. Plain text, with its line breaks. Writing one raises a notice for the card's assignees and the
 person who created the card (§16), never for its author. Replies are phase 2 (§25.6).
 
+**As built (task 18.6):** a comment is edited by its author alone and deleted by its author or a member of the board with the owner role. Comments are read a page at a time after a cursor of time and
+id, and rendered as text nodes.
+
 ### 15.6 Activity
 
 What happened on a board, by whom and when, written by the server in the same transaction as the change (§7.3), never by the browser.

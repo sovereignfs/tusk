@@ -16,6 +16,7 @@ import {
 } from './format';
 import {
   archivedCards,
+  commentsOf,
   boardPeople,
   boardsIndex,
   cardDetail,
@@ -424,6 +425,26 @@ const OPERATIONS: Row[] = [
     otherwise: 'not_found',
   },
   {
+    op: 'comment.add',
+    build: (w) => ({ op: 'comment.add', id: id(), cardId: w.cards.open, body: 'Hello there' }),
+    may: ['boardOwner', 'boardMember'],
+    otherwise: 'not_found',
+  },
+  {
+    // Only the author edits: here the board's owner wrote it, and even the board's other member is refused.
+    op: 'comment.edit',
+    build: (w) => ({ op: 'comment.edit', id: w.comments.byOwner, body: 'Changed' }),
+    may: ['boardOwner'],
+    otherwise: 'not_found',
+  },
+  {
+    // The author deletes, and so does the board's owner (here they are the same person): a member who is not the author is refused.
+    op: 'comment.delete',
+    build: (w) => ({ op: 'comment.delete', id: w.comments.byOwner }),
+    may: ['boardOwner'],
+    otherwise: 'not_found',
+  },
+  {
     // Anyone in it may leave (there is another owner in this world); an outsider has nothing to leave.
     op: 'member.leave',
     build: (w) => ({ op: 'member.leave', workspaceId: w.workspace }),
@@ -567,14 +588,9 @@ describe(`the roles (${leg})`, () => {
       expect(gone('label')).toBe(3);
       // The world's item and the one the contents add.
       expect(gone('checklist_item')).toBe(2);
-      for (const name of [
-        'card_label',
-        'card_assignee',
-        'comment',
-        'activity',
-        'publication',
-        'notice',
-      ])
+      // The world's two comments on the open card and the contents' own.
+      expect(gone('comment')).toBe(3);
+      for (const name of ['card_label', 'card_assignee', 'activity', 'publication', 'notice'])
         expect(gone(name), name).toBe(1);
       // The other one is whole.
       const t = tablesOf(database);
@@ -831,7 +847,7 @@ describe(`the roles (${leg})`, () => {
         expect((await mine(t.boardMember)).length, how).toBe(0);
         expect((await mine(t.cardAssignee)).length, how).toBe(0);
         // What they wrote stays, and the board is still the workspace's owners' to administer.
-        expect((await mine(t.comment, 'author_id')).length, how).toBe(1);
+        expect((await mine(t.comment, 'author_id')).length, how).toBe(2);
         expect(await listWorkspaces(database, w.accounts.boardOwner)).toEqual([]);
         expect(await reachable(database, boardsAdministeredBy, w.accounts.owner)).toHaveLength(3);
         // Others' places are untouched.
@@ -1061,7 +1077,9 @@ describe(`the roles (${leg})`, () => {
       const gone = (name: string) => (before[name] ?? 0) - (after[name] ?? 0);
       // The world's item and the contents' own.
       expect(gone('checklist_item')).toBe(2);
-      for (const name of ['board_list', 'card_label', 'card_assignee', 'comment', 'activity'])
+      // The world's two comments and the contents' own.
+      expect(gone('comment')).toBe(3);
+      for (const name of ['board_list', 'card_label', 'card_assignee', 'activity'])
         expect(gone(name), name).toBe(1);
       // The world's two cards and the one with contents were on it.
       expect(gone('card')).toBe(3);
@@ -1615,14 +1633,9 @@ describe(`the roles (${leg})`, () => {
       expect(gone('label')).toBe(2);
       // The world's item on the open card and the contents' own.
       expect(gone('checklist_item')).toBe(2);
-      for (const name of [
-        'card_label',
-        'card_assignee',
-        'comment',
-        'activity',
-        'publication',
-        'notice',
-      ])
+      // The world's two comments on the open card and the contents' own.
+      expect(gone('comment')).toBe(3);
+      for (const name of ['card_label', 'card_assignee', 'activity', 'publication', 'notice'])
         expect(gone(name), name).toBe(1);
       // The workspace, its people and its other boards are whole.
       expect(gone('workspace')).toBe(0);
@@ -1773,7 +1786,7 @@ describe(`the roles (${leg})`, () => {
         });
         expect(await onBoard(w.boards.publicBoard, w.accounts.boardOwner), how).toBe(false);
         expect((await mine(t().cardAssignee)).length, how).toBe(0);
-        expect((await mine(t().comment, 'author_id')).length, how).toBe(1);
+        expect((await mine(t().comment, 'author_id')).length, how).toBe(2);
         // They are still in the workspace and see the public board, as a viewer; the others on it are untouched.
         expect(
           (await readBoard(database, w.accounts.boardOwner, w.boards.publicBoard))?.can,
@@ -2270,6 +2283,244 @@ describe(`the roles (${leg})`, () => {
       expect((await itemsOf(w.cards.open)).length).toBe(before);
       await apply(w, 'boardMember', { op: 'card.delete', id: w.cards.open });
       expect((await itemsOf(w.cards.open)).length).toBe(0);
+    });
+  });
+
+  describe('comments', () => {
+    const apply = (w: World, role: Role, op: Op) =>
+      applyOp(database, w.accounts[role], { opId: id(), ...op } as OpRequest, OPTIONS);
+    const t = () => tablesOf(database);
+    const notices = (w: World) =>
+      dbAll<{ accountId: string; kind: string; actorId: string }>(
+        database,
+        sql`SELECT account_id AS "accountId", kind, actor_id AS "actorId" FROM ${t().notice}
+            WHERE workspace_id = ${w.workspace} AND kind = 'comment' ORDER BY account_id`,
+      );
+    const bodies = async (w: World, role: Role = 'member') =>
+      (await commentsOf(database, directory, w.accounts[role], w.cards.open))?.comments.map(
+        (c) => c.body,
+      );
+
+    it('adds a comment as text with its line breaks, newest first, and the card carries the count', async () => {
+      const w = await seedWorld(database);
+      const text = 'First line\n\n<script>alert(1)</script> & more';
+      const at = (now: number, role: Role, body: string) =>
+        applyOp(
+          database,
+          w.accounts[role],
+          { opId: id(), op: 'comment.add', id: id(), cardId: w.cards.open, body },
+          { now, directory },
+        );
+      expect(await at(NOW, 'boardMember', text)).toMatchObject({
+        status: 'applied',
+        rows: { card: { comments: 3 } },
+      });
+      await at(NOW + 1, 'boardOwner', 'Second');
+      // Kept exactly as written: the page renders it as a text node.
+      expect(await bodies(w)).toEqual(['Second', text, 'By the owner', 'An old comment']);
+      const tile = (await readBoard(database, w.accounts.member, w.boards.publicBoard))?.cards.find(
+        (c) => c.id === w.cards.open,
+      );
+      expect(tile?.comments).toBe(4);
+    });
+
+    it('tells the card’s assignees and its maker, never the author, and no one else', async () => {
+      const w = await seedWorld(database);
+      // boardOwner made the card; boardMember is assigned. A comment by boardMember tells only boardOwner; one by boardOwner tells only boardMember.
+      await apply(w, 'boardOwner', {
+        op: 'card.assign',
+        cardId: w.cards.open,
+        accountId: w.accounts.boardMember,
+      });
+      await apply(w, 'boardMember', {
+        op: 'comment.add',
+        id: id(),
+        cardId: w.cards.open,
+        body: 'From the assignee',
+      });
+      expect(await notices(w)).toEqual([
+        { accountId: w.accounts.boardOwner, kind: 'comment', actorId: w.accounts.boardMember },
+      ]);
+      await apply(w, 'boardOwner', {
+        op: 'comment.add',
+        id: id(),
+        cardId: w.cards.open,
+        body: 'From the maker',
+      });
+      expect((await notices(w)).map((n) => [n.accountId, n.actorId])).toEqual(
+        [
+          [w.accounts.boardOwner, w.accounts.boardMember],
+          [w.accounts.boardMember, w.accounts.boardOwner],
+        ].sort((a, b) => ((a[0] ?? '') < (b[0] ?? '') ? -1 : 1)),
+      );
+      // Someone who made the card and has left the workspace is not told.
+      await apply(w, 'owner', {
+        op: 'member.remove',
+        workspaceId: w.workspace,
+        accountId: w.accounts.boardOwner,
+      });
+      const before = (await notices(w)).length;
+      await apply(w, 'boardMember', {
+        op: 'comment.add',
+        id: id(),
+        cardId: w.cards.open,
+        body: 'Now',
+      });
+      expect((await notices(w)).length).toBe(before);
+    });
+
+    it('lets only the author edit, and the author or a board owner delete', async () => {
+      const w = await seedWorld(database);
+      const mine = id();
+      await apply(w, 'boardMember', {
+        op: 'comment.add',
+        id: mine,
+        cardId: w.cards.open,
+        body: 'Mine',
+      });
+      // Another member cannot edit or delete it; a member who is not the owner of the board certainly cannot; the author can.
+      await apply(w, 'boardOwner', {
+        op: 'board.update',
+        id: w.boards.publicBoard,
+        name: 'Roadmap',
+        color: '#2563eb',
+        description: '',
+      });
+      await apply(w, 'owner', {
+        op: 'boardMember.add',
+        boardId: w.boards.publicBoard,
+        accountId: w.accounts.member,
+      });
+      expect(await apply(w, 'member', { op: 'comment.edit', id: mine, body: 'Hijack' })).toEqual({
+        status: 'refused',
+        code: 'not_found',
+      });
+      expect(await apply(w, 'member', { op: 'comment.delete', id: mine })).toEqual({
+        status: 'refused',
+        code: 'not_found',
+      });
+      expect(
+        await apply(w, 'boardOwner', { op: 'comment.edit', id: mine, body: 'Hijack' }),
+      ).toEqual({ status: 'refused', code: 'not_found' });
+      expect(
+        await apply(w, 'boardMember', { op: 'comment.edit', id: mine, body: 'Mine, better' }),
+      ).toMatchObject({ status: 'applied' });
+      const page = await commentsOf(database, directory, w.accounts.boardMember, w.cards.open);
+      expect(page?.comments.find((c) => c.id === mine)).toMatchObject({
+        body: 'Mine, better',
+        canEdit: true,
+        canDelete: true,
+      });
+      expect(page?.comments.find((c) => c.id === mine)?.editedAt).toBe(NOW);
+      // The board's owner sees it as deletable and not editable; a plain member as neither; a workspace owner who is not on the board as neither.
+      expect(
+        (await commentsOf(database, directory, w.accounts.boardOwner, w.cards.open))?.comments.find(
+          (c) => c.id === mine,
+        ),
+      ).toMatchObject({ canEdit: false, canDelete: true });
+      expect(
+        (await commentsOf(database, directory, w.accounts.member, w.cards.open))?.comments.find(
+          (c) => c.id === mine,
+        ),
+      ).toMatchObject({ canEdit: false, canDelete: false });
+      expect(
+        (await commentsOf(database, directory, w.accounts.owner, w.cards.open))?.comments.find(
+          (c) => c.id === mine,
+        ),
+      ).toMatchObject({ canEdit: false, canDelete: false });
+      expect(await apply(w, 'boardOwner', { op: 'comment.delete', id: mine })).toMatchObject({
+        status: 'applied',
+        rows: { deletedComment: mine },
+      });
+      expect(await bodies(w)).toEqual(['By the owner', 'An old comment']);
+    });
+
+    it('pages newest first without skipping or repeating, whatever is added between pages', async () => {
+      const w = await seedWorld(database);
+      const t0 = NOW;
+      for (let i = 0; i < 45; i++)
+        await applyOp(
+          database,
+          w.accounts.boardMember,
+          { opId: id(), op: 'comment.add', id: id(), cardId: w.cards.open, body: `c${i}` },
+          { now: t0 + i, directory },
+        );
+      const first = await commentsOf(database, directory, w.accounts.member, w.cards.open);
+      expect(first?.comments).toHaveLength(WORKSPACE_LIMITS.commentsPage);
+      expect(first?.more).toBe(true);
+      expect(first?.comments[0]?.body).toBe('c44');
+      // One more arrives while the reader is on the first page.
+      await applyOp(
+        database,
+        w.accounts.boardMember,
+        { opId: id(), op: 'comment.add', id: id(), cardId: w.cards.open, body: 'late' },
+        { now: t0 + 100, directory },
+      );
+      const last = first?.comments.at(-1);
+      const second = await commentsOf(
+        database,
+        directory,
+        w.accounts.member,
+        w.cards.open,
+        last && { createdAt: last.createdAt, id: last.id },
+      );
+      const edge = second?.comments.at(-1);
+      const third = await commentsOf(
+        database,
+        directory,
+        w.accounts.member,
+        w.cards.open,
+        edge && { createdAt: edge.createdAt, id: edge.id },
+      );
+      const seen = [
+        ...(first?.comments ?? []),
+        ...(second?.comments ?? []),
+        ...(third?.comments ?? []),
+      ].map((c) => c.body);
+      expect(new Set(seen).size).toBe(seen.length);
+      expect(seen.slice(0, 3)).toEqual(['c44', 'c43', 'c42']);
+      expect(seen).not.toContain('late');
+      // Forty-five and the two of the world, and not the one that came after the first page was read.
+      expect(seen).toHaveLength(47);
+      expect(third?.more).toBe(false);
+      // Not for a card the asker cannot see.
+      expect(
+        await commentsOf(database, directory, w.accounts.outsider, w.cards.open),
+      ).toBeUndefined();
+    });
+
+    it('holds 1,000 comments a card, and none on an archived card or board', async () => {
+      const w = await seedWorld(database);
+      for (let i = 1; i < WORKSPACE_LIMITS.commentsPerCard; i++)
+        await dbAll(
+          database,
+          sql`INSERT INTO ${t().comment} (id, card_id, board_id, author_id, body, created_at) VALUES (${id()}, ${w.cards.open}, ${w.boards.publicBoard}, ${w.accounts.boardMember}, 'x', ${NOW + i}) RETURNING id`,
+        );
+      expect(
+        await apply(w, 'boardMember', {
+          op: 'comment.add',
+          id: id(),
+          cardId: w.cards.open,
+          body: 'one too many',
+        }),
+      ).toEqual({ status: 'refused', code: 'limit' });
+      expect(
+        await apply(w, 'boardMember', {
+          op: 'comment.add',
+          id: id(),
+          cardId: w.cards.archived,
+          body: 'x',
+        }),
+      ).toEqual({ status: 'refused', code: 'not_found' });
+      await apply(w, 'owner', { op: 'board.archive', id: w.boards.publicBoard });
+      expect(
+        await apply(w, 'boardMember', {
+          op: 'comment.add',
+          id: id(),
+          cardId: w.cards.open,
+          body: 'x',
+        }),
+      ).toEqual({ status: 'refused', code: 'not_found' });
     });
   });
 

@@ -67,7 +67,13 @@ const ARGUMENTS: Record<OpName, readonly string[]> = {
   'item.untick': ['id'],
   'item.move': ['id', 'position'],
   'item.delete': ['id'],
+  'comment.add': ['id', 'cardId', 'body'],
+  'comment.edit': ['id', 'body'],
+  'comment.delete': ['id'],
 };
+
+/** A comment is text with its line breaks, kept as written; a blank one is not a comment. */
+const COMMENT = text(1, WORKSPACE_LIMITS.commentChars);
 
 /** A label's name may be empty: a colour alone is a label (DESIGN.md §15.2). */
 const LABEL_NAME = text(0, WORKSPACE_LIMITS.labelNameChars);
@@ -493,6 +499,31 @@ export function parseOp(value: unknown): Parsed<OpRequest> {
     case 'item.tick':
     case 'item.untick':
     case 'item.delete': {
+      const id = uuid(value.id);
+      if (!id.ok) return no('id: not an id');
+      return { ok: true, value: { opId: opId.value, op: kind, id: id.value } };
+    }
+    case 'comment.add': {
+      const id = uuid(value.id);
+      const cardId = uuid(value.cardId);
+      if (!id.ok || !cardId.ok) return no('not an id');
+      const body = COMMENT(value.body);
+      if (!body.ok || (typeof value.body === 'string' && value.body.trim() === ''))
+        return no('body: nothing to say');
+      return {
+        ok: true,
+        value: { opId: opId.value, op: kind, id: id.value, cardId: cardId.value, body: body.value },
+      };
+    }
+    case 'comment.edit': {
+      const id = uuid(value.id);
+      if (!id.ok) return no('id: not an id');
+      const body = COMMENT(value.body);
+      if (!body.ok || (typeof value.body === 'string' && value.body.trim() === ''))
+        return no('body: nothing to say');
+      return { ok: true, value: { opId: opId.value, op: kind, id: id.value, body: body.value } };
+    }
+    case 'comment.delete': {
       const id = uuid(value.id);
       if (!id.ok) return no('id: not an id');
       return { ok: true, value: { opId: opId.value, op: kind, id: id.value } };

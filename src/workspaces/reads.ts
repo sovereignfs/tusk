@@ -7,12 +7,15 @@ import type { Directory } from '../auth/directory';
 import {
   boardsAdministeredBy,
   boardsEditableBy,
+  boardsOwnedBy,
   boardsVisibleTo,
   workspacesOf,
   workspacesOwnedBy,
 } from './can';
 import {
   type ArchivedCard,
+  type CommentPage,
+  type CommentRow,
   type ChecklistItem,
   type LabelRow,
   type BoardPeople,
@@ -227,6 +230,11 @@ export async function readBoard(
     sql`SELECT card_id AS "cardId", COUNT(*) AS total, SUM(CASE WHEN completed_at IS NULL THEN 0 ELSE 1 END) AS done
         FROM ${t.checklistItem} WHERE board_id = ${boardId} GROUP BY card_id`,
   );
+  const commentCounts = await dbAll<{ cardId: string; n: number | string }>(
+    database,
+    sql`SELECT card_id AS "cardId", COUNT(*) AS n FROM ${t.comment} WHERE board_id = ${boardId} GROUP BY card_id`,
+  );
+  const commentsOf = new Map(commentCounts.map((row) => [row.cardId, Number(row.n)]));
   const progressOf = new Map(
     counts.map((row) => [row.cardId, { done: Number(row.done ?? 0), total: Number(row.total) }]),
   );
@@ -243,6 +251,7 @@ export async function readBoard(
       labels: byCard.get(card.id) ?? [],
       assignees: assigneesOf.get(card.id) ?? [],
       checklist: progressOf.get(card.id) ?? { done: 0, total: 0 },
+      comments: commentsOf.get(card.id) ?? 0,
     })),
     workspace: { id: raw.workspaceId, name: raw.workspaceName },
     lists: lists.map((list) => ({ ...list, cards: Number(list.cards) })),
@@ -440,6 +449,14 @@ export async function cardDetail(
     id: row.id,
     items,
     checklist: { done: items.filter((each) => each.done).length, total: items.length },
+    comments: Number(
+      (
+        await dbGet<{ n: number | string }>(
+          database,
+          sql`SELECT COUNT(*) AS n FROM ${t.comment} WHERE card_id = ${cardId}`,
+        )
+      )?.n ?? 0,
+    ),
     labels: carried.map((each) => each.id),
     assignees: assignedTo.map((each) => each.id),
     boardId: row.boardId,
@@ -532,4 +549,55 @@ export async function boardPeople(
       .map((row) => ({ accountId: row.accountId, name: named(row.accountId) }))
       .sort((a, b) => collator.compare(a.name, b.name) || (a.accountId < b.accountId ? -1 : 1)),
   };
+}
+
+/**
+ * A page of a card's comments, newest first (DESIGN.md §15.5), for someone who can see its board: **the statement names the asker**, so a card that is
+ * not theirs is `undefined`. `before` is the last comment of the page before this one, as its time and id, so that a page never skips or repeats one
+ * when comments are added in between. The author's name is read from the account when it is shown. What the asker may do to each comment is worked out here.
+ */
+export async function commentsOf(
+  database: Database,
+  directory: Pick<Directory, 'profiles'>,
+  accountId: string,
+  cardId: string,
+  before?: { createdAt: number; id: string },
+): Promise<CommentPage | undefined> {
+  const t = tablesOf(database);
+  const card = await dbGet<{ editable: number | boolean; owned: number | boolean }>(
+    database,
+    sql`SELECT (c.board_id IN ${boardsEditableBy(database, accountId)}) AS editable,
+               (c.board_id IN ${boardsOwnedBy(database, accountId)}) AS owned
+        FROM ${t.card} c WHERE c.id = ${cardId} AND c.board_id IN ${boardsVisibleTo(database, accountId)}`,
+  );
+  if (!card) return undefined;
+  const editable = Boolean(Number(card.editable));
+  const owned = Boolean(Number(card.owned));
+  const page = WORKSPACE_LIMITS.commentsPage;
+  const rows = await dbAll<{
+    id: string;
+    authorId: string;
+    body: string;
+    createdAt: number | string;
+    editedAt: number | string | null;
+  }>(
+    database,
+    sql`SELECT id, author_id AS "authorId", body, created_at AS "createdAt", edited_at AS "editedAt" FROM ${t.comment}
+        WHERE card_id = ${cardId}
+          ${before ? sql`AND (created_at < ${before.createdAt} OR (created_at = ${before.createdAt} AND id < ${before.id}))` : sql``}
+        ORDER BY created_at DESC, id DESC LIMIT ${page + 1}`,
+  );
+  const profiles = await directory.profiles(rows.map((row) => row.authorId));
+  const comments: CommentRow[] = rows.slice(0, page).map((row) => ({
+    id: row.id,
+    cardId,
+    authorId: row.authorId,
+    authorName: profiles.get(row.authorId)?.name ?? 'Someone',
+    body: row.body,
+    createdAt: Number(row.createdAt),
+    editedAt: row.editedAt === null ? null : Number(row.editedAt),
+    canEdit: editable && row.authorId === accountId,
+    canDelete: editable && (row.authorId === accountId || owned),
+  }));
+  return { comments, more: rows.length > page };
 }

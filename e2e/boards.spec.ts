@@ -719,3 +719,63 @@ test('a checklist is added to in a card’s dialog, ticked, reordered and delete
   ).toBeVisible();
   await cleanUp(page, workspace);
 });
+
+test('a comment is written in a card’s dialog, shown as text with its line breaks, edited and deleted by its author, and counted on the tile', async ({
+  page,
+}) => {
+  await signedIn(page);
+  const { workspace } = await makeBoard(page);
+  await addCard(page, 'Backlog', 'Talked about');
+  const column = page.locator('section[aria-label="Backlog"]');
+  await column.getByLabel('Talked about', { exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Talked about' });
+  const comments = dialog.getByRole('region', { name: 'Comments' });
+  await expect(comments.getByText('No comments yet.')).toBeVisible();
+
+  // Markup in a comment is words, not markup; its line breaks stay.
+  await comments
+    .getByLabel('Write a comment')
+    .fill('First line\n<script>window.__ran = true</script>\n<b>bold?</b>');
+  await comments.getByRole('button', { name: 'Comment', exact: true }).click();
+  const text = comments.locator('p', { hasText: 'First line' });
+  await expect(text).toBeVisible();
+  await expect(text).toContainText('<script>window.__ran = true</script>');
+  await expect(text).toContainText('<b>bold?</b>');
+  expect(await text.evaluate((el) => getComputedStyle(el).whiteSpace)).toBe('pre-wrap');
+  expect(
+    await page.evaluate(() => (window as unknown as { __ran?: boolean }).__ran),
+  ).toBeUndefined();
+  expect(await comments.locator('script, b').count()).toBe(0);
+  await expect(comments.getByText('Ada', { exact: true })).toBeVisible();
+  await expect(column.getByLabel('1 comments')).toBeVisible();
+
+  // The author edits it, and it says so.
+  await comments.getByRole('button', { name: 'Edit comment by Ada' }).click();
+  await comments.getByLabel('Edit comment').fill('Changed my mind');
+  await comments.getByRole('button', { name: 'Save' }).click();
+  await expect(comments.getByText('Changed my mind')).toBeVisible();
+  await expect(comments.getByText('· edited')).toBeVisible();
+
+  // Kept after a reload, then deleted after asking.
+  await page.reload();
+  const again = page
+    .getByRole('dialog', { name: 'Talked about' })
+    .getByRole('region', { name: 'Comments' });
+  await expect(again.getByText('Changed my mind')).toBeVisible();
+  await again.getByRole('button', { name: 'Delete comment by Ada' }).click();
+  await page.getByRole('button', { name: 'Delete comment', exact: true }).click();
+  await expect(again.getByText('No comments yet.')).toBeVisible();
+  await expect(page.getByLabel('1 comments')).toHaveCount(0);
+
+  // The door refuses an edit of nobody's comment.
+  const refused = await page.request.post('/api/ops', {
+    headers: { origin: new URL(page.url()).origin },
+    data: { opId: crypto.randomUUID(), op: 'comment.edit', id: crypto.randomUUID(), body: 'x' },
+  });
+  expect(await refused.json()).toEqual({ status: 'refused', code: 'not_found' });
+  await page
+    .getByRole('dialog', { name: 'Talked about' })
+    .getByRole('button', { name: 'Close' })
+    .click();
+  await cleanUp(page, workspace);
+});

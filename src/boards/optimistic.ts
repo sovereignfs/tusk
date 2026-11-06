@@ -53,6 +53,9 @@ export function showing(
     case 'item.untick':
     case 'item.move':
     case 'item.delete':
+    case 'comment.add':
+    case 'comment.edit':
+    case 'comment.delete':
     case 'board.update':
     case 'board.archive':
     case 'board.restore':

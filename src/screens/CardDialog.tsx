@@ -8,6 +8,7 @@ import { formatDue } from '../format-due';
 import { browserZone, todayFor } from '../time';
 import { Avatar, Button, Checkbox, Dialog, FormField, Input, Popover, Textarea } from '../ui';
 import { CardChecklist } from './CardChecklist';
+import { CardComments } from './CardComments';
 import { LabelChip, LabelsEditor } from './LabelsEditor';
 import { type CardDetail, WORKSPACE_LIMITS } from '../workspaces/format';
 import styles from './CardDialog.module.css';
@@ -266,7 +267,9 @@ export function CardDialog({ detail: first }: { detail: CardDetail }) {
             store={store}
           />
 
-          {/* Comments and Activity as tabs go here. */}
+          <CardComments cardId={detail.id} editable={editable} store={store} />
+
+          {/* Activity, as a tab beside the comments, goes here. */}
         </div>
         {editable ? (
           <aside className={styles.side} aria-label="Actions">

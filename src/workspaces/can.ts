@@ -11,6 +11,7 @@ import { tablesOf } from './tables';
  *  - `boardsVisibleTo`   a public board of a workspace one is in, a board one is a member of, and every board of a workspace one owns (private included).
  *  - `boardsEditableBy`  a board one is a member of, and that is not archived. **Only membership edits**: a workspace owner who is not a member sees and
  *                        administers a board and does not touch its cards (§7.2).
+ *  - `boardsOwnedBy`  a board one is the *owner* of (a member with the owner role), that is not archived: who may delete another member's comment (§7.2)
  *  - `boardsAdministeredBy`  a board one owns, and every board of a workspace one owns. Archived or not: restoring one is administration.
  */
 export function workspacesOwnedBy(database: Database, accountId: string): SQL {
@@ -45,5 +46,13 @@ export function boardsAdministeredBy(database: Database, accountId: string): SQL
   return sql`(
     SELECT board_id FROM ${boardMember} WHERE account_id = ${accountId} AND role = 'owner'
     UNION SELECT id FROM ${board} WHERE workspace_id IN ${workspacesOwnedBy(database, accountId)}
+  )`;
+}
+
+export function boardsOwnedBy(database: Database, accountId: string): SQL {
+  const { board, boardMember } = tablesOf(database);
+  return sql`(
+    SELECT m.board_id FROM ${boardMember} m JOIN ${board} b ON b.id = m.board_id
+    WHERE m.account_id = ${accountId} AND m.role = 'owner' AND b.archived_at IS NULL
   )`;
 }

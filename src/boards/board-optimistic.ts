@@ -66,6 +66,7 @@ export function showingBoard(view: BoardView, op: Op): BoardView {
             labels: [],
             assignees: [],
             checklist: { done: 0, total: 0 },
+            comments: 0,
           },
         ],
       };
@@ -135,6 +136,13 @@ export function showingBoard(view: BoardView, op: Op): BoardView {
           each.id === op.cardId && !each.labels.includes(op.labelId)
             ? { ...each, labels: orderedLabels(view, [...each.labels, op.labelId]) }
             : each,
+        ),
+      };
+    case 'comment.add':
+      return {
+        ...view,
+        cards: view.cards.map((each) =>
+          each.id === op.cardId ? { ...each, comments: each.comments + 1 } : each,
         ),
       };
     case 'card.assign':
