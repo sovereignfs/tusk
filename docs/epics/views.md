@@ -2,7 +2,7 @@
 
 ## Status
 
-⏳ In progress: 6.1 is done. 6.1 and 6.2 are phase 1; Today, its cards and Review (6.3 to 6.5) are the phone's, in phase 2.
+⏳ In progress: 6.1 and 6.2 are done. 6.1 and 6.2 are phase 1; Today, its cards and Review (6.3 to 6.5) are the phone's, in phase 2.
 
 ## Overview
 
@@ -30,7 +30,7 @@ filter takes it out of view without moving it.
 
 **Done as:** `src/lists/filter.ts`, pure: the four filters (_All_, _Active_, _Starred_, _Overdue_) with their labels, `filterOf(list)` (anything unknown, missing or ciphertext is All), `filterCards(open, filter, now)` and `showsCompleted`. **The filter is now a field of the list,** `filter`, beside `sort` and `showCompleted`: a name in `FIELD_NAMES`, a rule in the server's validator that takes exactly the four, `setFilter` as the action, and §23.3's table updated. It survives a reload and reaches the person's other devices (3.10 had left it unremembered, as its epic did not ask). _Starred_ shows the open starred cards in the order they already have, with the pinning and the sort of the list unchanged; the Completed section is part of _All_ alone, so it follows the filter by not being there for the others, as it already was for _Active_ and _Overdue_. A filter only chooses what is shown: a card that is un-starred under _Starred_ leaves the view and is back in its place under _All_, and dragging under Custom works against the cards shown, as 3.6 does for any filter. Tests: the filters and their labels, the server taking each and nothing else, reading the list's field (and All for a missing, unknown or sealed one), `setFilter` as one change to one field, each filter's choice of cards without changing the input or its order, a star that cannot be read counting as none; and in Chromium and WebKit: Starred showing only the open starred cards with no Completed section, kept after a reload, a card dragged with the keyboard under it, and an un-starred card going without moving (All shows the order the drag made, with it where it was). **Not as the epic said:** none.
 
-#### 📋 6.2 — Search
+#### ✅ 6.2 — Search
 
 **Goal:** find a Desk card by what it says.
 
@@ -42,6 +42,8 @@ Checklist matches show under their card. Newest change first.
 
 **Accepts when:** a search for `%` matches only a literal `%`; "É" finds "é"; it works offline and on an encrypted Desk; 10,000 cards search without
 visible delay.
+
+**Done as:** `src/local/search.ts` (pure) and `src/fold.ts` (the folding of a board's search, moved to a file both use, so the two agree: case and accents do not decide, "É" finds "é" and "e", "straße" finds "STRASSE"). `searchDesk(cards, checks, query, open?)` wants every word typed, in any order, somewhere on the card: in its title, its description or one of its checklist items. The query is compared as text with `includes`, never as a pattern, so `%`, `_`, `*`, `.`, `(` and `[a-z]` match themselves only. A checklist item that has a word comes back with its card, to be shown under it; a long description comes back as a piece around the first word found, with marks where it was cut. **Newest change first** is by the latest server stamp of the card or of an item that matched, a row the server has not heard of counting as the newest of all, then by when the card was made, then id, so there is one order. **A sealed field is read through `open`,** which is what a Desk with personal keys (14.3) will supply; without it a sealed field is not searched. `searchable(db)` in the store reads the cards a screen may show and their live items, and the screen computes over that, so typing re-works the hits and asks IndexedDB for nothing. The search field is at the top of the lists column (`type="search"`, "Search the Desk"): from a list's page the first letter goes to `/desk?q=`, and after that the address is replaced as it is typed (the back button is not a step for each letter); `DeskScreen` shows `SearchResults` in place of the first list when `q` is not empty, with a count read out politely, each card linking to where it is, its list, "Done" if it is, and Escape empties the field. Tests: words in each of the three places; the pattern characters matching themselves; folding; every word in any order across the three; items shown under their card; the order, with a tie broken two ways; a sealed field; the snippet; **ten thousand cards with three-line descriptions and two items each searched in about 30 ms** (the test allows 600); and in Chromium and WebKit: finding by title, description and item, "É" finding "café" and an item with "CAFÉ", `%` finding only the literal one, `(` finding nothing, the query kept in the address and the field after a reload, **a search with the network switched off**, a hit opening its card, and Escape. **Not as the epic said:** "on an encrypted Desk" is supported by `open` and not yet exercised, since the keys are 14.3's; the results page is not paged, and ten thousand matches would be a long list (a search of one word in so many cards is not what this is for).
 
 #### 📋 6.3 — Today (phase 2)
 

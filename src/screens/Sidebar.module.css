@@ -120,3 +120,8 @@
   color: var(--sv-color-text-primary);
   font: inherit;
 }
+
+/* The search field above the lists. */
+.search {
+  padding: var(--sv-space-1) var(--sv-space-2) var(--sv-space-2);
+}

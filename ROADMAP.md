@@ -127,7 +127,7 @@ Everything that makes the Desk worth opening each day. **Done when** the Desk ca
 | 62  | [5.4](docs/epics/recurrence.md)  | Editing a recurring card                   | P1       | 5.2, 5.3       | ✅     |
 | 63  | [5.5](docs/epics/recurrence.md)  | Reopening, moving and deleting occurrences | P1       | 3.7, 3.8, 5.4  | ✅     |
 | 64  | [6.1](docs/epics/views.md)       | Starred                                    | P1       | 3.10, 3.12     | ✅     |
-| 65  | [6.2](docs/epics/views.md)       | Search                                     | P1       | 3.12           | 📋     |
+| 65  | [6.2](docs/epics/views.md)       | Search                                     | P1       | 3.12           | ✅     |
 | 66  | [3.11](docs/epics/desk.md)       | Bulk select                                | P2       | 3.7, 3.8, 3.12 | 📋     |
 | 67  | [7.6](docs/epics/interface.md)   | Keyboard                                   | P2       | 3.12, 18.1     | 📋     |
 | 68  | [1.11](docs/epics/foundation.md) | The PWA                                    | P1       | 1.7, 1.8, 3.12 | 📋     |

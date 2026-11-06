@@ -421,6 +421,21 @@ export async function visibleCards(db: LocalDatabase): Promise<LocalRow[]> {
 }
 
 /**
+ * What a search of the Desk looks through (DESIGN.md §10.7): the cards a screen may show (`visibleCards`), and the live checklist items of those cards.
+ * Read from the working copy, so a search works offline.
+ */
+export async function searchable(
+  db: LocalDatabase,
+): Promise<{ cards: LocalRow[]; checks: LocalRow[] }> {
+  const cards = await visibleCards(db);
+  const shown = new Set(cards.map((card) => card.id));
+  const checks = ((await db.getAll('desk_check')) as LocalRow[]).filter(
+    (item) => item.table === 'desk_check' && item.deletedAt === null && shown.has(item.cardId),
+  );
+  return { cards, checks };
+}
+
+/**
  * What the boards index shows of the Desk (DESIGN.md §17.3): how many cards are open, and how many of those are due today. "Open" is the sidebar's: not
  * deleted and not completed. A due date that is ciphertext cannot be read here, so such a card counts as open and not as due (task 14.3). Read from the
  * working copy, so it is there offline. `today` is the person's own date as `YYYY-MM-DD`, given and not read, so that a test controls it.

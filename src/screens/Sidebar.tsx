@@ -8,7 +8,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { createList, moveList } from '../actions/lists';
 import type { LocalRow } from '../local/rows';
@@ -43,6 +43,7 @@ export function Sidebar() {
 
   return (
     <nav className={styles.sidebar} aria-label="Lists">
+      <SearchBox />
       {PINNED.length > 0 ? (
         <ul className={styles.list}>
           {PINNED.map((view) => (
@@ -71,6 +72,43 @@ export function Sidebar() {
         )}
       </div>
     </nav>
+  );
+}
+
+/**
+ * The search field at the top of the lists column (DESIGN.md §10.7). Typing searches the Desk: the results are the content column at `/desk?q=`, which
+ * is the address kept as it is typed (replaced, so that the back button is not a step for each letter). From another page the first letter goes there.
+ * Empty, it is the Desk's first list again; Escape empties it.
+ */
+function SearchBox() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const asked = useSearchParams().get('q') ?? '';
+  const current = pathname === '/desk' ? asked : '';
+  const [value, setValue] = useState(current);
+  // The address changed elsewhere (a link, the back button): the field says what it says.
+  useEffect(() => setValue(current), [current]);
+
+  function change(next: string) {
+    setValue(next);
+    const address = next.trim() === '' ? '/desk' : `/desk?q=${encodeURIComponent(next)}`;
+    if (pathname === '/desk') window.history.replaceState(null, '', address);
+    else router.push(address);
+  }
+
+  return (
+    <div className={styles.search}>
+      <input
+        type="search"
+        className={styles.input}
+        aria-label="Search the Desk"
+        placeholder="Search"
+        maxLength={200}
+        value={value}
+        onChange={(event) => change(event.target.value)}
+        onKeyDown={(event) => event.key === 'Escape' && value !== '' && change('')}
+      />
+    </div>
   );
 }
 
