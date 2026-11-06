@@ -55,6 +55,8 @@ export const ROUTES: RouteRule[] = [
     route: '/api/backup/connection',
     methods: { GET: { kind: 'account' }, POST: { kind: 'account' }, DELETE: { kind: 'account' } },
   },
+  // Back up now (DESIGN.md §21.4): the account is the session's, at most once a minute.
+  { route: '/api/backup/run', methods: { POST: { kind: 'account' } } },
   { route: '/api/inbox', methods: { GET: { kind: 'account' } } },
   { route: '/api/inbox/seen', methods: { POST: { kind: 'account' } } },
   { route: '/api/inbox/unread', methods: { GET: { kind: 'account' } } },

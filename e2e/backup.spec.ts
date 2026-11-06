@@ -18,6 +18,8 @@ test.beforeAll(async () => {
 });
 test.afterAll(async () => fake.stop());
 
+test.setTimeout(150_000);
+
 test('a repository is connected with a token, a public one is refused in words, and disconnecting puts the form back', async ({
   page,
 }) => {
@@ -61,6 +63,31 @@ test('a repository is connected with a token, a public one is refused in words, 
   await expect(page.getByLabel('Token')).toHaveCount(0);
   expect(await page.content()).not.toContain('E2E_PLANTED');
 
+  // Back up now puts a file in the repository, under tusk/, and the page links to it.
+  await expect(page.getByText('No backup has been made yet.')).toBeVisible();
+  const data = page.getByRole('region', { name: 'Data' });
+  await page.getByRole('button', { name: 'Back up now' }).click();
+  const last = page.getByText(/^Last backup:/);
+  // Both browsers use one account, and a backup is at most once a minute for it: the second to get here waits out the first's.
+  const limited = data.getByRole('alert').filter({ hasText: 'Wait a minute' });
+  await expect(last.or(limited)).toBeVisible();
+  if (await limited.isVisible()) {
+    await page.waitForTimeout(61_000);
+    await page.getByRole('button', { name: 'Back up now' }).click();
+  }
+  await expect(last).toBeVisible();
+  const link = last.getByRole('link');
+  await expect(link).toHaveText(/^tusk\/\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.json$/);
+  const written = Object.keys(await fake.files(mine)).filter((path) => path.startsWith('tusk/'));
+  expect(written).toEqual([await link.innerText()]);
+  expect(JSON.parse((await fake.files(mine))[written[0] ?? ''] ?? '')).toMatchObject({
+    format: 'tusk',
+    scope: 'everything',
+  });
+  // And no more than once a minute.
+  await page.getByRole('button', { name: 'Back up now' }).click();
+  await expect(data.getByRole('alert')).toContainText('Wait a minute');
+
   // It is the server that remembers.
   await page.reload();
   await expect(page.getByRole('status').filter({ hasText: 'Connected to' })).toContainText(
@@ -71,6 +98,8 @@ test('a repository is connected with a token, a public one is refused in words, 
   await page.getByRole('button', { name: 'Disconnect' }).click();
   await expect(page.getByLabel('Token')).toBeVisible();
   await expect(page.getByText(/^Connected to/)).toHaveCount(0);
-  // The repository was only ever read.
-  expect(fake.requests.filter((request) => request.method !== 'GET')).toEqual([]);
+  // Disconnecting left the repository as it was.
+  expect(Object.keys(await fake.files(mine)).filter((path) => path.startsWith('tusk/'))).toEqual(
+    written,
+  );
 });

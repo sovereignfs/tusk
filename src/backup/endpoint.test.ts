@@ -14,6 +14,7 @@ import {
   connectionConnect,
   connectionDisconnect,
   connectionStatus,
+  runNow,
 } from './endpoint';
 
 /**
@@ -127,6 +128,7 @@ describe(`/api/backup/connection (${leg})`, () => {
       'branch',
       'connectedAt',
       'kind',
+      'lastBackup',
       'repository',
       'url',
     ]);
@@ -255,5 +257,75 @@ describe(`/api/backup/connection (${leg})`, () => {
     );
     expect(response.status).toBe(422);
     expect(await response.json()).toMatchObject({ code: 'no_key' });
+  });
+
+  describe('Back up now', () => {
+    // What the tests before left connected is not what these are about.
+    beforeEach(async () => {
+      for (const who of [t.ada, t.grace])
+        await routes().DELETE(t.request(who, path, { method: 'DELETE' }));
+    });
+    const run = (extra: Partial<ConnectionDeps> = {}) =>
+      accountRoute(
+        ({ accountId }) =>
+          runNow(accountId, { ...deps(extra), directory: { profiles: async () => new Map() } }),
+        t.deps,
+      );
+    const connect = async (who: typeof t.ada, ref: RepositoryRef) =>
+      routes({ limiter: { take: async () => ({ ok: true }) } }).POST(
+        t.request(who, path, {
+          method: 'POST',
+          body: { repository: `${ref.owner}/${ref.name}`, token: TOKEN },
+        }),
+      );
+
+    it('is for someone signed in and from the app, and is a 404 for an account with nothing connected', async () => {
+      const post = (who: typeof t.ada | null, headers: Record<string, string> = {}) =>
+        run()(t.request(who, '/api/backup/run', { method: 'POST', headers }));
+      expect((await post(null)).status).toBe(401);
+      expect((await post(t.ada, { origin: 'https://evil.example' })).status).toBe(403);
+      expect((await post(t.grace)).status).toBe(404);
+    });
+
+    it('writes the file, says where it is, shows it as the last backup, and is once a minute', async () => {
+      const ref = await repo();
+      await connect(t.ada, ref);
+      let clock = 1_800_000_000_000;
+      const route = run({ now: () => clock });
+      const first = await route(t.request(t.ada, '/api/backup/run', { method: 'POST' }));
+      expect(first.status).toBe(200);
+      const body = await first.json();
+      expect(body.path).toBe('tusk/2027-01-15_08-00-00.json');
+      expect(body.url).toContain(`/blob/main/${body.path}`);
+      expect(Object.keys(await fake.files(ref))).toContain(body.path);
+
+      const status = await (await routes().GET(t.request(t.ada, path))).json();
+      expect(status.connection.lastBackup).toMatchObject({ at: clock, path: body.path });
+
+      // Grace has nothing connected, and Ada's run was not hers.
+      expect(await (await routes().GET(t.request(t.grace, path))).json()).toMatchObject({
+        connection: null,
+      });
+
+      clock += 5_000;
+      const again = await route(t.request(t.ada, '/api/backup/run', { method: 'POST' }));
+      expect(again.status).toBe(429);
+      expect(Number(again.headers.get('retry-after'))).toBeGreaterThan(0);
+    });
+
+    it('answers a failure with our words and a code, 422, and nothing of the host’s or the token', async () => {
+      const ref = await repo();
+      await connect(t.grace, ref);
+      fake.setPrivate(ref, false);
+      const response = await run({ limiter: { take: async () => ({ ok: true }) } })(
+        t.request(t.grace, '/api/backup/run', { method: 'POST' }),
+      );
+      expect(response.status).toBe(422);
+      const everything = await text(response);
+      expect(everything).not.toContain('PLANTED');
+      expect(await response.json()).toMatchObject({ code: 'public' });
+      expect(everything).toMatch(/public now/);
+      await routes().DELETE(t.request(t.grace, path, { method: 'DELETE' }));
+    });
   });
 });

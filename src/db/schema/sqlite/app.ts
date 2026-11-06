@@ -197,4 +197,8 @@ export const backupConnection = sqliteTable('backup_connection', {
   branch: text('branch').notNull(),
   credentialId: ref('credential_id').notNull(),
   createdAt: epochMs('created_at').notNull(),
+  /** The last backup that was confirmed written (§21.4), when, to which file, and the fingerprint of what it held: all null until there is one. */
+  lastBackupAt: epochMs('last_backup_at'),
+  lastBackupPath: text('last_backup_path'),
+  lastFingerprint: text('last_fingerprint'),
 });

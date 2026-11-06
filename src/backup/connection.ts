@@ -62,6 +62,10 @@ export interface Connection {
   readonly branch: string;
   readonly credentialId: string;
   readonly createdAt: number;
+  /** The last backup confirmed written: when, to which file, and the fingerprint of what it held. Null until there is one. */
+  readonly lastBackupAt: number | null;
+  readonly lastBackupPath: string | null;
+  readonly lastFingerprint: string | null;
 }
 
 /** What the credential is for, in the store. */
@@ -125,9 +129,13 @@ export async function readConnection(
     branch: string;
     credentialId: string;
     createdAt: number | string;
+    lastBackupAt: number | string | null;
+    lastBackupPath: string | null;
+    lastFingerprint: string | null;
   }>(
     database,
-    sql`SELECT account_id AS "accountId", kind, repository, branch, credential_id AS "credentialId", created_at AS "createdAt"
+    sql`SELECT account_id AS "accountId", kind, repository, branch, credential_id AS "credentialId", created_at AS "createdAt",
+        last_backup_at AS "lastBackupAt", last_backup_path AS "lastBackupPath", last_fingerprint AS "lastFingerprint"
         FROM ${backupConnectionTable(database)} WHERE account_id = ${accountId}`,
   );
   return row
@@ -138,6 +146,9 @@ export async function readConnection(
         branch: row.branch,
         credentialId: row.credentialId,
         createdAt: Number(row.createdAt),
+        lastBackupAt: row.lastBackupAt === null ? null : Number(row.lastBackupAt),
+        lastBackupPath: row.lastBackupPath,
+        lastFingerprint: row.lastFingerprint,
       }
     : undefined;
 }

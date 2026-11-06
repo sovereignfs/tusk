@@ -8,6 +8,7 @@ interface Connection {
   repository: string;
   url: string;
   branch: string;
+  lastBackup: { at: number; path: string; url: string } | null;
 }
 
 interface Status {
@@ -76,6 +77,26 @@ export function BackupSection() {
     }
   }
 
+  async function backUpNow() {
+    setWorking(true);
+    setProblem(null);
+    setWarning(null);
+    try {
+      const reply = await fetch('/api/backup/run', { method: 'POST' });
+      if (reply.ok) await read();
+      else if (reply.status === 429)
+        setProblem('A backup was made a moment ago. Wait a minute and try again.');
+      else {
+        const body = (await reply.json().catch(() => ({}))) as { message?: string };
+        setProblem(body.message ?? 'That could not be backed up.');
+      }
+    } catch {
+      setProblem('That needs a connection.');
+    } finally {
+      setWorking(false);
+    }
+  }
+
   async function disconnect() {
     setWorking(true);
     setProblem(null);
@@ -113,7 +134,27 @@ export function BackupSection() {
             </a>
             , on <code>{status.connection.branch}</code>.
           </p>
+          <p>
+            {status.connection.lastBackup ? (
+              <>
+                Last backup: {new Date(status.connection.lastBackup.at).toLocaleString()},{' '}
+                <a
+                  href={status.connection.lastBackup.url}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                >
+                  {status.connection.lastBackup.path}
+                </a>
+                .
+              </>
+            ) : (
+              'No backup has been made yet.'
+            )}
+          </p>
           <div className={styles.row}>
+            <Button disabled={working} onClick={() => void backUpNow()}>
+              {working ? 'Working…' : 'Back up now'}
+            </Button>
             <Button variant="secondary" disabled={working} onClick={() => void disconnect()}>
               Disconnect
             </Button>

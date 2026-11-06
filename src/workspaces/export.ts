@@ -276,3 +276,38 @@ export async function exportOwned(
   }
   return out;
 }
+
+/**
+ * A stamp for each thing of the workspaces an account owns that an export holds and that moves when it changes: the workspace (its name and time), each
+ * board (its version, which every operation on it moves, and when it was archived) and each person in it with their role. For `backupFingerprint`, so
+ * they are read as text and are never exported. Every statement names the account, as every read here does.
+ */
+export async function ownedStamps(database: Database, accountId: string): Promise<string[]> {
+  const t = tablesOf(database);
+  const owned = workspacesOwnedBy(database, accountId);
+  const workspaces = await dbAll<{ id: string; updatedAt: number | string }>(
+    database,
+    sql`SELECT id, updated_at AS "updatedAt" FROM ${t.workspace} WHERE id IN ${owned}`,
+  );
+  const boards = await dbAll<{
+    id: string;
+    version: number | string;
+    updatedAt: number | string;
+    archivedAt: number | string | null;
+  }>(
+    database,
+    sql`SELECT id, version, updated_at AS "updatedAt", archived_at AS "archivedAt" FROM ${t.board} WHERE workspace_id IN ${owned}`,
+  );
+  const people = await dbAll<{ workspaceId: string; accountId: string; role: string }>(
+    database,
+    sql`SELECT workspace_id AS "workspaceId", account_id AS "accountId", role FROM ${t.workspaceMember} WHERE workspace_id IN ${owned}`,
+  );
+  return [
+    ...workspaces.map((row) => `w:${row.id}:${Number(row.updatedAt)}`),
+    ...boards.map(
+      (row) =>
+        `b:${row.id}:${Number(row.version)}:${Number(row.updatedAt)}:${row.archivedAt === null ? '' : Number(row.archivedAt)}`,
+    ),
+    ...people.map((row) => `m:${row.workspaceId}:${row.accountId}:${row.role}`),
+  ];
+}
