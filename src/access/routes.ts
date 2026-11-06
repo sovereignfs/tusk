@@ -30,6 +30,7 @@ export const ROUTES: RouteRule[] = [
   { route: '/account', page: { kind: 'account' } },
   { route: '/desk', page: { kind: 'account' } },
   { route: '/w/[id]', page: { kind: 'account' } },
+  { route: '/b/[id]', page: { kind: 'account' } },
   { route: '/desk/[id]', page: { kind: 'account' } },
 
   // APIs
@@ -39,6 +40,9 @@ export const ROUTES: RouteRule[] = [
   { route: '/api/ops', methods: { POST: { kind: 'account' } } },
   { route: '/api/workspaces', methods: { GET: { kind: 'account' } } },
   { route: '/api/workspaces/[id]/members', methods: { GET: { kind: 'account' } } },
+  { route: '/api/workspaces/[id]/boards', methods: { GET: { kind: 'account' } } },
+  { route: '/api/boards/[id]', methods: { GET: { kind: 'account' } } },
+  { route: '/api/boards/[id]/version', methods: { GET: { kind: 'account' } } },
   { route: '/api/health', methods: { GET: { kind: 'public' } } },
   // better-auth's own: it checks `Origin` and the session cookie itself, and rate-limits sign-in (src/auth/auth.ts). Absent, with a 404, when sign-in is off.
   {

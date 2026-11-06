@@ -7,7 +7,14 @@ import { makeStore } from '../sync/test-support';
 import { applyOp } from './apply';
 import { boardsAdministeredBy, boardsEditableBy, boardsVisibleTo } from './can';
 import { type Op, OPS, type OpRefusal, type OpRequest, WORKSPACE_LIMITS } from './format';
-import { listWorkspaces, peopleOf, workspaceOf } from './reads';
+import {
+  boardVersion,
+  boardsOfWorkspace,
+  listWorkspaces,
+  peopleOf,
+  readBoard,
+  workspaceOf,
+} from './reads';
 import { tablesOf } from './tables';
 import {
   type Role,
@@ -112,6 +119,50 @@ const OPERATIONS: Row[] = [
     otherwise: 'not_found',
   },
   {
+    // Anyone in the workspace may make a board of their own; an outsider has no workspace to make it in.
+    op: 'board.create',
+    build: (w) => ({
+      op: 'board.create',
+      id: id(),
+      workspaceId: w.workspace,
+      name: 'New board',
+      color: '#2563eb',
+    }),
+    may: ['owner', 'coOwner', 'boardOwner', 'boardMember', 'member'],
+    otherwise: 'not_found',
+  },
+  // Only a member of a board changes its lists (§7.2): its owners and members, and not a workspace owner who is not on it, nor a viewer.
+  {
+    op: 'list.create',
+    build: (w) => ({
+      op: 'list.create',
+      id: id(),
+      boardId: w.boards.publicBoard,
+      name: 'Doing',
+      position: 'a1',
+    }),
+    may: ['boardOwner', 'boardMember'],
+    otherwise: 'not_found',
+  },
+  {
+    op: 'list.rename',
+    build: (w) => ({ op: 'list.rename', id: w.lists.publicBoard, name: 'Later' }),
+    may: ['boardOwner', 'boardMember'],
+    otherwise: 'not_found',
+  },
+  {
+    op: 'list.move',
+    build: (w) => ({ op: 'list.move', id: w.lists.publicBoard, position: 'a1' }),
+    may: ['boardOwner', 'boardMember'],
+    otherwise: 'not_found',
+  },
+  {
+    op: 'list.delete',
+    build: (w) => ({ op: 'list.delete', id: w.lists.publicBoard }),
+    may: ['boardOwner', 'boardMember'],
+    otherwise: 'not_found',
+  },
+  {
     // Anyone in it may leave (there is another owner in this world); an outsider has nothing to leave.
     op: 'member.leave',
     build: (w) => ({ op: 'member.leave', workspaceId: w.workspace }),
@@ -148,7 +199,7 @@ describe(`the roles (${leg})`, () => {
             ]),
           ).toBe(beforeRows);
           // And nothing was recorded as done: the same `opId` can be tried again by someone who may.
-          const retry = await applyOp(database, mine.accounts.owner, request, OPTIONS);
+          const retry = await applyOp(database, mine.accounts[may[0] ?? 'owner'], request, OPTIONS);
           if (request.op !== 'workspace.create') expect(retry.status).toBe('applied');
         }
       });
@@ -244,8 +295,9 @@ describe(`the roles (${leg})`, () => {
       expect(gone('workspace_member')).toBe(5);
       expect(gone('board')).toBe(3);
       expect(gone('board_member')).toBe(4);
+      // One list of each of the three boards.
+      expect(gone('board_list')).toBe(3);
       for (const name of [
-        'board_list',
         'card',
         'label',
         'card_label',
@@ -535,6 +587,276 @@ describe(`the roles (${leg})`, () => {
       expect(asMember?.some((each) => each.email !== undefined)).toBe(false);
       expect(await peopleOf(database, directory, w.accounts.outsider, w.workspace)).toBeUndefined();
       expect(await peopleOf(database, directory, w.accounts.owner, id())).toBeUndefined();
+    });
+  });
+
+  describe('a board and its lists', () => {
+    const apply = (w: World, role: Role, op: Op) =>
+      applyOp(database, w.accounts[role], { opId: id(), ...op } as OpRequest, OPTIONS);
+    const t = () => tablesOf(database);
+    const listsOf = (boardId: string) =>
+      dbAll<{ id: string; name: string; position: string }>(
+        database,
+        sql`SELECT id, name, position FROM ${t().boardList} WHERE board_id = ${boardId} ORDER BY position, id`,
+      );
+    const versionOf = async (boardId: string) =>
+      Number(
+        (
+          await dbAll<{ v: number | string }>(
+            database,
+            sql`SELECT version AS v FROM ${t().board} WHERE id = ${boardId}`,
+          )
+        )[0]?.v,
+      );
+
+    it('makes a board with Backlog, its maker the owner and only member, public, and moves the workspace on', async () => {
+      const w = await seedWorld(database);
+      const board = id();
+      const result = await apply(w, 'member', {
+        op: 'board.create',
+        id: board,
+        workspaceId: w.workspace,
+        name: 'Roadmap',
+        color: '#7c3aed',
+      });
+      expect(result).toMatchObject({
+        status: 'applied',
+        rows: {
+          board: { id: board, name: 'Roadmap', color: '#7c3aed', visibility: 'public', version: 1 },
+        },
+      });
+      expect((await listsOf(board)).map((each) => each.name)).toEqual(['Backlog']);
+      // The maker owns it and is on it, so they edit it and administer it, and everyone in the workspace sees it.
+      expect(await reachable(database, boardsEditableBy, w.accounts.member)).toContain(board);
+      expect(await reachable(database, boardsAdministeredBy, w.accounts.member)).toContain(board);
+      expect(await reachable(database, boardsVisibleTo, w.accounts.boardMember)).toContain(board);
+      expect(await reachable(database, boardsEditableBy, w.accounts.boardMember)).not.toContain(
+        board,
+      );
+      expect(await reachable(database, boardsVisibleTo, w.accounts.outsider)).not.toContain(board);
+      const [row] = await dbAll<{ at: number | string }>(
+        database,
+        sql`SELECT updated_at AS at FROM ${t().workspace} WHERE id = ${w.workspace}`,
+      );
+      expect(Number(row?.at)).toBe(NOW);
+    });
+
+    it('takes no id another board already has, and holds 500 boards in a workspace', async () => {
+      const w = await seedWorld(database);
+      const before = JSON.stringify(await countAll(database));
+      expect(
+        await apply(w, 'owner', {
+          op: 'board.create',
+          id: w.boards.privateBoard,
+          workspaceId: w.workspace,
+          name: 'Mine now',
+          color: '#2563eb',
+        }),
+      ).toEqual({ status: 'refused', code: 'not_found' });
+      expect(JSON.stringify(await countAll(database))).toBe(before);
+      const existing = Number(
+        (
+          await dbAll<{ n: number | string }>(
+            database,
+            sql`SELECT COUNT(*) AS n FROM ${t().board} WHERE workspace_id = ${w.workspace}`,
+          )
+        )[0]?.n,
+      );
+      for (let i = existing; i < WORKSPACE_LIMITS.boardsPerWorkspace; i++)
+        await dbAll(
+          database,
+          sql`INSERT INTO ${t().board} (id, workspace_id, name, color, visibility, version, created_by, created_at, updated_at) VALUES (${id()}, ${w.workspace}, 'b', '#2563eb', 'public', 1, ${w.accounts.owner}, ${NOW}, ${NOW}) RETURNING id`,
+        );
+      expect(
+        await apply(w, 'owner', {
+          op: 'board.create',
+          id: id(),
+          workspaceId: w.workspace,
+          name: 'One more',
+          color: '#2563eb',
+        }),
+      ).toEqual({ status: 'refused', code: 'limit' });
+    });
+
+    it('adds, renames and moves a list, moves the version on each time, and writes one row for a move', async () => {
+      const w = await seedWorld(database);
+      const board = w.boards.publicBoard;
+      const start = await versionOf(board);
+      const doing = id();
+      expect(
+        await apply(w, 'boardMember', {
+          op: 'list.create',
+          id: doing,
+          boardId: board,
+          name: 'Doing',
+          position: 'a1',
+        }),
+      ).toMatchObject({
+        status: 'applied',
+        rows: { list: { id: doing, name: 'Doing', cards: 0 }, version: start + 1 },
+      });
+      expect(
+        await apply(w, 'boardOwner', { op: 'list.rename', id: doing, name: 'In flight' }),
+      ).toMatchObject({
+        rows: { list: { name: 'In flight' }, version: start + 2 },
+      });
+      const before = await listsOf(board);
+      expect(
+        await apply(w, 'boardOwner', { op: 'list.move', id: doing, position: 'Zz' }),
+      ).toMatchObject({ status: 'applied' });
+      const after = await listsOf(board);
+      expect(after.map((each) => each.id)).toEqual([doing, w.lists.publicBoard]);
+      // Everything but the one list is as it was.
+      expect(after.find((each) => each.id === w.lists.publicBoard)).toEqual(
+        before.find((each) => each.id === w.lists.publicBoard),
+      );
+      expect(await versionOf(board)).toBe(start + 3);
+    });
+
+    it('holds 100 lists, and takes no id that is already a list', async () => {
+      const w = await seedWorld(database);
+      const board = w.boards.publicBoard;
+      expect(
+        await apply(w, 'boardMember', {
+          op: 'list.create',
+          id: w.lists.privateBoard,
+          boardId: board,
+          name: 'Clash',
+          position: 'a1',
+        }),
+      ).toEqual({ status: 'refused', code: 'not_found' });
+      for (let i = (await listsOf(board)).length; i < WORKSPACE_LIMITS.listsPerBoard; i++)
+        await dbAll(
+          database,
+          sql`INSERT INTO ${t().boardList} (id, board_id, name, position, created_at, updated_at) VALUES (${id()}, ${board}, 'l', ${`b${String(i).padStart(3, '0')}`}, ${NOW}, ${NOW}) RETURNING id`,
+        );
+      expect(
+        await apply(w, 'boardMember', {
+          op: 'list.create',
+          id: id(),
+          boardId: board,
+          name: 'Too many',
+          position: 'zz',
+        }),
+      ).toEqual({ status: 'refused', code: 'limit' });
+      expect(await listsOf(board)).toHaveLength(WORKSPACE_LIMITS.listsPerBoard);
+    });
+
+    it('lets a private board’s member change it and nobody else, and no one change an archived board', async () => {
+      const w = await seedWorld(database);
+      const into = (boardId: string): Op => ({
+        op: 'list.create',
+        id: id(),
+        boardId,
+        name: 'X',
+        position: 'a5',
+      });
+      expect((await apply(w, 'boardMember', into(w.boards.privateBoard))).status).toBe('applied');
+      for (const role of ['owner', 'coOwner', 'boardOwner', 'member', 'outsider'] as const)
+        expect(await apply(w, role, into(w.boards.privateBoard)), role).toEqual({
+          status: 'refused',
+          code: 'not_found',
+        });
+      // Archived: read-only for everyone, its owner included.
+      for (const role of ROLES)
+        expect(await apply(w, role, into(w.boards.archivedBoard)), role).toEqual({
+          status: 'refused',
+          code: 'not_found',
+        });
+      expect(
+        await apply(w, 'boardOwner', { op: 'list.delete', id: w.lists.archivedBoard }),
+      ).toEqual({ status: 'refused', code: 'not_found' });
+    });
+
+    it('deletes a list with its cards and everything on them, and nothing of another list or board', async () => {
+      const w = await seedWorld(database);
+      await seedBoardContents(database, w);
+      const other = id();
+      await apply(w, 'boardOwner', {
+        op: 'list.create',
+        id: other,
+        boardId: w.boards.publicBoard,
+        name: 'Keep',
+        position: 'a1',
+      });
+      const card = id();
+      await dbAll(
+        database,
+        sql`INSERT INTO ${t().card} (id, board_id, list_id, title, position, created_by, created_at, updated_at) VALUES (${card}, ${w.boards.publicBoard}, ${other}, 'Stay', 'a0', ${w.accounts.boardOwner}, ${NOW}, ${NOW}) RETURNING id`,
+      );
+      const before = await countAll(database);
+      const result = await apply(w, 'boardMember', { op: 'list.delete', id: w.lists.publicBoard });
+      expect(result).toMatchObject({
+        status: 'applied',
+        rows: { deletedList: w.lists.publicBoard },
+      });
+      const after = await countAll(database);
+      const gone = (name: string) => (before[name] ?? 0) - (after[name] ?? 0);
+      for (const name of [
+        'board_list',
+        'card',
+        'card_label',
+        'card_assignee',
+        'checklist_item',
+        'comment',
+        'activity',
+      ])
+        expect(gone(name), name).toBe(1);
+      // The board's own labels stay, and so does the other list with its card.
+      expect(gone('label')).toBe(0);
+      expect(gone('board')).toBe(0);
+      expect((await listsOf(w.boards.publicBoard)).map((each) => each.id)).toEqual([other]);
+      expect(await dbAll(database, sql`SELECT 1 FROM ${t().card} WHERE id = ${card}`)).toHaveLength(
+        1,
+      );
+    });
+
+    it('is read whole for whoever can see it, with what they may do, and not at all for anyone else', async () => {
+      const w = await seedWorld(database);
+      await seedBoardContents(database, w);
+      const seen = async (role: Role, boardId: string) =>
+        readBoard(database, w.accounts[role], boardId);
+      const owner = await seen('owner', w.boards.privateBoard);
+      expect(owner).toMatchObject({
+        workspace: { name: 'Acme' },
+        can: { edit: false, admin: true },
+        board: { visibility: 'private' },
+      });
+      expect(await seen('boardMember', w.boards.privateBoard)).toMatchObject({
+        can: { edit: true, admin: false },
+      });
+      expect(await seen('boardOwner', w.boards.publicBoard)).toMatchObject({
+        can: { edit: true, admin: true },
+        lists: [{ id: w.lists.publicBoard, name: 'Backlog', cards: 1 }],
+      });
+      expect(await seen('member', w.boards.publicBoard)).toMatchObject({
+        can: { edit: false, admin: false },
+      });
+      // Archived: seen, and read-only even for its owner.
+      expect(await seen('boardOwner', w.boards.archivedBoard)).toMatchObject({
+        board: { archived: true },
+        can: { edit: false, admin: true },
+      });
+      // A private board is not there for a member who is not on it; nor is anything for an outsider or an id that is nothing.
+      expect(await seen('member', w.boards.privateBoard)).toBeUndefined();
+      expect(await seen('outsider', w.boards.publicBoard)).toBeUndefined();
+      expect(await readBoard(database, w.accounts.owner, id())).toBeUndefined();
+      expect(
+        await boardVersion(database, w.accounts.member, w.boards.privateBoard),
+      ).toBeUndefined();
+      expect(await boardVersion(database, w.accounts.member, w.boards.publicBoard)).toBe(1);
+    });
+
+    it('lists a workspace’s boards by name for those who can see them, and none for an outsider', async () => {
+      const w = await seedWorld(database);
+      const names = async (role: Role) =>
+        (await boardsOfWorkspace(database, w.accounts[role], w.workspace))?.map(
+          (each) => each.name,
+        );
+      expect(await names('owner')).toEqual(['Hiring', 'Last year', 'Roadmap']);
+      expect(await names('member')).toEqual(['Last year', 'Roadmap']);
+      expect(await names('boardMember')).toEqual(['Hiring', 'Last year', 'Roadmap']);
+      expect(await names('outsider')).toBeUndefined();
     });
   });
 

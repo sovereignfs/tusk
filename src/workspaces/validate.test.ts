@@ -20,6 +20,11 @@ describe('an operation', () => {
       'member.setRole',
       'member.remove',
       'member.leave',
+      'board.create',
+      'list.create',
+      'list.rename',
+      'list.move',
+      'list.delete',
     ]);
   });
 
@@ -38,6 +43,48 @@ describe('an operation', () => {
       if (parsed.ok && parsed.value.op === 'member.add')
         expect(parsed.value.email).toBe('ada@example.com');
     }
+  });
+
+  it('takes the board and list operations whole, with names trimmed', () => {
+    const [a, b] = [ID(), ID()];
+    const good = [
+      { op: 'board.create', id: a, workspaceId: b, name: ' Roadmap ', color: '#2563eb' },
+      { op: 'list.create', id: a, boardId: b, name: ' Doing ', position: 'a1' },
+      { op: 'list.rename', id: a, name: ' Later ' },
+      { op: 'list.move', id: a, position: 'a0V' },
+      { op: 'list.delete', id: a },
+    ];
+    for (const each of good) {
+      const parsed = parseOp(JSON.parse(JSON.stringify({ opId: ID(), ...each })));
+      expect(parsed.ok, each.op).toBe(true);
+      if (parsed.ok && 'name' in parsed.value)
+        expect(parsed.value.name).toBe(parsed.value.name.trim());
+    }
+  });
+
+  it('refuses a colour that is not #rrggbb, a position that is not one, a blank name and a key it does not take', () => {
+    const [a, b] = [ID(), ID()];
+    const bad: unknown[] = [
+      { op: 'board.create', id: a, workspaceId: b, name: 'x', color: 'blue' },
+      { op: 'board.create', id: a, workspaceId: b, name: 'x', color: '#2563EB' },
+      { op: 'board.create', id: a, workspaceId: b, name: '  ', color: '#2563eb' },
+      {
+        op: 'board.create',
+        id: a,
+        workspaceId: b,
+        name: 'x',
+        color: '#2563eb',
+        visibility: 'private',
+      },
+      { op: 'list.create', id: a, boardId: b, name: 'x', position: '' },
+      { op: 'list.create', id: a, boardId: b, name: 'x', position: 'a b' },
+      { op: 'list.create', id: a, boardId: b, name: 'x', position: 'a'.repeat(65) },
+      { op: 'list.move', id: a, position: 'a1', boardId: b },
+      { op: 'list.rename', id: a, name: 'x'.repeat(101) },
+      { op: 'list.delete', id: 'x' },
+    ];
+    for (const each of bad)
+      expect(parseOp({ opId: ID(), ...(each as object) }).ok, JSON.stringify(each)).toBe(false);
   });
 
   it('refuses what is not an address, not a role, or says more than it takes', () => {

@@ -24,8 +24,14 @@ export function showing(
     case 'workspace.delete':
       return workspaces.filter((each) => each.id !== request.id);
     // Nothing about people is guessed. Leaving is *not* shown at once, as a delete is: it can be refused (the last owner may not leave), and the screen
-    // that is showing the workspace would have gone with it. The list is changed when the server has said yes.
+    // that is showing the workspace would have gone with it. The list is changed when the server has said yes. Boards and lists are not on this list at
+    // all: a board's own store (`store.ts`) shows them.
     case 'member.leave':
+    case 'board.create':
+    case 'list.create':
+    case 'list.rename':
+    case 'list.move':
+    case 'list.delete':
     case 'member.add':
     case 'member.setRole':
     case 'member.remove':

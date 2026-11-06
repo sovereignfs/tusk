@@ -756,6 +756,8 @@ In phase 1, boards are read from the server and held in memory, not on the devic
   version every 20 seconds and on focus, and reloads the board if it moved, keeping an open card and anything being typed. Live updates are phase 2
   (§25.4).
 - **Offline, a board says it needs a connection,** and changes nothing. What it held stays on the screen, read-only, until the connection comes back.
+- **As built (task 17.1):** a refusal puts the board back as the server last said it was and drops what was queued behind it; the answer to an operation carries the board's new `version`, so the board's own
+  change is not read as someone else's; the version is also asked for when the connection returns. A list is named by its id alone in an operation, and the permission is the board's (`board_id IN boardsEditableBy`).
 
 ## 15. Cards on a board
 

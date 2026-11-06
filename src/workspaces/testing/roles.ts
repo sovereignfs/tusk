@@ -18,6 +18,8 @@ import { tablesOf } from '../tables';
  *   publicBoard      everyone in the workspace sees it; boardOwner owns it, boardMember is on it
  *   privateBoard     boardMember only, and the workspace's owners
  *   archivedBoard    public, boardOwner's, archived: read-only for everyone
+ *
+ * Each board has one list, `Backlog`, so that the operations on a list have one to be done to.
  */
 export const ROLES = [
   'owner',
@@ -33,6 +35,8 @@ export interface World {
   accounts: Record<Role, string>;
   workspace: string;
   boards: { publicBoard: string; privateBoard: string; archivedBoard: string };
+  /** One list on each board, so that the operations on a list have one to be done to. */
+  lists: { publicBoard: string; privateBoard: string; archivedBoard: string };
 }
 
 const uuid = () => crypto.randomUUID();
@@ -42,6 +46,7 @@ export async function seedWorld(database: Database): Promise<World> {
   const accounts = Object.fromEntries(ROLES.map((role) => [role, uuid()])) as Record<Role, string>;
   const workspace = uuid();
   const boards = { publicBoard: uuid(), privateBoard: uuid(), archivedBoard: uuid() };
+  const lists = { publicBoard: uuid(), privateBoard: uuid(), archivedBoard: uuid() };
   const now = 1_800_000_000_000;
 
   await dbRun(
@@ -84,7 +89,12 @@ export async function seedWorld(database: Database): Promise<World> {
   await member(boards.publicBoard, 'boardMember', 'member');
   await member(boards.privateBoard, 'boardMember', 'member');
   await member(boards.archivedBoard, 'boardOwner', 'owner');
-  return { accounts, workspace, boards };
+  for (const key of ['publicBoard', 'privateBoard', 'archivedBoard'] as const)
+    await dbRun(
+      database,
+      sql`INSERT INTO ${t.boardList} (id, board_id, name, position, created_at, updated_at) VALUES (${lists[key]}, ${boards[key]}, 'Backlog', 'a0', ${now}, ${now})`,
+    );
+  return { accounts, workspace, boards, lists };
 }
 
 /** The ids of the boards a permission reaches for an account, from the subquery itself. */
@@ -100,19 +110,16 @@ export async function reachable(
   return rows.map((row) => row.id);
 }
 
-/** One row of every table below a board, on the public board, and a notice about the workspace: what deleting a workspace must leave nothing of. */
+/** One row of every table below a board, on the public board (its list is the world's), and a notice about the workspace: what deleting a workspace must leave nothing of. */
 export async function seedBoardContents(database: Database, world: World): Promise<void> {
   const t = tablesOf(database);
   const board = world.boards.publicBoard;
-  const list = uuid();
+  const list = world.lists.publicBoard;
   const card = uuid();
   const label = uuid();
   const now = 1_800_000_000_000;
   const who = world.accounts.boardOwner;
   const run = (query: ReturnType<typeof sql>) => dbRun(database, query);
-  await run(
-    sql`INSERT INTO ${t.boardList} (id, board_id, name, position, created_at, updated_at) VALUES (${list}, ${board}, 'Backlog', 'a0', ${now}, ${now})`,
-  );
   await run(
     sql`INSERT INTO ${t.card} (id, board_id, list_id, title, position, created_by, created_at, updated_at) VALUES (${card}, ${board}, ${list}, 'First', 'a0', ${who}, ${now}, ${now})`,
   );

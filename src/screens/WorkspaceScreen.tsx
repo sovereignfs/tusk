@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { type FormEvent, useEffect, useState } from 'react';
+import { WorkspaceBoards } from './WorkspaceBoards';
 import { WorkspaceSettings } from './WorkspaceSettings';
 import type { WorkspaceRow } from '../workspaces/format';
 import { failureMessage, useWorkspaces } from '../boards/workspaces';
@@ -9,7 +10,7 @@ import { Alert, Button, Dialog, FormField, Icon, Input } from '../ui';
 import styles from './WorkspaceScreen.module.css';
 
 /**
- * A workspace (DESIGN.md §13, §17.11): its name, a gear that opens its settings (`WorkspaceSettings`: name, people, leaving), and its boards (task 17.1). **Deleting one is typed**: its owners confirm by
+ * A workspace (DESIGN.md §13, §17.11): its name, a gear that opens its settings (`WorkspaceSettings`: name, people, leaving), and its boards as tiles (`WorkspaceBoards`). **Deleting one is typed**: its owners confirm by
  * writing its name, because a shared space is not deleted by accident and there is no Undo (§13.1). The workspace is read by the server before the page is
  * sent, so one that is not the person's is a 404 and never reaches here; what is held here follows the list in memory, so that a rename shows at once.
  */
@@ -43,7 +44,7 @@ export function WorkspaceScreen({ workspace }: { workspace: WorkspaceRow }) {
           <Icon name="settings" aria-hidden />
         </Button>
       </header>
-      <p className={styles.muted}>No boards yet.</p>
+      <WorkspaceBoards workspaceId={current.id} />
       {settings ? (
         <WorkspaceSettings
           workspace={current}

@@ -18,6 +18,11 @@ export const OPS = [
   'member.setRole',
   'member.remove',
   'member.leave',
+  'board.create',
+  'list.create',
+  'list.rename',
+  'list.move',
+  'list.delete',
 ] as const;
 export type OpName = (typeof OPS)[number];
 
@@ -36,7 +41,27 @@ export type Op =
     }
   | { readonly op: 'member.remove'; readonly workspaceId: string; readonly accountId: string }
   /** Whoever asks leaves: there is no `accountId` in it, since nobody else's leaving is theirs to ask. */
-  | { readonly op: 'member.leave'; readonly workspaceId: string };
+  | { readonly op: 'member.leave'; readonly workspaceId: string }
+  /** The creator becomes the board's owner and its only member, and it is made with one list, _Backlog_ (DESIGN.md §14.1). Public until its settings say otherwise. */
+  | {
+      readonly op: 'board.create';
+      readonly id: string;
+      readonly workspaceId: string;
+      readonly name: string;
+      readonly color: string;
+    }
+  /** `position` is chosen by the device between the neighbours it sees (DESIGN.md §10.4): a new list goes at the end. */
+  | {
+      readonly op: 'list.create';
+      readonly id: string;
+      readonly boardId: string;
+      readonly name: string;
+      readonly position: string;
+    }
+  /** A list is named by its id alone: the board it is on is the row's, and the permission is the board's. */
+  | { readonly op: 'list.rename'; readonly id: string; readonly name: string }
+  | { readonly op: 'list.move'; readonly id: string; readonly position: string }
+  | { readonly op: 'list.delete'; readonly id: string };
 
 /** A person's role in a workspace (DESIGN.md §7.2). */
 export type Role = 'owner' | 'member';
@@ -54,6 +79,11 @@ export const WORKSPACE_LIMITS = {
   membersPerWorkspace: 100,
   /** Addresses one account may try to add in an hour: it tells an owner whether an address has an account, so it is limited (DESIGN.md §13.2). */
   addsPerHour: 30,
+  /** Boards in a workspace, lists on a board (DESIGN.md §7.4). */
+  boardsPerWorkspace: 500,
+  listsPerBoard: 100,
+  /** A position key, in characters. */
+  positionChars: 64,
   /** A request body, in bytes: an operation is small. */
   bodyBytes: 64 * 1024,
 } as const;
@@ -105,8 +135,47 @@ export interface Person {
   readonly you: boolean;
 }
 
+/** A board as the people who can see it do. */
+export interface BoardRow {
+  readonly id: string;
+  readonly workspaceId: string;
+  readonly name: string;
+  readonly color: string;
+  readonly description: string | null;
+  readonly visibility: 'public' | 'private';
+  readonly archived: boolean;
+  /** Moved on by every operation on the board, so that an open one can tell it has changed (DESIGN.md §14.7). */
+  readonly version: number;
+  readonly createdAt: number;
+  readonly updatedAt: number;
+}
+
+/** A list on a board, with how many open cards it holds. */
+export interface ListRow {
+  readonly id: string;
+  readonly boardId: string;
+  readonly name: string;
+  readonly position: string;
+  readonly cards: number;
+}
+
+/** A board whole and light (DESIGN.md §14.7): what a person who opens it is sent. Lists now; labels, people and cards arrive with the tasks that make them. */
+export interface BoardView {
+  readonly board: BoardRow;
+  readonly workspace: { readonly id: string; readonly name: string };
+  readonly lists: readonly ListRow[];
+  /** What the one asking may do here: only a member changes the board, and an archived one is read-only (§7.2). */
+  readonly can: { readonly edit: boolean; readonly admin: boolean };
+}
+
 export interface OpRows {
   readonly workspace?: WorkspaceRow;
+  readonly board?: BoardRow;
+  readonly list?: ListRow;
+  /** The id of a list that is gone, with the cards that were on it. */
+  readonly deletedList?: string;
+  /** The board's version after the operation, so that its own change is not mistaken for someone else's. */
+  readonly version?: number;
   readonly member?: MemberRow;
   /** Someone who is no longer in the workspace. */
   readonly removed?: { readonly workspaceId: string; readonly accountId: string };

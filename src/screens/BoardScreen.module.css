@@ -1,0 +1,150 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sv-space-3);
+  min-height: 100%;
+  min-width: 0;
+}
+
+/* The board's colour is a thin band at the top, and not a wash behind the cards, so that text stays readable in both themes (DESIGN.md §17.5). */
+.band {
+  height: 4px;
+  flex: none;
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sv-space-3);
+  padding: var(--sv-space-2) var(--sv-space-6) 0;
+}
+
+.crumb {
+  color: var(--sv-color-text-muted);
+  font-size: var(--sv-font-size-sm);
+  text-decoration: none;
+}
+
+.crumb:hover {
+  text-decoration: underline;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--sv-font-size-xl);
+  font-weight: var(--sv-font-weight-semibold);
+}
+
+.badge {
+  color: var(--sv-color-text-muted);
+  font-size: var(--sv-font-size-sm);
+}
+
+.columns {
+  display: flex;
+  flex: 1;
+  align-items: flex-start;
+  gap: var(--sv-space-3);
+  padding: var(--sv-space-2) var(--sv-space-6) var(--sv-space-6);
+  overflow-x: auto;
+}
+
+.column {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--sv-space-2);
+  width: 280px;
+  max-height: 100%;
+  padding: var(--sv-space-2);
+  border: var(--sv-border-width-hairline) solid var(--sv-color-border);
+  border-radius: var(--sv-radius-md);
+  background: var(--sv-color-surface-sunken);
+}
+
+.dragging {
+  opacity: 0.6;
+}
+
+.listHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--sv-space-1);
+}
+
+.listTitle {
+  display: flex;
+  flex: 1;
+  align-items: baseline;
+  gap: var(--sv-space-2);
+  min-width: 0;
+  padding: var(--sv-space-1) var(--sv-space-2);
+}
+
+.handle {
+  cursor: grab;
+  touch-action: none;
+}
+
+.listName {
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--sv-font-size-md);
+  font-weight: var(--sv-font-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.count {
+  color: var(--sv-color-text-muted);
+  font-size: var(--sv-font-size-sm);
+}
+
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: var(--sv-radius-sm);
+  background: transparent;
+  color: var(--sv-color-text-muted);
+  cursor: pointer;
+}
+
+.iconButton:hover {
+  background: var(--sv-color-surface-sunken);
+}
+
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sv-space-2);
+  min-height: var(--sv-space-2);
+}
+
+.add {
+  flex: none;
+  width: 280px;
+}
+
+.addForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sv-space-2);
+}
+
+.dialog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sv-space-4);
+  padding: var(--sv-space-6);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sv-space-2);
+}

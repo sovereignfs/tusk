@@ -29,6 +29,9 @@ export function useReorderSensors() {
 /** Pass to `DndContext`'s `autoScroll`: vertical only. */
 export const VERTICAL_AUTOSCROLL = { threshold: { x: 0, y: 0.2 } } as const;
 
+/** Pass to `DndContext`'s `autoScroll` on a board: sideways only, since its lists are columns side by side and scroll that way (DESIGN.md §17.5). */
+export const HORIZONTAL_AUTOSCROLL = { threshold: { x: 0.15, y: 0 } } as const;
+
 /**
  * Swallows the click that ends a drag. Call `begin()` when a drag starts and `end()` when it ends or is cancelled; the click comes straight after the
  * pointer is released, so the guard is held a moment longer. One listener, put on the window once.

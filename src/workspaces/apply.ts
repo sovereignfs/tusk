@@ -4,12 +4,14 @@ import { dbAll, dbGet, transaction } from '../db/exec';
 import * as postgresApp from '../db/schema/postgres/app';
 import * as sqliteApp from '../db/schema/sqlite/app';
 import type { Directory } from '../auth/directory';
-import { workspacesOf, workspacesOwnedBy } from './can';
+import { first } from '../position';
+import { boardsEditableBy, workspacesOf, workspacesOwnedBy } from './can';
 import {
   type OpReason,
   type OpRefusal,
   type OpRequest,
   type OpResult,
+  type ListRow,
   type Role,
   WORKSPACE_LIMITS,
 } from './format';
@@ -182,6 +184,112 @@ async function run(
       await takeOut(tx, request.workspaceId, accountId, 'not_found');
       return { removed: { workspaceId: request.workspaceId, accountId } };
     }
+    case 'board.create': {
+      await lockWorkspace(tx, request.workspaceId, workspacesOf(tx, accountId), now);
+      const count = await dbGet<{ n: number | string }>(
+        tx,
+        sql`SELECT COUNT(*) AS n FROM ${t.board} WHERE workspace_id = ${request.workspaceId}`,
+      );
+      if (Number(count?.n ?? 0) >= WORKSPACE_LIMITS.boardsPerWorkspace) throw new Refused('limit');
+      // An id that another account already uses is a conflict, and is answered as a board that is not theirs.
+      const made = await dbAll<{ id: string }>(
+        tx,
+        sql`INSERT INTO ${t.board} (id, workspace_id, name, color, description, visibility, archived_at, version, created_by, created_at, updated_at)
+            VALUES (${request.id}, ${request.workspaceId}, ${request.name}, ${request.color}, NULL, 'public', NULL, 1, ${accountId}, ${now}, ${now})
+            ON CONFLICT (id) DO NOTHING RETURNING id`,
+      );
+      if (made.length === 0) throw new Refused('not_found');
+      await dbAll(
+        tx,
+        sql`INSERT INTO ${t.boardMember} (board_id, account_id, workspace_id, role, created_at)
+            VALUES (${request.id}, ${accountId}, ${request.workspaceId}, 'owner', ${now}) RETURNING account_id`,
+      );
+      await dbAll(
+        tx,
+        sql`INSERT INTO ${t.boardList} (id, board_id, name, position, created_at, updated_at)
+            VALUES (${crypto.randomUUID()}, ${request.id}, 'Backlog', ${first()}, ${now}, ${now}) RETURNING id`,
+      );
+      return {
+        board: {
+          id: request.id,
+          workspaceId: request.workspaceId,
+          name: request.name,
+          color: request.color,
+          description: null,
+          visibility: 'public' as const,
+          archived: false,
+          version: 1,
+          createdAt: now,
+          updatedAt: now,
+        },
+        version: 1,
+      };
+    }
+    case 'list.create': {
+      // The board is taken, with the permission in the statement, and its version moved on; the list is made under it.
+      const version = await touchBoard(tx, request.boardId, boardsEditableBy(tx, accountId), now);
+      const count = await dbGet<{ n: number | string }>(
+        tx,
+        sql`SELECT COUNT(*) AS n FROM ${t.boardList} WHERE board_id = ${request.boardId}`,
+      );
+      if (Number(count?.n ?? 0) >= WORKSPACE_LIMITS.listsPerBoard) throw new Refused('limit');
+      const made = await dbAll<{ id: string }>(
+        tx,
+        sql`INSERT INTO ${t.boardList} (id, board_id, name, position, created_at, updated_at)
+            VALUES (${request.id}, ${request.boardId}, ${request.name}, ${request.position}, ${now}, ${now})
+            ON CONFLICT (id) DO NOTHING RETURNING id`,
+      );
+      if (made.length === 0) throw new Refused('not_found');
+      const list: ListRow = {
+        id: request.id,
+        boardId: request.boardId,
+        name: request.name,
+        position: request.position,
+        cards: 0,
+      };
+      return { list, version };
+    }
+    case 'list.rename':
+    case 'list.move': {
+      const changed = await dbAll<{ boardId: string; name: string; position: string }>(
+        tx,
+        request.op === 'list.rename'
+          ? sql`UPDATE ${t.boardList} SET name = ${request.name}, updated_at = ${now}
+                WHERE id = ${request.id} AND board_id IN ${boardsEditableBy(tx, accountId)}
+                RETURNING board_id AS "boardId", name, position`
+          : sql`UPDATE ${t.boardList} SET position = ${request.position}, updated_at = ${now}
+                WHERE id = ${request.id} AND board_id IN ${boardsEditableBy(tx, accountId)}
+                RETURNING board_id AS "boardId", name, position`,
+      );
+      const row = changed[0];
+      if (!row) throw new Refused('not_found');
+      const version = await touchBoard(tx, row.boardId, boardsEditableBy(tx, accountId), now);
+      const list: ListRow = { id: request.id, ...row, cards: await openCards(tx, request.id) };
+      return { list, version };
+    }
+    case 'list.delete': {
+      const gone = await dbAll<{ boardId: string }>(
+        tx,
+        sql`DELETE FROM ${t.boardList}
+            WHERE id = ${request.id} AND board_id IN ${boardsEditableBy(tx, accountId)}
+            RETURNING board_id AS "boardId"`,
+      );
+      const boardId = gone[0]?.boardId;
+      if (!boardId) throw new Refused('not_found');
+      // The cards that were on it, and everything on them: by `board_id` and the list's own id, children before parents.
+      const cards = sql`card_id IN (SELECT id FROM ${t.card} WHERE list_id = ${request.id} AND board_id = ${boardId})`;
+      for (const table of [t.comment, t.checklistItem, t.cardAssignee, t.cardLabel, t.activity])
+        await dbAll(
+          tx,
+          sql`DELETE FROM ${table} WHERE board_id = ${boardId} AND ${cards} RETURNING 1 AS one`,
+        );
+      await dbAll(
+        tx,
+        sql`DELETE FROM ${t.card} WHERE list_id = ${request.id} AND board_id = ${boardId} RETURNING 1 AS one`,
+      );
+      const version = await touchBoard(tx, boardId, boardsEditableBy(tx, accountId), now);
+      return { deletedList: request.id, version };
+    }
     case 'workspace.rename': {
       // The permission is in the statement: only an owner's workspace is a row it can reach.
       const changed = await dbAll<{ createdAt: number | string }>(
@@ -203,6 +311,42 @@ async function run(
       };
     }
   }
+}
+
+/**
+ * The first statement of every operation on a board's lists (DESIGN.md §14.7): it moves the board's `version` on, so that anyone who has it open can
+ * tell it has changed, and the workspace's `updated_at` with it. It carries the permission, and **takes the board's row**, so that two people changing
+ * one board wait for each other and the limits are counted fairly. Returns the version now.
+ */
+async function touchBoard(
+  tx: Database,
+  boardId: string,
+  permission: SQL,
+  now: number,
+): Promise<number> {
+  const t = tablesOf(tx);
+  const moved = await dbAll<{ version: number | string; workspaceId: string }>(
+    tx,
+    sql`UPDATE ${t.board} SET version = version + 1, updated_at = ${now}
+        WHERE id = ${boardId} AND id IN ${permission}
+        RETURNING version, workspace_id AS "workspaceId"`,
+  );
+  const row = moved[0];
+  if (!row) throw new Refused('not_found');
+  await dbAll(
+    tx,
+    sql`UPDATE ${t.workspace} SET updated_at = ${now} WHERE id = ${row.workspaceId} RETURNING id`,
+  );
+  return Number(row.version);
+}
+
+async function openCards(tx: Database, listId: string): Promise<number> {
+  const t = tablesOf(tx);
+  const count = await dbGet<{ n: number | string }>(
+    tx,
+    sql`SELECT COUNT(*) AS n FROM ${t.card} WHERE list_id = ${listId} AND archived_at IS NULL`,
+  );
+  return Number(count?.n ?? 0);
 }
 
 /**

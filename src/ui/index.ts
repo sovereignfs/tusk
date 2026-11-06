@@ -30,6 +30,7 @@ export {
   FormField,
   Icon,
   Input,
+  Menu,
   Popover,
   SegmentedControl,
   Select,

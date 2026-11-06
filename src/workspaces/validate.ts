@@ -1,4 +1,6 @@
-import { type Parsed, oneOf, text, uuid } from '../access/parse';
+import { type Parsed, type Parser, oneOf, text, uuid } from '../access/parse';
+import { HEX_COLOR } from '../lists/colors';
+import { isPosition } from '../position';
 import { OPS, type OpName, type OpRequest, WORKSPACE_LIMITS } from './format';
 
 /**
@@ -20,7 +22,17 @@ const ARGUMENTS: Record<OpName, readonly string[]> = {
   'member.setRole': ['workspaceId', 'accountId', 'role'],
   'member.remove': ['workspaceId', 'accountId'],
   'member.leave': ['workspaceId'],
+  'board.create': ['id', 'workspaceId', 'name', 'color'],
+  'list.create': ['id', 'boardId', 'name', 'position'],
+  'list.rename': ['id', 'name'],
+  'list.move': ['id', 'position'],
+  'list.delete': ['id'],
 };
+
+const POSITION: Parser<string> = (value) =>
+  typeof value === 'string' && value.length <= WORKSPACE_LIMITS.positionChars && isPosition(value)
+    ? { ok: true, value }
+    : { ok: false, reason: 'not a position' };
 
 const ROLE = oneOf('owner', 'member');
 /** An address as a person types it: one @ with something either side, no space. Whether it belongs to an account is the server's to say. */
@@ -107,6 +119,68 @@ export function parseOp(value: unknown): Parsed<OpRequest> {
       const workspaceId = uuid(value.workspaceId);
       if (!workspaceId.ok) return no('workspaceId: not an id');
       return { ok: true, value: { opId: opId.value, op: kind, workspaceId: workspaceId.value } };
+    }
+    case 'board.create': {
+      const id = uuid(value.id);
+      const workspaceId = uuid(value.workspaceId);
+      if (!id.ok || !workspaceId.ok) return no('not an id');
+      const name = NAME(typeof value.name === 'string' ? value.name.trim() : value.name);
+      if (!name.ok) return no(`name: ${name.reason}`);
+      if (typeof value.color !== 'string' || !HEX_COLOR.test(value.color))
+        return no('color: not a colour');
+      return {
+        ok: true,
+        value: {
+          opId: opId.value,
+          op: kind,
+          id: id.value,
+          workspaceId: workspaceId.value,
+          name: name.value,
+          color: value.color,
+        },
+      };
+    }
+    case 'list.create': {
+      const id = uuid(value.id);
+      const boardId = uuid(value.boardId);
+      if (!id.ok || !boardId.ok) return no('not an id');
+      const name = NAME(typeof value.name === 'string' ? value.name.trim() : value.name);
+      if (!name.ok) return no(`name: ${name.reason}`);
+      const position = POSITION(value.position);
+      if (!position.ok) return no('position: not a position');
+      return {
+        ok: true,
+        value: {
+          opId: opId.value,
+          op: kind,
+          id: id.value,
+          boardId: boardId.value,
+          name: name.value,
+          position: position.value,
+        },
+      };
+    }
+    case 'list.rename': {
+      const id = uuid(value.id);
+      if (!id.ok) return no('id: not an id');
+      const name = NAME(typeof value.name === 'string' ? value.name.trim() : value.name);
+      if (!name.ok) return no(`name: ${name.reason}`);
+      return { ok: true, value: { opId: opId.value, op: kind, id: id.value, name: name.value } };
+    }
+    case 'list.move': {
+      const id = uuid(value.id);
+      if (!id.ok) return no('id: not an id');
+      const position = POSITION(value.position);
+      if (!position.ok) return no('position: not a position');
+      return {
+        ok: true,
+        value: { opId: opId.value, op: kind, id: id.value, position: position.value },
+      };
+    }
+    case 'list.delete': {
+      const id = uuid(value.id);
+      if (!id.ok) return no('id: not an id');
+      return { ok: true, value: { opId: opId.value, op: kind, id: id.value } };
     }
   }
 }
