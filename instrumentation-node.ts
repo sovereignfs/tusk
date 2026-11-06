@@ -7,7 +7,8 @@ import { processEnv } from './src/config/env';
  *
  * 1. The settings are checked, and a wrong one stops the server, naming it.
  * 2. The database is provisioned, opened and migrated (DESIGN.md §22.1), and the server does not start if it cannot. It waits for one that is
- *    still starting, up to TUSK_DB_CONNECT_TIMEOUT_MS, since in a compose file the app and its database come up together.
+ *    still starting, up to TUSK_DB_CONNECT_TIMEOUT_MS, since in a compose file the app and its database come up together. The credentials that
+ *    are kept sealed must be openable with the keys it was given, or it stops, naming the keys; and are moved to a new key when one is given.
  *
  * 3. The background jobs start, unless `TUSK_WORKER=off` (src/jobs), and stop when the process is told to (SIGTERM, which Docker sends).
  */
@@ -21,7 +22,12 @@ export async function start(): Promise<void> {
 
   try {
     const { getStores } = await import('./src/db/boot');
-    await getStores(result.config.database);
+    const stores = await getStores(result.config.database);
+    // What is kept sealed must be openable: a key that was dropped stops the server here, naming it, and not a backup later. Credentials wrapped under the
+    // previous key are moved to the current one (DESIGN.md §21.2), by whichever replica starts first or all of them: each row is moved once.
+    const { assertKeys, rotateCredentials } = await import('./src/crypto/store');
+    await assertKeys(stores.app, result.config.encryption);
+    if (result.config.encryption) await rotateCredentials(stores.app, result.config.encryption);
   } catch (error) {
     console.error('Tasks cannot start, because its database is not usable:');
     console.error(`  - ${error instanceof Error ? error.message : String(error)}`);

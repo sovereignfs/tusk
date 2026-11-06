@@ -29,6 +29,13 @@
       "when": 1793969905108,
       "tag": "0003_inbox",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1793997848309,
+      "tag": "0004_credential",
+      "breakpoints": true
     }
   ]
 }

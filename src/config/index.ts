@@ -1,4 +1,5 @@
 import { resolveAuth, type AuthSettings } from '../auth/config';
+import { type KeyRing, parseKey, ringOf } from '../crypto/keys';
 import { DatabaseConfigError, resolveDatabaseSettings, type DatabaseSettings } from '../db/config';
 import { readSetting, SettingFileError, type Env, type ReadFile } from './env';
 
@@ -12,6 +13,8 @@ export interface Config {
   readonly auth: AuthSettings | undefined;
   /** Which database, and how to wait for it and migrate it (DESIGN.md §22.1). */
   readonly database: DatabaseSettings;
+  /** The instance key, and the one it replaces while credentials are moved to it; absent when there is none, and nothing that needs one is offered (DESIGN.md §21.2). */
+  readonly encryption: KeyRing | undefined;
 }
 
 /** One thing that is wrong, in words that name the setting and never its value. */
@@ -52,6 +55,30 @@ const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 /** localhost, an address on this machine, or a name under `.localhost`: the only places plain http is allowed. */
 function isLocalHost(hostname: string): boolean {
   return LOCAL_HOSTS.has(hostname) || hostname.endsWith('.localhost');
+}
+
+const KEY_HELP =
+  'It is 32 random bytes, in base64, URL-safe base64 or hex (openssl rand -base64 32).';
+
+/** The instance key and the previous one, as a ring, or what is wrong with them. */
+function checkKeys(
+  current: string | undefined,
+  previous: string | undefined,
+  problems: Problem[],
+): KeyRing | undefined {
+  const key = current === undefined ? undefined : parseKey(current);
+  const old = previous === undefined ? undefined : parseKey(previous);
+  if (current !== undefined && key === undefined)
+    problems.push(`TUSK_ENCRYPTION_KEY is not a key. ${KEY_HELP}`);
+  if (previous !== undefined && old === undefined)
+    problems.push(`TUSK_ENCRYPTION_KEY_PREVIOUS is not a key. ${KEY_HELP}`);
+  if (previous !== undefined && current === undefined)
+    problems.push(
+      'TUSK_ENCRYPTION_KEY_PREVIOUS is given, and there is no TUSK_ENCRYPTION_KEY to move the credentials to.',
+    );
+  if (key && old && key.equals(old))
+    problems.push('TUSK_ENCRYPTION_KEY_PREVIOUS is the same key as TUSK_ENCRYPTION_KEY.');
+  return ringOf(key, old);
 }
 
 /** Checks `TUSK_URL`. Returns the origin to keep, or says what is wrong. */
@@ -126,6 +153,14 @@ export function loadConfig(env: Env, readFile?: ReadFile): LoadResult {
     }
   }
 
+  // The instance key (DESIGN.md §9.2, §21.2). Optional until something is stored; a key that is given must be a key, and a message names the setting and
+  // never what was given.
+  const encryption = checkKeys(
+    read('TUSK_ENCRYPTION_KEY'),
+    read('TUSK_ENCRYPTION_KEY_PREVIOUS'),
+    problems,
+  );
+
   // Mail is optional, but a host with no sender would send nothing anyone could answer, so it stops here rather than at the first message.
   if (read('TUSK_SMTP_HOST') !== undefined && read('TUSK_SMTP_FROM') === undefined) {
     problems.push('TUSK_SMTP_HOST is set, and mail needs TUSK_SMTP_FROM as well.');
@@ -145,5 +180,5 @@ export function loadConfig(env: Env, readFile?: ReadFile): LoadResult {
   }
 
   if (problems.length > 0 || database === undefined) return { ok: false, problems };
-  return { ok: true, config: { url, auth, worker: rawWorker !== 'off', database } };
+  return { ok: true, config: { url, auth, worker: rawWorker !== 'off', database, encryption } };
 }

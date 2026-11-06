@@ -137,6 +137,80 @@ describe('loadConfig', () => {
     });
   });
 
+  describe('the instance key', () => {
+    const key = Buffer.alloc(32, 7);
+    const other = Buffer.alloc(32, 9);
+    const ringOf = (result: LoadResult) => (result.ok ? result.config.encryption : undefined);
+
+    it('is optional: with none there is no ring, and nothing is wrong', () => {
+      const result = loadConfig({});
+      expect(result.ok && result.config.encryption).toBeUndefined();
+    });
+
+    it('is read in base64, URL-safe base64 and hex, from the setting or its file, and known by a fingerprint', () => {
+      for (const text of [key.toString('base64'), key.toString('base64url'), key.toString('hex')]) {
+        const ring = ringOf(loadConfig({ TUSK_ENCRYPTION_KEY: text }));
+        expect(ring?.current.key.equals(key), text).toBe(true);
+        expect(ring?.current.fingerprint).toMatch(/^[0-9a-f]{16}$/);
+        expect(ring?.previous).toBeUndefined();
+      }
+      const fromFile = ringOf(
+        loadConfig({ TUSK_ENCRYPTION_KEY_FILE: '/run/key' }, () => `${key.toString('base64')}\n`),
+      );
+      expect(fromFile?.current.key.equals(key)).toBe(true);
+    });
+
+    it('may have the key it replaces beside it, for the restart that moves the credentials', () => {
+      const ring = ringOf(
+        loadConfig({
+          TUSK_ENCRYPTION_KEY: key.toString('hex'),
+          TUSK_ENCRYPTION_KEY_PREVIOUS: other.toString('hex'),
+        }),
+      );
+      expect(ring?.current.key.equals(key)).toBe(true);
+      expect(ring?.previous?.key.equals(other)).toBe(true);
+      expect(ring?.previous?.fingerprint).not.toBe(ring?.current.fingerprint);
+    });
+
+    it('stops the server for a key that is not one, a previous key with no current one, and the same key twice, naming the setting and never its value', () => {
+      const secret = 'hunter2-NOT-A-KEY';
+      const wrong = problems(loadConfig({ TUSK_ENCRYPTION_KEY: secret }));
+      expect(wrong.join(' ')).toContain('TUSK_ENCRYPTION_KEY is not a key');
+      expect(
+        problems(loadConfig({ TUSK_ENCRYPTION_KEY: Buffer.alloc(16).toString('hex') })).join(' '),
+      ).toContain('not a key');
+      expect(
+        problems(
+          loadConfig({
+            TUSK_ENCRYPTION_KEY: key.toString('hex'),
+            TUSK_ENCRYPTION_KEY_PREVIOUS: secret,
+          }),
+        ).join(' '),
+      ).toContain('TUSK_ENCRYPTION_KEY_PREVIOUS is not a key');
+      expect(
+        problems(loadConfig({ TUSK_ENCRYPTION_KEY_PREVIOUS: key.toString('hex') })).join(' '),
+      ).toContain('no TUSK_ENCRYPTION_KEY to move');
+      expect(
+        problems(
+          loadConfig({
+            TUSK_ENCRYPTION_KEY: key.toString('hex'),
+            TUSK_ENCRYPTION_KEY_PREVIOUS: key.toString('base64'),
+          }),
+        ).join(' '),
+      ).toContain('the same key');
+      for (const message of [
+        ...wrong,
+        ...problems(
+          loadConfig({
+            TUSK_ENCRYPTION_KEY: key.toString('hex'),
+            TUSK_ENCRYPTION_KEY_PREVIOUS: secret,
+          }),
+        ),
+      ])
+        expect(message).not.toContain(secret);
+    });
+  });
+
   it('reports every problem at once, so that one run fixes them all', () => {
     const result = problems(
       loadConfig({ TUSK_URL: 'tusk', TUSK_WORKER: 'x', TUSK_VAPID_PUBLIC_KEY: 'k' }),

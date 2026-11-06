@@ -133,3 +133,21 @@ export const rateBucket = app.table(
   },
   (table) => [index('rate_bucket_window_idx').on(table.windowStart)],
 );
+
+/** See `schema/sqlite/app.ts`. */
+export const credential = app.table(
+  'credential',
+  {
+    id: id('id'),
+    accountId: ref('account_id').notNull(),
+    purpose: text('purpose').notNull(),
+    sealed: text('sealed').notNull(),
+    keyFingerprint: text('key_fingerprint').notNull(),
+    createdAt: epochMs('created_at').notNull(),
+    updatedAt: epochMs('updated_at').notNull(),
+  },
+  (table) => [
+    index('credential_account_idx').on(table.accountId),
+    index('credential_key_idx').on(table.keyFingerprint),
+  ],
+);

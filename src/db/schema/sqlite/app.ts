@@ -161,3 +161,25 @@ export const rateBucket = sqliteTable(
   },
   (table) => [index('rate_bucket_window_idx').on(table.windowStart)],
 );
+
+/**
+ * A secret a person gave Tusk, kept sealed (DESIGN.md §9.2, §21.2): a repository's token for backup. **Only `src/crypto/` writes or reads `sealed`**, which is
+ * envelope-encrypted under the instance key and bound to this row's `id` and `purpose`. `key_fingerprint` is the fingerprint of the key that wraps it, kept
+ * beside it so that a start-up can tell which keys the rows need, and rotation can find the rows it has to move. It is the person's, and goes with them.
+ */
+export const credential = sqliteTable(
+  'credential',
+  {
+    id: id('id'),
+    accountId: ref('account_id').notNull(),
+    purpose: text('purpose').notNull(),
+    sealed: text('sealed').notNull(),
+    keyFingerprint: text('key_fingerprint').notNull(),
+    createdAt: epochMs('created_at').notNull(),
+    updatedAt: epochMs('updated_at').notNull(),
+  },
+  (table) => [
+    index('credential_account_idx').on(table.accountId),
+    index('credential_key_idx').on(table.keyFingerprint),
+  ],
+);
