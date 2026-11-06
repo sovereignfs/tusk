@@ -217,6 +217,37 @@ const OPERATIONS: Row[] = [
     may: ['boardOwner', 'boardMember'],
     otherwise: 'not_found',
   },
+  // Administering a board is its owner's, and a workspace owner's, who need not be on it (§7.2).
+  {
+    op: 'board.update',
+    build: (w) => ({
+      op: 'board.update',
+      id: w.boards.publicBoard,
+      name: 'Renamed',
+      color: '#dc2626',
+      description: 'About it',
+    }),
+    may: ['owner', 'coOwner', 'boardOwner'],
+    otherwise: 'not_found',
+  },
+  {
+    op: 'board.archive',
+    build: (w) => ({ op: 'board.archive', id: w.boards.publicBoard }),
+    may: ['owner', 'coOwner', 'boardOwner'],
+    otherwise: 'not_found',
+  },
+  {
+    op: 'board.restore',
+    build: (w) => ({ op: 'board.restore', id: w.boards.archivedBoard }),
+    may: ['owner', 'coOwner', 'boardOwner'],
+    otherwise: 'not_found',
+  },
+  {
+    op: 'board.delete',
+    build: (w) => ({ op: 'board.delete', id: w.boards.publicBoard, name: 'Roadmap' }),
+    may: ['owner', 'coOwner', 'boardOwner'],
+    otherwise: 'not_found',
+  },
   {
     // Anyone in it may leave (there is another owner in this world); an outsider has nothing to leave.
     op: 'member.leave',
@@ -1211,6 +1242,178 @@ describe(`the roles (${leg})`, () => {
         await archivedCards(database, w.accounts.member, w.boards.privateBoard),
       ).toBeUndefined();
       expect(await archivedCards(database, w.accounts.member, id())).toBeUndefined();
+    });
+  });
+
+  describe('a board’s settings, archive and delete', () => {
+    const apply = (w: World, role: Role, op: Op) =>
+      applyOp(database, w.accounts[role], { opId: id(), ...op } as OpRequest, OPTIONS);
+    const t = () => tablesOf(database);
+    const boardRow = async (boardId: string) =>
+      (
+        await dbAll<{
+          name: string;
+          color: string;
+          description: string | null;
+          archivedAt: number | string | null;
+          version: number | string;
+        }>(
+          database,
+          sql`SELECT name, color, description, archived_at AS "archivedAt", version FROM ${t().board} WHERE id = ${boardId}`,
+        )
+      )[0];
+
+    it('changes the name, colour and description together, and a blank description is none', async () => {
+      const w = await seedWorld(database);
+      const start = Number((await boardRow(w.boards.publicBoard))?.version);
+      expect(
+        await apply(w, 'boardOwner', {
+          op: 'board.update',
+          id: w.boards.publicBoard,
+          name: 'Plans',
+          color: '#7c3aed',
+          description: 'What we do next',
+        }),
+      ).toMatchObject({
+        status: 'applied',
+        rows: {
+          board: {
+            name: 'Plans',
+            color: '#7c3aed',
+            description: 'What we do next',
+            archived: false,
+          },
+          version: start + 1,
+        },
+      });
+      expect(await boardRow(w.boards.publicBoard)).toMatchObject({
+        name: 'Plans',
+        color: '#7c3aed',
+        description: 'What we do next',
+      });
+      await apply(w, 'owner', {
+        op: 'board.update',
+        id: w.boards.publicBoard,
+        name: 'Plans',
+        color: '#7c3aed',
+        description: ' \n ',
+      });
+      expect((await boardRow(w.boards.publicBoard))?.description).toBeNull();
+    });
+
+    it('lets a workspace owner who is not on a board archive it, and not add a card to it', async () => {
+      const w = await seedWorld(database);
+      expect(
+        (await apply(w, 'owner', { op: 'board.archive', id: w.boards.publicBoard })).status,
+      ).toBe('applied');
+      expect(await readBoard(database, w.accounts.owner, w.boards.publicBoard)).toMatchObject({
+        board: { archived: true },
+        can: { edit: false, admin: true },
+      });
+      // Not a member, so not an editor, archived or not.
+      expect(
+        await apply(w, 'owner', {
+          op: 'card.create',
+          id: id(),
+          listId: w.lists.privateBoard,
+          title: 'x',
+          position: 'a0',
+        }),
+      ).toEqual({ status: 'refused', code: 'not_found' });
+    });
+
+    it('makes an archived board refuse every content operation from everyone, its owners included, until it is restored', async () => {
+      const w = await seedWorld(database);
+      await apply(w, 'boardOwner', { op: 'board.archive', id: w.boards.publicBoard });
+      const content: Op[] = [
+        { op: 'list.create', id: id(), boardId: w.boards.publicBoard, name: 'x', position: 'a5' },
+        { op: 'list.rename', id: w.lists.publicBoard, name: 'x' },
+        { op: 'list.move', id: w.lists.publicBoard, position: 'a9' },
+        { op: 'list.delete', id: w.lists.publicBoard },
+        { op: 'card.create', id: id(), listId: w.lists.publicBoard, title: 'x', position: 'a5' },
+        { op: 'card.move', id: w.cards.open, listId: w.lists.publicBoard, position: 'a9' },
+        { op: 'card.archive', id: w.cards.open },
+        { op: 'card.rename', id: w.cards.open, title: 'x' },
+        { op: 'card.describe', id: w.cards.open, description: 'x' },
+      ];
+      for (const role of ROLES)
+        for (const op of content)
+          expect(await apply(w, role, op), `${role} ${op.op}`).toEqual({
+            status: 'refused',
+            code: 'not_found',
+          });
+      // Its settings are read-only too, and archiving twice is not a thing.
+      expect(
+        await apply(w, 'boardOwner', {
+          op: 'board.update',
+          id: w.boards.publicBoard,
+          name: 'x',
+          color: '#2563eb',
+          description: '',
+        }),
+      ).toEqual({ status: 'refused', code: 'not_found' });
+      expect(
+        await apply(w, 'boardOwner', { op: 'board.archive', id: w.boards.publicBoard }),
+      ).toEqual({ status: 'refused', code: 'not_found' });
+      // Restored, the work is allowed again.
+      expect(
+        (await apply(w, 'owner', { op: 'board.restore', id: w.boards.publicBoard })).status,
+      ).toBe('applied');
+      expect((await apply(w, 'boardMember', content[0] as Op)).status).toBe('applied');
+      expect(await apply(w, 'owner', { op: 'board.restore', id: w.boards.publicBoard })).toEqual({
+        status: 'refused',
+        code: 'not_found',
+      });
+    });
+
+    it('deletes a board with a row of every table below it, and nothing of another board or of the workspace', async () => {
+      const w = await seedWorld(database);
+      await seedBoardContents(database, w);
+      const before = await countAll(database);
+      expect(
+        await apply(w, 'boardOwner', {
+          op: 'board.delete',
+          id: w.boards.publicBoard,
+          name: 'Roadmap',
+        }),
+      ).toMatchObject({
+        status: 'applied',
+        rows: { deletedBoard: w.boards.publicBoard },
+      });
+      const after = await countAll(database);
+      const gone = (name: string) => (before[name] ?? 0) - (after[name] ?? 0);
+      expect(gone('board')).toBe(1);
+      expect(gone('board_member')).toBe(2);
+      expect(gone('board_list')).toBe(1);
+      // The world's two cards and the one with contents.
+      expect(gone('card')).toBe(3);
+      for (const name of [
+        'label',
+        'card_label',
+        'card_assignee',
+        'checklist_item',
+        'comment',
+        'activity',
+        'publication',
+        'notice',
+      ])
+        expect(gone(name), name).toBe(1);
+      // The workspace, its people and its other boards are whole.
+      expect(gone('workspace')).toBe(0);
+      expect(gone('workspace_member')).toBe(0);
+      expect(after.board).toBe((before.board ?? 0) - 1);
+      expect(await readBoard(database, w.accounts.owner, w.boards.privateBoard)).toBeDefined();
+    });
+
+    it('needs the name as it is, typed: another name deletes nothing and says it is invalid', async () => {
+      const w = await seedWorld(database);
+      const before = JSON.stringify(await countAll(database));
+      for (const name of ['roadmap', 'Roadmap ', 'Other'])
+        expect(
+          await apply(w, 'boardOwner', { op: 'board.delete', id: w.boards.publicBoard, name }),
+          name,
+        ).toEqual({ status: 'refused', code: 'invalid' });
+      expect(JSON.stringify(await countAll(database))).toBe(before);
     });
   });
 

@@ -369,3 +369,18 @@ export async function cardDetail(
     updatedAt: Number(row.updatedAt),
   };
 }
+
+/**
+ * A board's row as the database now has it, **without asking who is looking**: for a transaction that has already carried the permission in its own
+ * statement and wants to answer with the row. Not for a route.
+ */
+export async function boardRowOf(
+  database: Database,
+  boardId: string,
+): Promise<BoardRow | undefined> {
+  const raw = await dbGet<RawBoard>(
+    database,
+    sql`SELECT ${sql.raw(BOARD_COLUMNS)} FROM ${tablesOf(database).board} b WHERE b.id = ${boardId}`,
+  );
+  return raw ? toBoard(raw) : undefined;
+}

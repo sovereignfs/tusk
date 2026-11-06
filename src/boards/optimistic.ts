@@ -39,6 +39,10 @@ export function showing(
     case 'card.delete':
     case 'card.rename':
     case 'card.describe':
+    case 'board.update':
+    case 'board.archive':
+    case 'board.restore':
+    case 'board.delete':
     case 'member.add':
     case 'member.setRole':
     case 'member.remove':

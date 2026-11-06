@@ -5,7 +5,8 @@ import * as postgresApp from '../db/schema/postgres/app';
 import * as sqliteApp from '../db/schema/sqlite/app';
 import type { Directory } from '../auth/directory';
 import { first } from '../position';
-import { boardsEditableBy, workspacesOf, workspacesOwnedBy } from './can';
+import { boardsAdministeredBy, boardsEditableBy, workspacesOf, workspacesOwnedBy } from './can';
+import { boardRowOf } from './reads';
 import {
   type OpReason,
   type OpRefusal,
@@ -377,6 +378,43 @@ async function run(
       const version = await touchBoard(tx, boardId, boardsEditableBy(tx, accountId), now);
       return { card: await cardTile(tx, request.id), version };
     }
+    case 'board.update':
+    case 'board.archive':
+    case 'board.restore': {
+      // Administration is a board owner's, or the owner of its workspace, who need not be on the board. The state a board must be in is part of the
+      // statement: an archived board is read-only for everyone, its settings included, until it is restored.
+      const description = request.op === 'board.update' ? request.description.trim() : '';
+      const changed = await dbAll<{ id: string }>(
+        tx,
+        request.op === 'board.update'
+          ? sql`UPDATE ${t.board} SET name = ${request.name}, color = ${request.color}, description = ${description === '' ? null : request.description}, updated_at = ${now}
+                WHERE id = ${request.id} AND id IN ${boardsAdministeredBy(tx, accountId)} AND archived_at IS NULL RETURNING id`
+          : request.op === 'board.archive'
+            ? sql`UPDATE ${t.board} SET archived_at = ${now}, updated_at = ${now}
+                  WHERE id = ${request.id} AND id IN ${boardsAdministeredBy(tx, accountId)} AND archived_at IS NULL RETURNING id`
+            : sql`UPDATE ${t.board} SET archived_at = NULL, updated_at = ${now}
+                  WHERE id = ${request.id} AND id IN ${boardsAdministeredBy(tx, accountId)} AND archived_at IS NOT NULL RETURNING id`,
+      );
+      if (changed.length === 0) throw new Refused('not_found');
+      const version = await touchBoard(tx, request.id, boardsAdministeredBy(tx, accountId), now);
+      const board = await boardRowOf(tx, request.id);
+      if (!board) throw new Refused('not_found');
+      return { board, version };
+    }
+    case 'board.delete': {
+      const found = await dbGet<{ name: string; workspaceId: string }>(
+        tx,
+        sql`SELECT name, workspace_id AS "workspaceId" FROM ${t.board} WHERE id = ${request.id} AND id IN ${boardsAdministeredBy(tx, accountId)}`,
+      );
+      if (!found) throw new Refused('not_found');
+      if (found.name !== request.name) throw new Refused('invalid');
+      await deleteBoard(tx, request.id);
+      await dbAll(
+        tx,
+        sql`UPDATE ${t.workspace} SET updated_at = ${now} WHERE id = ${found.workspaceId} RETURNING id`,
+      );
+      return { deletedBoard: request.id };
+    }
     case 'workspace.rename': {
       // The permission is in the statement: only an owner's workspace is a row it can reach.
       const changed = await dbAll<{ createdAt: number | string }>(
@@ -533,21 +571,10 @@ async function takeOut(
  */
 async function deleteWorkspace(tx: Database, workspaceId: string): Promise<void> {
   const t = tablesOf(tx);
+  // Set-based: a workspace can hold 500 boards, and a statement for each would be thousands.
   const inBoards = sql`board_id IN (SELECT id FROM ${t.board} WHERE workspace_id = ${workspaceId})`;
-  for (const table of [
-    t.activity,
-    t.comment,
-    t.checklistItem,
-    t.cardAssignee,
-    t.cardLabel,
-    t.label,
-    t.card,
-    t.boardList,
-    t.publication,
-    t.boardMember,
-  ]) {
-    await dbAll(tx, sql`DELETE FROM ${table} WHERE ${inBoards} RETURNING 1 AS one`);
-  }
+  for (const table of BOARD_TABLES)
+    await dbAll(tx, sql`DELETE FROM ${tablesOf(tx)[table]} WHERE ${inBoards} RETURNING 1 AS one`);
   await dbAll(
     tx,
     sql`DELETE FROM ${t.board} WHERE workspace_id = ${workspaceId} RETURNING 1 AS one`,
@@ -561,4 +588,30 @@ async function deleteWorkspace(tx: Database, workspaceId: string): Promise<void>
     sql`DELETE FROM ${t.workspaceMember} WHERE workspace_id = ${workspaceId} RETURNING 1 AS one`,
   );
   await dbAll(tx, sql`DELETE FROM ${t.workspace} WHERE id = ${workspaceId} RETURNING 1 AS one`);
+}
+
+/** The tables with a `board_id` that a board's deletion empties, children before parents (the board's people last, then the board itself). */
+const BOARD_TABLES = [
+  'activity',
+  'comment',
+  'checklistItem',
+  'cardAssignee',
+  'cardLabel',
+  'label',
+  'card',
+  'boardList',
+  'publication',
+  'boardMember',
+] as const;
+
+/**
+ * Everything of a board, by name and in the transaction that holds it (DESIGN.md §23.1: no cascades): every row below it by `board_id`, its publication,
+ * the notices about it, its people and the board. Children before parents, so that a run that stopped never leaves a card whose board is gone.
+ */
+async function deleteBoard(tx: Database, boardId: string): Promise<void> {
+  const t = tablesOf(tx);
+  for (const table of BOARD_TABLES)
+    await dbAll(tx, sql`DELETE FROM ${t[table]} WHERE board_id = ${boardId} RETURNING 1 AS one`);
+  await dbAll(tx, sql`DELETE FROM ${t.notice} WHERE board_id = ${boardId} RETURNING 1 AS one`);
+  await dbAll(tx, sql`DELETE FROM ${t.board} WHERE id = ${boardId} RETURNING 1 AS one`);
 }

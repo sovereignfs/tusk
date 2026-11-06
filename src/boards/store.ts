@@ -94,6 +94,8 @@ export function useBoard(
           if (result.status === 'applied') {
             confirmed.current = settled(showingBoard(confirmed.current, op), op, result.rows);
             pending.current -= 1;
+            // Archiving and restoring change what the person may do here, which only the server knows: the board is read again.
+            if (op.op === 'board.archive' || op.op === 'board.restore') await reload();
             // Nothing else waits: the screen is the server's, with the row it sent in place of the guess.
             if (pending.current === 0) setView(confirmed.current);
             else setView((now) => settled(now, op, result.rows));
@@ -118,7 +120,8 @@ export function useBoard(
 
   const perform = useCallback(
     (op: Op): Promise<boolean> => {
-      if (offline || gone || !view.can.edit) {
+      // An administrator who is not on the board (and a board that is archived) changes nothing in it, but archives, restores, edits and deletes it.
+      if (offline || gone || !(view.can.edit || view.can.admin)) {
         if (offline) failed.current('offline');
         return Promise.resolve(false);
       }
@@ -129,7 +132,7 @@ export function useBoard(
       queue.current = run;
       return run;
     },
-    [gone, offline, send, view.can.edit],
+    [gone, offline, send, view.can.edit, view.can.admin],
   );
 
   // Freshness: the version, every twenty seconds while the board is open and visible, and when the person comes back to it.

@@ -24,7 +24,17 @@ import {
 } from '../boards/board-optimistic';
 import { boardFailureMessage, useBoard } from '../boards/store';
 import { HORIZONTAL_AUTOSCROLL, useDragClickGuard, useReorderSensors } from '../ui/dnd';
-import { Alert, Button, ConfirmDialog, Dialog, EmptyState, Icon, Input, useToast } from '../ui';
+import {
+  Alert,
+  Button,
+  ConfirmDialog,
+  Dialog,
+  Menu,
+  EmptyState,
+  Icon,
+  Input,
+  useToast,
+} from '../ui';
 import {
   type ArchivedCard,
   type BoardView,
@@ -33,6 +43,7 @@ import {
   WORKSPACE_LIMITS,
 } from '../workspaces/format';
 import { TileBody } from './CardTileView';
+import { BoardSettingsDialog, DeleteBoardDialog } from './BoardSettings';
 import { ListColumn } from './ListColumn';
 import styles from './BoardScreen.module.css';
 
@@ -75,6 +86,8 @@ export function BoardScreen({
   const [name, setName] = useState('');
   const [dragging, setDragging] = useState<CardTile | null>(null);
   const [archivedOpen, setArchivedOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [dialog, setDialog] = useState<'settings' | 'delete' | null>(null);
   const addForm = useRef<HTMLFormElement>(null);
   // The field is put in front of the person who asked for it.
   useEffect(() => {
@@ -160,10 +173,93 @@ export function BoardScreen({
           ) : !view.can.edit ? (
             <span className={styles.badge}>Viewing</span>
           ) : null}
-          <button type="button" className={styles.link} onClick={() => setArchivedOpen(true)}>
-            Archived cards
-          </button>
+          <Menu
+            aria-label="Board menu"
+            open={menuOpen}
+            onClose={() => setMenuOpen(false)}
+            align="right"
+            width={220}
+            trigger={
+              <button
+                type="button"
+                className={`${styles.iconButton} ${styles.menuButton}`}
+                aria-label="Board menu"
+                aria-expanded={menuOpen}
+                onClick={() => setMenuOpen((was) => !was)}
+              >
+                <Icon name="ellipsis-vertical" aria-hidden />
+              </button>
+            }
+            items={[
+              ...(view.can.admin && !view.board.archived
+                ? [
+                    {
+                      label: 'Settings',
+                      icon: 'settings' as const,
+                      onSelect: () => setDialog('settings'),
+                    },
+                  ]
+                : []),
+              {
+                label: 'Archived cards',
+                icon: 'archive' as const,
+                onSelect: () => setArchivedOpen(true),
+              },
+              ...(view.can.admin
+                ? [
+                    { type: 'separator' as const },
+                    view.board.archived
+                      ? {
+                          label: 'Restore board',
+                          icon: 'archive-restore' as const,
+                          onSelect: () =>
+                            void store.perform({ op: 'board.restore', id: view.board.id }),
+                        }
+                      : {
+                          label: 'Archive board',
+                          icon: 'archive' as const,
+                          onSelect: () =>
+                            void store.perform({ op: 'board.archive', id: view.board.id }),
+                        },
+                    {
+                      label: 'Delete board',
+                      icon: 'trash-2' as const,
+                      destructive: true,
+                      onSelect: () => setDialog('delete'),
+                    },
+                  ]
+                : []),
+            ]}
+          />
         </header>
+        {view.board.archived ? (
+          <Alert variant="info">
+            This board is archived and read-only for everyone.
+            {view.can.admin ? (
+              <>
+                {' '}
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => void store.perform({ op: 'board.restore', id: view.board.id })}
+                >
+                  Restore board
+                </Button>
+              </>
+            ) : null}
+          </Alert>
+        ) : null}
+        {dialog === 'settings' ? (
+          <BoardSettingsDialog board={view.board} store={store} onClose={() => setDialog(null)} />
+        ) : null}
+        {dialog === 'delete' ? (
+          <DeleteBoardDialog
+            board={view.board}
+            workspaceId={view.workspace.id}
+            store={store}
+            onClose={() => setDialog(null)}
+          />
+        ) : null}
         {offline ? (
           <Alert variant="warning">
             This board needs a connection. It is as it was when it was last read, and cannot be

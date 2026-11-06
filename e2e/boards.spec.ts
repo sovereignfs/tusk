@@ -36,6 +36,12 @@ async function makeBoard(page: Page, boardName = unique('Roadmap')) {
   return { workspace, boardName, address: page.url() };
 }
 
+/** An entry of the board's menu. */
+async function openFromMenu(page: Page, item: string) {
+  await page.getByRole('button', { name: 'Board menu' }).click();
+  await page.getByRole('menuitem', { name: item }).click();
+}
+
 /** The board's own button (the Desk's sidebar has one of the same name, with no text). */
 const addListButton = (page: Page) => page.locator('button', { hasText: 'Add a list' });
 
@@ -275,7 +281,7 @@ test('a card is archived from its menu, listed under Archived cards, restored to
   await page.reload();
   expect(await cardsOf(page, 'Backlog')).toEqual(['Keep']);
 
-  await page.getByRole('button', { name: 'Archived cards' }).click();
+  await openFromMenu(page, 'Archived cards');
   const dialog = page.getByRole('dialog', { name: 'Archived cards' });
   await expect(dialog.getByText('Old')).toBeVisible();
   await dialog.getByRole('button', { name: 'Restore Old' }).click();
@@ -286,7 +292,7 @@ test('a card is archived from its menu, listed under Archived cards, restored to
 
   await page.getByRole('button', { name: 'Card options for Old' }).click();
   await page.getByRole('menuitem', { name: 'Archive' }).click();
-  await page.getByRole('button', { name: 'Archived cards' }).click();
+  await openFromMenu(page, 'Archived cards');
   await page
     .getByRole('dialog', { name: 'Archived cards' })
     .getByRole('button', { name: 'Delete Old' })
@@ -392,4 +398,93 @@ test('a card is opened with Enter, archived from its dialog, and a card that is 
   void baseURL;
   await page.goto(`/b/${board}`);
   await cleanUp(page, workspace);
+});
+
+test('a board’s settings change its name, colour and description; archiving makes it read-only and restoring gives the work back', async ({
+  page,
+}) => {
+  await signedIn(page);
+  const { workspace } = await makeBoard(page);
+  await addCard(page, 'Backlog', 'Stays');
+
+  await openFromMenu(page, 'Settings');
+  const settings = page.getByRole('dialog', { name: 'Board settings' });
+  const renamed = unique('Plans');
+  await settings.getByLabel('Name').fill(renamed);
+  await settings.getByLabel('Description').fill('What we do next');
+  await settings.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: renamed })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('heading', { level: 1, name: renamed })).toBeVisible();
+  await openFromMenu(page, 'Settings');
+  await expect(
+    page.getByRole('dialog', { name: 'Board settings' }).getByLabel('Description'),
+  ).toHaveValue('What we do next');
+  await page
+    .getByRole('dialog', { name: 'Board settings' })
+    .getByRole('button', { name: 'Cancel' })
+    .click();
+
+  // Archived: read-only, with a banner and a way back.
+  await openFromMenu(page, 'Archive board');
+  await expect(page.getByText('This board is archived and read-only for everyone.')).toBeVisible();
+  await expect(addListButton(page)).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Card options for Stays' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'List options for Backlog' })).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByText('This board is archived and read-only for everyone.')).toBeVisible();
+  // The operation itself refuses too, from the owner.
+  const board = new URL(page.url()).pathname.split('/')[2] ?? '';
+  const refused = await page.request.post('/api/ops', {
+    headers: { origin: new URL(page.url()).origin },
+    data: {
+      opId: crypto.randomUUID(),
+      op: 'list.create',
+      id: crypto.randomUUID(),
+      boardId: board,
+      name: 'No',
+      position: 'a5',
+    },
+  });
+  expect(await refused.json()).toEqual({ status: 'refused', code: 'not_found' });
+
+  await page
+    .getByRole('alert')
+    .getByRole('button', { name: 'Restore board' })
+    .or(page.getByRole('button', { name: 'Restore board' }))
+    .first()
+    .click();
+  await expect(addListButton(page)).toBeVisible();
+  await expect(page.getByText('This board is archived and read-only for everyone.')).toHaveCount(0);
+  await addList(page, 'Back to work');
+  await cleanUp(page, workspace);
+});
+
+test('a board is deleted by typing its name, and is gone from its workspace and the server', async ({
+  page,
+}) => {
+  await signedIn(page);
+  const { workspace, boardName } = await makeBoard(page);
+  const address = page.url();
+  await addCard(page, 'Backlog', 'Doomed card');
+  await openFromMenu(page, 'Delete board');
+  const dialog = page.getByRole('dialog', { name: 'Delete board' });
+  const confirm = dialog.getByRole('button', { name: 'Delete this board' });
+  await expect(confirm).toBeDisabled();
+  await dialog.getByLabel('Type the name to confirm').fill(boardName.toLowerCase());
+  await expect(confirm).toBeDisabled();
+  await dialog.getByLabel('Type the name to confirm').fill(boardName);
+  await confirm.click();
+  // Back at the workspace, where it is no longer a tile.
+  await expect(page).toHaveURL(/\/w\/[0-9a-f-]{36}$/);
+  await expect(page.getByRole('link', { name: boardName })).toHaveCount(0);
+  await page.goto(address);
+  await expect(page.getByRole('heading', { name: 'That is not here' })).toBeVisible();
+  await page.goBack();
+  await expect(page).toHaveURL(/\/w\//);
+  await page.getByRole('button', { name: 'Workspace settings' }).click();
+  await page.getByRole('button', { name: 'Delete workspace' }).click();
+  const wd = page.getByRole('dialog', { name: 'Delete workspace' });
+  await wd.getByLabel('Type the name to confirm').fill(workspace);
+  await wd.getByRole('button', { name: 'Delete this workspace' }).click();
 });

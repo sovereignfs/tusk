@@ -30,6 +30,10 @@ export const OPS = [
   'card.delete',
   'card.rename',
   'card.describe',
+  'board.update',
+  'board.archive',
+  'board.restore',
+  'board.delete',
 ] as const;
 export type OpName = (typeof OPS)[number];
 
@@ -91,7 +95,19 @@ export type Op =
   | { readonly op: 'card.delete'; readonly id: string }
   | { readonly op: 'card.rename'; readonly id: string; readonly title: string }
   /** Plain text, shown as written with its line breaks; nothing (or only space) is no description. */
-  | { readonly op: 'card.describe'; readonly id: string; readonly description: string };
+  | { readonly op: 'card.describe'; readonly id: string; readonly description: string }
+  /** The board's name, colour and description, together: the settings dialog sends all three. Visibility is its own operation (§14.3). */
+  | {
+      readonly op: 'board.update';
+      readonly id: string;
+      readonly name: string;
+      readonly color: string;
+      readonly description: string;
+    }
+  | { readonly op: 'board.archive'; readonly id: string }
+  | { readonly op: 'board.restore'; readonly id: string }
+  /** `name` is the board's name as it is, typed by the person: deleting is final and takes everything on the board (DESIGN.md §14.4). */
+  | { readonly op: 'board.delete'; readonly id: string; readonly name: string };
 
 /** A person's role in a workspace (DESIGN.md §7.2). */
 export type Role = 'owner' | 'member';
@@ -117,6 +133,8 @@ export const WORKSPACE_LIMITS = {
   cardTitleChars: 500,
   /** A card's description, in characters. */
   descriptionChars: 20_000,
+  /** A board's description, in characters. */
+  boardDescriptionChars: 2000,
   /** A position key, in characters. */
   positionChars: 64,
   /** A request body, in bytes: an operation is small. */
@@ -239,6 +257,8 @@ export interface OpRows {
   readonly board?: BoardRow;
   readonly list?: ListRow;
   readonly card?: CardTile;
+  /** The id of a board that is gone for good. */
+  readonly deletedBoard?: string;
   /** The id of a card that is gone for good. */
   readonly deletedCard?: string;
   /** The id of a list that is gone, with the cards that were on it. */

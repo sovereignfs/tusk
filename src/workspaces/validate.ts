@@ -34,7 +34,13 @@ const ARGUMENTS: Record<OpName, readonly string[]> = {
   'card.delete': ['id'],
   'card.rename': ['id', 'title'],
   'card.describe': ['id', 'description'],
+  'board.update': ['id', 'name', 'color', 'description'],
+  'board.archive': ['id'],
+  'board.restore': ['id'],
+  'board.delete': ['id', 'name'],
 };
+
+const BOARD_DESCRIPTION = text(0, WORKSPACE_LIMITS.boardDescriptionChars);
 
 const DESCRIPTION = text(0, WORKSPACE_LIMITS.descriptionChars);
 
@@ -253,6 +259,41 @@ export function parseOp(value: unknown): Parsed<OpRequest> {
         ok: true,
         value: { opId: opId.value, op: kind, id: id.value, description: description.value },
       };
+    }
+    case 'board.update': {
+      const id = uuid(value.id);
+      if (!id.ok) return no('id: not an id');
+      const name = NAME(typeof value.name === 'string' ? value.name.trim() : value.name);
+      if (!name.ok) return no(`name: ${name.reason}`);
+      if (typeof value.color !== 'string' || !HEX_COLOR.test(value.color))
+        return no('color: not a colour');
+      const description = BOARD_DESCRIPTION(value.description);
+      if (!description.ok) return no(`description: ${description.reason}`);
+      return {
+        ok: true,
+        value: {
+          opId: opId.value,
+          op: kind,
+          id: id.value,
+          name: name.value,
+          color: value.color,
+          description: description.value,
+        },
+      };
+    }
+    case 'board.archive':
+    case 'board.restore': {
+      const id = uuid(value.id);
+      if (!id.ok) return no('id: not an id');
+      return { ok: true, value: { opId: opId.value, op: kind, id: id.value } };
+    }
+    case 'board.delete': {
+      const id = uuid(value.id);
+      if (!id.ok) return no('id: not an id');
+      // The name is compared as it is typed, so it is not trimmed: a deletion is not done by accident.
+      const name = NAME(value.name);
+      if (!name.ok) return no(`name: ${name.reason}`);
+      return { ok: true, value: { opId: opId.value, op: kind, id: id.value, name: name.value } };
     }
   }
 }

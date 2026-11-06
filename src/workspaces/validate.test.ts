@@ -32,6 +32,10 @@ describe('an operation', () => {
       'card.delete',
       'card.rename',
       'card.describe',
+      'board.update',
+      'board.archive',
+      'board.restore',
+      'board.delete',
     ]);
   });
 
@@ -112,6 +116,40 @@ describe('an operation', () => {
       { op: 'card.describe', id: a, description: 'x'.repeat(20_001) },
       { op: 'card.describe', id: a, description: 7 },
       { op: 'card.describe', id: a },
+    ])
+      expect(parseOp({ opId: ID(), ...bad }).ok, JSON.stringify(bad)).toBe(false);
+  });
+
+  it('takes the board settings whole, and refuses a colour, a long description and a name typed with the space it was given', () => {
+    const a = ID();
+    const update = {
+      op: 'board.update',
+      id: a,
+      name: ' Plans ',
+      color: '#7c3aed',
+      description: 'Why\nand how',
+    };
+    expect(parseOp({ opId: ID(), ...update })).toMatchObject({
+      ok: true,
+      value: { name: 'Plans', description: 'Why\nand how' },
+    });
+    for (const each of [
+      { op: 'board.archive', id: a },
+      { op: 'board.restore', id: a },
+    ])
+      expect(parseOp({ opId: ID(), ...each }).ok, each.op).toBe(true);
+    // The name to delete is compared as typed: it is not trimmed.
+    expect(parseOp({ opId: ID(), op: 'board.delete', id: a, name: 'Plans ' })).toMatchObject({
+      ok: true,
+      value: { name: 'Plans ' },
+    });
+    for (const bad of [
+      { ...update, color: 'purple' },
+      { ...update, description: 'x'.repeat(2001) },
+      { ...update, visibility: 'private' },
+      { op: 'board.update', id: a, name: 'x', color: '#7c3aed' },
+      { op: 'board.delete', id: a, name: '' },
+      { op: 'board.archive', id: a, name: 'x' },
     ])
       expect(parseOp({ opId: ID(), ...bad }).ok, JSON.stringify(bad)).toBe(false);
   });

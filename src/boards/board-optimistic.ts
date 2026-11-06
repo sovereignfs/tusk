@@ -68,6 +68,24 @@ export function showingBoard(view: BoardView, op: Op): BoardView {
           each.id === op.id ? { ...each, listId: op.listId, position: op.position } : each,
         ),
       };
+    case 'board.update':
+      if (op.id !== view.board.id) return view;
+      return {
+        ...view,
+        board: {
+          ...view.board,
+          name: op.name,
+          color: op.color,
+          description: op.description.trim() === '' ? null : op.description,
+        },
+      };
+    case 'board.archive':
+      if (op.id !== view.board.id) return view;
+      return {
+        ...view,
+        board: { ...view.board, archived: true },
+        can: { ...view.can, edit: false },
+      };
     case 'card.rename':
       return {
         ...view,
@@ -97,6 +115,8 @@ export function settled(view: BoardView, op: Op, rows: OpRows): BoardView {
   if (card && card.boardId === view.board.id && op.op !== 'card.archive')
     cards = [...cards.filter((each) => each.id !== card.id), card];
   if (op.op === 'card.archive') cards = cards.filter((each) => each.id !== op.id);
+  // The board's own row, once the server has said so: an archived board is read-only for everyone, so it can no longer be edited.
+  const board = rows.board && rows.board.id === view.board.id ? rows.board : null;
   const goneCard = rows.deletedCard;
   if (goneCard) cards = cards.filter((each) => each.id !== goneCard);
   const row = rows.list;
@@ -111,7 +131,11 @@ export function settled(view: BoardView, op: Op, rows: OpRows): BoardView {
     ...view,
     lists: sortLists(lists),
     cards,
-    board: rows.version === undefined ? view.board : { ...view.board, version: rows.version },
+    board: {
+      ...(board ?? view.board),
+      version: rows.version === undefined ? (board ?? view.board).version : rows.version,
+    },
+    can: board && board.archived ? { ...view.can, edit: false } : view.can,
   };
 }
 

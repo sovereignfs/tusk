@@ -727,6 +727,9 @@ Lists are dragged by their header to reorder, which writes one row. A new list g
   keeps everything; restoring clears it. A published archived board stays published until it is unpublished.
 - **Delete** asks for its name to be typed, and removes it with everything on it, at once. There is no Undo; archive is the reversible half.
 
+**As built (task 17.2):** every operation of this section is an administrator's (a board's owner, or the owner of its workspace), and an archived board refuses all
+of them but Restore and Delete. Its settings dialog changes the name, colour and description; visibility is §14.3's.
+
 ### 14.5 Search on a board
 
 A search field in the board's header filters the cards shown, as you type, by title, label name and assignee name, in the browser over the board it has

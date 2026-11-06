@@ -6,6 +6,7 @@ import { type FormEvent, useCallback, useEffect, useState } from 'react';
 import { failureMessage, useWorkspaces } from '../boards/workspaces';
 import { SWATCHES } from '../lists/colors';
 import { WORKSPACE_LIMITS, type BoardRow } from '../workspaces/format';
+import { readableOn } from '../ui/contrast';
 import { Alert, Button, ColorPicker, Dialog, FormField, Icon, Input } from '../ui';
 import styles from './WorkspaceBoards.module.css';
 
@@ -83,8 +84,14 @@ export function WorkspaceBoards({ workspaceId }: { workspaceId: string }) {
 export function Tile({ board }: { board: BoardRow }) {
   return (
     <Link href={`/b/${board.id}`} className={styles.tile}>
-      {/* The colour is the board's own and is data: a band, with the name in the page's text colour on the page's own background. */}
-      <span className={styles.tileBand} style={{ background: board.color }} aria-hidden />
+      {/* The colour is the board's own and is data: a band with its initial, in black or white by contrast, and the name on the page's own background. */}
+      <span
+        className={styles.tileBand}
+        style={{ background: board.color, color: readableOn(board.color) }}
+        aria-hidden
+      >
+        {([...board.name][0] ?? '?').toUpperCase()}
+      </span>
       <span className={styles.tileName}>{board.name}</span>
       {board.visibility === 'private' ? (
         <span className={styles.tileNote}>
