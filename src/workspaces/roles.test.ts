@@ -9,6 +9,7 @@ import { boardsAdministeredBy, boardsEditableBy, boardsVisibleTo } from './can';
 import { type Op, OPS, type OpRefusal, type OpRequest, WORKSPACE_LIMITS } from './format';
 import {
   archivedCards,
+  cardDetail,
   boardVersion,
   boardsOfWorkspace,
   listWorkspaces,
@@ -201,6 +202,18 @@ const OPERATIONS: Row[] = [
   {
     op: 'card.delete',
     build: (w) => ({ op: 'card.delete', id: w.cards.archived }),
+    may: ['boardOwner', 'boardMember'],
+    otherwise: 'not_found',
+  },
+  {
+    op: 'card.rename',
+    build: (w) => ({ op: 'card.rename', id: w.cards.open, title: 'Renamed' }),
+    may: ['boardOwner', 'boardMember'],
+    otherwise: 'not_found',
+  },
+  {
+    op: 'card.describe',
+    build: (w) => ({ op: 'card.describe', id: w.cards.open, description: 'Words' }),
     may: ['boardOwner', 'boardMember'],
     otherwise: 'not_found',
   },
@@ -1122,6 +1135,66 @@ describe(`the roles (${leg})`, () => {
       expect(gone('activity')).toBe(0);
       expect(gone('label')).toBe(0);
       expect(await cardRow(w.cards.open)).toBeDefined();
+    });
+
+    it('renames a card and describes it, keeps the description as written, and takes a blank one for none', async () => {
+      const w = await seedWorld(database);
+      const start = await versionOf(w.boards.publicBoard);
+      expect(
+        await apply(w, 'boardMember', { op: 'card.rename', id: w.cards.open, title: 'Better' }),
+      ).toMatchObject({
+        status: 'applied',
+        rows: { card: { id: w.cards.open, title: 'Better' }, version: start + 1 },
+      });
+      const text = 'First line\n\n  indented <b>not html</b>\nlast';
+      expect(
+        await apply(w, 'boardMember', { op: 'card.describe', id: w.cards.open, description: text }),
+      ).toMatchObject({
+        rows: { card: { hasDescription: true } },
+      });
+      const read = await cardDetail(database, w.accounts.member, w.cards.open);
+      expect(read).toMatchObject({
+        title: 'Better',
+        description: text,
+        listName: 'Backlog',
+        archived: false,
+      });
+      expect(
+        await apply(w, 'boardMember', {
+          op: 'card.describe',
+          id: w.cards.open,
+          description: '  \n ',
+        }),
+      ).toMatchObject({
+        rows: { card: { hasDescription: false } },
+      });
+      expect((await cardDetail(database, w.accounts.member, w.cards.open))?.description).toBeNull();
+    });
+
+    it('reads a card for whoever can see its board, an archived one too, and for nobody else', async () => {
+      const w = await seedWorld(database);
+      expect((await cardDetail(database, w.accounts.member, w.cards.open))?.title).toBe('Open one');
+      expect(await cardDetail(database, w.accounts.member, w.cards.archived)).toMatchObject({
+        archived: true,
+      });
+      expect(await cardDetail(database, w.accounts.outsider, w.cards.open)).toBeUndefined();
+      expect(await cardDetail(database, w.accounts.member, id())).toBeUndefined();
+      // A card on a private board is not there for a member who is not on it.
+      const secret = id();
+      await apply(w, 'boardMember', {
+        op: 'card.create',
+        id: secret,
+        listId: w.lists.privateBoard,
+        title: 'Secret',
+        position: 'a0',
+      });
+      expect(await cardDetail(database, w.accounts.boardMember, secret)).toMatchObject({
+        title: 'Secret',
+      });
+      expect(await cardDetail(database, w.accounts.owner, secret)).toMatchObject({
+        title: 'Secret',
+      });
+      expect(await cardDetail(database, w.accounts.member, secret)).toBeUndefined();
     });
 
     it('reads archived cards for whoever can see the board, and for nobody else', async () => {

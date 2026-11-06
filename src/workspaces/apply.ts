@@ -360,6 +360,23 @@ async function run(
         ? { deletedCard: request.id, version }
         : { card: await cardTile(tx, request.id), version };
     }
+    case 'card.rename':
+    case 'card.describe': {
+      const changed = await dbAll<{ boardId: string }>(
+        tx,
+        request.op === 'card.rename'
+          ? sql`UPDATE ${t.card} SET title = ${request.title}, updated_at = ${now}
+                WHERE id = ${request.id} AND board_id IN ${boardsEditableBy(tx, accountId)}
+                RETURNING board_id AS "boardId"`
+          : sql`UPDATE ${t.card} SET description = ${request.description.trim() === '' ? null : request.description}, updated_at = ${now}
+                WHERE id = ${request.id} AND board_id IN ${boardsEditableBy(tx, accountId)}
+                RETURNING board_id AS "boardId"`,
+      );
+      const boardId = changed[0]?.boardId;
+      if (!boardId) throw new Refused('not_found');
+      const version = await touchBoard(tx, boardId, boardsEditableBy(tx, accountId), now);
+      return { card: await cardTile(tx, request.id), version };
+    }
     case 'workspace.rename': {
       // The permission is in the statement: only an owner's workspace is a row it can reach.
       const changed = await dbAll<{ createdAt: number | string }>(

@@ -11,6 +11,9 @@ import {
 } from '@dnd-kit/core';
 import { SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortable';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import type { ReactNode } from 'react';
+import { BoardContext } from '../boards/context';
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import {
   cardPositionFor,
@@ -52,8 +55,16 @@ const collisions: CollisionDetection = (args) => {
     : closestCorners({ ...args, droppableContainers: containers });
 };
 
-export function BoardScreen({ initial }: { initial: BoardView }) {
+export function BoardScreen({
+  initial,
+  children,
+}: {
+  initial: BoardView;
+  /** What the board's address shows over it: a card's dialog, when its address is the one open. */
+  children?: ReactNode;
+}) {
   const toast = useToast();
+  const router = useRouter();
   const store = useBoard(initial, (reason) =>
     toast.show({ title: boardFailureMessage(reason), category: 'warning' }),
   );
@@ -136,141 +147,145 @@ export function BoardScreen({ initial }: { initial: BoardView }) {
 
   const full = view.lists.length >= WORKSPACE_LIMITS.listsPerBoard;
   return (
-    <div className={styles.page}>
-      <div className={styles.band} style={{ background: view.board.color }} aria-hidden />
-      <header className={styles.header}>
-        <Link href={`/w/${view.workspace.id}`} className={styles.crumb}>
-          {view.workspace.name}
-        </Link>
-        <h1 className={styles.title}>{view.board.name}</h1>
-        {view.board.archived ? (
-          <span className={styles.badge}>Archived</span>
-        ) : !view.can.edit ? (
-          <span className={styles.badge}>Viewing</span>
+    <BoardContext.Provider value={store}>
+      <div className={styles.page}>
+        <div className={styles.band} style={{ background: view.board.color }} aria-hidden />
+        <header className={styles.header}>
+          <Link href={`/w/${view.workspace.id}`} className={styles.crumb}>
+            {view.workspace.name}
+          </Link>
+          <h1 className={styles.title}>{view.board.name}</h1>
+          {view.board.archived ? (
+            <span className={styles.badge}>Archived</span>
+          ) : !view.can.edit ? (
+            <span className={styles.badge}>Viewing</span>
+          ) : null}
+          <button type="button" className={styles.link} onClick={() => setArchivedOpen(true)}>
+            Archived cards
+          </button>
+        </header>
+        {offline ? (
+          <Alert variant="warning">
+            This board needs a connection. It is as it was when it was last read, and cannot be
+            changed until you are back online.
+          </Alert>
         ) : null}
-        <button type="button" className={styles.link} onClick={() => setArchivedOpen(true)}>
-          Archived cards
-        </button>
-      </header>
-      {offline ? (
-        <Alert variant="warning">
-          This board needs a connection. It is as it was when it was last read, and cannot be
-          changed until you are back online.
-        </Alert>
-      ) : null}
-      <DndContext
-        id={`board-${view.board.id}`}
-        sensors={sensors}
-        autoScroll={HORIZONTAL_AUTOSCROLL}
-        collisionDetection={collisions}
-        onDragStart={onDragStart}
-        onDragEnd={onDragEnd}
-        onDragCancel={() => {
-          guard.end();
-          setDragging(null);
-        }}
-      >
-        <SortableContext
-          items={view.lists.map((each) => each.id)}
-          strategy={horizontalListSortingStrategy}
+        <DndContext
+          id={`board-${view.board.id}`}
+          sensors={sensors}
+          autoScroll={HORIZONTAL_AUTOSCROLL}
+          collisionDetection={collisions}
+          onDragStart={onDragStart}
+          onDragEnd={onDragEnd}
+          onDragCancel={() => {
+            guard.end();
+            setDragging(null);
+          }}
         >
-          <div className={styles.columns}>
-            {view.lists.map((list, index) => (
-              <ListColumn
-                key={list.id}
-                list={list}
-                cards={cardsIn(view.cards, list.id)}
-                index={index}
-                count={view.lists.length}
-                editable={editable}
-                onRename={(next) =>
-                  void store.perform({ op: 'list.rename', id: list.id, name: next })
-                }
-                onMove={(to) =>
-                  void store.perform({
-                    op: 'list.move',
-                    id: list.id,
-                    position: positionFor(view.lists, list.id, to),
-                  })
-                }
-                onDelete={() => void store.perform({ op: 'list.delete', id: list.id })}
-                onAddCard={(title) =>
-                  void store.perform({
-                    op: 'card.create',
-                    id: crypto.randomUUID(),
-                    listId: list.id,
-                    title,
-                    position: topPosition(view.cards, list.id),
-                  })
-                }
-                onArchiveCard={(card) => void store.perform({ op: 'card.archive', id: card.id })}
-              />
-            ))}
-            {editable ? (
-              <div className={styles.add}>
-                {adding ? (
-                  <form ref={addForm} onSubmit={addList} className={styles.addForm}>
-                    <Input
-                      aria-label="Name of the new list"
-                      value={name}
-                      maxLength={WORKSPACE_LIMITS.nameChars}
-                      placeholder="Name of the list"
-                      onChange={(event) => setName(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Escape') {
-                          setAdding(false);
-                          setName('');
-                        }
-                      }}
-                    />
-                    <div className={styles.actions}>
-                      <Button type="submit" disabled={name.trim() === ''}>
-                        Add list
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        onClick={() => {
-                          setAdding(false);
-                          setName('');
+          <SortableContext
+            items={view.lists.map((each) => each.id)}
+            strategy={horizontalListSortingStrategy}
+          >
+            <div className={styles.columns}>
+              {view.lists.map((list, index) => (
+                <ListColumn
+                  key={list.id}
+                  list={list}
+                  cards={cardsIn(view.cards, list.id)}
+                  index={index}
+                  count={view.lists.length}
+                  editable={editable}
+                  onRename={(next) =>
+                    void store.perform({ op: 'list.rename', id: list.id, name: next })
+                  }
+                  onMove={(to) =>
+                    void store.perform({
+                      op: 'list.move',
+                      id: list.id,
+                      position: positionFor(view.lists, list.id, to),
+                    })
+                  }
+                  onDelete={() => void store.perform({ op: 'list.delete', id: list.id })}
+                  onAddCard={(title) =>
+                    void store.perform({
+                      op: 'card.create',
+                      id: crypto.randomUUID(),
+                      listId: list.id,
+                      title,
+                      position: topPosition(view.cards, list.id),
+                    })
+                  }
+                  onArchiveCard={(card) => void store.perform({ op: 'card.archive', id: card.id })}
+                  onOpenCard={(card) => router.push(`/b/${view.board.id}/c/${card.id}`)}
+                />
+              ))}
+              {editable ? (
+                <div className={styles.add}>
+                  {adding ? (
+                    <form ref={addForm} onSubmit={addList} className={styles.addForm}>
+                      <Input
+                        aria-label="Name of the new list"
+                        value={name}
+                        maxLength={WORKSPACE_LIMITS.nameChars}
+                        placeholder="Name of the list"
+                        onChange={(event) => setName(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Escape') {
+                            setAdding(false);
+                            setName('');
+                          }
                         }}
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  </form>
-                ) : (
-                  <Button
-                    variant="secondary"
-                    disabled={full}
-                    title={full ? 'A board can hold 100 lists.' : undefined}
-                    onClick={() => setAdding(true)}
-                  >
-                    <Icon name="plus" aria-hidden /> Add a list
-                  </Button>
-                )}
+                      />
+                      <div className={styles.actions}>
+                        <Button type="submit" disabled={name.trim() === ''}>
+                          Add list
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={() => {
+                            setAdding(false);
+                            setName('');
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </form>
+                  ) : (
+                    <Button
+                      variant="secondary"
+                      disabled={full}
+                      title={full ? 'A board can hold 100 lists.' : undefined}
+                      onClick={() => setAdding(true)}
+                    >
+                      <Icon name="plus" aria-hidden /> Add a list
+                    </Button>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          </SortableContext>
+          <DragOverlay>
+            {dragging ? (
+              <div className={`${styles.card} ${styles.overlay}`}>
+                <TileBody card={dragging} />
               </div>
             ) : null}
-          </div>
-        </SortableContext>
-        <DragOverlay>
-          {dragging ? (
-            <div className={`${styles.card} ${styles.overlay}`}>
-              <TileBody card={dragging} />
-            </div>
-          ) : null}
-        </DragOverlay>
-      </DndContext>
-      {archivedOpen ? (
-        <ArchivedDialog
-          boardId={view.board.id}
-          lists={view.lists}
-          editable={editable}
-          onClose={() => setArchivedOpen(false)}
-          perform={store.perform}
-        />
-      ) : null}
-    </div>
+          </DragOverlay>
+        </DndContext>
+        {archivedOpen ? (
+          <ArchivedDialog
+            boardId={view.board.id}
+            lists={view.lists}
+            editable={editable}
+            onClose={() => setArchivedOpen(false)}
+            perform={store.perform}
+          />
+        ) : null}
+        {children}
+      </div>
+    </BoardContext.Provider>
   );
 }
 

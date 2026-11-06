@@ -7,6 +7,7 @@ import type { Directory } from '../auth/directory';
 import { boardsEditableBy, boardsAdministeredBy, boardsVisibleTo, workspacesOf } from './can';
 import {
   type ArchivedCard,
+  type CardDetail,
   type CardTile,
   type BoardRow,
   type BoardsIndex,
@@ -318,4 +319,53 @@ export async function archivedCards(
         ORDER BY archived_at DESC, id LIMIT ${WORKSPACE_LIMITS.cardsPerBoard}`,
   );
   return rows.map((row) => ({ ...row, archivedAt: Number(row.archivedAt) }));
+}
+
+/**
+ * A card whole, for its dialog (DESIGN.md §17.6), for someone who can see its board: **the statement names the asker**, so a card on a board that is not
+ * theirs is `undefined`, the same as one that is not there. An archived card is read too, since a link to it may be followed.
+ */
+export async function cardDetail(
+  database: Database,
+  accountId: string,
+  cardId: string,
+): Promise<CardDetail | undefined> {
+  const t = tablesOf(database);
+  const row = await dbGet<{
+    id: string;
+    boardId: string;
+    listId: string;
+    listName: string;
+    title: string;
+    position: string;
+    description: string | null;
+    dueDate: string | null;
+    dueTime: string | null;
+    archivedAt: number | string | null;
+    createdAt: number | string;
+    updatedAt: number | string;
+  }>(
+    database,
+    sql`SELECT c.id AS id, c.board_id AS "boardId", c.list_id AS "listId", l.name AS "listName", c.title AS title, c.position AS position,
+          c.description AS description, c.due_date AS "dueDate", c.due_time AS "dueTime", c.archived_at AS "archivedAt",
+          c.created_at AS "createdAt", c.updated_at AS "updatedAt"
+        FROM ${t.card} c JOIN ${t.boardList} l ON l.id = c.list_id
+        WHERE c.id = ${cardId} AND c.board_id IN ${boardsVisibleTo(database, accountId)}`,
+  );
+  if (!row) return undefined;
+  return {
+    id: row.id,
+    boardId: row.boardId,
+    listId: row.listId,
+    listName: row.listName,
+    title: row.title,
+    position: row.position,
+    dueDate: row.dueDate,
+    dueTime: row.dueTime,
+    hasDescription: row.description !== null && row.description !== '',
+    description: row.description,
+    archived: row.archivedAt !== null,
+    createdAt: Number(row.createdAt),
+    updatedAt: Number(row.updatedAt),
+  };
 }

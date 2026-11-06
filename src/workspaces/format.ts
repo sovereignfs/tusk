@@ -28,6 +28,8 @@ export const OPS = [
   'card.archive',
   'card.restore',
   'card.delete',
+  'card.rename',
+  'card.describe',
 ] as const;
 export type OpName = (typeof OPS)[number];
 
@@ -86,7 +88,10 @@ export type Op =
   /** Back to its list and its position, which archiving did not touch. */
   | { readonly op: 'card.restore'; readonly id: string }
   /** Only an archived card is deleted (§15.8), with its labels, assignees, checklist and comments; its activity stays. */
-  | { readonly op: 'card.delete'; readonly id: string };
+  | { readonly op: 'card.delete'; readonly id: string }
+  | { readonly op: 'card.rename'; readonly id: string; readonly title: string }
+  /** Plain text, shown as written with its line breaks; nothing (or only space) is no description. */
+  | { readonly op: 'card.describe'; readonly id: string; readonly description: string };
 
 /** A person's role in a workspace (DESIGN.md §7.2). */
 export type Role = 'owner' | 'member';
@@ -110,6 +115,8 @@ export const WORKSPACE_LIMITS = {
   cardsPerBoard: 5000,
   /** A card's title, in characters (DESIGN.md §15.1). */
   cardTitleChars: 500,
+  /** A card's description, in characters. */
+  descriptionChars: 20_000,
   /** A position key, in characters. */
   positionChars: 64,
   /** A request body, in bytes: an operation is small. */
@@ -197,6 +204,15 @@ export interface CardTile {
   readonly dueDate: string | null;
   readonly dueTime: string | null;
   readonly hasDescription: boolean;
+}
+
+/** A card whole, for its dialog (DESIGN.md §17.6): what the tile shows and the description, and the list it is in. */
+export interface CardDetail extends CardTile {
+  readonly listName: string;
+  readonly description: string | null;
+  readonly archived: boolean;
+  readonly createdAt: number;
+  readonly updatedAt: number;
 }
 
 /** An archived card, for the list of them (DESIGN.md §15.8). */

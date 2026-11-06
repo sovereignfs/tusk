@@ -10,16 +10,18 @@ import styles from './BoardScreen.module.css';
  * A card on a board (DESIGN.md §15.1): its title and the badges for what it has, as a tile. **It is dragged by its whole surface, with no handle:** a
  * press that does not move is a click (the pointer sensor needs a few pixels), and the keyboard picks up a focused card with Space, moves it with the
  * arrows and puts it down with Space. The menu beside it is its own button, outside the draggable surface, so a key pressed on it is not a pick-up.
- * Opening a card is task 18.2; the badges for labels, checklist, comments and people join as their tasks are built.
+ * A click or Enter opens it (its dialog, `CardDialog`); the badges for labels, checklist, comments and people join as their tasks are built.
  */
 export function CardTileView({
   card,
   editable,
   onArchive,
+  onOpen,
 }: {
   card: CardTile;
   editable: boolean;
   onArchive: () => void;
+  onOpen: () => void;
 }) {
   const sortable = useSortable({
     id: card.id,
@@ -39,11 +41,18 @@ export function CardTileView({
       style={style}
       className={`${styles.cardWrap} ${sortable.isDragging ? styles.dragging : ''}`}
     >
+      {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- dnd-kit's attributes give it role="button" and a place in the tab order */}
       <div
         ref={sortable.setActivatorNodeRef}
         className={styles.card}
         {...sortable.attributes}
         {...sortable.listeners}
+        onClick={onOpen}
+        onKeyDown={(event) => {
+          sortable.listeners?.onKeyDown?.(event);
+          // Enter opens it; Space is the pick-up.
+          if (event.key === 'Enter') onOpen();
+        }}
         aria-label={card.title}
         aria-roledescription="sortable card"
       >

@@ -68,6 +68,18 @@ export function showingBoard(view: BoardView, op: Op): BoardView {
           each.id === op.id ? { ...each, listId: op.listId, position: op.position } : each,
         ),
       };
+    case 'card.rename':
+      return {
+        ...view,
+        cards: view.cards.map((each) => (each.id === op.id ? { ...each, title: op.title } : each)),
+      };
+    case 'card.describe':
+      return {
+        ...view,
+        cards: view.cards.map((each) =>
+          each.id === op.id ? { ...each, hasDescription: op.description.trim() !== '' } : each,
+        ),
+      };
     case 'card.archive':
     case 'card.delete':
       return { ...view, cards: view.cards.filter((each) => each.id !== op.id) };

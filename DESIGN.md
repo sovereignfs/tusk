@@ -950,6 +950,9 @@ directly. Two columns at desktop widths: the title and the list it is in; labels
 checklist; then Comments and Activity as two tabs. A side column holds the actions: Move, Clone, Archive, and the pickers. On a narrow screen it is one
 column.
 
+**As built (task 18.2):** the dialog is the page of its address, rendered inside the board's layout (`app/(app)/b/[id]/layout.tsx`), not an intercepting route: the board stays mounted
+and is not read again, and an address opened directly shows the board with the dialog over it. Its fields save as they are left, through the board's store.
+
 ### 17.7 Colours
 
 Boards, Desk lists and labels each have a colour, and **any colour can be picked**: `ColorPicker` from the design system, offering a row of suggested

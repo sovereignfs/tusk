@@ -24,6 +24,7 @@ export function ListColumn({
   onDelete,
   onAddCard,
   onArchiveCard,
+  onOpenCard,
 }: {
   list: ListRow;
   /** Its open cards, top to bottom. */
@@ -39,6 +40,7 @@ export function ListColumn({
   /** A card with this title at the top of the list. */
   onAddCard(title: string): void;
   onArchiveCard(card: CardTile): void;
+  onOpenCard(card: CardTile): void;
 }) {
   const sortable = useSortable({ id: list.id, data: { type: 'list' }, disabled: !editable });
   const [menu, setMenu] = useState(false);
@@ -177,6 +179,7 @@ export function ListColumn({
               card={card}
               editable={editable}
               onArchive={() => onArchiveCard(card)}
+              onOpen={() => onOpenCard(card)}
             />
           ))}
         </SortableContext>

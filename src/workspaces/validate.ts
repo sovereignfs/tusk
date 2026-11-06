@@ -32,7 +32,11 @@ const ARGUMENTS: Record<OpName, readonly string[]> = {
   'card.archive': ['id'],
   'card.restore': ['id'],
   'card.delete': ['id'],
+  'card.rename': ['id', 'title'],
+  'card.describe': ['id', 'description'],
 };
+
+const DESCRIPTION = text(0, WORKSPACE_LIMITS.descriptionChars);
 
 const TITLE = text(1, WORKSPACE_LIMITS.cardTitleChars);
 
@@ -232,6 +236,23 @@ export function parseOp(value: unknown): Parsed<OpRequest> {
       const id = uuid(value.id);
       if (!id.ok) return no('id: not an id');
       return { ok: true, value: { opId: opId.value, op: kind, id: id.value } };
+    }
+    case 'card.rename': {
+      const id = uuid(value.id);
+      if (!id.ok) return no('id: not an id');
+      const title = TITLE(typeof value.title === 'string' ? value.title.trim() : value.title);
+      if (!title.ok) return no(`title: ${title.reason}`);
+      return { ok: true, value: { opId: opId.value, op: kind, id: id.value, title: title.value } };
+    }
+    case 'card.describe': {
+      const id = uuid(value.id);
+      if (!id.ok) return no('id: not an id');
+      const description = DESCRIPTION(value.description);
+      if (!description.ok) return no(`description: ${description.reason}`);
+      return {
+        ok: true,
+        value: { opId: opId.value, op: kind, id: id.value, description: description.value },
+      };
     }
   }
 }

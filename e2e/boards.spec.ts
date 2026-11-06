@@ -305,3 +305,91 @@ test('a card is archived from its menu, listed under Archived cards, restored to
   expect(await cardsOf(page, 'Backlog')).toEqual(['Keep']);
   await cleanUp(page, workspace);
 });
+
+test('a card opens over its board at its own address, saves what is left, keeps its place on reload, and closes by replacing the address', async ({
+  page,
+}) => {
+  await signedIn(page);
+  const { workspace } = await makeBoard(page);
+  await addCard(page, 'Backlog', 'Write the spec');
+  const board = page.url();
+
+  // A click opens it; the address is the card's.
+  await page
+    .locator('section[aria-label="Backlog"]')
+    .getByLabel('Write the spec', { exact: true })
+    .click();
+  // Named by the card as it was opened, whatever is typed in it after.
+  const dialog = page.getByRole('dialog', { name: 'Write the spec' });
+  await expect(dialog).toBeVisible();
+  await expect(page).toHaveURL(/\/b\/[0-9a-f-]{36}\/c\/[0-9a-f-]{36}$/);
+  const address = page.url();
+  await expect(dialog.getByText('Backlog', { exact: true })).toBeVisible();
+
+  // Saved as it is left, and the tile behind follows at once.
+  await dialog.getByLabel('Title').fill('Write the better spec');
+  await dialog.getByLabel('Description').click();
+  await expect(
+    page
+      .locator('section[aria-label="Backlog"]')
+      .getByLabel('Write the better spec', { exact: true }),
+  ).toBeVisible();
+  await dialog.getByLabel('Description').fill('First line\n\nSecond <b>paragraph</b>');
+  await dialog.getByLabel('Title').click();
+  await expect(
+    page.locator('section[aria-label="Backlog"]').getByLabel('Has a description'),
+  ).toBeVisible();
+
+  // A title emptied goes back to the one it had, and nothing is sent.
+  await dialog.getByLabel('Title').fill('   ');
+  await dialog.getByLabel('Description').click();
+  await expect(dialog.getByLabel('Title')).toHaveValue('Write the better spec');
+
+  // Reloading the address opens the same card, over the board, with what was saved.
+  await page.reload();
+  const again = page.getByRole('dialog', { name: 'Write the better spec' });
+  await expect(again.getByLabel('Description')).toHaveValue(
+    'First line\n\nSecond <b>paragraph</b>',
+  );
+  expect(page.url()).toBe(address);
+
+  // Closing replaces the address with the board's, so Back does not return to the card.
+  await again.getByRole('button', { name: 'Close' }).click();
+  await expect(page).toHaveURL(board);
+  await expect(page.getByRole('dialog', { name: 'Write the better spec' })).toHaveCount(0);
+  await page.goBack();
+  await expect(page).not.toHaveURL(address);
+  await cleanUp(page, workspace);
+});
+
+test('a card is opened with Enter, archived from its dialog, and a card that is not there is the page for what is not here', async ({
+  page,
+  baseURL,
+}) => {
+  await signedIn(page);
+  const { workspace } = await makeBoard(page);
+  await addCard(page, 'Backlog', 'Keyboard card');
+  const tile = page
+    .locator('section[aria-label="Backlog"]')
+    .getByLabel('Keyboard card', { exact: true });
+  await tile.focus();
+  await page.keyboard.press('Enter');
+  const dialog = page.getByRole('dialog', { name: 'Keyboard card' });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: 'Archive' }).click();
+  await expect(page.getByRole('dialog', { name: 'Keyboard card' })).toHaveCount(0);
+  await expect.poll(() => cardsOf(page, 'Backlog')).toEqual([]);
+
+  // The address of a card that is not there, or of another board, or not an id, is the page for what is not here.
+  const board = new URL(page.url()).pathname.split('/')[2] ?? '';
+  for (const path of [`/b/${board}/c/${crypto.randomUUID()}`, `/b/${board}/c/not-an-id`]) {
+    await page.goto(path);
+    await expect(page.getByRole('heading', { name: 'That is not here' })).toBeVisible();
+  }
+  const none = crypto.randomUUID();
+  expect((await page.request.get(`/api/cards/${none}`)).status()).toBe(404);
+  expect((await page.request.get('/api/cards/not-an-id')).status()).toBe(404);
+  void baseURL;
+  await page.goto(`/b/${board}`);
+  await cleanUp(page, workspace);
+});

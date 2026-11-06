@@ -163,6 +163,22 @@ describe('cards on a board', () => {
     ).toBe(v);
   });
 
+  it('shows a rename and whether a description is there', () => {
+    const v = base();
+    expect(
+      showingBoard(v, { op: 'card.rename', id: 'x', title: 'Renamed' }).cards.find(
+        (c) => c.id === 'x',
+      )?.title,
+    ).toBe('Renamed');
+    const described = showingBoard(v, { op: 'card.describe', id: 'x', description: 'Words' });
+    expect(described.cards.find((c) => c.id === 'x')?.hasDescription).toBe(true);
+    expect(
+      showingBoard(described, { op: 'card.describe', id: 'x', description: '  ' }).cards.find(
+        (c) => c.id === 'x',
+      )?.hasDescription,
+    ).toBe(false);
+  });
+
   it('finds the position among what is shown: the top, between two, and the end, in this list or another', () => {
     const v = base();
     expect(comparePositions(cardPositionFor(v.cards, 'y', 'a', 0), 'a0')).toBe(-1);

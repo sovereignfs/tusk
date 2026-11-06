@@ -30,6 +30,8 @@ describe('an operation', () => {
       'card.archive',
       'card.restore',
       'card.delete',
+      'card.rename',
+      'card.describe',
     ]);
   });
 
@@ -90,6 +92,28 @@ describe('an operation', () => {
     ];
     for (const each of bad)
       expect(parseOp({ opId: ID(), ...(each as object) }).ok, JSON.stringify(each)).toBe(false);
+  });
+
+  it('takes a rename and a description, and refuses a blank title, and a description that is too long', () => {
+    const a = ID();
+    const lines = 'one\n\n two ';
+    expect(parseOp({ opId: ID(), op: 'card.rename', id: a, title: ' New ' })).toMatchObject({
+      ok: true,
+      value: { title: 'New' },
+    });
+    // A description is kept as written, and an empty one is a description of nothing.
+    expect(parseOp({ opId: ID(), op: 'card.describe', id: a, description: lines })).toMatchObject({
+      ok: true,
+      value: { description: lines },
+    });
+    expect(parseOp({ opId: ID(), op: 'card.describe', id: a, description: '' }).ok).toBe(true);
+    for (const bad of [
+      { op: 'card.rename', id: a, title: '   ' },
+      { op: 'card.describe', id: a, description: 'x'.repeat(20_001) },
+      { op: 'card.describe', id: a, description: 7 },
+      { op: 'card.describe', id: a },
+    ])
+      expect(parseOp({ opId: ID(), ...bad }).ok, JSON.stringify(bad)).toBe(false);
   });
 
   it('refuses a colour that is not #rrggbb, a position that is not one, a blank name and a key it does not take', () => {
