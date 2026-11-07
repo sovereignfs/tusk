@@ -23,7 +23,14 @@ const ids = { newId: () => crypto.randomUUID() };
 type Stage =
   | { kind: 'idle' }
   | { kind: 'refused'; error: string }
-  | { kind: 'ready'; source: string; file: TuskExport; summary: Summary }
+  | {
+      kind: 'ready';
+      source: string;
+      file: TuskExport;
+      summary: Summary;
+      /** What was changed or left behind in reading another app's file, said before anything is written. */
+      converted: readonly string[] | undefined;
+    }
   | { kind: 'working' }
   | { kind: 'done'; message: string }
   | { kind: 'failed'; message: string };
@@ -49,7 +56,13 @@ export function ImportSection() {
     const source = await file.text();
     const read = validateFile(source);
     if (!read.ok) return setStage({ kind: 'refused', error: read.error });
-    setStage({ kind: 'ready', source, file: read.file, summary: summarise(read.file) });
+    setStage({
+      kind: 'ready',
+      source,
+      file: read.file,
+      summary: summarise(read.file),
+      converted: read.converted,
+    });
   }
 
   /** The Desk's part as mutations, worked out against what the Desk has: pure, and nothing is committed here. */
@@ -148,9 +161,9 @@ export function ImportSection() {
     <div className={styles.group}>
       <h2>Import</h2>
       <p>
-        Choose a file made by Export. Importing always adds: it never replaces or merges, so
-        importing the same file twice makes two copies. Comments and activity are kept in the file
-        as a record and are not imported.
+        Choose a file made by Export, or the file the Sovereign Tasks plugin saves. Importing always
+        adds: it never replaces or merges, so importing the same file twice makes two copies.
+        Comments and activity are kept in the file as a record and are not imported.
       </p>
       <input
         type="file"
@@ -177,6 +190,19 @@ export function ImportSection() {
               : ''}
             .
           </p>
+          {stage.converted ? (
+            <div>
+              <p>This is a Sovereign Tasks file, and it was read as a Desk:</p>
+              <ul aria-label="What was changed">
+                {stage.converted.length === 0 ? (
+                  <li>Everything in it is carried as it is.</li>
+                ) : null}
+                {stage.converted.map((each) => (
+                  <li key={each}>{each}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           {stage.file.scope === 'board' ? (
             <FormField label="Into which workspace?">
               {(field) => (

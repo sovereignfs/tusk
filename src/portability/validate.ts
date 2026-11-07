@@ -2,6 +2,7 @@ import { type Parser, bool, hhmm, isoDate, nullable, oneOf, text, uuid } from '.
 import { HEX_COLOR } from '../lists/colors';
 import { SORTS } from '../lists/sort';
 import { parseRule } from '../recurrence';
+import { convertTasksPlugin, isPluginFile } from './plugin';
 import { FIELD_NAMES, LIMITS } from '../sync/format';
 import { WORKSPACE_LIMITS } from '../workspaces/format';
 import {
@@ -29,7 +30,9 @@ import {
  */
 export const MAX_FILE_BYTES = 50 * 1024 * 1024;
 
-export type Validated = { ok: true; file: TuskExport } | { ok: false; error: string };
+export type Validated =
+  /** `converted` is what was changed or left behind when the file was another app's, in words: the preview shows it before anything is written. */
+  { ok: true; file: TuskExport; converted?: readonly string[] } | { ok: false; error: string };
 
 class Bad extends Error {}
 
@@ -415,6 +418,14 @@ export function validateFile(source: string): Validated {
   } catch {
     return { ok: false, error: 'the file is not JSON' };
   }
+  // The tasks plugin's file is turned into a Desk export of this version first, and read like any other (`plugin.ts`).
+  let converted: readonly string[] | undefined;
+  if (isPluginFile(raw)) {
+    const result = convertTasksPlugin(raw, new Date());
+    if (!result.ok) return { ok: false, error: result.error };
+    raw = result.conversion.file;
+    converted = result.conversion.notes;
+  }
   try {
     const o = rec(raw, 'file');
     if (o.format !== FORMAT) throw new Bad('format: this is not a Tusk export');
@@ -452,6 +463,7 @@ export function validateFile(source: string): Validated {
     };
     return {
       ok: true,
+      ...(converted ? { converted } : {}),
       file: {
         format: FORMAT,
         version: VERSION,

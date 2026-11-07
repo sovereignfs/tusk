@@ -152,7 +152,7 @@ A person's data can come in and go out, keeps itself safe in their own repositor
 | 80  | [14.4](docs/epics/encryption.md) | Turning it on later                 | P1       | 14.3                       | ✅     |
 | 81  | [14.5](docs/epics/encryption.md) | Encrypted export, import and backup | P1       | 9.2, 10.4, 14.3            | ✅     |
 | 82  | [14.7](docs/epics/encryption.md) | Operator-key mode                   | P2       | 10.1, 13.2, 14.2, 18.6     | 📋     |
-| 83  | [9.3](docs/epics/portability.md) | Reading the tasks plugin's file     | P2       | 9.2                        | 📋     |
+| 83  | [9.3](docs/epics/portability.md) | Reading the tasks plugin's file     | P2       | 9.2                        | ✅     |
 
 ### Milestone H — Part of the suite
 

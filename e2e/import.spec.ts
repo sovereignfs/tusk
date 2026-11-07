@@ -265,3 +265,92 @@ test('the route checks the file again, and takes it only from the signed-in, fro
   const big = await request.post('/api/import', { headers, data: ' '.repeat(51 * 1024 * 1024) });
   expect(big.status()).toBe(413);
 });
+
+test('the tasks plugin’s file is read as a Desk, says what it changed before anything is written, and its lists and tasks arrive with the repeat working', async ({
+  page,
+}) => {
+  await signedIn(page);
+  const stem = unique('Plugin');
+  const t = (day: string) => Math.floor(Date.parse(`${day}T09:00:00Z`) / 1000);
+  const item = (extra: Record<string, unknown>) => ({
+    id: 'x',
+    listId: 'l1',
+    parentId: null,
+    assigneeId: null,
+    title: 'A task',
+    notes: null,
+    favorite: false,
+    dueDate: null,
+    dueTime: null,
+    reminderSentAt: null,
+    completedAt: null,
+    sortOrder: 0,
+    recurrenceRule: null,
+    seriesId: null,
+    createdAt: 1,
+    updatedAt: 1,
+    ...extra,
+  });
+  const file = {
+    pluginId: 'fs.sovereign.tasks',
+    schemaVersion: 1,
+    data: {
+      lists: [
+        { id: 'l1', title: stem, color: '#16a34a', sortOrder: 1, createdAt: 1, updatedAt: 1 },
+      ],
+      userListPrefs: [],
+      views: [
+        {
+          id: 'v1',
+          listId: 'l1',
+          name: 'Board',
+          kind: 'board',
+          config: '{}',
+          isDefault: true,
+          sortOrder: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+      items: [
+        item({ id: 'a', title: `${stem} milk`, notes: 'Oat', favorite: true, sortOrder: 1 }),
+        item({
+          id: 'b',
+          parentId: 'a',
+          title: `${stem} oat milk`,
+          sortOrder: 1,
+          completedAt: t('2026-11-01'),
+        }),
+        item({
+          id: 'c',
+          title: `${stem} bins`,
+          dueDate: '2026-11-09',
+          recurrenceRule: 'FREQ=WEEKLY;BYDAY=MO',
+          seriesId: 's',
+          sortOrder: 2,
+        }),
+      ],
+      notificationPrefs: null,
+    },
+  };
+  await page.goto('/account?section=data');
+  await page.getByLabel('File to import').setInputFiles({
+    name: 'tasks.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(file)),
+  });
+  await expect(holds(page)).toContainText('your Desk: 1 list, 2 cards');
+  // What it changed or left behind is said before anything is written.
+  await expect(page.getByText('This is a Sovereign Tasks file')).toBeVisible();
+  await expect(page.getByLabel('What was changed')).toContainText('saved view');
+  await importButton(page).click();
+  await expect(imported(page)).toContainText('1 list, 2 cards added to your Desk');
+
+  await page.goto('/desk');
+  await lists(page, stem).click();
+  await expect(page.getByRole('link', { name: `${stem} milk`, exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: `${stem} bins`, exact: true })).toBeVisible();
+  // The checklist came with the card, and the repeat is a repeat.
+  await page.getByRole('link', { name: `${stem} bins`, exact: true }).click();
+  await expect(page.getByText(/Repeats/)).toBeVisible();
+});
