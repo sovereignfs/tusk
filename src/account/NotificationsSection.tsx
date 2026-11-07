@@ -11,6 +11,7 @@ const LABELS: Record<NoticeKind, string> = {
   added_to_workspace: 'When I am added to a workspace',
   added_to_board: 'When I am added to a board',
   backup_stopped: 'When my automatic backups stop',
+  workspace_passed: 'When a workspace is passed to me because its owner left',
 };
 
 /**

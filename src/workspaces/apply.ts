@@ -1297,7 +1297,7 @@ async function takeOut(
  * Everything of a workspace, by name and in one transaction (DESIGN.md §23.1: no cascades): the rows below its boards by `board_id`, the boards, the
  * people, the notices about it, and the workspace. Children before parents, so that a run that stopped never leaves a card whose board is gone.
  */
-async function deleteWorkspace(tx: Database, workspaceId: string): Promise<void> {
+export async function deleteWorkspace(tx: Database, workspaceId: string): Promise<void> {
   const t = tablesOf(tx);
   // Set-based: a workspace can hold 500 boards, and a statement for each would be thousands.
   const inBoards = sql`board_id IN (SELECT id FROM ${t.board} WHERE workspace_id = ${workspaceId})`;

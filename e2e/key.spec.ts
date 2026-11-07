@@ -174,3 +174,31 @@ test('on a device that does not have the key the Desk shows nothing of itself, a
   await page.goto('/desk');
   await expect(page.getByRole('region', { name: 'Unlock your Desk' })).toBeVisible();
 });
+
+test('the account is deleted from Settings with the password, says what goes first, and then is not there to sign in to', async ({
+  page,
+  browserName,
+}) => {
+  // Last, and once: the account is the one this instance has, and the key tests above are done with it.
+  test.skip(
+    browserName !== 'webkit',
+    'the account is deleted once, at the end, in the last browser',
+  );
+  await trySignIn(page, EMAIL, PASSWORD);
+  await expect(page.getByRole('button', { name: 'User menu' })).toBeVisible();
+  await page.goto('/account?section=data');
+  await page.getByRole('button', { name: 'Delete my account…' }).click();
+  const form = page.getByRole('form', { name: 'Delete account' });
+  await expect(form).toContainText('This deletes your account, your Desk');
+  await expect(form).toContainText('Deleted account');
+  // The wrong password deletes nothing.
+  await form.getByLabel('Your password').fill('not the password at all');
+  await form.getByRole('button', { name: 'Delete my account for good' }).click();
+  await expect(form.getByRole('alert')).toContainText('not your password');
+  await form.getByLabel('Your password').fill(PASSWORD);
+  await form.getByRole('button', { name: 'Delete my account for good' }).click();
+  await page.waitForURL((url) => url.pathname === '/');
+  // The account is gone: its address and password sign in to nothing.
+  await trySignIn(page, EMAIL, PASSWORD);
+  await expect(page.getByText(/do not match/)).toBeVisible();
+});

@@ -7,6 +7,7 @@ import { deskFile, everythingFile, save } from '../portability/client';
 import { useLocal, useSync } from '../sync/react';
 import { useKey } from '../screens/KeyContext';
 import { BackupSection } from './BackupSection';
+import { DeleteAccountSection } from './DeleteAccountSection';
 import { EncryptionSection } from './EncryptionSection';
 import { ImportSection } from './ImportSection';
 import { Button } from '../ui';
@@ -15,8 +16,8 @@ import styles from './Account.module.css';
 
 /**
  * Settings, Data (DESIGN.md §19): when this device last heard from the server, read from the device; and the boards of the person that are published
- * (§14.6), so that they can see what of theirs is public and take it back. Encryption and deleting the account join with the tasks that build them
- * (14.2, 2.8); backing up to git is `BackupSection`.
+ * (§14.6), so that they can see what of theirs is public and take it back. Backing up to git is `BackupSection`, the Desk's key `EncryptionSection`, and deleting the account
+ * `DeleteAccountSection`.
  */
 export function DataSection() {
   const client = useSync();
@@ -146,6 +147,7 @@ export function DataSection() {
           ))}
         </ul>
       </div>
+      <DeleteAccountSection />
     </>
   );
 }

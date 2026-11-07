@@ -71,6 +71,11 @@ export const ROUTES: RouteRule[] = [
   // Moving a Desk with things in it to a key of its own (DESIGN.md §9.3).
   { route: '/api/encryption/begin', methods: { POST: { kind: 'account' } } },
   { route: '/api/encryption/finish', methods: { POST: { kind: 'account' } } },
+  // Deleting the account (DESIGN.md §22): what it would do, and doing it with the password; the account is the session's.
+  {
+    route: '/api/account/delete',
+    methods: { GET: { kind: 'account' }, POST: { kind: 'account' } },
+  },
   { route: '/api/inbox', methods: { GET: { kind: 'account' } } },
   { route: '/api/inbox/seen', methods: { POST: { kind: 'account' } } },
   { route: '/api/inbox/unread', methods: { GET: { kind: 'account' } } },

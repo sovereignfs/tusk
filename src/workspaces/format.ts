@@ -520,6 +520,7 @@ export const NOTICE_KINDS = [
   'added_to_workspace',
   'added_to_board',
   'backup_stopped',
+  'workspace_passed',
 ] as const;
 export type NoticeKind = (typeof NOTICE_KINDS)[number];
 

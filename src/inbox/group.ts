@@ -60,6 +60,7 @@ export function noticeText(notice: Pick<NoticeRow, 'kind' | 'actorName' | 'subje
     added_to_workspace: `${who} added you to the workspace ${notice.subject}`,
     added_to_board: `${who} added you to the board ${notice.subject}`,
     backup_stopped: backupStoppedText(notice.subject),
+    workspace_passed: `The workspace ${notice.subject} was passed to you: its owner deleted their account, and you have been in it longest`,
   };
   return texts[notice.kind];
 }
@@ -84,6 +85,7 @@ export function noticeHref(
   notice: Pick<NoticeRow, 'workspaceId' | 'boardId' | 'cardId'> & { kind?: NoticeRow['kind'] },
 ): string {
   if (notice.kind === 'backup_stopped') return '/account?section=data';
+  // A workspace passed on is opened like any other notice of a workspace, below.
   if (notice.boardId && notice.cardId) return `/b/${notice.boardId}/c/${notice.cardId}`;
   if (notice.boardId) return `/b/${notice.boardId}`;
   if (notice.workspaceId) return `/w/${notice.workspaceId}`;
