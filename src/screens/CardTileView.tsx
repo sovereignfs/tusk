@@ -12,7 +12,7 @@ import styles from './BoardScreen.module.css';
 /**
  * A card on a board (DESIGN.md §15.1): its title and the badges for what it has, as a tile. **It is dragged by its whole surface, with no handle:** a
  * press that does not move is a click (the pointer sensor needs a few pixels), and the keyboard picks up a focused card with Space, moves it with the
- * arrows and puts it down with Space. The menu beside it is its own button, outside the draggable surface, so a key pressed on it is not a pick-up.
+ * arrows and puts it down with Space. Its menu (Clone, Archive) is opened by a right-click, or the keyboard's menu key, where the pointer is, and is not a button on the card.
  * A click or Enter opens it (its dialog, `CardDialog`); the badges for labels, checklist, comments and people join as their tasks are built.
  */
 export function CardTileView({
@@ -39,7 +39,8 @@ export function CardTileView({
     data: { type: 'card', listId: card.listId },
     disabled: !editable || !draggable,
   });
-  const [menu, setMenu] = useState(false);
+  // The card's menu opens where it was right-clicked (or where the keyboard's menu key says), and is not a button on the card.
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const style = {
     transform: sortable.transform
       ? `translate3d(${sortable.transform.x}px, ${sortable.transform.y}px, 0)`
@@ -59,6 +60,11 @@ export function CardTileView({
         {...sortable.attributes}
         {...sortable.listeners}
         onClick={onOpen}
+        onContextMenu={(event) => {
+          if (!editable) return;
+          event.preventDefault();
+          setMenu({ x: event.clientX, y: event.clientY });
+        }}
         onKeyDown={(event) => {
           sortable.listeners?.onKeyDown?.(event);
           // Enter opens it; Space is the pick-up.
@@ -70,25 +76,16 @@ export function CardTileView({
       >
         <TileBody card={card} labels={labels} />
       </div>
-      {editable ? (
-        <div className={styles.cardMenu}>
+      {editable && menu ? (
+        // A menu with nothing to press: its trigger is a point at the pointer, fixed to the window so that the list's own scrolling does not cut the menu.
+        <div className={styles.cardMenu} style={{ left: menu.x, top: menu.y }}>
           <Menu
             aria-label={`Options of ${card.title}`}
-            open={menu}
-            onClose={() => setMenu(false)}
-            align="right"
+            open
+            onClose={() => setMenu(null)}
+            align="left"
             width={180}
-            trigger={
-              <button
-                type="button"
-                className={styles.iconButton}
-                aria-label={`Card options for ${card.title}`}
-                aria-expanded={menu}
-                onClick={() => setMenu((was) => !was)}
-              >
-                <Icon name="ellipsis-vertical" aria-hidden />
-              </button>
-            }
+            trigger={<span className={styles.menuPoint} aria-hidden />}
             items={[
               { label: 'Clone', icon: 'copy', onSelect: onClone },
               { label: 'Archive', icon: 'archive', onSelect: onArchive },

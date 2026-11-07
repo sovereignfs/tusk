@@ -4,8 +4,8 @@
   flex-direction: column;
   flex-shrink: 0;
   justify-content: space-between;
-  width: 220px;
-  padding: var(--sv-space-3) var(--sv-space-2);
+  width: 280px;
+  padding: var(--sv-space-3) var(--sv-space-3);
   overflow-y: auto;
   background: var(--sv-color-surface-raised);
   border-right: var(--sv-border-width-hairline) solid var(--sv-color-border);

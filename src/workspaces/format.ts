@@ -477,8 +477,11 @@ export type OpResult =
   | { readonly status: 'applied'; readonly replay: boolean; readonly rows: OpRows }
   | { readonly status: 'refused'; readonly code: OpRefusal; readonly reason?: OpReason };
 
-/** How the boards index sorts a person's own workspaces (DESIGN.md §17.3): by name, newest created first, or most recently updated first. */
-export const WORKSPACE_SORTS = ['name', 'created', 'updated'] as const;
+/**
+ * How Home sorts a person's own workspaces (DESIGN.md §17.3): by title (A to Z), oldest created first (`oldest`), newest created first (`created`, which
+ * it was called before there was another), or most recently updated first.
+ */
+export const WORKSPACE_SORTS = ['name', 'oldest', 'created', 'updated'] as const;
 export type WorkspaceSort = (typeof WORKSPACE_SORTS)[number];
 
 /** A workspace on the boards index: its visible boards, and a few of its people as avatars (names are read from the accounts, never copied). */

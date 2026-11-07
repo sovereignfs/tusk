@@ -25,7 +25,7 @@ test('Home opens full and the Desk opens a rail, which names each entry for a sc
   await signedIn(page);
   // Home is where signing in lands: the whole sidebar, with the workspaces by name.
   await expect(sidebar(page)).toHaveAttribute('data-sidebar', 'full');
-  expect(await widthOf(page)).toBe(220);
+  expect(await widthOf(page)).toBe(280);
   await expect(sidebar(page).getByRole('link', { name: 'Home' })).toHaveAttribute(
     'aria-current',
     'page',
@@ -75,7 +75,7 @@ test('the sidebar’s own button narrows a full sidebar and widens it again, and
   await page.goto('/desk');
   await page.getByRole('button', { name: 'Widen the sidebar' }).click();
   await expect(sidebar(page)).toHaveAttribute('data-sidebar', 'full');
-  expect(await widthOf(page)).toBe(220);
+  expect(await widthOf(page)).toBe(280);
   await expect(sidebar(page).getByText('Desk', { exact: true })).toBeVisible();
 
   await page.reload();

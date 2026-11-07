@@ -45,7 +45,7 @@ test('someone signed in has Home at the front address, and it is the front page 
   // The front address is Home for someone signed in: the workspaces, and no Desk lists beside it.
   await page.goto('/');
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByRole('heading', { level: 1, name: 'Workspaces' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Home' })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Lists' })).toHaveCount(0);
 
   await signOut(page);

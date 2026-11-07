@@ -47,6 +47,7 @@ import {
 } from '../workspaces/format';
 import { TileBody } from './CardTileView';
 import { BoardSettingsDialog, DeleteBoardDialog } from './BoardSettings';
+import { LucideIcon } from '../ui/icons';
 import { ShareDialog } from './ShareDialog';
 import { ActivityList } from './ActivityList';
 import { ListColumn } from './ListColumn';
@@ -213,150 +214,153 @@ export function BoardScreen({
     <BoardContext.Provider value={store}>
       <BoardPeopleContext.Provider value={people}>
         <div className={styles.page}>
-          <div className={styles.band} style={{ background: view.board.color }} aria-hidden />
           <header className={styles.header}>
-            <Link href={`/w/${view.workspace.id}`} className={styles.crumb}>
-              {view.workspace.name}
-            </Link>
             <h1 className={styles.title}>{view.board.name}</h1>
             <div className={styles.search}>
-              <Input
-                ref={search}
-                type="search"
-                aria-label="Search cards"
-                data-shortcut="search"
-                placeholder="Search cards…  ( / )"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Escape') {
-                    setQuery('');
-                    event.currentTarget.blur();
-                  }
-                }}
-              />
+              <div className={styles.searchField}>
+                <Icon name="search" className={styles.searchIcon} aria-hidden />
+                <Input
+                  ref={search}
+                  type="search"
+                  aria-label="Search cards"
+                  data-shortcut="search"
+                  placeholder="Search cards…"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Escape') {
+                      setQuery('');
+                      event.currentTarget.blur();
+                    }
+                  }}
+                />
+              </div>
               {filtering && hidden > 0 ? (
                 <span className={styles.muted} role="status">
                   {hidden} {hidden === 1 ? 'card is' : 'cards are'} hidden
                 </span>
               ) : null}
             </div>
-            {view.board.archived ? (
-              <span className={styles.badge}>Archived</span>
-            ) : !view.can.edit ? (
-              <span className={styles.badge}>Viewing</span>
-            ) : null}
-            <button
-              type="button"
-              className={`${styles.avatars} ${styles.menuButton}`}
-              aria-label={`Share board, ${people?.members.length ?? 0} people`}
-              onClick={() => setDialog('share')}
-            >
-              {(people?.members ?? []).slice(0, 4).map((person) => (
-                <Avatar key={person.accountId} name={person.name} size="sm" />
-              ))}
-              {people && people.members.length > 4 ? (
-                <span className={styles.badge}>+{people.members.length - 4}</span>
+            <div className={styles.tools}>
+              {view.board.archived ? (
+                <span className={styles.badge}>Archived</span>
+              ) : !view.can.edit ? (
+                <span className={styles.badge}>Viewing</span>
               ) : null}
-              {people && people.members.length === 0 ? (
-                <span className={styles.badge}>Share</span>
-              ) : null}
-            </button>
-            {view.can.join ? (
+              {/* Who is on the board, drawn and not a control: the Share button beside it says how many, and opens them. */}
+              <span className={styles.avatars} aria-hidden>
+                {(people?.members ?? []).slice(0, 4).map((person) => (
+                  <Avatar key={person.accountId} name={person.name} size="sm" />
+                ))}
+                {people && people.members.length > 4 ? (
+                  <span className={styles.badge}>+{people.members.length - 4}</span>
+                ) : null}
+              </span>
               <Button
-                size="sm"
-                onClick={() => void store.perform({ op: 'board.join', id: view.board.id })}
+                variant="secondary"
+                aria-label={`Share board, ${people?.members.length ?? 0} people`}
+                onClick={() => setDialog('share')}
               >
-                Join board
+                <LucideIcon name="user-plus" /> Share
               </Button>
-            ) : null}
-            <Menu
-              aria-label="Board menu"
-              open={menuOpen}
-              onClose={() => setMenuOpen(false)}
-              align="right"
-              width={220}
-              trigger={
-                <button
-                  type="button"
-                  className={styles.iconButton}
-                  aria-label="Board menu"
-                  aria-expanded={menuOpen}
-                  onClick={() => setMenuOpen((was) => !was)}
+              {view.can.join ? (
+                <Button
+                  size="sm"
+                  onClick={() => void store.perform({ op: 'board.join', id: view.board.id })}
                 >
-                  <Icon name="ellipsis-vertical" aria-hidden />
-                </button>
-              }
-              items={[
-                ...(view.can.admin && !view.board.archived
-                  ? [
-                      {
-                        label: 'Settings',
-                        icon: 'settings' as const,
-                        onSelect: () => setDialog('settings'),
-                      },
-                    ]
-                  : []),
-                {
-                  label: 'Activity',
-                  icon: 'activity' as const,
-                  onSelect: () => setDialog('activity'),
-                },
-                {
-                  label: 'Archived cards',
-                  icon: 'archive' as const,
-                  onSelect: () => setArchivedOpen(true),
-                },
-                {
-                  label: 'Export',
-                  icon: 'download' as const,
-                  // The server makes the file (DESIGN.md §20.1) and names it; the browser saves what comes.
-                  onSelect: () =>
-                    window.location.assign(`/api/export?scope=board&id=${view.board.id}`),
-                },
-                ...(view.can.admin
-                  ? [
-                      { type: 'separator' as const },
-                      view.board.archived
-                        ? {
-                            label: 'Restore board',
-                            icon: 'archive-restore' as const,
-                            onSelect: () =>
-                              void store.perform({ op: 'board.restore', id: view.board.id }),
-                          }
-                        : {
-                            label: 'Archive board',
-                            icon: 'archive' as const,
-                            onSelect: () =>
-                              void store.perform({ op: 'board.archive', id: view.board.id }),
-                          },
-                      {
-                        label: 'Delete board',
-                        icon: 'trash-2' as const,
-                        destructive: true,
-                        onSelect: () => setDialog('delete'),
-                      },
-                    ]
-                  : []),
-              ]}
-            />
+                  Join board
+                </Button>
+              ) : null}
+              <Menu
+                aria-label="Board menu"
+                open={menuOpen}
+                onClose={() => setMenuOpen(false)}
+                align="right"
+                width={220}
+                trigger={
+                  <button
+                    type="button"
+                    className={styles.iconButton}
+                    aria-label="Board menu"
+                    aria-expanded={menuOpen}
+                    onClick={() => setMenuOpen((was) => !was)}
+                  >
+                    <Icon name="ellipsis-vertical" aria-hidden />
+                  </button>
+                }
+                items={[
+                  ...(view.can.admin && !view.board.archived
+                    ? [
+                        {
+                          label: 'Settings',
+                          icon: 'settings' as const,
+                          onSelect: () => setDialog('settings'),
+                        },
+                      ]
+                    : []),
+                  {
+                    label: 'Activity',
+                    icon: 'activity' as const,
+                    onSelect: () => setDialog('activity'),
+                  },
+                  {
+                    label: 'Archived cards',
+                    icon: 'archive' as const,
+                    onSelect: () => setArchivedOpen(true),
+                  },
+                  {
+                    label: 'Export',
+                    icon: 'download' as const,
+                    // The server makes the file (DESIGN.md §20.1) and names it; the browser saves what comes.
+                    onSelect: () =>
+                      window.location.assign(`/api/export?scope=board&id=${view.board.id}`),
+                  },
+                  ...(view.can.admin
+                    ? [
+                        { type: 'separator' as const },
+                        view.board.archived
+                          ? {
+                              label: 'Restore board',
+                              icon: 'archive-restore' as const,
+                              onSelect: () =>
+                                void store.perform({ op: 'board.restore', id: view.board.id }),
+                            }
+                          : {
+                              label: 'Archive board',
+                              icon: 'archive' as const,
+                              onSelect: () =>
+                                void store.perform({ op: 'board.archive', id: view.board.id }),
+                            },
+                        {
+                          label: 'Delete board',
+                          icon: 'trash-2' as const,
+                          destructive: true,
+                          onSelect: () => setDialog('delete'),
+                        },
+                      ]
+                    : []),
+                ]}
+              />
+            </div>
           </header>
           {view.board.archived ? (
-            <Alert variant="info">
-              This board is archived and read-only for everyone.
-              {view.can.admin ? (
-                <>
-                  {' '}
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => void store.perform({ op: 'board.restore', id: view.board.id })}
-                  >
-                    Restore board
-                  </Button>
-                </>
-              ) : null}
-            </Alert>
+            <div className={styles.notice}>
+              <Alert variant="info">
+                This board is archived and read-only for everyone.
+                {view.can.admin ? (
+                  <>
+                    {' '}
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => void store.perform({ op: 'board.restore', id: view.board.id })}
+                    >
+                      Restore board
+                    </Button>
+                  </>
+                ) : null}
+              </Alert>
+            </div>
           ) : null}
           {dialog === 'settings' ? (
             <BoardSettingsDialog board={view.board} store={store} onClose={() => setDialog(null)} />
@@ -394,10 +398,12 @@ export function BoardScreen({
             />
           ) : null}
           {offline ? (
-            <Alert variant="warning">
-              This board needs a connection. It is as it was when it was last read, and cannot be
-              changed until you are back online.
-            </Alert>
+            <div className={styles.notice}>
+              <Alert variant="warning">
+                This board needs a connection. It is as it was when it was last read, and cannot be
+                changed until you are back online.
+              </Alert>
+            </div>
           ) : null}
           <DndContext
             id={`board-${view.board.id}`}
@@ -416,7 +422,13 @@ export function BoardScreen({
               items={view.lists.map((each) => each.id)}
               strategy={horizontalListSortingStrategy}
             >
-              <div className={styles.columns}>
+              <div
+                className={styles.columns}
+                // The board's colour, as a tint behind the lists: no text is set on it, since the lists and the cards are surfaces of their own (DESIGN.md §17.5).
+                style={{
+                  background: `color-mix(in srgb, ${view.board.color} 22%, var(--sv-color-surface))`,
+                }}
+              >
                 {view.lists.map((list, index) => (
                   <ListColumn
                     key={list.id}

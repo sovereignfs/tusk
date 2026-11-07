@@ -79,7 +79,7 @@ test('a place chosen in the drawer is gone to, and the drawer is closed behind i
 }) => {
   await signedIn(page);
   await page.goto('/');
-  await expect(page.getByRole('heading', { level: 1, name: 'Workspaces' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Home' })).toBeVisible();
   await fits(page);
   await openNavigation(page);
   await drawer(page)

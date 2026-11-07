@@ -20,7 +20,7 @@ async function signedIn(page: Page) {
     window.localStorage.setItem('tusk.sidebar', '{"page":{"state":"full","shown":"full"}}'),
   );
   await page.goto('/');
-  await expect(page.getByRole('heading', { level: 1, name: 'Workspaces' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Home' })).toBeVisible();
 }
 
 async function makeWorkspace(page: Page, name: string) {
@@ -95,18 +95,27 @@ test('the sort of one’s own workspaces is kept with the account, and survives 
   const name = unique('Sorted');
   await makeWorkspace(page, name);
   await page.goto('/');
-  const sort = page.getByLabel('Sort my workspaces');
-  await expect(sort).toHaveValue('name');
-  await sort.selectOption('updated');
+  const sorts = page.getByRole('group', { name: 'Sort my workspaces' });
+  const pressed = (label: string) => sorts.getByRole('button', { name: label });
+  await expect(pressed('Title (A–Z)')).toHaveAttribute('aria-pressed', 'true');
+  await pressed('Recently updated').click();
+  await expect(pressed('Recently updated')).toHaveAttribute('aria-pressed', 'true');
   await expect
     .poll(
       async () => ((await (await page.request.get('/api/boards')).json()) as { sort: string }).sort,
     )
     .toBe('updated');
   await page.reload();
-  await expect(page.getByLabel('Sort my workspaces')).toHaveValue('updated');
+  await expect(pressed('Recently updated')).toHaveAttribute('aria-pressed', 'true');
+  // The four the screen offers are options to choose from, one pressed: a menu is not opened to see them.
+  await expect(sorts.getByRole('button')).toHaveText([
+    'Title (A–Z)',
+    'Created first',
+    'Created last',
+    'Recently updated',
+  ]);
   // Put back as it was found.
-  await page.getByLabel('Sort my workspaces').selectOption('name');
+  await pressed('Title (A–Z)').click();
   await expect
     .poll(
       async () => ((await (await page.request.get('/api/boards')).json()) as { sort: string }).sort,
@@ -195,7 +204,7 @@ test.describe('the browser’s time zone', () => {
       if (request.method() === 'PATCH' && request.url().endsWith('/api/settings')) again += 1;
     });
     await page.reload();
-    await expect(page.getByRole('heading', { level: 1, name: 'Workspaces' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Home' })).toBeVisible();
     await page.waitForTimeout(500);
     expect(again).toBe(0);
   });

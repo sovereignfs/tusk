@@ -24,6 +24,7 @@ describe('the order of the boards index', () => {
 
   it('puts the newest made first, or the most recently changed first, and breaks a tie by name', () => {
     expect(ids(sortWorkspaces(rows, 'created'))).toBe('dacb');
+    expect(ids(sortWorkspaces(rows, 'oldest'))).toBe('bcad');
     expect(ids(sortWorkspaces(rows, 'updated'))).toBe('bcad');
     const tied = [row('x', 'Beta', 1, 1), row('y', 'alpha', 1, 1)];
     expect(ids(sortWorkspaces(tied, 'created'))).toBe('yx');

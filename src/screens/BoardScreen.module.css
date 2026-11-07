@@ -1,39 +1,37 @@
 .page {
   display: flex;
   flex-direction: column;
-  gap: var(--sv-space-3);
-  min-height: 100%;
+  /* As tall as the content area, and no taller: the lists scroll inside it and the page does not. */
+  height: 100%;
+  min-height: 0;
   min-width: 0;
 }
 
-/* The board's colour is a thin band at the top, and not a wash behind the cards, so that text stays readable in both themes (DESIGN.md §17.5). */
-.band {
-  height: 4px;
-  flex: none;
-}
-
+/* The board's header, as the legacy kanban's was: its title at the left, the search in the middle, and at the right who is on it, Share and the menu. */
 .header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--sv-space-3);
-  padding: var(--sv-space-2) var(--sv-space-6) 0;
-}
-
-.crumb {
-  color: var(--sv-color-text-muted);
-  font-size: var(--sv-font-size-sm);
-  text-decoration: none;
-}
-
-.crumb:hover {
-  text-decoration: underline;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(12rem, 36rem) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--sv-space-4);
+  padding: var(--sv-space-2) var(--sv-space-6);
+  border-bottom: var(--sv-border-width-hairline) solid var(--sv-color-border);
+  background: var(--sv-color-surface);
 }
 
 .title {
   margin: 0;
-  font-size: var(--sv-font-size-xl);
+  overflow: hidden;
+  font-size: var(--sv-font-size-2xl);
   font-weight: var(--sv-font-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tools {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sv-space-3);
 }
 
 .badge {
@@ -41,26 +39,35 @@
   font-size: var(--sv-font-size-sm);
 }
 
+/* An alert on the board is padded as the page's content is, since the page itself is not. */
+.notice {
+  padding: var(--sv-space-3) var(--sv-space-6) 0;
+}
+
+/* The lists lie on a tint of the board's colour (set on the element), which fills what is left of the page. Nothing is written on the tint: the lists and the
+   cards are surfaces of their own. */
 .columns {
   display: flex;
   flex: 1;
   align-items: flex-start;
-  gap: var(--sv-space-3);
-  padding: var(--sv-space-2) var(--sv-space-6) var(--sv-space-6);
+  gap: var(--sv-space-4);
+  min-height: 0;
+  padding: var(--sv-space-6);
   overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .column {
   display: flex;
   flex: none;
   flex-direction: column;
-  gap: var(--sv-space-2);
-  width: 280px;
+  gap: var(--sv-space-3);
+  width: 300px;
   max-height: 100%;
-  padding: var(--sv-space-2);
-  border: var(--sv-border-width-hairline) solid var(--sv-color-border);
-  border-radius: var(--sv-radius-md);
-  background: var(--sv-color-surface-sunken);
+  padding: var(--sv-space-3);
+  border-radius: var(--sv-radius-xl);
+  background: var(--sv-color-surface-raised);
+  box-shadow: var(--sv-shadow-card);
 }
 
 .dragging {
@@ -90,7 +97,7 @@
 .listName {
   margin: 0;
   overflow: hidden;
-  font-size: var(--sv-font-size-md);
+  font-size: var(--sv-font-size-lg);
   font-weight: var(--sv-font-weight-semibold);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -118,16 +125,22 @@
   background: var(--sv-color-surface-sunken);
 }
 
+/* A list's cards scroll inside the list when there are more than it has room for, and the header above them and the way to add one below stay in view. */
 .cards {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: var(--sv-space-2);
-  min-height: var(--sv-space-2);
+  min-height: var(--sv-space-6);
+  /* Room for the cards' own shadow and focus ring, which a scrolling box would cut. */
+  margin: calc(var(--sv-space-1) * -1);
+  padding: var(--sv-space-1);
+  overflow-y: auto;
 }
 
 .add {
   flex: none;
-  width: 280px;
+  width: 300px;
 }
 
 .addForm {
@@ -180,9 +193,10 @@
   display: flex;
   flex-direction: column;
   gap: var(--sv-space-2);
-  padding: var(--sv-space-2) var(--sv-space-6) var(--sv-space-2) var(--sv-space-3);
+  padding: var(--sv-space-3);
   border: var(--sv-border-width-hairline) solid var(--sv-color-border);
-  border-radius: var(--sv-radius-sm);
+  border-radius: var(--sv-radius-md);
+  box-shadow: var(--sv-shadow-control);
   background: var(--sv-color-surface-raised);
   color: var(--sv-color-text-primary);
   cursor: grab;
@@ -198,9 +212,14 @@
 }
 
 .cardMenu {
-  position: absolute;
-  top: 2px;
-  right: 2px;
+  position: fixed;
+  z-index: 1;
+}
+
+.menuPoint {
+  display: block;
+  width: 0;
+  height: 0;
 }
 
 .badges {
@@ -257,15 +276,6 @@
   display: inline-flex;
   align-items: center;
   gap: var(--sv-space-1);
-  padding: var(--sv-space-1);
-  border: 0;
-  border-radius: var(--sv-radius-sm);
-  background: transparent;
-  cursor: pointer;
-}
-
-.avatars:hover {
-  background: var(--sv-color-surface-sunken);
 }
 
 .field {
@@ -347,12 +357,47 @@
   display: flex;
   align-items: center;
   gap: var(--sv-space-3);
-  min-width: 12rem;
+  min-width: 0;
+}
+
+.searchField {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.searchField input {
+  padding-left: 2.5rem;
+}
+
+.searchIcon {
+  position: absolute;
+  top: 50%;
+  left: var(--sv-space-3);
+  color: var(--sv-color-text-muted);
+  pointer-events: none;
+  transform: translateY(-50%);
 }
 
 /* On a phone (DESIGN.md §18): the columns scroll sideways and each stops at the left edge, nearly the width of the screen, so that one list is read at a time and
    the next is a hint at the edge. Only what is laid out differs: the same board, at the same address. */
 @media (max-width: 768px) {
+  /* The header stacks: the title and what is at its right, then the search. */
+  .header {
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: var(--sv-space-3) var(--sv-space-4);
+  }
+
+  .search {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .notice {
+    padding-right: var(--sv-space-4);
+    padding-left: var(--sv-space-4);
+  }
+
   .columns {
     padding-right: var(--sv-space-4);
     padding-left: var(--sv-space-4);

@@ -7,7 +7,7 @@ import { useWorkspaces } from '../boards/workspaces';
 import { deskSummary } from '../local/store';
 import { useLocal } from '../sync/react';
 import { browserZone, todayFor } from '../time';
-import { Alert, Avatar, Button, EmptyState, Icon, Select, useToast } from '../ui';
+import { Alert, Avatar, Button, EmptyState, Icon, useToast } from '../ui';
 import { LucideIcon } from '../ui/icons';
 import {
   type BoardsIndex,
@@ -23,13 +23,14 @@ import { WorkspaceSettings } from './WorkspaceSettings';
 import styles from './BoardsScreen.module.css';
 
 const SORT_LABELS: Record<WorkspaceSort, string> = {
-  name: 'Name',
-  created: 'Date created',
+  name: 'Title (A–Z)',
+  oldest: 'Created first',
+  created: 'Created last',
   updated: 'Recently updated',
 };
 
 /**
- * Home (DESIGN.md §17.3), the workspaces, at `/`: **Pinned** first, with the Desk as its first item and a tile of its own, and then _My workspaces_ and
+ * Home (DESIGN.md §17.3), the workspaces, at `/`: **Pinned** first, with the Desk as its first item and a tile of its own (the size of a board's), and then _My workspaces_ and
  * _Shared with me_, each workspace a section of its boards. **The Desk is read from the working copy, so its tile is there offline;** everything else is read from the server and says it needs
  * a connection when it cannot be had, and shows a skeleton until it is. The sort of the person's own workspaces is kept with the account, so it is the
  * same on every device.
@@ -119,21 +120,27 @@ export function BoardsScreen() {
 
   return (
     <div className={styles.page}>
-      <h1 className={styles.title}>Workspaces</h1>
+      <h1 className={styles.srOnly}>Home</h1>
 
       <section aria-label="Pinned" className={styles.group}>
         <div className={styles.groupHeader}>
           <h2 className={styles.groupTitle}>Pinned</h2>
         </div>
-        <Link href="/desk" className={styles.desk}>
-          <LucideIcon name="list-todo" />
-          <span className={styles.deskName}>Desk</span>
-          {desk ? (
-            <span className={styles.deskCounts}>
-              {desk.open} open · {desk.dueToday} due today
-            </span>
-          ) : null}
-        </Link>
+        <ul className={styles.tiles}>
+          <li>
+            <Link href="/desk" className={styles.desk}>
+              <span className={styles.deskTitle}>
+                <LucideIcon name="list-todo" />
+                <span className={styles.deskName}>Desk</span>
+              </span>
+              {desk ? (
+                <span className={styles.deskCounts}>
+                  {desk.open} open · {desk.dueToday} due today
+                </span>
+              ) : null}
+            </Link>
+          </li>
+        </ul>
       </section>
 
       {failed ? (
@@ -161,17 +168,19 @@ export function BoardsScreen() {
         <section aria-label="My workspaces" className={styles.group}>
           <div className={styles.groupHeader}>
             <h2 className={styles.groupTitle}>My workspaces</h2>
-            <Select
-              aria-label="Sort my workspaces"
-              value={sort}
-              onChange={(event) => void choose(event.target.value as WorkspaceSort)}
-            >
+            <div role="group" aria-label="Sort my workspaces" className={styles.sorts}>
               {WORKSPACE_SORTS.map((each) => (
-                <option key={each} value={each}>
+                <button
+                  key={each}
+                  type="button"
+                  className={styles.sort}
+                  aria-pressed={sort === each}
+                  onClick={() => void choose(each)}
+                >
                   {SORT_LABELS[each]}
-                </option>
+                </button>
               ))}
-            </Select>
+            </div>
           </div>
           {mine.map(section)}
         </section>
@@ -219,9 +228,14 @@ function WorkspaceSection({
   return (
     <section aria-label={row.name} className={styles.workspace}>
       <div className={styles.workspaceHeader}>
-        <h3 className={styles.workspaceName}>
-          <Link href={`/w/${row.id}`}>{row.name}</Link>
-        </h3>
+        <div className={styles.workspaceTitle}>
+          <h3 className={styles.workspaceName}>
+            <Link href={`/w/${row.id}`}>{row.name}</Link>
+          </h3>
+          <span className={styles.count}>
+            {open.length} {open.length === 1 ? 'board' : 'boards'}
+          </span>
+        </div>
         <span className={styles.people} aria-label={`${entry.peopleCount} people`}>
           {entry.people.map((person) => (
             <Avatar key={person.accountId} name={person.name} size="sm" />

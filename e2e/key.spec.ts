@@ -120,7 +120,7 @@ test('on a device that does not have the key the Desk shows nothing of itself, a
 
   // Boards and the Inbox are not the Desk's, and are as they were.
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Workspaces' }).first()).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Home' }).first()).toBeVisible();
   await page.goto('/inbox');
   await expect(page.getByRole('heading', { name: 'Inbox' }).first()).toBeVisible();
   await page.goto('/desk');

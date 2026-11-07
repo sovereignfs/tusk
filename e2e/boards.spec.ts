@@ -278,7 +278,7 @@ test('a card is archived from its menu, listed under Archived cards, restored to
   await addCard(page, 'Backlog', 'Old');
   expect(await cardsOf(page, 'Backlog')).toEqual(['Old', 'Keep']);
 
-  await page.getByRole('button', { name: 'Card options for Old' }).click();
+  await page.getByRole('button', { name: 'Old', exact: true }).click({ button: 'right' });
   await page.getByRole('menuitem', { name: 'Archive' }).click();
   await expect.poll(() => cardsOf(page, 'Backlog')).toEqual(['Keep']);
   await page.reload();
@@ -293,7 +293,7 @@ test('a card is archived from its menu, listed under Archived cards, restored to
   // Back at the place it had, above the one it was above.
   await expect.poll(() => cardsOf(page, 'Backlog')).toEqual(['Old', 'Keep']);
 
-  await page.getByRole('button', { name: 'Card options for Old' }).click();
+  await page.getByRole('button', { name: 'Old', exact: true }).click({ button: 'right' });
   await page.getByRole('menuitem', { name: 'Archive' }).click();
   await openFromMenu(page, 'Archived cards');
   await page
@@ -432,7 +432,12 @@ test('a board’s settings change its name, colour and description; archiving ma
   await openFromMenu(page, 'Archive board');
   await expect(page.getByText('This board is archived and read-only for everyone.')).toBeVisible();
   await expect(addListButton(page)).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Card options for Stays' })).toHaveCount(0);
+  // A card's menu is for those who can change the board: a right-click on one here opens nothing.
+  // (The card is disabled for them, which Playwright will not click without being made to.)
+  await page
+    .getByRole('button', { name: 'Stays', exact: true })
+    .click({ button: 'right', force: true });
+  await expect(page.getByRole('menuitem', { name: 'Archive' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'List options for Backlog' })).toHaveCount(0);
   await page.reload();
   await expect(page.getByText('This board is archived and read-only for everyone.')).toBeVisible();
@@ -860,8 +865,8 @@ test('a card is cloned below itself, and moved to a list of another board of the
     (await page.getByRole('link', { name: workspace, exact: true }).first().getAttribute('href')) ??
     '';
   await addCard(page, 'Backlog', 'Original');
-  // Cloned from the tile's menu: a copy below it, with the same title.
-  await page.getByRole('button', { name: 'Card options for Original' }).click();
+  // Cloned from the tile's menu, opened by a right-click: a copy below it, with the same title.
+  await page.getByRole('button', { name: 'Original', exact: true }).click({ button: 'right' });
   await page.getByRole('menuitem', { name: 'Clone' }).click();
   await expect.poll(() => cardsOf(page, 'Backlog')).toEqual(['Original', 'Original']);
 

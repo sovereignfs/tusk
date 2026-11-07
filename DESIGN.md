@@ -943,12 +943,16 @@ Two rows: the header, and the main area of two columns, the sidebar and the cont
 
 ### 17.3 Home
 
-`/`, for someone signed in (the proxy serves the page that is `app/(app)/home`, and `/home` and the old `/boards` send to `/`, so there is one address). Titled
-_Workspaces_. Its first group is _Pinned_, whose first item is the Desk, as a tile of its own (its open count, and today's due); then _My workspaces_, each
-workspace as a section: its name, its people's avatars,
-a gear for its settings, and its boards as tiles of their colour, ending with a "Create board" tile. _My workspaces_ come first and can be sorted by
-name, date created or recently updated; the choice is saved with the account (§19), so it is the same on every device. _Shared with me_ follow, sorted
-by name. A person who has none sees the Desk and a way to create the first.
+`/`, for someone signed in (the proxy serves the page that is `app/(app)/home`, and `/home` and the old `/boards` send to `/`, so there is one address). The
+window's title is _Home_, and the page has a heading for a screen reader and none on screen: it starts with its first group, **Pinned**, then _My workspaces_
+and _Shared with me_, each titled in small muted capitals as the sidebar's headings are. It takes the whole width of the content, which the frame pads (24px).
+
+**Pinned** holds the Desk as a tile of its own (its open count, and today's due), **the size of a board's tile** (the same grid and the same height) and not
+its look: it has no band of a colour, since it is not a board. _My workspaces_ is each workspace as a section: its name with how many boards it has, then at
+the right its people's avatars and a gear for its settings, and its boards as tiles of their colour, ending with a "Create board" tile. _My workspaces_ can
+be sorted, and the options are shown as they are, one pressed, at the right of the group's title and not in a menu: **Title (A-Z), Created first, Created
+last** and **Recently updated**. The choice is saved with the account (§19), so it is the same on every device. _Shared with me_ follow, sorted by title. A
+person who has none sees the Desk and a way to create the first.
 
 **A workspace's settings** are a dialog from its gear: its name; its people, their roles, adding by email, removing, leaving; and Delete. A member sees
 the people and Leave.
@@ -981,12 +985,16 @@ the list, and a card's detail on the right while `?card=<id>` is set.
 
 ### 17.5 A board
 
-`/b/<boardId>`. Three rows inside the content: the app's header, the board's header, and the columns.
+`/b/<boardId>`. Three rows inside the content: the app's header, the board's header, and the columns. **The page goes to the edges of the content** (the frame adds
+no padding), and pads what needs it itself, as the legacy kanban's board did.
 
-- **The board's header:** its name (renamed in place by an editor), its search (§14.5), its members' avatars, Share, and a menu: Activity (a dialog of
+- **The board's header:** a bar with a rule under it. Its name at the left (renamed in place by an editor), its search (§14.5) in the middle, with a search
+  icon, and at the right its members' avatars (drawn, not a control), a **Share** button (`user-plus`) that opens the people, and a menu: Activity (a dialog of
   §15.6), Settings, Archived cards, Archive or Restore, Delete, each shown only to whom it is for (§7.2). A viewer of a public board sees "Join board".
-- **The columns:** the lists side by side, scrolling sideways, each with its header (§14.2) and its cards, and "Add a list" at the end. The board's
-  colour is a thin band at the top, not a wash behind the cards, so that text stays readable in both themes.
+- **The columns:** the lists side by side, scrolling sideways, each with its header (§14.2) and its cards, and "Add a list" at the end. **The board's
+  colour is a tint behind them** (the colour at 22% over the page's surface, so that it is light in light mode and dark in dark mode): the lists are white
+  panels (300px, rounded, with a soft shadow) and the cards are white with a border and a small shadow. **The page is as tall as the content area and does not scroll:** a list with more cards than fit scrolls inside itself, its header and "Add a card" staying in view. **A card has no menu button:** its menu (Clone, Archive) opens on a right-click, or the keyboard's menu key, at the pointer. **No text is written on the tint,** so that text
+  stays readable in both themes: this is the one place a picked colour is a background, and only as a tint that carries nothing.
 
 ### 17.6 The card dialog
 

@@ -149,7 +149,7 @@ describe(`the sort kept with the account (${leg})`, () => {
   });
 
   it('takes a sort or a zone and nothing else', () => {
-    for (const sort of ['name', 'created', 'updated'])
+    for (const sort of ['name', 'oldest', 'created', 'updated'])
       expect(parseSettingsChange({ workspaceSort: sort }).ok, sort).toBe(true);
     for (const bad of [
       null,

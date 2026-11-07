@@ -1,12 +1,17 @@
 /**
  * Icons the design system's curated set does not have (`IconName` in `@sovereignfs/ui`), drawn from [Lucide](https://lucide.dev) (ISC licence), which is
  * where the set comes from: `panel-left-close` and `panel-left-open` for the sidebar's button, `folder-kanban`, the default icon of a workspace, and `list-todo`
- * and `calendar-days` for the Desk and the Planner.
+ * and `calendar-days` for the Desk and the Planner, and `user-plus` for a board's Share button.
  * **Worth offering to `@sovereignfs/ui`** (as the shell's header is); until it has them they are here, drawn the way its `Icon` is (20px, a stroke in the
  * text's colour, hidden from a screen reader unless labelled).
  */
 export type LucideName =
-  'panel-left-close' | 'panel-left-open' | 'folder-kanban' | 'list-todo' | 'calendar-days';
+  | 'panel-left-close'
+  | 'panel-left-open'
+  | 'folder-kanban'
+  | 'list-todo'
+  | 'calendar-days'
+  | 'user-plus';
 type Name = LucideName;
 
 /** Whether a name is one of these and not the design system's own. */
@@ -34,6 +39,14 @@ const PATHS: Record<Name, React.ReactNode> = {
       <path d="M13 6h8" />
       <path d="M13 12h8" />
       <path d="M13 18h8" />
+    </>
+  ),
+  'user-plus': (
+    <>
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <line x1="19" x2="19" y1="8" y2="14" />
+      <line x1="22" x2="16" y1="11" y2="11" />
     </>
   ),
   'calendar-days': (

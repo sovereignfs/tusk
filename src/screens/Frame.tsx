@@ -34,6 +34,8 @@ export function Frame({ children }: { children: ReactNode }) {
   useEffect(() => setOpen(false), [pathname, search, setOpen]);
   const key = useKey();
   const onDesk = pathname.startsWith('/desk');
+  // A board goes to the edges of the content, since its lists are laid on a tint of its colour that fills the page; the page pads what needs it.
+  const flush = pathname.startsWith('/b/');
   // The Desk's lists are a column beside the Desk and the Inbox, and nowhere else: Home, a workspace and a board have the width. Settings opens as a
   // dialog over the page it was opened from, which is still there behind it: it keeps what that page had.
   const beside = onDesk || pathname === '/inbox';
@@ -50,7 +52,12 @@ export function Frame({ children }: { children: ReactNode }) {
       {locked ? null : <FirstList />}
       <ThreeColumnLayout sidebarHidden={mobile || !withLists}>
         {locked || mobile || !withLists ? <div /> : <Sidebar />}
-        <div style={{ padding: mobile ? 'var(--sv-space-4)' : 'var(--sv-space-6)' }}>
+        <div
+          style={{
+            padding: flush ? 0 : mobile ? 'var(--sv-space-4)' : 'var(--sv-space-6)',
+            ...(flush ? { height: '100%', minHeight: 0 } : {}),
+          }}
+        >
           {onDesk ? <KeyOffer /> : null}
           {onDesk && key.progress ? (
             <p role="status" aria-label="Sealing the Desk">

@@ -1,40 +1,21 @@
+/* Home (DESIGN.md §17.3): the whole width of the content, which the frame pads. */
 .page {
   display: flex;
   flex-direction: column;
-  gap: var(--sv-space-5);
-  max-width: 960px;
-  padding: var(--sv-space-6);
+  gap: var(--sv-space-6);
 }
 
-.title {
-  margin: 0;
-  font-size: var(--sv-font-size-2xl);
-  font-weight: var(--sv-font-weight-semibold);
-}
-
-.desk {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sv-space-3);
-  padding: var(--sv-space-3) var(--sv-space-4);
-  border: var(--sv-border-width-hairline) solid var(--sv-color-border);
-  border-radius: var(--sv-radius-md);
-  background: var(--sv-color-surface-raised);
-  color: var(--sv-color-text-primary);
-  text-decoration: none;
-}
-
-.desk:hover {
-  background: var(--sv-color-surface-sunken);
-}
-
-.deskName {
-  font-weight: var(--sv-font-weight-semibold);
-}
-
-.deskCounts {
-  color: var(--sv-color-text-muted);
-  font-size: var(--sv-font-size-sm);
+/* The page's own heading, for a screen reader: what is on screen starts with Pinned. */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .skeleton {
@@ -57,15 +38,56 @@
 
 .groupHeader {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--sv-space-3);
 }
 
+/* A group's title: small, muted capitals, as the sidebar's own headings are. */
 .groupTitle {
   margin: 0;
-  font-size: var(--sv-font-size-lg);
+  color: var(--sv-color-text-muted);
+  font-size: var(--sv-font-size-sm);
   font-weight: var(--sv-font-weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* The sort: the options as they are, one pressed, and not a menu to open. */
+.sorts {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--sv-space-1);
+}
+
+.sort {
+  min-height: 28px;
+  padding: 0 var(--sv-space-3);
+  border: var(--sv-border-width-hairline) solid transparent;
+  border-radius: var(--sv-radius-md);
+  background: transparent;
+  color: var(--sv-color-text-muted);
+  font: inherit;
+  font-size: var(--sv-font-size-sm);
+  cursor: pointer;
+}
+
+.sort:hover {
+  background: var(--sv-color-surface-sunken);
+  color: var(--sv-color-text-primary);
+}
+
+.sort[aria-pressed='true'] {
+  border-color: var(--sv-color-border);
+  background: var(--sv-color-surface-raised);
+  color: var(--sv-color-text-primary);
+  font-weight: var(--sv-font-weight-semibold);
+}
+
+.sort:focus-visible {
+  outline: 2px solid var(--sv-color-focus-ring);
+  outline-offset: 2px;
 }
 
 .workspace {
@@ -80,11 +102,18 @@
   gap: var(--sv-space-3);
 }
 
-.workspaceName {
+.workspaceTitle {
+  display: flex;
   flex: 1;
+  align-items: baseline;
+  gap: var(--sv-space-2);
+  min-width: 0;
+}
+
+.workspaceName {
   margin: 0;
   min-width: 0;
-  font-size: var(--sv-font-size-md);
+  font-size: var(--sv-font-size-xl);
   font-weight: var(--sv-font-weight-semibold);
 }
 
@@ -95,6 +124,12 @@
 
 .workspaceName a:hover {
   text-decoration: underline;
+}
+
+.count {
+  color: var(--sv-color-text-muted);
+  font-size: var(--sv-font-size-md);
+  white-space: nowrap;
 }
 
 .people {
@@ -108,6 +143,7 @@
   font-size: var(--sv-font-size-sm);
 }
 
+/* The same grid as a workspace's boards, so that the Desk is the size of one. */
 .tiles {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -115,6 +151,40 @@
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+/* The Desk: the dimensions of a board's tile, and not its look (no band of a colour): it is not a board. */
+.desk {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sv-space-2);
+  width: 100%;
+  min-height: 88px;
+  padding: var(--sv-space-3);
+  border: var(--sv-border-width-hairline) solid var(--sv-color-border);
+  border-radius: var(--sv-radius-md);
+  background: var(--sv-color-surface-sunken);
+  color: var(--sv-color-text-primary);
+  text-decoration: none;
+}
+
+.desk:hover {
+  background: var(--sv-color-accent-subtle);
+}
+
+.deskTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--sv-space-2);
+}
+
+.deskName {
+  font-weight: var(--sv-font-weight-semibold);
+}
+
+.deskCounts {
+  color: var(--sv-color-text-muted);
+  font-size: var(--sv-font-size-sm);
 }
 
 .create {
