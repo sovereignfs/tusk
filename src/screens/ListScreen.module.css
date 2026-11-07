@@ -35,6 +35,11 @@
   background: var(--sv-color-accent-subtle);
 }
 
+/* The open card's row is tinted, and the muted colour of a due date does not have the contrast it needs on the tint: it takes the text's own colour there (an overdue one keeps the danger colour). */
+.row[aria-current='true'] .due:not(.overdue) {
+  color: var(--sv-color-text-primary);
+}
+
 .name {
   flex: 1;
   min-width: 0;
