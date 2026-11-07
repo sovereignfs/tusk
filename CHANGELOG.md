@@ -39,6 +39,7 @@ Each release's section is also its GitHub release notes: the release workflow re
 - Sovereign can sign a person out of Tusk everywhere, and delete their Tusk account when they delete theirs, by signed notices Tusk checks against its keys (`/api/sovereign/backchannel-logout`, `/api/sovereign/account-deleted`). `sovereign.manifest.json` is now complete, so a Sovereign instance can host Tusk (`sv app add`): see `deploy/README.md`.
 - Where whoever runs Tusk has registered a GitHub App, Settings > Data > Backup offers _Connect with GitHub_: the person installs the App on one private repository and Tusk keeps no token, asking GitHub for a short-lived one each time. Removing the App or the repository on GitHub disconnects it. Connecting with a token still works.
 - On a phone, the sidebar and the Desk's lists are in a drawer the header's button opens, a card opens as a page of its own, a board's lists scroll sideways and stop at each, and the card's dialog fills the screen. The addresses and the data are the same at every width.
+- Accessibility: every page is checked with axe in light and dark, on a desktop and a phone, in both browsers; a drag of a list, a card or a checklist item by the keyboard says what it picked up and where it is (it used to read out an id), and the header's name, a list's handle and the due-date and repeat buttons are named by what is drawn on them.
 
 ### Changed
 

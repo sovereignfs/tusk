@@ -24,7 +24,7 @@ import {
   topPosition,
 } from '../boards/board-optimistic';
 import { boardFailureMessage, useBoard } from '../boards/store';
-import { HORIZONTAL_AUTOSCROLL, useDragClickGuard, useReorderSensors } from '../ui/dnd';
+import { HORIZONTAL_AUTOSCROLL, spokenDrag, useDragClickGuard, useReorderSensors } from '../ui/dnd';
 import {
   Alert,
   Avatar,
@@ -143,6 +143,28 @@ export function BoardScreen({
     setName('');
     setAdding(false);
   }
+
+  // What a drag says aloud: a list or a card by its name and where it is, never by its id.
+  const spoken = spokenDrag((id) => {
+    const list = view.lists.findIndex((each) => each.id === id);
+    if (list >= 0)
+      return {
+        noun: 'list',
+        name: view.lists[list]?.name ?? '',
+        position: list + 1,
+        total: view.lists.length,
+      };
+    const card = view.cards.find((each) => each.id === id);
+    if (!card) return undefined;
+    const there = cardsIn(view.cards, card.listId);
+    return {
+      noun: 'card',
+      name: card.title,
+      position: there.findIndex((each) => each.id === id) + 1,
+      total: there.length,
+      inside: view.lists.find((each) => each.id === card.listId)?.name ?? '',
+    };
+  });
 
   function onDragStart(event: DragStartEvent) {
     guard.begin();
@@ -379,6 +401,7 @@ export function BoardScreen({
           ) : null}
           <DndContext
             id={`board-${view.board.id}`}
+            accessibility={spoken}
             sensors={sensors}
             autoScroll={HORIZONTAL_AUTOSCROLL}
             collisionDetection={collisions}

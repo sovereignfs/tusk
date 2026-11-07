@@ -38,7 +38,7 @@ test('a Desk card gets a date and a time from the picker, shows them on its row,
   await page.getByRole('button', { name: 'Tomorrow' }).click();
   await page.getByLabel('Time', { exact: true }).fill('09:30');
   await page.keyboard.press('Escape');
-  await expect(detail.getByRole('button', { name: /^Due Tomorrow, / })).toBeVisible();
+  await expect(detail.getByRole('button', { name: /^Tomorrow, / })).toBeVisible();
   await expect(
     page
       .getByRole('listitem')
@@ -48,13 +48,13 @@ test('a Desk card gets a date and a time from the picker, shows them on its row,
 
   await page.reload();
   await expect(
-    page.getByRole('region', { name: 'Card' }).getByRole('button', { name: /^Due Tomorrow, / }),
+    page.getByRole('region', { name: 'Card' }).getByRole('button', { name: /^Tomorrow, / }),
   ).toBeVisible();
 
   // Cleared with its time.
   await page
     .getByRole('region', { name: 'Card' })
-    .getByRole('button', { name: /^Due Tomorrow/ })
+    .getByRole('button', { name: /^Tomorrow/ })
     .click();
   await page.getByRole('button', { name: 'Clear' }).click();
   await expect(
@@ -106,7 +106,7 @@ test('a card on a board gets a date from the dialog, shows it on its tile, shows
 
   await page.reload();
   await expect(
-    page.getByRole('dialog', { name: 'Ship it' }).getByRole('button', { name: /^Due Today, / }),
+    page.getByRole('dialog', { name: 'Ship it' }).getByRole('button', { name: /^Today, / }),
   ).toBeVisible();
   await page
     .getByRole('dialog', { name: 'Ship it' })
@@ -180,7 +180,7 @@ test('on the Desk, what is due today floats to the top under Custom, a card turn
     await page.getByRole('button', { name: choice, exact: true }).click();
     if (time) await page.getByLabel('Time', { exact: true }).fill(time);
     await page.keyboard.press('Escape');
-    await expect(detail.getByRole('button', { name: new RegExp(`^Due ${choice}`) })).toBeVisible();
+    await expect(detail.getByRole('button', { name: new RegExp(`^${choice}`) })).toBeVisible();
   }
   await setDue('Late one', 'Today', '09:00');
   await setDue('Soon one', 'Tomorrow');

@@ -86,7 +86,7 @@ test('a page loaded offline does every Desk action with no error, and a second d
   await detail.getByRole('button', { name: 'Set a due date' }).click();
   await page.getByRole('button', { name: 'Tomorrow' }).click();
   await page.keyboard.press('Escape');
-  await expect(detail.getByRole('button', { name: /^Due Tomorrow/ })).toBeVisible();
+  await expect(detail.getByRole('button', { name: /^Tomorrow/ })).toBeVisible();
   await detail.getByRole('button', { name: 'Close' }).click();
   await expect(link(page, 'two, edited')).toBeVisible();
   await rows(page)

@@ -56,7 +56,8 @@ export function DuePicker({
           className={`${styles.trigger} ${due?.overdue ? styles.overdue : ''}`}
           disabled={disabled}
           aria-expanded={open}
-          aria-label={due ? `Due ${due.text}` : 'Set a due date'}
+          // The name begins with what is drawn on the button (WCAG 2.5.3) and then says what it does.
+          aria-label={due ? `${due.text}, change the due date` : 'No due date, set a due date'}
           onClick={() => setOpen((was) => !was)}
         >
           <Icon name="calendar" aria-hidden />

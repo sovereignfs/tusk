@@ -122,7 +122,7 @@ test('a list is picked up by its title and put down with the keyboard', async ({
   const { workspace } = await makeBoard(page);
   await addList(page, 'Doing');
   await addList(page, 'Done');
-  const handle = page.getByLabel('Done, drag to reorder');
+  const handle = page.locator('[aria-roledescription="sortable list"]', { hasText: 'Done' });
   await handle.focus();
   // A frame between the keys, as a person's fingers leave: the drag measures where the lists are after each move.
   for (const key of ['Space', 'ArrowLeft', 'ArrowLeft', 'Space']) {

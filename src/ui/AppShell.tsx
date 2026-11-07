@@ -38,7 +38,7 @@ export function AppShell({
       <header className={styles.header}>
         <div className={styles.lead}>
           {toolbar}
-          <a href="/" className={styles.brand} aria-label={name}>
+          <a href="/" className={styles.brand}>
             <BrandBadge name={name} mark={markOf(name)} />
             <span className={styles.name}>{name}</span>
           </a>

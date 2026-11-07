@@ -17,6 +17,7 @@ import { useHasSynced, useLocal, useSync } from '../sync/react';
 import { Icon, useToast } from '../ui';
 import {
   VERTICAL_AUTOSCROLL,
+  spokenDrag,
   useDragClickGuard,
   useOptimisticOrder,
   useReorderSensors,
@@ -203,6 +204,18 @@ function Lists({
   const guard = useDragClickGuard();
   const sensors = useReorderSensors();
 
+  const spoken = spokenDrag((id) => {
+    const at = rendered.findIndex((list) => list.id === id);
+    return at < 0
+      ? undefined
+      : {
+          noun: 'list',
+          name: text(rendered[at], 'title', 'Untitled'),
+          position: at + 1,
+          total: rendered.length,
+        };
+  });
+
   function onDragEnd(event: DragEndEvent) {
     guard.end();
     const { active, over } = event;
@@ -224,6 +237,7 @@ function Lists({
   return (
     // An explicit `id`, or the server and the browser name the drag's pieces differently and React reports a mismatch (DESIGN.md §15.8).
     <DndContext
+      accessibility={spoken}
       id="lists"
       sensors={sensors}
       autoScroll={VERTICAL_AUTOSCROLL}

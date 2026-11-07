@@ -147,7 +147,7 @@ test('the repeat picker sets a preset from the keyboard, a custom rule, keeps we
   await page.keyboard.press('Enter');
   await expect(detail.getByRole('button', { name: 'Repeats every week on Friday' })).toBeVisible();
   // A card with no date is given one: the first date the rule matches from today.
-  await expect(detail.getByRole('button', { name: /^Due Today/ })).toBeVisible();
+  await expect(detail.getByRole('button', { name: /^Today/ })).toBeVisible();
   await expect(detail.getByText('Repeats every week on Friday')).toBeVisible();
 
   // Custom: every 2 weeks on Monday and Friday. Weekdays are weekly's: not carried to months, and back to weekly starts again from the date's.
@@ -190,7 +190,7 @@ test('the repeat picker sets a preset from the keyboard, a custom rule, keeps we
   // A number that is not one cannot be applied.
   await page
     .getByRole('region', { name: 'Card' })
-    .getByRole('button', { name: /^Repeats every 2 weeks/ })
+    .getByRole('button', { name: /repeats every 2 weeks/i })
     .click();
   await page.getByLabel('Every how many').fill('0');
   await expect(page.getByRole('button', { name: 'Apply' })).toBeDisabled();
@@ -205,7 +205,7 @@ test('the repeat picker sets a preset from the keyboard, a custom rule, keeps we
   ).toBeVisible();
   await expect(page.getByText(/^Repeats every/)).toHaveCount(0);
   await expect(
-    page.getByRole('region', { name: 'Card' }).getByRole('button', { name: /^Due Today/ }),
+    page.getByRole('region', { name: 'Card' }).getByRole('button', { name: /^Today/ }),
   ).toBeVisible();
 });
 
@@ -274,7 +274,7 @@ test('editing a card that repeats: a rename and a new date apply from there on w
   await detail.getByLabel('Title').fill('Water everything');
   await detail.getByLabel('Title').press('Enter');
   await expect(cards('Water everything')).toHaveCount(1);
-  await detail.getByRole('button', { name: /^Due Nov 13/ }).click();
+  await detail.getByRole('button', { name: /^Nov 13/ }).click();
   await page.getByRole('button', { name: 'Tomorrow' }).click();
   await page.keyboard.press('Escape');
   await expect(
@@ -291,7 +291,7 @@ test('editing a card that repeats: a rename and a new date apply from there on w
 
   // Clearing the date ends it: the card is a one-off.
   await cards('Water everything').filter({ hasText: 'Nov 14' }).getByRole('link').click();
-  await detail.getByRole('button', { name: /^Due Nov 14/ }).click();
+  await detail.getByRole('button', { name: /^Nov 14/ }).click();
   await page.getByRole('button', { name: 'Clear' }).click();
   await page.keyboard.press('Escape');
   await expect(detail.getByRole('button', { name: 'Set a repeat' })).toBeVisible();

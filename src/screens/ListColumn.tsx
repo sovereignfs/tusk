@@ -102,7 +102,7 @@ export function ListColumn({
             className={`${styles.listTitle} ${styles.handle}`}
             {...sortable.attributes}
             {...sortable.listeners}
-            aria-label={`${list.name}, drag to reorder`}
+            // Named by what is on screen, the title and the count (WCAG 2.5.3); how to move it is the instructions the sortable already points at.
             aria-roledescription="sortable list"
           >
             {heading}

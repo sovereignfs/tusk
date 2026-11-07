@@ -101,7 +101,12 @@ export function RepeatPicker({
           className={styles.trigger}
           disabled={disabled}
           aria-expanded={open}
-          aria-label={value ? `Repeats ${describe(value)}` : 'Set a repeat'}
+          // The name begins with what is drawn on the button (WCAG 2.5.3) and then says what it does.
+          aria-label={
+            value
+              ? `${summary(value)}, repeats ${describe(value)}`
+              : 'Does not repeat, set a repeat'
+          }
           onClick={() => (open ? setOpen(false) : show())}
         >
           <Icon name="refresh-cw" aria-hidden />

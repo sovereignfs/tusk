@@ -1,4 +1,10 @@
-import { KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import {
+  type Announcements,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -82,4 +88,68 @@ export function useOptimisticOrder<T extends { id: string }>(
   }, [shown]);
 
   return { rendered, show: setShown };
+}
+
+/** What a drag says of a thing it is moving or has come over. */
+export interface Spoken {
+  /** `list`, `card` or `item`. */
+  readonly noun: string;
+  /** What a person calls it (its title). **Never its id**: dnd-kit's own words read the id aloud. */
+  readonly name: string;
+  /** Where it is among its neighbours, from 1. */
+  readonly position: number;
+  readonly total: number;
+  /** For a card, the list it is in. */
+  readonly inside?: string;
+}
+
+const where = (about: Spoken) =>
+  `position ${about.position} of ${about.total}${about.inside ? ` in ${about.inside}` : ''}`;
+
+/**
+ * What a drag says aloud (DESIGN.md §17.8). dnd-kit announces a pick-up, a move, a drop and a cancel in a live region, but in its own words, which name a thing by
+ * its id ("Draggable item f0ed12b5-… was moved over droppable area f0ed…"): nothing a person could use. These say what it is and where it is, in order, so that a
+ * drag by the keyboard can be done and checked by ear. `about` names a thing by its id, as the screen knows it, or `undefined` for what it does not know.
+ */
+export function spokenDrag(about: (id: string) => Spoken | undefined): {
+  announcements: Announcements;
+  screenReaderInstructions: { draggable: string };
+} {
+  const of = (id: string | number) => about(String(id));
+  const pickedUp = (it: Spoken) =>
+    `Picked up ${it.noun} ${it.name}, ${where(it)}. Move it with the arrow keys, drop it with Space, cancel with Escape.`;
+  return {
+    screenReaderInstructions: {
+      draggable:
+        'To pick this up, press Space. Move it with the arrow keys, drop it with Space, or cancel with Escape.',
+    },
+    announcements: {
+      onDragStart({ active }) {
+        const it = of(active.id);
+        return it ? pickedUp(it) : 'Picked up.';
+      },
+      onDragOver({ active, over }) {
+        const it = of(active.id);
+        const there = over ? of(over.id) : undefined;
+        if (!it || !there) return undefined;
+        // The first thing after a pick-up is "over itself", in the same render as the pick-up, which would be replaced by it unheard: so it says the pick-up.
+        if (over && String(over.id) === String(active.id)) return pickedUp(it);
+        return there.noun === it.noun
+          ? `${it.name} is over ${where(there)}.`
+          : `${it.name} is over ${there.noun} ${there.name}.`;
+      },
+      onDragEnd({ active, over }) {
+        const it = of(active.id);
+        const there = over ? of(over.id) : undefined;
+        if (!it) return 'Dropped.';
+        return there && there.noun === it.noun
+          ? `Dropped ${it.noun} ${it.name} at ${where(there)}.`
+          : `Dropped ${it.noun} ${it.name}.`;
+      },
+      onDragCancel({ active }) {
+        const it = of(active.id);
+        return it ? `Cancelled. ${it.name} stays where it was.` : 'Cancelled.';
+      },
+    },
+  };
 }

@@ -11,7 +11,7 @@ import { type FormEvent, useCallback, useRef, useState } from 'react';
 import { progressOf, showingItems, sortItems, withProgress } from '../boards/checklist';
 import type { BoardStore } from '../boards/store';
 import { after, between, first } from '../position';
-import { VERTICAL_AUTOSCROLL, useDragClickGuard, useReorderSensors } from '../ui/dnd';
+import { VERTICAL_AUTOSCROLL, spokenDrag, useDragClickGuard, useReorderSensors } from '../ui/dnd';
 import { Button, Checkbox, Input } from '../ui';
 import { type ChecklistItem, type Op, WORKSPACE_LIMITS } from '../workspaces/format';
 import styles from './CardChecklist.module.css';
@@ -46,6 +46,12 @@ export function CardChecklist({
   const field = useRef<HTMLInputElement>(null);
   const sensors = useReorderSensors();
   const guard = useDragClickGuard();
+  const spoken = spokenDrag((id) => {
+    const at = items.findIndex((each) => each.id === id);
+    return at < 0
+      ? undefined
+      : { noun: 'item', name: items[at]?.title ?? '', position: at + 1, total: items.length };
+  });
 
   /** Does one thing: shows it, tells the board the new count, sends it, and puts the items back if it was refused. */
   const act = useCallback(
@@ -111,6 +117,7 @@ export function CardChecklist({
         />
       ) : null}
       <DndContext
+        accessibility={spoken}
         id={`checklist-${cardId}`}
         sensors={sensors}
         autoScroll={VERTICAL_AUTOSCROLL}
