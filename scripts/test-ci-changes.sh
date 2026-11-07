@@ -10,7 +10,7 @@ HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 PASSED=0
 FAILED=0
 
-# expect "name" "code=… scripts=…" path...
+# expect "name" "code=… scripts=… image=…" path...
 expect() {
   local name=$1 want=$2 got
   shift 2
@@ -24,10 +24,12 @@ expect() {
   fi
 }
 
-NONE="code=false scripts=false"
-CODE="code=true scripts=false"
-SCRIPTS="code=false scripts=true"
-ALL="code=true scripts=true"
+NONE="code=false scripts=false image=false"
+CODE="code=true scripts=false image=false"
+IMAGE="code=true scripts=false image=true"
+SCRIPTS="code=false scripts=true image=false"
+ALL="code=true scripts=true image=true"
+BOTH="code=true scripts=true image=false"
 
 printf '\nchanges that need nothing\n'
 expect "no changes at all" "$NONE"
@@ -41,15 +43,13 @@ printf '\nchanges that need the app jobs\n'
 expect "a page" "$CODE" app/page.tsx
 expect "a source file" "$CODE" src/position.ts
 expect "a test" "$CODE" src/position.test.ts
-expect "the lockfile" "$CODE" pnpm-lock.yaml
-expect "package.json" "$CODE" package.json
-expect "a migration" "$CODE" migrations/sqlite/0000_init.sql
-expect "the manifest an instance reads" "$CODE" sovereign.manifest.json
-expect "the image" "$CODE" Dockerfile .dockerignore
-expect "the workflow itself" "$CODE" .github/workflows/ci.yml
+expect "a screen" "$CODE" src/screens/BoardScreen.tsx
+expect "a style" "$CODE" src/screens/BoardScreen.module.css
+expect "a browser test" "$CODE" e2e/boards.spec.ts
+expect "the browser tests' config and runner" "$CODE" playwright.config.ts scripts/e2e-shard.mjs
 expect "the publish workflow" "$CODE" .github/workflows/publish.yml
 expect "a Markdown file that is not one of the documents" "$CODE" src/landing/terms.md
-expect "a document in a subfolder of the root that is not under docs" "$CODE" deploy/README.md
+expect "a document in a subfolder of the root that is not under docs" "$CODE" src/landing/README.md
 expect "the README, which a test reads" "$CODE" README.md
 expect "a document and a source file together" "$CODE" CHANGELOG.md src/time.ts
 expect "an unknown kind of file" "$CODE" something/new.thing
@@ -59,14 +59,28 @@ expect "a release script" "$SCRIPTS" scripts/release.sh
 expect "the release library" "$SCRIPTS" scripts/lib/release.sh
 expect "a release file" "$SCRIPTS" scripts/release/tusk.sh
 expect "the release tests" "$SCRIPTS" scripts/test-release.sh
-expect "other scripts are the app's" "$CODE" scripts/deploy-check.sh
+expect "other scripts are the app's" "$CODE" scripts/seed-run.mjs
+
+printf '\nchanges that need the image too\n'
+expect "the lockfile" "$IMAGE" pnpm-lock.yaml
+expect "package.json" "$IMAGE" package.json
+expect "a migration" "$IMAGE" migrations/sqlite/0000_init.sql
+expect "the manifest an instance reads" "$IMAGE" sovereign.manifest.json
+expect "the image" "$IMAGE" Dockerfile .dockerignore
+expect "the setups it is brought up in" "$IMAGE" deploy/compose.yaml
+expect "a document in them" "$IMAGE" deploy/README.md
+expect "the script that brings them up" "$IMAGE" scripts/deploy-check.sh
+expect "the database code that runs at start-up" "$IMAGE" src/db/migrate.ts src/config/index.ts
+expect "Next's config" "$IMAGE" next.config.ts
+expect "the workflow itself" "$IMAGE" .github/workflows/ci.yml
+expect "a screen and the Dockerfile together" "$IMAGE" src/screens/Frame.tsx Dockerfile
 
 printf '\nthe classifier itself\n'
 expect "changing the classifier runs everything" "$ALL" scripts/ci-changes.sh
 expect "changing its tests runs everything" "$ALL" scripts/test-ci-changes.sh
 
 printf '\nboth kinds at once\n'
-expect "a source file and a release script" "$ALL" src/time.ts scripts/release.sh
+expect "a source file and a release script" "$BOTH" src/time.ts scripts/release.sh
 expect "a document and a release script" "$SCRIPTS" ROADMAP.md scripts/release.sh
 
 printf '\n%s passed, %s failed\n' "$PASSED" "$FAILED"
