@@ -45,6 +45,9 @@ function shown(
     lastBackupPath: string | null;
     lastCheckedAt: number | null;
     keyConfirmedAt: number | null;
+    failureKind: string | null;
+    failures: number;
+    stoppedAt: number | null;
     mode: Mode;
     frequency: Frequency;
     nextBackupAt: number | null;
@@ -63,6 +66,18 @@ function shown(
     nextBackupAt: connection.nextBackupAt,
     lastCheckedAt: connection.lastCheckedAt,
     keyConfirmedAt: connection.keyConfirmedAt,
+    // Why the last backup failed, in our words, and whether automatic backups have stopped for it: Settings always shows it, with what to do.
+    failure:
+      connection.failureKind !== null
+        ? {
+            code: connection.failureKind,
+            message:
+              (RUN_MESSAGES as Record<string, string>)[connection.failureKind] ??
+              'The last backup could not be made.',
+            failures: connection.failures,
+            stoppedAt: connection.stoppedAt,
+          }
+        : null,
     lastBackup:
       connection.lastBackupAt !== null && connection.lastBackupPath !== null
         ? {

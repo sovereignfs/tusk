@@ -59,12 +59,31 @@ export function noticeText(notice: Pick<NoticeRow, 'kind' | 'actorName' | 'subje
     comment: `${who} commented on ${what}`,
     added_to_workspace: `${who} added you to the workspace ${notice.subject}`,
     added_to_board: `${who} added you to the board ${notice.subject}`,
+    backup_stopped: backupStoppedText(notice.subject),
   };
   return texts[notice.kind];
 }
 
+/** What a stopped backup says, by the kind of failure (a word of ours): why, and what to do. */
+function backupStoppedText(kind: string): string {
+  const why: Record<string, string> = {
+    token_rejected: 'GitHub no longer accepts the saved token',
+    read_only: 'the saved token can no longer write to the repository',
+    not_visible: 'the repository cannot be seen any more',
+    public: 'the repository has been made public',
+    empty: 'the repository has nothing in it',
+    too_large: 'everything together is over 50 MB',
+    key_unconfirmed: 'your Desk has a key now and backups wait for you to confirm it',
+    no_key: 'this server has lost its encryption key',
+  };
+  return `Automatic backups have stopped: ${why[kind] ?? 'a backup could not be made'}. Open Settings, Data, to see what to do.`;
+}
+
 /** Where a notice goes when it is opened: the card, the board or the workspace it is about. */
-export function noticeHref(notice: Pick<NoticeRow, 'workspaceId' | 'boardId' | 'cardId'>): string {
+export function noticeHref(
+  notice: Pick<NoticeRow, 'workspaceId' | 'boardId' | 'cardId'> & { kind?: NoticeRow['kind'] },
+): string {
+  if (notice.kind === 'backup_stopped') return '/account?section=data';
   if (notice.boardId && notice.cardId) return `/b/${notice.boardId}/c/${notice.cardId}`;
   if (notice.boardId) return `/b/${notice.boardId}`;
   if (notice.workspaceId) return `/w/${notice.workspaceId}`;

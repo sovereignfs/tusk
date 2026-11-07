@@ -513,12 +513,13 @@ export interface BoardPeople {
   readonly candidates: readonly { readonly accountId: string; readonly name: string }[];
 }
 
-/** The kinds of notice there are (DESIGN.md §16): being assigned a card, a comment on a card one is assigned to or made, being added to a workspace, being added to a board. */
+/** The kinds of notice there are (DESIGN.md §16): being assigned a card, a comment on a card one is assigned to or made, being added to a workspace, being added to a board, and the person's own backups stopping (§21.4). */
 export const NOTICE_KINDS = [
   'assigned',
   'comment',
   'added_to_workspace',
   'added_to_board',
+  'backup_stopped',
 ] as const;
 export type NoticeKind = (typeof NOTICE_KINDS)[number];
 

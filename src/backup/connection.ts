@@ -76,6 +76,11 @@ export interface Connection {
   readonly nextBackupAt: number | null;
   /** When the person confirmed that backups go on after their Desk got a key: older files stay plain. Null until they have. */
   readonly keyConfirmedAt: number | null;
+  /** Why the last backup failed, and how many in a row; null and 0 after one that worked. */
+  readonly failureKind: string | null;
+  readonly failures: number;
+  /** When automatic backups were stopped by a failure that will not mend itself; null while they run. */
+  readonly stoppedAt: number | null;
 }
 
 /** What the credential is for, in the store. */
@@ -147,11 +152,15 @@ export async function readConnection(
     frequency: string;
     nextBackupAt: number | string | null;
     keyConfirmedAt: number | string | null;
+    failureKind: string | null;
+    failures: number | string;
+    stoppedAt: number | string | null;
   }>(
     database,
     sql`SELECT account_id AS "accountId", kind, repository, branch, credential_id AS "credentialId", created_at AS "createdAt",
         last_backup_at AS "lastBackupAt", last_backup_path AS "lastBackupPath", last_fingerprint AS "lastFingerprint",
-        last_checked_at AS "lastCheckedAt", mode, frequency, next_backup_at AS "nextBackupAt", key_confirmed_at AS "keyConfirmedAt"
+        last_checked_at AS "lastCheckedAt", mode, frequency, next_backup_at AS "nextBackupAt", key_confirmed_at AS "keyConfirmedAt",
+        failure_kind AS "failureKind", failures, stopped_at AS "stoppedAt"
         FROM ${backupConnectionTable(database)} WHERE account_id = ${accountId}`,
   );
   return row
@@ -170,6 +179,9 @@ export async function readConnection(
         frequency: isFrequency(row.frequency) ? row.frequency : DEFAULT_FREQUENCY,
         nextBackupAt: row.nextBackupAt === null ? null : Number(row.nextBackupAt),
         keyConfirmedAt: row.keyConfirmedAt === null ? null : Number(row.keyConfirmedAt),
+        failureKind: row.failureKind,
+        failures: Number(row.failures),
+        stoppedAt: row.stoppedAt === null ? null : Number(row.stoppedAt),
       }
     : undefined;
 }
@@ -237,7 +249,8 @@ export async function connectRepository(
           ON CONFLICT (account_id) DO UPDATE SET
             kind = 'token', repository = ${`${ref.owner}/${ref.name}`}, branch = ${branch}, credential_id = ${credentialId}, created_at = ${now},
             last_backup_at = NULL, last_backup_path = NULL, last_fingerprint = NULL, last_checked_at = NULL,
-            key_confirmed_at = ${sealed ? now : null}
+            key_confirmed_at = ${sealed ? now : null},
+            failure_kind = NULL, failures = 0, stopped_at = NULL
           RETURNING account_id`,
     );
   } catch (error) {
@@ -277,7 +290,12 @@ export async function confirmKey(
 ): Promise<boolean> {
   const rows = await dbAll(
     database,
-    sql`UPDATE ${backupConnectionTable(database)} SET key_confirmed_at = ${now} WHERE account_id = ${accountId} RETURNING account_id`,
+    sql`UPDATE ${backupConnectionTable(database)}
+        SET key_confirmed_at = ${now},
+            stopped_at = CASE WHEN failure_kind = 'key_unconfirmed' THEN NULL ELSE stopped_at END,
+            failure_kind = CASE WHEN failure_kind = 'key_unconfirmed' THEN NULL ELSE failure_kind END,
+            failures = CASE WHEN failure_kind = 'key_unconfirmed' THEN 0 ELSE failures END
+        WHERE account_id = ${accountId} RETURNING account_id`,
   );
   return rows.length > 0;
 }

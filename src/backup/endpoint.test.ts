@@ -132,6 +132,7 @@ describe(`/api/backup/connection (${leg})`, () => {
     expect(Object.keys(body.connection).sort()).toEqual([
       'branch',
       'connectedAt',
+      'failure',
       'frequency',
       'keyConfirmedAt',
       'kind',

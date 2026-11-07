@@ -167,7 +167,7 @@ It signs in like Fjord in every way, an instance can host it, and a person can l
 | 88  | [2.6](docs/epics/accounts.md)  | Linking a Sovereign identity      | P1       | 2.5, 2.7        | 📋     |
 | 89  | [2.9](docs/epics/accounts.md)  | Notices from core                 | P1       | 2.5, 2.8        | 📋     |
 | 90  | [2.10](docs/epics/accounts.md) | Hosting on an instance            | P1       | 1.10, 2.9       | 📋     |
-| 91  | [10.6](docs/epics/backup.md)   | Failures                          | P1       | 8.1, 10.5       | 📋     |
+| 91  | [10.6](docs/epics/backup.md)   | Failures                          | P1       | 8.1, 10.5       | ✅     |
 | 92  | [10.7](docs/epics/backup.md)   | Connecting through the GitHub App | P3       | 10.6            | 📋     |
 
 ### Milestone I — First release

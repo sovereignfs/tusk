@@ -222,6 +222,11 @@ export const backupConnection = sqliteTable(
     nextBackupAt: epochMs('next_backup_at'),
     /** When the person confirmed that backups continue once their Desk has a key of its own: files written before stay plain and readable (§9.3, §21.3). Null until they have. */
     keyConfirmedAt: epochMs('key_confirmed_at'),
+    /** Why the last backup failed (a `RunProblem`), and how many in a row have; null and 0 after one that worked (§21.4). */
+    failureKind: text('failure_kind'),
+    failures: counter('failures').notNull().default(0),
+    /** When automatic backups were stopped by a failure that will not mend itself: a token that no longer works, a repository gone or made public. Null while they run. */
+    stoppedAt: epochMs('stopped_at'),
   },
   (table) => [index('backup_connection_due_idx').on(table.nextBackupAt)],
 );

@@ -11,6 +11,7 @@ interface Connection {
   branch: string;
   lastBackup: { at: number; path: string; url: string } | null;
   keyConfirmedAt: number | null;
+  failure: { code: string; message: string; failures: number; stoppedAt: number | null } | null;
   mode: 'manual' | 'auto';
   frequency: Frequency;
   nextBackupAt: number | null;
@@ -240,6 +241,17 @@ export function BackupSection() {
                 ? ` Next check: ${new Date(status.connection.nextBackupAt).toLocaleString()}.`
                 : ''}
             </p>
+          ) : null}
+          {status.connection.failure ? (
+            <Alert variant={status.connection.failure.stoppedAt === null ? 'warning' : 'error'}>
+              {status.connection.failure.stoppedAt === null
+                ? 'The last backup could not be made. It will try again at the next time. '
+                : 'Automatic backups have stopped. '}
+              {status.connection.failure.message}
+              {status.connection.failure.stoppedAt !== null
+                ? ' Back up now, or connecting again, starts them again once it is mended.'
+                : ''}
+            </Alert>
           ) : null}
           {key.moving ? (
             <p className={styles.hint}>

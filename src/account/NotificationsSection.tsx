@@ -10,6 +10,7 @@ const LABELS: Record<NoticeKind, string> = {
   comment: 'When someone comments on a card I made or am assigned to',
   added_to_workspace: 'When I am added to a workspace',
   added_to_board: 'When I am added to a board',
+  backup_stopped: 'When my automatic backups stop',
 };
 
 /**

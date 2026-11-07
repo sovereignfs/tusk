@@ -11,6 +11,7 @@ import { MAX_FILE_BYTES } from '../portability/validate';
 import { serialise } from '../portability/format';
 import { readEncryption } from '../encryption/state';
 import { webUrlOf } from './address';
+import { recordFailure } from './failure';
 import { TOKEN_PURPOSE, credentialIdOf, readConnection } from './connection';
 import { backupMessage, backupPath } from './path';
 import { takeSnapshot } from './snapshot';
@@ -22,7 +23,7 @@ import { backupConnectionTable } from './tables';
  * and it is put at `tusk/<UTC time>.json` on the default branch in one commit on the head just read, **never forced and nothing else in the repository
  * touched**. A branch that moved is read again and tried once more; **a write whose answer is lost is not repeated** (it is `unreachable`, nothing is
  * recorded, and the next backup is a new file, so the worst case is one file too many). Success is recorded only once the host has confirmed the commit.
- * Failures are given back as a kind and are not kept here: keeping them, and what they stop, are task 10.6's.
+ * Failures are given back as a kind, and `runBackup` keeps them and what they stop (`failure.ts`).
  */
 export type RunProblem =
   | 'not_connected'
@@ -126,6 +127,21 @@ export async function runBackup(
   now: number,
   trigger: Trigger,
 ): Promise<RunResult> {
+  const result = await attempt(deps, accountId, now, trigger);
+  // What came of it is kept (`failure.ts`): a failure is counted and may stop automatic backups and tell the person, once; a success ends all of that.
+  if (!result.ok)
+    await recordFailure(deps.database, accountId, result.problem, now, {
+      ...(result.retryAfterMs === undefined ? {} : { retryAfterMs: result.retryAfterMs }),
+    });
+  return result;
+}
+
+async function attempt(
+  deps: RunDeps,
+  accountId: string,
+  now: number,
+  trigger: Trigger,
+): Promise<RunResult> {
   const connection = await readConnection(deps.database, accountId);
   if (!connection) return { ok: false, problem: 'not_connected' };
   if (!deps.ring) return { ok: false, problem: 'no_key' };
@@ -169,7 +185,7 @@ export async function runBackup(
     if (trigger === 'auto' && snapshot.fingerprint === connection.lastFingerprint) {
       await dbAll(
         deps.database,
-        sql`UPDATE ${backupConnectionTable(deps.database)} SET last_checked_at = ${now}
+        sql`UPDATE ${backupConnectionTable(deps.database)} SET last_checked_at = ${now}, failure_kind = NULL, failures = 0, stopped_at = NULL
             WHERE account_id = ${accountId} RETURNING account_id`,
       );
       return { ok: true, unchanged: true, trigger, at: now };
@@ -199,7 +215,8 @@ export async function runBackup(
     await dbAll(
       deps.database,
       sql`UPDATE ${backupConnectionTable(deps.database)}
-          SET last_backup_at = ${now}, last_checked_at = ${now}, last_backup_path = ${path}, last_fingerprint = ${snapshot.fingerprint}
+          SET last_backup_at = ${now}, last_checked_at = ${now}, last_backup_path = ${path}, last_fingerprint = ${snapshot.fingerprint},
+              failure_kind = NULL, failures = 0, stopped_at = NULL
           WHERE account_id = ${accountId} RETURNING account_id`,
     );
     return {

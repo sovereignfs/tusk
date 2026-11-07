@@ -38,7 +38,8 @@ export async function setSchedule(
         : current.nextBackupAt;
   await dbAll(
     database,
-    sql`UPDATE ${backupConnectionTable(database)} SET mode = ${mode}, frequency = ${frequency}, next_backup_at = ${next}
+    sql`UPDATE ${backupConnectionTable(database)} SET mode = ${mode}, frequency = ${frequency}, next_backup_at = ${next},
+            stopped_at = ${mode === 'auto' ? null : current.stoppedAt}
         WHERE account_id = ${accountId} RETURNING account_id`,
   );
   return readConnection(database, accountId);
@@ -67,7 +68,7 @@ async function due(database: Database, now: number, cap: number) {
   const rows = await dbAll<{ accountId: string; frequency: string; due: number | string }>(
     database,
     sql`SELECT account_id AS "accountId", frequency, next_backup_at AS due FROM ${backupConnectionTable(database)}
-        WHERE mode = 'auto' AND next_backup_at IS NOT NULL AND next_backup_at <= ${now}
+        WHERE mode = 'auto' AND stopped_at IS NULL AND next_backup_at IS NOT NULL AND next_backup_at <= ${now}
         ORDER BY next_backup_at, account_id LIMIT ${cap}`,
   );
   return rows.map((row) => ({
@@ -95,7 +96,7 @@ export async function runDueBackups(
     const won = await claim(
       deps.database,
       sql`UPDATE ${backupConnectionTable(deps.database)} SET next_backup_at = ${next}
-          WHERE account_id = ${candidate.accountId} AND mode = 'auto' AND next_backup_at = ${candidate.due}
+          WHERE account_id = ${candidate.accountId} AND mode = 'auto' AND stopped_at IS NULL AND next_backup_at = ${candidate.due}
           RETURNING account_id`,
     );
     if (!won) return;

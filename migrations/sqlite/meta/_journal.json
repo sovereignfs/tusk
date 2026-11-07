@@ -71,6 +71,13 @@
       "when": 1794009720740,
       "tag": "0009_backup_key_confirmed",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1794010825572,
+      "tag": "0010_backup_failures",
+      "breakpoints": true
     }
   ]
 }

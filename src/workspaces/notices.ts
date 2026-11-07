@@ -51,3 +51,23 @@ export async function raise(tx: Database, notice: Notice, now: number): Promise<
   );
   return true;
 }
+
+/**
+ * A notice from the app itself, with no one who did it and nothing of a workspace: a backup that stopped (DESIGN.md §21.4). `subject` is a word of ours for
+ * what it is about (the kind of failure), never text from outside. A kind the person turned off is not written. Called inside the transaction of what
+ * it is about.
+ */
+export async function raiseSystem(
+  tx: Database,
+  notice: { recipient: string; kind: NoticeKind; subject: string },
+  now: number,
+): Promise<boolean> {
+  if ((await kindsOff(tx, notice.recipient)).includes(notice.kind)) return false;
+  await dbAll(
+    tx,
+    sql`INSERT INTO ${tablesOf(tx).notice} (id, account_id, kind, actor_id, workspace_id, board_id, card_id, details, created_at)
+        VALUES (${crypto.randomUUID()}, ${notice.recipient}, ${notice.kind}, NULL, NULL, NULL, NULL, ${JSON.stringify({ title: notice.subject })}, ${now})
+        RETURNING id`,
+  );
+  return true;
+}
