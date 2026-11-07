@@ -42,7 +42,7 @@ let fake: FakeGitHub;
 let database: Database;
 let close: () => Promise<void>;
 let tokens: InstallationTokens;
-let clock = Date.parse('2026-11-07T10:00:00Z');
+let clock = Date.now();
 let counter = 0;
 let installationIds = 100;
 beforeAll(async () => {
@@ -61,7 +61,8 @@ beforeEach(() => {
     clientId: app.clientId,
     clientSecret: app.clientSecret,
   });
-  clock = Date.parse('2026-11-07T10:00:00Z');
+  // The real clock: the fake GitHub checks a JWT's age against it, so a fixed date here would make every test fail once the day moved past it.
+  clock = Date.now();
   tokens = new InstallationTokens({
     appId: app.appId,
     privateKey: PRIVATE,
