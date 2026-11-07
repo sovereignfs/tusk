@@ -9,8 +9,8 @@ afterEach(() => {
   vi.doUnmock('@/src/auth/server');
 });
 
-async function route(auth: unknown) {
-  vi.doMock('@/src/auth/server', () => ({ getAuth: async () => auth }));
+async function route(auth: unknown, mail = false) {
+  vi.doMock('@/src/auth/server', () => ({ getAuth: async () => auth, mailAvailable: () => mail }));
   return import('../../app/api/auth/[...all]/route');
 }
 
@@ -28,5 +28,32 @@ describe('/api/auth', () => {
     const reply = await GET(new Request('http://localhost:3000/api/auth/get-session'));
     expect(reply.status).toBe(200);
     expect(handler).toHaveBeenCalledOnce();
+  });
+
+  it('answers 404, as a route that is not there, to the reset and verification routes when there is no mail, and hands them on when there is', async () => {
+    const handler = vi.fn(async () => new Response('{"ok":true}', { status: 200 }));
+    const without = await route({ handler }, false);
+    for (const path of [
+      'request-password-reset',
+      'reset-password',
+      'reset-password/abc',
+      'send-verification-email',
+      'verify-email',
+    ]) {
+      const request = new Request(`http://localhost:3000/api/auth/${path}`);
+      expect((await without.GET(request)).status, path).toBe(404);
+      expect((await without.POST(request)).status, path).toBe(404);
+    }
+    expect(handler).not.toHaveBeenCalled();
+    // The rest of sign-in is there either way.
+    expect(
+      (await without.GET(new Request('http://localhost:3000/api/auth/get-session'))).status,
+    ).toBe(200);
+    vi.resetModules();
+    const withMail = await route({ handler }, true);
+    expect(
+      (await withMail.POST(new Request('http://localhost:3000/api/auth/request-password-reset')))
+        .status,
+    ).toBe(200);
   });
 });

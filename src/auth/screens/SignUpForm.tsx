@@ -6,12 +6,13 @@ import { messageFor } from '../messages';
 import { AuthButton, AuthError, AuthField, AuthForm, Input } from '../../ui';
 
 /** Name, email and password. Without email there is nothing to confirm, so the account is made and the person is signed in. */
-export function SignUpForm({ minLength }: { minLength: number }) {
+export function SignUpForm({ minLength, mail = false }: { minLength: number; mail?: boolean }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState(false);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -23,8 +24,21 @@ export function SignUpForm({ minLength }: { minLength: number }) {
       setError(messageFor(failure));
       return;
     }
+    // With mail the account is not signed in until the link in the message is used; without it the person is signed in at once.
+    if (mail) {
+      setBusy(false);
+      setSent(true);
+      return;
+    }
     window.location.assign('/');
   }
+
+  if (sent)
+    return (
+      <p role="status">
+        Check your email: a link was sent to {email}. Open it to confirm the address and sign in.
+      </p>
+    );
 
   return (
     <AuthForm onSubmit={(event) => void onSubmit(event)}>

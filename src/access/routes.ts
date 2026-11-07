@@ -25,6 +25,9 @@ export const ROUTES: RouteRule[] = [
   { route: '/', page: { kind: 'public' } },
   { route: '/sign-in', page: { kind: 'public' } },
   { route: '/sign-up', page: { kind: 'public' } },
+  // Only with mail (DESIGN.md §6): without it they are 404, like the routes under /api/auth that send and use the links.
+  { route: '/forgot-password', page: { kind: 'public' } },
+  { route: '/reset-password', page: { kind: 'public' } },
   // The page the service worker keeps (DESIGN.md §17.9): the same for everyone, with nothing of an account in it. Who is signed in is read on the device.
   { route: '/shell', page: { kind: 'public' } },
   // The app, for someone signed in: the layout around it (`app/(app)/layout.tsx`) finds who, and each page asks for itself as well.

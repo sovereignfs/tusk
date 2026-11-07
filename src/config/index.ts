@@ -1,4 +1,6 @@
 import { resolveAuth, type AuthSettings } from '../auth/config';
+import { resolveMail } from '../mail/config';
+import type { MailSettings } from '../mail/mailer';
 import { type KeyRing, parseKey, ringOf } from '../crypto/keys';
 import { DatabaseConfigError, resolveDatabaseSettings, type DatabaseSettings } from '../db/config';
 import { checkApiUrl, DEFAULT_API_URL } from '../providers/github/provider';
@@ -21,6 +23,8 @@ export interface Config {
   readonly githubApiUrl: string;
   /** `TUSK_DB_ENCRYPTION=on` (DESIGN.md §9.5): the server seals content with the instance key, and personal keys are not offered to anyone. */
   readonly operatorEncryption: boolean;
+  /** Where mail goes, or `undefined`: then an address is not verified, a password is not reset by mail, and no screen or route offers either (DESIGN.md §6). */
+  readonly mail: MailSettings | undefined;
 }
 
 /** One thing that is wrong, in words that name the setting and never its value. */
@@ -193,9 +197,7 @@ export function loadConfig(env: Env, readFile?: ReadFile): LoadResult {
   }
 
   // Mail is optional, but a host with no sender would send nothing anyone could answer, so it stops here rather than at the first message.
-  if (read('TUSK_SMTP_HOST') !== undefined && read('TUSK_SMTP_FROM') === undefined) {
-    problems.push('TUSK_SMTP_HOST is set, and mail needs TUSK_SMTP_FROM as well.');
-  }
+  const mail = resolveMail(read, problems);
 
   // The database: which of the three forms, and the address it needs. A secret address may arrive as a file.
   let database: DatabaseSettings | undefined;
@@ -221,6 +223,7 @@ export function loadConfig(env: Env, readFile?: ReadFile): LoadResult {
       encryption,
       githubApiUrl,
       operatorEncryption: rawOperator === 'on',
+      mail,
     },
   };
 }

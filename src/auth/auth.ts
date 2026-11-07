@@ -3,6 +3,8 @@ import { betterAuth } from 'better-auth';
 import { APIError } from 'better-auth/api';
 import { nextCookies } from 'better-auth/next-js';
 import type { Database } from '../db/client';
+import type { Mailer } from '../mail/mailer';
+import { resetMessage, verificationMessage } from '../mail/templates';
 import * as postgresAuth from '../db/schema/postgres/auth';
 import * as sqliteAuth from '../db/schema/sqlite/auth';
 import { type AuthSettings, SIGNUP_CLOSED } from './config';
@@ -18,12 +20,17 @@ export interface AuthDependencies {
   name: string;
   /** The auth store's database. */
   database: Database;
+  /**
+   * Where mail goes, if there is any. **With a mailer an address is verified before the first sign-in (the link signs in) and a forgotten password is reset by
+   * a single-use link that ends every other session; without one, neither exists** and the routes that would do them are not mounted (`app/api/auth`).
+   */
+  mailer?: Mailer | undefined;
 }
 
 /** The prefix of better-auth's cookies, so that ours do not collide with another app's on localhost. */
 export const COOKIE_PREFIX = 'tusk';
 
-export function createAuth({ settings, name, database }: AuthDependencies) {
+export function createAuth({ settings, name, database, mailer }: AuthDependencies) {
   const schema = database.dialect === 'postgres' ? postgresAuth : sqliteAuth;
 
   return betterAuth({
@@ -39,8 +46,39 @@ export function createAuth({ settings, name, database }: AuthDependencies) {
     emailAndPassword: {
       enabled: true,
       minPasswordLength: settings.passwordMinLength,
-      autoSignIn: true,
+      // With mail, a new account is signed in by the link it is sent and not before; without it, at once.
+      autoSignIn: mailer === undefined,
+      requireEmailVerification: mailer !== undefined,
+      ...(mailer
+        ? {
+            // A reset link is good once and for an hour, and using it ends every session of the account.
+            resetPasswordTokenExpiresIn: 60 * 60,
+            revokeSessionsOnPasswordReset: true,
+            sendResetPassword: async ({ user, url }: { user: { email: string }; url: string }) => {
+              // Not awaited by the request (a slow mail server would tell a visitor which addresses have accounts by how long it takes) and a failure is not told to them.
+              void mailer.send(resetMessage(name, user.email, url)).catch(() => undefined);
+            },
+          }
+        : {}),
     },
+    ...(mailer
+      ? {
+          emailVerification: {
+            sendOnSignUp: true,
+            sendOnSignIn: true,
+            autoSignInAfterVerification: true,
+            sendVerificationEmail: async ({
+              user,
+              url,
+            }: {
+              user: { email: string };
+              url: string;
+            }) => {
+              void mailer.send(verificationMessage(name, user.email, url)).catch(() => undefined);
+            },
+          },
+        }
+      : {}),
     // Counted in the database, not in memory, so that a limit holds across every process.
     rateLimit: { enabled: true, storage: 'database' },
     advanced: {

@@ -13,6 +13,9 @@ const BY_CODE: Record<string, string> = {
     'There is already an account with that email address. Try signing in instead.',
   SIGNUP_CLOSED: 'Sign-up is closed on this instance.',
   UNAUTHORIZED: 'You need to sign in first.',
+  EMAIL_NOT_VERIFIED:
+    'Confirm your email address first: a link was sent to it. Open the link, and you are signed in.',
+  INVALID_TOKEN: 'That link is not good any more. Ask for a new one.',
 };
 
 export interface AuthError {

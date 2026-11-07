@@ -1,5 +1,6 @@
 import { getConfig } from '../config/current';
 import { getAuthDatabase } from '../db/boot';
+import { smtpMailer } from '../mail/smtp';
 import { site } from '../site';
 import { type Auth, createAuth } from './auth';
 import type { AuthSettings } from './config';
@@ -24,12 +25,25 @@ export function getAuth(): Promise<Auth | null> {
   // On `globalThis`, because the development server reloads modules and a second instance must not be made.
   const holder = globalThis as Holder;
   holder[KEY] ??= getAuthDatabase()
-    .then((database) => createAuth({ settings, name: site.name, database }))
+    .then((database) => {
+      const mail = getConfig().mail;
+      return createAuth({
+        settings,
+        name: site.name,
+        database,
+        mailer: mail ? smtpMailer(mail) : undefined,
+      });
+    })
     .catch((error: unknown) => {
       holder[KEY] = undefined;
       throw error;
     });
   return holder[KEY];
+}
+
+/** Whether this server can send mail: then addresses are verified and a forgotten password is reset by a link (DESIGN.md §6). */
+export function mailAvailable(): boolean {
+  return getConfig().mail !== undefined && authSettings() !== undefined;
 }
 
 /**

@@ -1,7 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
 import { AuthShell } from '@/src/auth/screens/AuthShell';
 import { SignUpForm } from '@/src/auth/screens/SignUpForm';
-import { authSettings, signUpAvailable } from '@/src/auth/server';
+import { authSettings, mailAvailable, signUpAvailable } from '@/src/auth/server';
 import { getSession } from '@/src/auth/session';
 import { AuthLink } from '@/src/ui';
 
@@ -33,7 +33,7 @@ export default async function SignUpPage() {
         </>
       }
     >
-      <SignUpForm minLength={settings.passwordMinLength} />
+      <SignUpForm minLength={settings.passwordMinLength} mail={mailAvailable()} />
     </AuthShell>
   );
 }

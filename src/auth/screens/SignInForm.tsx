@@ -6,7 +6,13 @@ import { messageFor } from '../messages';
 import { AuthButton, AuthError, AuthField, AuthFooter, AuthForm, AuthLink, Input } from '../../ui';
 
 /** Email and password. No message says whether an address has an account: a wrong address and a wrong password read the same. */
-export function SignInForm({ canSignUp }: { canSignUp: boolean }) {
+export function SignInForm({
+  canSignUp,
+  canReset = false,
+}: {
+  canSignUp: boolean;
+  canReset?: boolean;
+}) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -62,6 +68,11 @@ export function SignInForm({ canSignUp }: { canSignUp: boolean }) {
           Sign in
         </AuthButton>
       </AuthForm>
+      {canReset ? (
+        <AuthFooter>
+          <AuthLink href="/forgot-password">Forgot your password?</AuthLink>
+        </AuthFooter>
+      ) : null}
       {canSignUp ? (
         <AuthFooter>
           New here? <AuthLink href="/sign-up">Create account</AuthLink>

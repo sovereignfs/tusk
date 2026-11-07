@@ -16,7 +16,7 @@ import { HSTS, contentSecurityPolicy, newNonce } from './src/security/csp';
  * sent with, so the nonce in its policy is the nonce on its scripts: it needs no fresh one. A page the worker builds itself ("needs a connection") carries a
  * policy of its own, which allows no script.
  */
-const SIGN_IN_PAGES = new Set(['/sign-in', '/sign-up']);
+const SIGN_IN_PAGES = new Set(['/sign-in', '/sign-up', '/forgot-password', '/reset-password']);
 
 export function proxy(request: NextRequest) {
   const { secure, development, authLocal } = edgeSettings();

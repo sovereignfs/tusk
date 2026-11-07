@@ -160,7 +160,7 @@ It signs in like Fjord in every way, an instance can host it, and a person can l
 
 | #   | ID                             | Task                              | Priority | Depends on      | Status |
 | --- | ------------------------------ | --------------------------------- | -------- | --------------- | ------ |
-| 84  | [2.3](docs/epics/accounts.md)  | Email: verification and reset     | P1       | 2.1, 15.1       | 📋     |
+| 84  | [2.3](docs/epics/accounts.md)  | Email: verification and reset     | P1       | 2.1, 15.1       | ✅     |
 | 85  | [2.4](docs/epics/accounts.md)  | Two-factor and passkeys           | P1       | 2.1, 2.7        | 📋     |
 | 86  | [2.8](docs/epics/accounts.md)  | People, and deleting an account   | P1       | 2.7, 16.3, 18.6 | ✅     |
 | 87  | [2.5](docs/epics/accounts.md)  | Sovereign sign-in                 | P1       | 2.1, 15.1       | 📋     |
