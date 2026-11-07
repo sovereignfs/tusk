@@ -31,7 +31,7 @@ ALL="code=true scripts=true"
 
 printf '\nchanges that need nothing\n'
 expect "no changes at all" "$NONE"
-expect "the root documents" "$NONE" README.md CHANGELOG.md CONTRIBUTING.md AGENTS.md CLAUDE.md DESIGN.md ROADMAP.md
+expect "the root documents" "$NONE" CHANGELOG.md CONTRIBUTING.md AGENTS.md CLAUDE.md DESIGN.md ROADMAP.md
 expect "the documentation folder" "$NONE" docs/epics/foundation.md docs/README.md docs/rfcs/0001-sharing.md
 expect "the licence" "$NONE" LICENSE
 expect "the PR template and Dependabot's file" "$NONE" .github/PULL_REQUEST_TEMPLATE.md .github/dependabot.yml
@@ -50,7 +50,8 @@ expect "the workflow itself" "$CODE" .github/workflows/ci.yml
 expect "the publish workflow" "$CODE" .github/workflows/publish.yml
 expect "a Markdown file that is not one of the documents" "$CODE" src/landing/terms.md
 expect "a document in a subfolder of the root that is not under docs" "$CODE" deploy/README.md
-expect "a document and a source file together" "$CODE" README.md src/time.ts
+expect "the README, which a test reads" "$CODE" README.md
+expect "a document and a source file together" "$CODE" CHANGELOG.md src/time.ts
 expect "an unknown kind of file" "$CODE" something/new.thing
 
 printf '\nchanges that need only the script checks\n'

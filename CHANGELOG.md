@@ -40,6 +40,7 @@ Each release's section is also its GitHub release notes: the release workflow re
 - Where whoever runs Tusk has registered a GitHub App, Settings > Data > Backup offers _Connect with GitHub_: the person installs the App on one private repository and Tusk keeps no token, asking GitHub for a short-lived one each time. Removing the App or the repository on GitHub disconnects it. Connecting with a token still works.
 - On a phone, the sidebar and the Desk's lists are in a drawer the header's button opens, a card opens as a page of its own, a board's lists scroll sideways and stop at each, and the card's dialog fills the screen. The addresses and the data are the same at every width.
 - Accessibility: every page is checked with axe in light and dark, on a desktop and a phone, in both browsers; a drag of a list, a card or a checklist item by the keyboard says what it picked up and where it is (it used to read out an id), and the header's name, a list's handle and the due-date and repeat buttons are named by what is drawn on them.
+- The README lists every setting and what it does, and there are pages for the people who use Tusk on encryption, workspaces and who sees what, publishing, and backups and restoring.
 
 ### Changed
 

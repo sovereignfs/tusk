@@ -20,9 +20,8 @@ set -euo pipefail
 code=false
 scripts=false
 
-# Documents nothing builds or tests from. A regex and not a glob, because in a `case` pattern `*` matches `/`. The README is one until a test
-# reads it (task 11.2 checks that every setting is in it), and then it stops being one.
-document='^(README|CHANGELOG|CONTRIBUTING|AGENTS|CLAUDE|DESIGN|ROADMAP|SECURITY|RELEASING)\.md$|^LICENSE$|^docs/|^\.github/(PULL_REQUEST_TEMPLATE\.md|dependabot\.yml)$'
+# Documents nothing builds or tests from. A regex and not a glob, because in a `case` pattern `*` matches `/`. The README is not one: a test reads it (task 11.2 checks that every setting is in it).
+document='^(CHANGELOG|CONTRIBUTING|AGENTS|CLAUDE|DESIGN|ROADMAP|SECURITY|RELEASING)\.md$|^LICENSE$|^docs/|^\.github/(PULL_REQUEST_TEMPLATE\.md|dependabot\.yml)$'
 
 while IFS= read -r path; do
   [ -n "$path" ] || continue

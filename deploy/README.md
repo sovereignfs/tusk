@@ -85,6 +85,20 @@ Set the six `TUSK_GITHUB_APP_*` settings (`.env.example`) and `TUSK_URL`, and re
 repository** when GitHub asks where to install it, and it must be private; Tusk says what to fix if not. If the App is uninstalled, or the repository taken out of
 it, GitHub tells Tusk by the webhook and the connection is removed. For a GitHub Enterprise Server set `TUSK_GITHUB_API_URL` too.
 
+## Keys
+
+There are three keys, and they are different things.
+
+- **`TUSK_AUTH_SECRET`** signs sessions and tokens. Changing it signs everyone out. Make it once (`openssl rand -base64 48`) and keep it with your secrets.
+- **`TUSK_ENCRYPTION_KEY`** seals the credentials people give Tusk (a repository's token) in the database. Without it a token cannot be kept, and the setting that
+  connects one by token says so. A lost key means people connect their repositories again. **To change it**, put the new one in `TUSK_ENCRYPTION_KEY` and the old
+  in `TUSK_ENCRYPTION_KEY_PREVIOUS`, start the server once (it moves what is stored to the new key), and then remove the old one.
+- **A person's own key** is theirs: it seals their Desk in their browser, and you cannot recover it for them ([`docs/encryption.md`](../docs/encryption.md)).
+
+**Operator-key mode (`TUSK_DB_ENCRYPTION=on`, which would encrypt every Desk and every workspace with `TUSK_ENCRYPTION_KEY`) is not built.** The server refuses to
+start with it on, naming the setting, rather than say it encrypts when it does not. Until it is, whoever runs the server can read boards, and a Desk is private
+from you only if its owner sealed it with a key of their own.
+
 ## Backups
 
 The database is the whole of it, apart from the one key below.
