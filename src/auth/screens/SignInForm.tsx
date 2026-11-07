@@ -3,19 +3,35 @@
 import { type FormEvent, useEffect, useState } from 'react';
 import { authClient } from '../client';
 import { messageFor } from '../messages';
-import { AuthButton, AuthError, AuthField, AuthFooter, AuthForm, AuthLink, Input } from '../../ui';
+import {
+  AuthButton,
+  AuthDivider,
+  AuthError,
+  AuthField,
+  AuthFooter,
+  AuthForm,
+  AuthLink,
+  Input,
+} from '../../ui';
 
-/** Email and password. No message says whether an address has an account: a wrong address and a wrong password read the same. */
+/**
+ * Email and password (`local`), and/or Sovereign, which takes the person away to sign in there and back (DESIGN.md §6). No message says whether an address
+ * has an account: a wrong address and a wrong password read the same. `failure` is what went wrong on the way back from Sovereign, if anything.
+ */
 export function SignInForm({
-  canSignUp,
-  canReset = false,
+  local,
+  sovereign,
+  failure: returned = null,
 }: {
-  canSignUp: boolean;
-  canReset?: boolean;
+  local: { canSignUp: boolean; canReset: boolean } | undefined;
+  sovereign: boolean;
+  failure?: string | null;
 }) {
+  const canSignUp = local?.canSignUp ?? false;
+  const canReset = local?.canReset ?? false;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(returned);
   const [busy, setBusy] = useState(false);
   const [secondStep, setSecondStep] = useState(false);
   const [passkeys, setPasskeys] = useState(false);
@@ -73,6 +89,43 @@ export function SignInForm({
     }
     window.location.assign('/');
   }
+
+  async function onSovereign(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
+    setBusy(true);
+    setError(null);
+    // On success the browser is sent to Sovereign, so there is nothing to do after the call; a person who comes back with a failure lands on this page
+    // again with the reason.
+    const { error: failure } = await authClient.signIn.social({
+      provider: 'sovereign',
+      callbackURL: '/',
+      errorCallbackURL: '/sign-in',
+    });
+    if (failure) {
+      setBusy(false);
+      setError(messageFor(failure, 'Signing in with Sovereign did not work. Try again.'));
+    }
+  }
+
+  const sovereignButton = (
+    <AuthButton
+      type={local ? 'button' : 'submit'}
+      variant={local ? 'secondary' : 'primary'}
+      onClick={local ? () => void onSovereign() : undefined}
+      loading={busy}
+      disabled={busy}
+    >
+      Sign in with Sovereign
+    </AuthButton>
+  );
+
+  if (!local)
+    return (
+      <AuthForm onSubmit={(event) => void onSovereign(event)}>
+        {error ? <AuthError>{error}</AuthError> : null}
+        {sovereignButton}
+      </AuthForm>
+    );
 
   if (secondStep)
     return (
@@ -152,6 +205,12 @@ export function SignInForm({
             Use a passkey instead
           </button>
         </AuthFooter>
+      ) : null}
+      {sovereign ? (
+        <>
+          <AuthDivider />
+          {sovereignButton}
+        </>
       ) : null}
       {canReset ? (
         <AuthFooter>

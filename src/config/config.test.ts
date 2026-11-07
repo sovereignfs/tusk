@@ -125,6 +125,12 @@ describe('loadConfig', () => {
     });
   });
 
+  /** Sovereign sign-in is a way in, so it needs what any way in needs: the address people use, and a secret to sign sessions with. */
+  const SIGNED_IN = {
+    TUSK_URL: 'https://tusk.example.com',
+    TUSK_AUTH_SECRET: 'a-secret-that-is-at-least-thirty-two-characters-long',
+  };
+
   describe('settings that go together', () => {
     it.each([
       ['TUSK_CORE_URL', 'Sovereign sign-in'],
@@ -147,6 +153,7 @@ describe('loadConfig', () => {
     it('accepts all of a group', () => {
       expect(
         loadConfig({
+          ...SIGNED_IN,
           TUSK_CORE_URL: 'https://core.example.com',
           TUSK_CORE_CLIENT_ID: 'a',
           TUSK_CORE_CLIENT_SECRET: 'b',
@@ -158,6 +165,7 @@ describe('loadConfig', () => {
       const files: Record<string, string> = { '/run/secret': 's3cret\n' };
       const result = loadConfig(
         {
+          ...SIGNED_IN,
           TUSK_CORE_URL: 'https://core.example.com',
           TUSK_CORE_CLIENT_ID: 'a',
           TUSK_CORE_CLIENT_SECRET_FILE: '/run/secret',

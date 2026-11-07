@@ -10,10 +10,13 @@ export function edgeSettings(env: Record<string, string | undefined> = process.e
   development: boolean;
   /** Local sign-in is on (`TUSK_AUTH_LOCAL`): when it is not, the sign-in pages do not exist. */
   authLocal: boolean;
+  /** Sign-in through a core is set up (`TUSK_CORE_URL`): the sign-in page exists for it, though the other pages of local sign-in do not. */
+  authSovereign: boolean;
 } {
   const local = (env.TUSK_AUTH_LOCAL ?? '').trim().toLowerCase();
   return {
     authLocal: local === '1' || local === 'true',
+    authSovereign: (env.TUSK_CORE_URL ?? '').trim() !== '',
     secure: (env.TUSK_URL ?? '').startsWith('https://'),
     development: env.NODE_ENV === 'development',
   };

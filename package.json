@@ -66,6 +66,7 @@
     "fake-indexeddb": "^6.2.7",
     "globals": "^17.14.0",
     "jiti": "^2.7.0",
+    "jose": "6.2.13",
     "prettier": "^3.9.10",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.72.1",

@@ -2,14 +2,19 @@ import { drizzleAdapter } from '@better-auth/drizzle-adapter';
 import { betterAuth } from 'better-auth';
 import { APIError } from 'better-auth/api';
 import { nextCookies } from 'better-auth/next-js';
-import { twoFactor } from 'better-auth/plugins';
+import { genericOAuth, twoFactor } from 'better-auth/plugins';
 import { passkey } from '@better-auth/passkey';
 import type { Database } from '../db/client';
 import type { Mailer } from '../mail/mailer';
 import { resetMessage, verificationMessage } from '../mail/templates';
 import * as postgresAuth from '../db/schema/postgres/auth';
 import * as sqliteAuth from '../db/schema/sqlite/auth';
-import { type AuthSettings, SIGNUP_CLOSED } from './config';
+import {
+  type AuthSettings,
+  SIGNUP_CLOSED,
+  SOVEREIGN_PROVIDER_ID,
+  SOVEREIGN_SCOPES,
+} from './config';
 import { countUsers } from './users';
 
 /**
@@ -34,6 +39,9 @@ export const COOKIE_PREFIX = 'tusk';
 
 export function createAuth({ settings, name, database, mailer }: AuthDependencies) {
   const schema = database.dialect === 'postgres' ? postgresAuth : sqliteAuth;
+  const { local, sovereign } = settings;
+  // Mail is for the password's account: an address is verified, and a password reset, only where there is a password.
+  const mail = local ? mailer : undefined;
 
   return betterAuth({
     appName: name,
@@ -46,24 +54,24 @@ export function createAuth({ settings, name, database, mailer }: AuthDependencie
     }),
     // Without email (task 2.3) there is nothing to verify an address with, so sign-up is immediate and signs the person in.
     emailAndPassword: {
-      enabled: true,
+      enabled: local,
       minPasswordLength: settings.passwordMinLength,
       // With mail, a new account is signed in by the link it is sent and not before; without it, at once.
-      autoSignIn: mailer === undefined,
-      requireEmailVerification: mailer !== undefined,
-      ...(mailer
+      autoSignIn: mail === undefined,
+      requireEmailVerification: mail !== undefined,
+      ...(mail
         ? {
             // A reset link is good once and for an hour, and using it ends every session of the account.
             resetPasswordTokenExpiresIn: 60 * 60,
             revokeSessionsOnPasswordReset: true,
             sendResetPassword: async ({ user, url }: { user: { email: string }; url: string }) => {
               // Not awaited by the request (a slow mail server would tell a visitor which addresses have accounts by how long it takes) and a failure is not told to them.
-              void mailer.send(resetMessage(name, user.email, url)).catch(() => undefined);
+              void mail.send(resetMessage(name, user.email, url)).catch(() => undefined);
             },
           }
         : {}),
     },
-    ...(mailer
+    ...(mail
       ? {
           emailVerification: {
             sendOnSignUp: true,
@@ -76,11 +84,27 @@ export function createAuth({ settings, name, database, mailer }: AuthDependencie
               user: { email: string };
               url: string;
             }) => {
-              void mailer.send(verificationMessage(name, user.email, url)).catch(() => undefined);
+              void mail.send(verificationMessage(name, user.email, url)).catch(() => undefined);
             },
           },
         }
       : {}),
+    account: {
+      // A Sovereign login is matched to an account by its `sub`, never by an email address that happens to be a local account's (DESIGN.md §6). The two are
+      // linked from a signed-in session (task 2.6), by someone who has shown they control both, and only when core's address is the account's own: a link that
+      // came with another address would be a way to attach someone else's identity to this account. Until then a Sovereign login whose address is a local
+      // account's is refused (`account_not_linked`).
+      accountLinking: {
+        disableImplicitLinking: true,
+        allowDifferentEmails: false,
+        // Unlinking can never leave an account with no way to sign in: its last one stays.
+        allowUnlinkingAll: false,
+        // Sovereign's contract is that `email` is verified, which is what linking asks of a provider.
+        ...(sovereign ? { trustedProviders: [SOVEREIGN_PROVIDER_ID] } : {}),
+      },
+      // What core hands over is not used after sign-in; what is kept is kept encrypted.
+      encryptOAuthTokens: true,
+    },
     // Counted in the database, not in memory, so that a limit holds across every process.
     rateLimit: { enabled: true, storage: 'database' },
     advanced: {
@@ -108,15 +132,45 @@ export function createAuth({ settings, name, database, mailer }: AuthDependencie
       },
     },
     plugins: [
-      // An authenticator app, with ten single-use backup codes (DESIGN.md §6, §19). It is on for an account only once a code from the app has been shown to work, and
-      // turning it off, or making new backup codes, asks for the password again.
-      twoFactor({ issuer: name }),
-      // Passkeys, which can sign in with no password. The relying party is the address people use (`TUSK_URL`): a passkey made here works here and nowhere else.
-      passkey({
-        rpID: new URL(settings.url).hostname,
-        rpName: name,
-        origin: settings.url,
-      }),
+      ...(local
+        ? [
+            // An authenticator app, with ten single-use backup codes (DESIGN.md §6, §19). It is on for an account only once a code from the app has been shown to work,
+            // and turning it off, or making new backup codes, asks for the password again.
+            twoFactor({ issuer: name }),
+            // Passkeys, which can sign in with no password. The relying party is the address people use (`TUSK_URL`): a passkey made here works here and nowhere else.
+            passkey({ rpID: new URL(settings.url).hostname, rpName: name, origin: settings.url }),
+          ]
+        : []),
+      ...(sovereign
+        ? [
+            genericOAuth({
+              config: [
+                {
+                  providerId: SOVEREIGN_PROVIDER_ID,
+                  discoveryUrl: `${sovereign.issuer}/.well-known/openid-configuration`,
+                  // The profile comes from the ID token, so this refuses to run on one that cannot be checked against the issuer's keys: a discovery
+                  // document without them is not a reason to trust whatever the token endpoint says.
+                  requireIdTokenVerification: true,
+                  clientId: sovereign.clientId,
+                  clientSecret: sovereign.clientSecret,
+                  authentication: 'basic',
+                  scopes: SOVEREIGN_SCOPES,
+                  pkce: true,
+                  // Signing out of Tusk does not sign the person out of core, which is their account for other things as well.
+                  disableProviderLogout: true,
+                  // Core's contract is `sub`, `email` and `name`; a missing name is not a reason to refuse.
+                  mapProfileToUser: (profile: Record<string, unknown>) => ({
+                    name:
+                      typeof profile.name === 'string' && profile.name.trim() !== ''
+                        ? profile.name
+                        : String(profile.email ?? '').split('@')[0] || 'Sovereign user',
+                    emailVerified: profile.emailVerified === true,
+                  }),
+                },
+              ],
+            }),
+          ]
+        : []),
       // Must be last: it turns cookies set while handling a Server Action into real ones.
       nextCookies(),
     ],

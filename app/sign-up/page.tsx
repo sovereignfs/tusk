@@ -10,7 +10,7 @@ export const metadata = { title: 'Create an account' };
 
 export default async function SignUpPage() {
   const settings = authSettings();
-  if (!settings) notFound();
+  if (!settings?.local) notFound();
   if (await getSession()) redirect('/');
 
   if (!(await signUpAvailable())) {

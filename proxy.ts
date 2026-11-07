@@ -17,9 +17,11 @@ import { HSTS, contentSecurityPolicy, newNonce } from './src/security/csp';
  * policy of its own, which allows no script.
  */
 const SIGN_IN_PAGES = new Set(['/sign-in', '/sign-up', '/forgot-password', '/reset-password']);
+/** What a Sovereign-only instance has of them: the page that takes a person away to sign in there. Sign-up, and resetting a password, are local. */
+const SOVEREIGN_PAGES = new Set(['/sign-in']);
 
 export function proxy(request: NextRequest) {
-  const { secure, development, authLocal } = edgeSettings();
+  const { secure, development, authLocal, authSovereign } = edgeSettings();
   // A published board is its own document with a policy of its own (`app/p/[token]/route.ts`): the proxy puts no nonce on it and no policy over it.
   const page =
     !request.nextUrl.pathname.startsWith('/api/') && !request.nextUrl.pathname.startsWith('/p/');
@@ -32,9 +34,12 @@ export function proxy(request: NextRequest) {
     requestHeaders.set('content-security-policy', policy);
   }
 
-  // Off means off (DESIGN.md §6): with local sign-in off, the sign-in pages are not there. A page cannot say so itself: the root loading state
-  // has already sent a 200 by the time it would, so the proxy answers with the page that is not found, and its status.
-  const absent = !authLocal && SIGN_IN_PAGES.has(request.nextUrl.pathname);
+  // Off means off (DESIGN.md §6): with local sign-in off, the sign-in pages are not there (but the one page that takes a person to Sovereign, when
+  // that is set up). A page cannot say so itself: the root loading state has already sent a 200 by the time it would, so the proxy answers with the
+  // page that is not found, and its status.
+  const path = request.nextUrl.pathname;
+  const absent =
+    !authLocal && SIGN_IN_PAGES.has(path) && !(authSovereign && SOVEREIGN_PAGES.has(path));
   // The front address is the first list for someone with a session cookie, and the address stays `/` (DESIGN.md §17.11). Only the cookie is looked at:
   // it cannot be checked here, and `/desk` checks it and sends a forged one to sign in.
   const signedIn = request.nextUrl.pathname === '/' && hasSessionCookie(request.cookies);

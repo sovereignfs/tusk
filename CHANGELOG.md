@@ -34,6 +34,7 @@ Each release's section is also its GitHub release notes: the release workflow re
 - Deleted cards, items and lists are removed for good after seven days, and a device that was away learns of it the next time it connects; one that was away for more than ninety days starts again from what the server holds, after sending what it had changed.
 - A list can be sorted by the order you made, date created, due date or title, and the choice is remembered for that list on every device; under any sort but your own order a card cannot be dragged. The Completed section opens and closes as you left it, can be hidden with _Active_, and has _Delete completed_, with Undo.
 - A card can be moved to another list from its detail (its checklist stays with it), and starred with a star on its row or in the detail.
+- Sign-in through a Sovereign core: set `TUSK_CORE_URL`, `TUSK_CORE_CLIENT_ID` and `TUSK_CORE_CLIENT_SECRET` and the sign-in page offers "Sign in with Sovereign", alone or beside a password. A person is the account their Sovereign identity says; a Sovereign login whose address is a local account's is refused until the two are linked from a signed-in session, and the server starts, and local sign-in works, when the core is down.
 
 ### Changed
 

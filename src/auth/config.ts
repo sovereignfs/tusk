@@ -9,7 +9,9 @@ import type { Problem } from '../config';
  *   TUSK_AUTH_SIGNUP                `closed` (the default): the first account is made and then sign-up is refused, by the server. `open`:
  *                                    anyone who can reach the page. A self-hoster who forgets is not an open registration.
  *   TUSK_AUTH_PASSWORD_MIN_LENGTH   the shortest password, 10 by default.
- *   TUSK_URL                        the address people use; required with local sign-in (links, cookies and passkeys are made from it).
+ *   TUSK_URL                        the address people use; required with either way (links, cookies, passkeys and the redirect are made from it).
+ *   TUSK_CORE_URL, TUSK_CORE_CLIENT_ID, TUSK_CORE_CLIENT_SECRET[_FILE]
+ *                                   Sovereign sign-in, through a core (DESIGN.md §6): all three or none. Either way, or both, can be on.
  *
  * With none of the ways on there is no sign-in at all, and the other settings here are not read.
  */
@@ -19,7 +21,24 @@ export interface AuthSettings {
   readonly secret: string;
   readonly signUp: 'open' | 'closed';
   readonly passwordMinLength: number;
+  /** Email and password, passkeys and an authenticator app are on. Off means off: their pages and routes answer 404. */
+  readonly local: boolean;
+  /** Sign-in through a core, or `undefined` when it is not set up. */
+  readonly sovereign: SovereignSettings | undefined;
 }
+
+export interface SovereignSettings {
+  /** Core's address, its OIDC issuer: no trailing slash. Its discovery document is at `/.well-known/openid-configuration` under it. */
+  readonly issuer: string;
+  readonly clientId: string;
+  readonly clientSecret: string;
+}
+
+/** The id Sovereign sign-in is known by: it is in the redirect address registered with core, and it is the `provider_id` of the account it makes. */
+export const SOVEREIGN_PROVIDER_ID = 'sovereign';
+
+/** What Tusk asks core for. The manifest (`sovereign.manifest.json`) says the same, which a test holds it to. */
+export const SOVEREIGN_SCOPES = ['openid', 'profile', 'email'];
 
 export const MIN_SECRET_LENGTH = 32;
 const DEFAULT_PASSWORD_MIN_LENGTH = 10;
@@ -41,19 +60,19 @@ export function resolveAuth(
   problems: Problem[],
 ): AuthSettings | undefined {
   const local = readFlag(read, 'TUSK_AUTH_LOCAL', problems);
-  if (!local) return undefined;
+  const sovereign = resolveSovereign(read, problems);
+  if (!local && !sovereign) return undefined;
+  const why = local ? 'TUSK_AUTH_LOCAL is on' : 'Sovereign sign-in is set';
 
   if (url === undefined && read('TUSK_URL') === undefined) {
     problems.push(
-      'TUSK_AUTH_LOCAL is on, so TUSK_URL (the address people use) is required: links and cookies are made from it.',
+      `${why}, so TUSK_URL (the address people use) is required: links, cookies and the sign-in redirect are made from it.`,
     );
   }
 
   const secret = read('TUSK_AUTH_SECRET');
   if (secret === undefined) {
-    problems.push(
-      'TUSK_AUTH_LOCAL is on, so TUSK_AUTH_SECRET (or TUSK_AUTH_SECRET_FILE) is required.',
-    );
+    problems.push(`${why}, so TUSK_AUTH_SECRET (or TUSK_AUTH_SECRET_FILE) is required.`);
   } else if (secret.length < MIN_SECRET_LENGTH) {
     problems.push(
       `TUSK_AUTH_SECRET must be at least ${MIN_SECRET_LENGTH} characters (openssl rand -base64 48 makes one).`,
@@ -80,7 +99,53 @@ export function resolveAuth(
   if (secret.length < MIN_SECRET_LENGTH || (rawSignUp !== 'open' && rawSignUp !== 'closed')) {
     return undefined;
   }
-  return { url, secret, signUp: rawSignUp, passwordMinLength };
+  return { url, secret, signUp: rawSignUp, passwordMinLength, local, sovereign };
+}
+
+/**
+ * Sovereign sign-in: off when none of the three is given, and a problem (from `loadConfig`'s groups) when only some are, in which case it is
+ * left off here and the problem is what stops the server. The secret may be a file.
+ */
+function resolveSovereign(read: Read, problems: Problem[]): SovereignSettings | undefined {
+  const issuer = read('TUSK_CORE_URL');
+  const clientId = read('TUSK_CORE_CLIENT_ID');
+  const clientSecret = read('TUSK_CORE_CLIENT_SECRET');
+  if (issuer === undefined || clientId === undefined || clientSecret === undefined) {
+    return undefined;
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(issuer);
+  } catch {
+    problems.push('TUSK_CORE_URL is not an address. Give it as https://sovereign.example.com.');
+    return undefined;
+  }
+  // The client secret goes to this host, and the people who sign in are trusted as it says they are.
+  if (
+    parsed.protocol !== 'https:' &&
+    !(parsed.protocol === 'http:' && isLocalHost(parsed.hostname))
+  ) {
+    problems.push('TUSK_CORE_URL must be https, except on localhost.');
+    return undefined;
+  }
+  if (parsed.search || parsed.hash || parsed.username || parsed.password) {
+    problems.push('TUSK_CORE_URL has no user, query or fragment.');
+    return undefined;
+  }
+  return {
+    issuer: `${parsed.origin}${parsed.pathname}`.replace(/\/+$/, ''),
+    clientId,
+    clientSecret,
+  };
+}
+
+function isLocalHost(hostname: string): boolean {
+  return (
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '[::1]' ||
+    hostname.endsWith('.localhost')
+  );
 }
 
 /** A switch is 1 or true to be on, 0 or false (or nothing) to be off; anything else is a mistake and is not guessed at. */

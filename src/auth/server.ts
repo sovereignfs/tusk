@@ -43,7 +43,7 @@ export function getAuth(): Promise<Auth | null> {
 
 /** Whether this server can send mail: then addresses are verified and a forgotten password is reset by a link (DESIGN.md §6). */
 export function mailAvailable(): boolean {
-  return getConfig().mail !== undefined && authSettings() !== undefined;
+  return getConfig().mail !== undefined && authSettings()?.local === true;
 }
 
 /**
@@ -52,7 +52,8 @@ export function mailAvailable(): boolean {
  */
 export async function signUpAvailable(): Promise<boolean> {
   const settings = authSettings();
-  if (!settings) return false;
+  // Sign-up is a page of local sign-in; a person who comes through Sovereign is made at their first sign-in (under the same policy, in the hook).
+  if (!settings?.local) return false;
   if (settings.signUp === 'open') return true;
   return (await countUsers(await getAuthDatabase())) === 0;
 }

@@ -22,6 +22,8 @@ const SETTINGS: AuthSettings = {
   secret: 'test-secret-'.padEnd(40, 'x'),
   signUp: 'closed',
   passwordMinLength: 10,
+  local: true,
+  sovereign: undefined,
 };
 
 /** What a test changes about the instance it gets. */
@@ -76,6 +78,12 @@ export class TestClient {
   /** What a browser would send as `Cookie`, for a test that builds its own request (a route handler is called with one, not with a client). */
   cookieHeader(): string {
     return [...this.jar].map(([k, v]) => `${k}=${v}`).join('; ');
+  }
+
+  /** Follow a full URL (the address a sign-in sends the browser back to) as a GET, without following redirects. */
+  follow(url: string): Promise<Reply> {
+    const target = new URL(url);
+    return this.request('GET', target.pathname + target.search, undefined, {});
   }
 
   has(cookieNameFragment: string): boolean {

@@ -29,6 +29,17 @@ const KEYS_PORT = 3997;
  * a code by one that failed half way. Its own SQLite file and its own first account, like the second's. `e2e/security.spec.ts` uses it.
  */
 const SECURITY_PORT = 3996;
+/**
+ * Two more, for signing in through Sovereign, a fake one run by `e2e/fake-sovereign-server.ts` (port 3190, and a control port, 3191, that says who the next
+ * person to sign in is): one that takes only Sovereign and only the first account, and one that takes both ways and anyone. `e2e/sovereign.spec.ts`.
+ */
+const SOVEREIGN_PORT = 3995;
+const BOTH_PORT = 3994;
+const CORE = {
+  TUSK_CORE_URL: 'http://localhost:3190/api/auth',
+  TUSK_CORE_CLIENT_ID: 'tusk-e2e-client',
+  TUSK_CORE_CLIENT_SECRET: 'tusk-e2e-secret',
+};
 const SECRET = 'e2e-only-secret-not-for-anything-real-0123456789';
 // Playwright loads this file again in every worker: the first load makes the directory and the others, which inherit the variable, use it.
 const directory = process.env.TUSK_E2E_DIR ?? mkdtempSync(join(tmpdir(), 'tusk-e2e-'));
@@ -46,6 +57,7 @@ const BLANK = Object.fromEntries(
     'TUSK_CORE_URL',
     'TUSK_CORE_CLIENT_ID',
     'TUSK_CORE_CLIENT_SECRET',
+    'TUSK_CORE_CLIENT_SECRET_FILE',
     'TUSK_SMTP_HOST',
     'TUSK_WORKER',
     'TUSK_ENCRYPTION_KEY',
@@ -70,6 +82,13 @@ export default defineConfig({
     { name: 'webkit', use: { ...devices['Desktop Safari'] } },
   ],
   webServer: [
+    // First, so that it is up when the instances that sign in through it start and discover it.
+    {
+      command: 'node e2e/fake-sovereign-server.ts',
+      url: 'http://localhost:3191/health',
+      timeout: 30_000,
+      reuseExistingServer: false,
+    },
     {
       command: `node scripts/serve-standalone.mjs ${PORT}`,
       url: `http://localhost:${PORT}/api/health`,
@@ -115,6 +134,37 @@ export default defineConfig({
         TUSK_AUTH_LOCAL: '1',
         TUSK_AUTH_SECRET: SECRET,
         TUSK_AUTH_SIGNUP: 'closed',
+      } as Record<string, string>,
+    },
+    {
+      command: `node scripts/serve-standalone.mjs ${SOVEREIGN_PORT}`,
+      url: `http://localhost:${SOVEREIGN_PORT}/api/health`,
+      timeout: 90_000,
+      reuseExistingServer: false,
+      env: {
+        ...BLANK,
+        TUSK_DB_DIALECT: 'sqlite',
+        TUSK_SQLITE_URL: `file:${join(directory, 'tusk-sovereign.db')}`,
+        TUSK_URL: `http://localhost:${SOVEREIGN_PORT}`,
+        TUSK_AUTH_SECRET: SECRET,
+        TUSK_AUTH_SIGNUP: 'closed',
+        ...CORE,
+      } as Record<string, string>,
+    },
+    {
+      command: `node scripts/serve-standalone.mjs ${BOTH_PORT}`,
+      url: `http://localhost:${BOTH_PORT}/api/health`,
+      timeout: 90_000,
+      reuseExistingServer: false,
+      env: {
+        ...BLANK,
+        TUSK_DB_DIALECT: 'sqlite',
+        TUSK_SQLITE_URL: `file:${join(directory, 'tusk-both.db')}`,
+        TUSK_URL: `http://localhost:${BOTH_PORT}`,
+        TUSK_AUTH_LOCAL: '1',
+        TUSK_AUTH_SECRET: SECRET,
+        TUSK_AUTH_SIGNUP: 'open',
+        ...CORE,
       } as Record<string, string>,
     },
   ],
