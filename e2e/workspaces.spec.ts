@@ -136,7 +136,9 @@ test('deleting needs the name typed as it is, and takes it out of the sidebar an
   await expect(confirm).toBeDisabled();
   await dialog.getByLabel('Type the name to confirm').fill(name);
   await confirm.click();
-  await expect(page).toHaveURL(/\/$|\/desk$/);
+  await expect(page).toHaveURL(/\/$/);
+  // Home is the page it leads to: the next step waits for it, and not for a navigation still on its way.
+  await expect(page.getByRole('heading', { level: 1, name: 'Workspaces' })).toBeVisible();
   await expect(
     page.getByRole('region', { name: 'My workspaces' }).getByRole('link', { name }),
   ).toHaveCount(0);
