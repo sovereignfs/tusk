@@ -40,14 +40,23 @@
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   padding: 0;
-  color: var(--sv-color-text-muted);
+  /* Drawn in line with the sidebar's icons beneath it (the rail's icons are centred in 56px): this is the header's own padding, taken back. */
+  margin-left: calc(-1 * var(--sv-space-2));
+  color: var(--sv-color-text-primary);
   background: transparent;
   border: 0;
   border-radius: var(--sv-radius-md);
   cursor: pointer;
+}
+
+/* Bigger and bolder than the icons of the sidebar, so that it reads as the control of the frame and not as a place. */
+.toggle svg {
+  width: 24px;
+  height: 24px;
+  stroke-width: 2.5;
 }
 
 .toggle:hover {
