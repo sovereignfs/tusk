@@ -48,6 +48,8 @@ const made: {
 async function seed(page: Page) {
   await ensureAccount(page);
   await trySignIn(page, EMAIL, PASSWORD);
+  // Signed in before going anywhere: a navigation while the sign-in is still answering cancels it.
+  await expect(page.getByRole('button', { name: 'User menu' })).toBeVisible();
   await page.setViewportSize({ width: 1280, height: 800 });
   // A list and a card on the Desk.
   await page.goto('/desk');

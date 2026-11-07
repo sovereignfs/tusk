@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react';
-import { BrandBadge } from './index';
-import { markOf } from './brand';
+import { TuskMark } from './TuskMark';
 import styles from './AppShell.module.css';
 
 /**
@@ -39,7 +38,7 @@ export function AppShell({
         <div className={styles.lead}>
           {toolbar}
           <a href="/" className={styles.brand}>
-            <BrandBadge name={name} mark={markOf(name)} />
+            <TuskMark className={styles.mark} />
             <span className={styles.name}>{name}</span>
           </a>
         </div>

@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
-import { AuthCard, AuthFooter, BrandBadge } from '../../ui';
-import { markOf } from '../../ui/brand';
+import { AuthCard, AuthFooter } from '../../ui';
+import { TuskMark } from '../../ui/TuskMark';
 import { site } from '../../site';
+import styles from './AuthShell.module.css';
 
 /**
  * The frame of a screen before sign-in: the design system's card, with the app's mark above the title. `footer` is the small print under the form,
@@ -24,7 +25,7 @@ export function AuthShell({
 }) {
   return (
     <AuthCard
-      brand={<BrandBadge name={site.name} mark={markOf(site.name)} />}
+      brand={<TuskMark label={site.name} className={styles.mark} />}
       title={title}
       {...(lead ? { lead } : {})}
       legal={false}

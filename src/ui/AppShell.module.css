@@ -70,6 +70,11 @@
   border-radius: var(--sv-radius-md);
 }
 
+.mark {
+  flex-shrink: 0;
+  height: 26px;
+}
+
 .name {
   overflow: hidden;
   text-overflow: ellipsis;

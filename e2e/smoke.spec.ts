@@ -37,7 +37,8 @@ test('the page is the shell: a header with the app’s mark and name, and the ma
   await expect(page).toHaveTitle('Tusk');
   const header = page.getByRole('banner');
   await expect(header.getByText('Tusk')).toBeVisible();
-  await expect(header.getByText('Tu', { exact: true })).toBeVisible();
+  // The mark, drawn beside the name and silent, since the name says it.
+  await expect(header.locator('a[href="/"] svg[aria-hidden="true"]')).toBeVisible();
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   expect(await violations()).toEqual([]);
   expect(errors.filter((text) => !/favicon|Failed to load resource/.test(text))).toEqual([]);

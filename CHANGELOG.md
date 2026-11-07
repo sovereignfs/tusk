@@ -41,6 +41,7 @@ Each release's section is also its GitHub release notes: the release workflow re
 - On a phone, the sidebar and the Desk's lists are in a drawer the header's button opens, a card opens as a page of its own, a board's lists scroll sideways and stop at each, and the card's dialog fills the screen. The addresses and the data are the same at every width.
 - Accessibility: every page is checked with axe in light and dark, on a desktop and a phone, in both browsers; a drag of a list, a card or a checklist item by the keyboard says what it picked up and where it is (it used to read out an id), and the header's name, a list's handle and the due-date and repeat buttons are named by what is drawn on them.
 - The README lists every setting and what it does, and there are pages for the people who use Tusk on encryption, workspaces and who sees what, publishing, and backups and restoring.
+- Tusk has a logo: an elephant with its tusk, in the header, on the sign-in pages, and as the app's icon (a light elephant on a dark tile) when it is installed or bookmarked.
 
 ### Changed
 
