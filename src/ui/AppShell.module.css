@@ -79,17 +79,14 @@
   border-radius: var(--sv-radius-md);
 }
 
-.mark {
-  flex-shrink: 0;
-  height: 30px;
-}
-
-.name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--sv-font-size-xl);
-  font-weight: var(--sv-font-weight-semibold);
+/* The wordmark: lowercase, in the design system's own face at its heaviest and drawn close, so that it reads as a mark and not as a title. */
+.wordmark {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.05em;
+  line-height: 1;
+  /* The letters of a lowercase word sit low: a little room under, so that it centres by its x-height and not by its box. */
+  padding-bottom: 3px;
 }
 
 .actions {

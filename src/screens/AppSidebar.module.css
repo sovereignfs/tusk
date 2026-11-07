@@ -106,7 +106,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 var(--sv-space-3);
+  padding: 0 var(--sv-space-3) var(--sv-space-1);
   color: var(--sv-color-text-muted);
   font-size: var(--sv-font-size-xs);
   font-weight: var(--sv-font-weight-semibold);
@@ -114,42 +114,28 @@
   text-transform: uppercase;
 }
 
+/* The + after the workspaces: a row like the others, drawn quieter, since it is a button and not a place. */
 .add {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  color: var(--sv-color-text-muted);
+  width: 100%;
   background: transparent;
   border: 0;
-  border-radius: var(--sv-radius-md);
+  color: var(--sv-color-text-muted);
   cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.rail .add {
+  width: 40px;
 }
 
 .add:hover {
   color: var(--sv-color-text-primary);
-  background: var(--sv-color-surface-sunken);
 }
 
 .add:focus-visible {
   outline: 2px solid var(--sv-color-focus-ring);
-  outline-offset: 2px;
-}
-
-.initial {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  color: var(--sv-color-text-primary);
-  background: var(--sv-color-surface-sunken);
-  border-radius: var(--sv-radius-md);
-  font-size: var(--sv-font-size-sm);
-  font-weight: var(--sv-font-weight-semibold);
+  outline-offset: -2px;
 }
 
 .create {

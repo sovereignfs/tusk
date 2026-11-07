@@ -122,8 +122,11 @@ test('offline, the Desk tile stays and the rest says it needs a connection', asy
 }) => {
   await signedIn(page);
   await context.setOffline(true);
-  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
-  await expect(page.getByText(/need a connection/)).toBeVisible();
+  // The screen listens for the window's focus once it is drawn, which is a moment after the page is: say it until it has been heard.
+  await expect(async () => {
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await expect(page.getByText(/need a connection/)).toBeVisible({ timeout: 1000 });
+  }).toPass();
   await expect(
     page.getByRole('region', { name: 'Pinned' }).getByRole('link', { name: /Desk/ }),
   ).toBeVisible();

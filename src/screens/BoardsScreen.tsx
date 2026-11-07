@@ -8,6 +8,7 @@ import { deskSummary } from '../local/store';
 import { useLocal } from '../sync/react';
 import { browserZone, todayFor } from '../time';
 import { Alert, Avatar, Button, EmptyState, Icon, Select, useToast } from '../ui';
+import { LucideIcon } from '../ui/icons';
 import {
   type BoardsIndex,
   type IndexWorkspace,
@@ -125,7 +126,7 @@ export function BoardsScreen() {
           <h2 className={styles.groupTitle}>Pinned</h2>
         </div>
         <Link href="/desk" className={styles.desk}>
-          <Icon name="layout-dashboard" aria-hidden />
+          <LucideIcon name="list-todo" />
           <span className={styles.deskName}>Desk</span>
           {desk ? (
             <span className={styles.deskCounts}>

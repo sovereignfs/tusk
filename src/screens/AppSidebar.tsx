@@ -7,25 +7,26 @@ import { unreadLabel } from '../inbox/group';
 import { failureMessage, useWorkspaces } from '../boards/workspaces';
 import { WORKSPACE_LIMITS, type WorkspaceRow } from '../workspaces/format';
 import { Alert, Button, Dialog, FormField, Icon, type IconName, Input } from '../ui';
-import { LucideIcon } from '../ui/icons';
+import { LucideIcon, type LucideName, isLucide } from '../ui/icons';
 import { useSidebar } from '../ui/useSidebar';
 import styles from './AppSidebar.module.css';
 
 /**
- * The app's sidebar (DESIGN.md §17.2), at the left of every signed-in page: the places (Home, the Desk and the Inbox), then the person's workspaces. **An entry
- * is here only when its page is**: a link to a page that is not there is worse than none, so the Planner (phase 2) joins when it is built.
+ * The app's sidebar (DESIGN.md §17.2), at the left of every signed-in page: the places (Home, the Desk, the Planner and the Inbox), then the person's workspaces.
+ * **An entry is here only when its page is**: a link to a page that is not there is worse than none.
  */
 interface Entry {
   href: string;
   label: string;
-  icon: IconName;
+  icon: IconName | LucideName;
   /** The addresses that are this entry's, for the one that is current. */
   under: readonly string[];
 }
 
 export const ENTRIES: readonly Entry[] = [
   { href: '/', label: 'Home', icon: 'house', under: ['/'] },
-  { href: '/desk', label: 'Desk', icon: 'list', under: ['/desk'] },
+  { href: '/desk', label: 'Desk', icon: 'list-todo', under: ['/desk'] },
+  { href: '/planner', label: 'Planner', icon: 'calendar-days', under: ['/planner'] },
   { href: '/inbox', label: 'Inbox', icon: 'inbox', under: ['/inbox'] },
 ];
 
@@ -86,7 +87,11 @@ function NavigationContent({ rail, pathname }: { rail: boolean; pathname: string
               }
               title={rail ? entry.label : undefined}
             >
-              <Icon name={entry.icon} aria-hidden />
+              {isLucide(entry.icon) ? (
+                <LucideIcon name={entry.icon} />
+              ) : (
+                <Icon name={entry.icon} aria-hidden />
+              )}
               {rail ? null : <span className={styles.label}>{entry.label}</span>}
               {entry.href === '/inbox' && unreadLabel(unread) ? (
                 <span className={styles.unread} aria-hidden>
@@ -138,8 +143,9 @@ export function AppSidebar() {
 }
 
 /**
- * The workspaces (DESIGN.md §17.2): the person's own under _My workspaces_ with a + to make one, and those they are in under _Shared with me_. A rail
- * shows each by its first letter. Nothing is drawn until the list has been read, and nothing at all for a person who has none and cannot make one.
+ * The workspaces (DESIGN.md §17.2): the person's own under _My workspaces_, and those they are in under _Shared with me_, and after them the way to make
+ * one. A rail shows each by its icon, with a divider above them. Nothing is drawn until the list has been read, and nothing at all for a person who has none
+ * and cannot make one.
  */
 function Workspaces({ rail, pathname }: { rail: boolean; pathname: string }) {
   const { workspaces, ready } = useWorkspaces();
@@ -150,25 +156,26 @@ function Workspaces({ rail, pathname }: { rail: boolean; pathname: string }) {
   const add = (
     <button
       type="button"
-      className={styles.add}
-      aria-label="Create a workspace"
-      title="Create a workspace"
+      className={`${styles.row} ${styles.add}`}
+      aria-label={rail ? 'Create a workspace' : undefined}
+      title={rail ? 'Create a workspace' : undefined}
       onClick={() => setMaking(true)}
     >
       <Icon name="plus" aria-hidden />
+      {rail ? null : <span className={styles.label}>Create a workspace</span>}
     </button>
   );
   return (
     <div className={styles.workspaces}>
       {rail ? (
-        // A rail: the +, a divider, and every workspace as its icon, mine and then those shared with me, for a way into each from any page.
+        // A rail: a divider, every workspace as its icon (mine and then those shared with me, for a way into each from any page), and then the +.
         <section aria-label="Workspaces" className={styles.railGroup}>
-          {add}
           <hr className={styles.divider} />
           <ul className={styles.list}>
             {[...mine, ...shared].map((each) => (
               <WorkspaceRow key={each.id} row={each} rail pathname={pathname} />
             ))}
+            <li>{add}</li>
           </ul>
         </section>
       ) : (
@@ -225,12 +232,12 @@ function Group({
     <section aria-label={title}>
       <div className={styles.heading}>
         <span>{title}</span>
-        {action}
       </div>
       <ul className={styles.list}>
         {rows.map((each) => (
           <WorkspaceRow key={each.id} row={each} rail={false} pathname={pathname} />
         ))}
+        {action ? <li>{action}</li> : null}
       </ul>
     </section>
   );

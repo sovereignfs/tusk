@@ -913,26 +913,28 @@ Two rows: the header, and the main area of two columns, the sidebar and the cont
 │ ▣ Tusk                                                          (avatar) │  header
 ├───────────────────┬──────────────────────────────────────────────────────┤
 │ ⌂ Home            │                                                      │
-│ ☰ Desk            │                    content                           │
+│ ☑ Desk            │                    content                           │
+│ ▤ Planner         │                                                      │
 │ ▢ Inbox        3  │                                                      │
 │                   │                                                      │
-│ MY WORKSPACES   + │                                                      │
+│ MY WORKSPACES     │                                                      │
 │  ● Acme           │                                                      │
 │  ● Side project   │                                                      │
+│  + Create…        │                                                      │
 │ SHARED WITH ME    │                                                      │
 │  ● Club           │                                                      │
 │               ⇤   │                                                      │
 └───────────────────┴──────────────────────────────────────────────────────┘
 ```
 
-- **Header:** the sidebar's toggle (`menu`), the logo and "Tusk" on the left, linking home; the avatar on the right. The avatar opens `UserMenu`: a header of the person's name and
+- **Header:** the sidebar's toggle (`menu`) and the wordmark _tusk._ on the left, linking home (lowercase, in the design system's face at weight 800 with tight tracking: a page may not name a typeface of its own or fetch one, so a drawn wordmark waits for the design system to have one; the elephant is kept for sign-in and the icons); the avatar on the right. The avatar opens `UserMenu`: a header of the person's name and
   email, then Settings, and Sign out; and when a core is set, a way back to it.
-- **Sidebar, first block:** Home (`/`, `house`), the Desk (`/desk`, `list`) and the Inbox (`/inbox`, `inbox`, with its unread count). The Planner entry
-  appears when the Planner is built (phase 2), not before: there is no entry that leads nowhere. **An entry is there only when its page is.**
-- **Sidebar, second block:** the workspaces. The person's own (those they own) under _My workspaces_, with a + to create one; those they are a member
-  of, under _Shared with me_, at the bottom. A workspace opens to its boards (`/w/<id>`), and expands in place to list them. Each has an icon,
-  `folder-kanban` for now; a person choosing one, as they choose a colour, is a later feature. **As a rail** the same block is a +, a divider, and the
-  workspaces' icons (mine, then shared), so every workspace is one click away from any page.
+- **Sidebar, first block:** Home (`/`, `house`), the Desk (`/desk`, `list-todo`), the Planner (`/planner`, `calendar-days`) and the Inbox (`/inbox`, `inbox`,
+  with its unread count). **An entry is there only when its page is:** the Planner's page is blank until the Planner is built (phase 2, §25.1).
+- **Sidebar, second block:** the workspaces. The person's own (those they own) under _My workspaces_, and those they are a member of under _Shared with
+  me_; a workspace opens to its boards (`/w/<id>`). **The way to make one, a + (_Create a workspace_), comes after the workspaces,** not before. Each has an icon,
+  `folder-kanban` for now; a person choosing one, as they choose a colour, is a later feature. **As a rail** the same block is a divider, the workspaces'
+  icons (mine, then shared) and then the +, so every workspace is one click away from any page.
 - **Three states:** full, a rail of icons, and hidden. Two controls change it and both are remembered on the device: the header's toggle (`menu`)
   hides the sidebar and shows it as it was, and the button at the sidebar's foot (`panel-left-close`, `panel-left-open`) narrows a full sidebar to a rail
   and widens it again. **By default it is full on Home and a rail on every other page;** a person's choice changes the default for that kind of page
@@ -1062,6 +1064,7 @@ Each of these cost a release there. They are written here so they are not paid f
 | `/w/<workspaceId>`                        | One workspace's boards                                                    |
 | `/b/<boardId>`, `/b/<boardId>/c/<cardId>` | A board, and a card on it                                                 |
 | `/inbox`                                  | §16                                                                       |
+| `/planner`                                | The Planner (§25.1): a blank page until it is built                       |
 | `/planner`                                | Phase 2 (§25.1)                                                           |
 | `/account?section=`                       | Settings (§19), a dialog over the page as Fjord's is                      |
 | `/p/<token>`                              | A published board (§14.6), for anyone                                     |
@@ -1073,7 +1076,7 @@ Anything that is not there, or not there for this person, says so with a way bac
 The phone's own screens are phase 2. **Phase 1 lays their foundations:** every screen works at a phone's width as a single column, the routes are the
 ones the phone will use, and the shell can swap its sidebar for the footer below at 768px and under. What phase 2 builds, as the owner set it out:
 
-- **Three rows:** the header (logo and Tusk, avatar), the content, and a footer of five: **Desk | Boards | Action | Planner | Inbox**.
+- **Three rows:** the header (wordmark, avatar), the content, and a footer of five: **Desk | Boards | Action | Planner | Inbox**.
 - **The Desk is the default,** as a carousel of its lists, one per slide (`SwipableMobileCarousel`). The action button opens four: the list selector
   (and a new list), a new card (a dialog, with the list on screen chosen), **Today's agenda** as a swipe view, and **Review** as a swipe view (§25.3).
 - **Boards** shows the boards grouped by workspace; a board opens as a carousel of its columns. The action button offers a new board and a new workspace;

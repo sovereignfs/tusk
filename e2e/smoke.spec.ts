@@ -26,7 +26,7 @@ test('the app is up on its database, and says which', async ({ request }) => {
   expect(['sqlite', 'postgres']).toContain(body.database);
 });
 
-test('the page is the shell: a header with the app’s mark and name, and the main area', async ({
+test('the page is the shell: a header with the app’s wordmark, and the main area', async ({
   page,
 }) => {
   const violations = await recordViolations(page);
@@ -36,9 +36,9 @@ test('the page is the shell: a header with the app’s mark and name, and the ma
 
   await expect(page).toHaveTitle('Tusk');
   const header = page.getByRole('banner');
-  await expect(header.getByText('Tusk')).toBeVisible();
-  // The mark, drawn beside the name and silent, since the name says it.
-  await expect(header.locator('a[href="/"] svg[aria-hidden="true"]')).toBeVisible();
+  // The wordmark, drawn lowercase and silent, since the link says the name.
+  await expect(header.getByRole('link', { name: 'Tusk' })).toBeVisible();
+  await expect(header.getByText('tusk.')).toBeVisible();
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   expect(await violations()).toEqual([]);
   expect(errors.filter((text) => !/favicon|Failed to load resource/.test(text))).toEqual([]);

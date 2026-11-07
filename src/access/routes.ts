@@ -38,6 +38,7 @@ export const ROUTES: RouteRule[] = [
   // Home, the workspaces: the front address `/` shows it to someone signed in (the proxy rewrites it), and `/home` itself is sent back to `/`.
   { route: '/home', page: { kind: 'account' } },
   { route: '/inbox', page: { kind: 'account' } },
+  { route: '/planner', page: { kind: 'account' } },
   { route: '/b/[id]', page: { kind: 'account' } },
   { route: '/b/[id]/c/[cardId]', page: { kind: 'account' } },
   { route: '/desk/[id]', page: { kind: 'account' } },

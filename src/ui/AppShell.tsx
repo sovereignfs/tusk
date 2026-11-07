@@ -1,10 +1,9 @@
 import type { ReactNode } from 'react';
-import { TuskMark } from './TuskMark';
 import styles from './AppShell.module.css';
 
 /**
- * The frame of a signed-in page (DESIGN.md §17.2): a header row and the main area. In the header, the logo and the app's name on the left, and on
- * the right the notification bell and the person's avatar menu. The main area is given its columns by the page (`ThreeColumnLayout`, task 7.1).
+ * The frame of a signed-in page (DESIGN.md §17.2): a header row and the main area. In the header, the sidebar's button and the app's wordmark, _tusk._, on
+ * the left (the elephant is for the places that have room for it: sign-in, the icons), and on the right the notification bell and the person's avatar menu. The main area is given its columns by the page (`ThreeColumnLayout`, task 7.1).
  *
  * It is made here because the design system's `Header` requires an app launcher, which an app has no use for, and its `MobileHeader` never
  * stretches past 768px. **Worth offering to `@sovereignfs/ui`** (a `Header` whose launcher is optional) once a second app wants the same.
@@ -37,9 +36,11 @@ export function AppShell({
       <header className={styles.header}>
         <div className={styles.lead}>
           {toolbar}
-          <a href="/" className={styles.brand}>
-            <TuskMark className={styles.mark} />
-            <span className={styles.name}>{name}</span>
+          {/* The wordmark is set in the design system's typeface (a page may not name another, and may not fetch one), heavy and tight; a screen reader says the name. */}
+          <a href="/" className={styles.brand} aria-label={name}>
+            <span className={styles.wordmark} aria-hidden>
+              tusk.
+            </span>
           </a>
         </div>
         <div className={styles.actions}>

@@ -34,7 +34,7 @@ test('Home opens full and the Desk opens a rail, which names each entry for a sc
   await page.goto('/desk');
   await expect(sidebar(page)).toHaveAttribute('data-sidebar', 'rail');
   expect(await widthOf(page)).toBe(56);
-  for (const name of ['Home', 'Desk', 'Inbox']) {
+  for (const name of ['Home', 'Desk', 'Planner', 'Inbox']) {
     const entry = sidebar(page).getByRole('link', { name });
     await expect(entry).toBeVisible();
     await expect(entry).toHaveAttribute('title', name);
@@ -47,8 +47,25 @@ test('Home opens full and the Desk opens a rail, which names each entry for a sc
     'aria-current',
     'page',
   );
-  // After the Inbox: a +, a divider, then the workspaces' icons.
+  // After the Inbox: a divider, the workspaces' icons, and then the +.
   await expect(sidebar(page).getByRole('button', { name: 'Create a workspace' })).toBeVisible();
+});
+
+test('the Planner is between the Desk and the Inbox, and its page is blank for now', async ({
+  page,
+}) => {
+  await signedIn(page);
+  const places = await sidebar(page)
+    .getByRole('link')
+    .evaluateAll((links) => links.slice(0, 4).map((link) => link.textContent?.trim() ?? ''));
+  expect(places).toEqual(['Home', 'Desk', 'Planner', 'Inbox']);
+  await sidebar(page).getByRole('link', { name: 'Planner' }).click();
+  await expect(page).toHaveURL(/\/planner$/);
+  await expect(sidebar(page).getByRole('link', { name: 'Planner' })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+  await expect(page.getByRole('navigation', { name: 'Lists' })).toHaveCount(0);
 });
 
 test('the sidebar’s own button narrows a full sidebar and widens it again, and it is remembered after a reload', async ({
