@@ -2,7 +2,7 @@ import { type Parser, bool, hhmm, isoDate, nullable, oneOf, text, uuid } from '.
 import { HEX_COLOR } from '../lists/colors';
 import { SORTS } from '../lists/sort';
 import { parseRule } from '../recurrence';
-import { LIMITS } from '../sync/format';
+import { FIELD_NAMES, LIMITS } from '../sync/format';
 import { WORKSPACE_LIMITS } from '../workspaces/format';
 import {
   type BoardPart,
@@ -16,6 +16,8 @@ import {
   type TuskExport,
   VERSION,
   type WorkspacePart,
+  type SealedDeskPart,
+  type SealedField,
 } from './format';
 
 /**
@@ -81,6 +83,81 @@ const name = trimmed(1, WORKSPACE_LIMITS.nameChars);
 function unique(seen: Set<string>, id: string, path: string): void {
   if (seen.has(id)) throw new Bad(`${path}.id: used twice in the file`);
   seen.add(id);
+}
+
+const CIPHER_FIELD = /^[A-Za-z0-9_-]{20,40000}$/;
+const WRAPPED = /^[A-Za-z0-9_-]{100,600}$/;
+
+/** A sealed row's fields: only the names its table has, each ciphertext, and a list's `key` plain and wrapped. A field in the clear is no part of a sealed file. */
+function sealedFields(
+  v: unknown,
+  path: string,
+  names: readonly string[],
+): Record<string, SealedField> {
+  const o = rec(v, path);
+  const out: Record<string, SealedField> = {};
+  for (const key of Object.keys(o)) {
+    if (!names.includes(key)) throw new Bad(`${path}: names a field there is not`);
+    const f = rec(o[key], `${path}.${key}`);
+    const keys = Object.keys(f);
+    if (key === 'key') {
+      if (keys.length !== 1 || typeof f.v !== 'string' || !WRAPPED.test(f.v))
+        throw new Bad(`${path}.key: not a wrapped key`);
+      out[key] = { v: f.v };
+    } else {
+      if (keys.length !== 1 || typeof f.c !== 'string' || !CIPHER_FIELD.test(f.c))
+        throw new Bad(`${path}.${key}: not ciphertext`);
+      out[key] = { c: f.c };
+    }
+  }
+  return out;
+}
+
+function sealedDesk(v: unknown): SealedDeskPart {
+  const o = rec(v, 'sealedDesk');
+  const seen = new Set<string>();
+  const ids = (raw: Rec, at: string) => {
+    const id = get(raw, 'id', uuid, at);
+    unique(seen, id, at);
+    return id;
+  };
+  const lists = list(o.lists, 'sealedDesk.lists', LIMITS.listsPerAccount).map((raw, i) => {
+    const at = `sealedDesk.lists[${i}]`;
+    const r = rec(raw, at);
+    const fields = sealedFields(r.fields, `${at}.fields`, FIELD_NAMES.desk_list);
+    if (!fields.key) throw new Bad(`${at}.fields: a list has its key`);
+    return { id: ids(r, at), position: get(r, 'position', position, at), fields };
+  });
+  const cards = list(o.cards, 'sealedDesk.cards', LIMITS.cardsPerAccount).map((raw, i) => {
+    const at = `sealedDesk.cards[${i}]`;
+    const r = rec(raw, at);
+    return {
+      id: ids(r, at),
+      listId: get(r, 'listId', uuid, at),
+      position: get(r, 'position', position, at),
+      fields: sealedFields(r.fields, `${at}.fields`, FIELD_NAMES.desk_card),
+    };
+  });
+  const checks = list(o.checks, 'sealedDesk.checks', LIMITS.checksPerAccount).map((raw, i) => {
+    const at = `sealedDesk.checks[${i}]`;
+    const r = rec(raw, at);
+    return {
+      id: ids(r, at),
+      cardId: get(r, 'cardId', uuid, at),
+      position: get(r, 'position', position, at),
+      fields: sealedFields(r.fields, `${at}.fields`, FIELD_NAMES.desk_check),
+    };
+  });
+  const series = list(o.series, 'sealedDesk.series', LIMITS.cardsPerAccount).map((raw, i) => {
+    const at = `sealedDesk.series[${i}]`;
+    const r = rec(raw, at);
+    return {
+      id: ids(r, at),
+      listId: get(r, 'listId', uuid, at),
+      fields: sealedFields(r.fields, `${at}.fields`, FIELD_NAMES.desk_series),
+    };
+  });
+  return { lists, cards, checks, series };
 }
 
 function checklist(
@@ -354,10 +431,15 @@ export function validateFile(source: string): Validated {
       'file',
     ) as Scope;
     const exportedAt = get(o, 'exportedAt', isoInstant, 'file');
-    const parts: Pick<TuskExport, 'desk' | 'board' | 'workspace' | 'workspaces'> = {
-      ...(scope === 'desk' || (scope === 'everything' && o.desk !== undefined)
-        ? { desk: desk(o.desk) }
-        : {}),
+    // A file made by the server for an account with a key of its own holds a sealed Desk, and says so; one that says so holds nothing else of the Desk.
+    const encrypted = o.encrypted === true;
+    if (o.encrypted !== undefined && o.encrypted !== true)
+      throw new Bad('encrypted: true or absent');
+    const hasDesk =
+      scope === 'desk' || (scope === 'everything' && (o.desk ?? o.sealedDesk) !== undefined);
+    const parts: Pick<TuskExport, 'desk' | 'board' | 'workspace' | 'workspaces' | 'sealedDesk'> = {
+      ...(hasDesk && !encrypted ? { desk: desk(o.desk) } : {}),
+      ...(hasDesk && encrypted ? { sealedDesk: sealedDesk(o.sealedDesk) } : {}),
       ...(scope === 'board' ? { board: board(o.board, 'board') } : {}),
       ...(scope === 'workspace' ? { workspace: workspace(o.workspace, 'workspace') } : {}),
       ...(scope === 'everything'
@@ -368,7 +450,17 @@ export function validateFile(source: string): Validated {
           }
         : {}),
     };
-    return { ok: true, file: { format: FORMAT, version: VERSION, exportedAt, scope, ...parts } };
+    return {
+      ok: true,
+      file: {
+        format: FORMAT,
+        version: VERSION,
+        exportedAt,
+        scope,
+        ...(encrypted ? { encrypted: true as const } : {}),
+        ...parts,
+      },
+    };
   } catch (error) {
     if (error instanceof Bad) return { ok: false, error: error.message };
     throw error;
@@ -400,7 +492,9 @@ export function summarise(file: TuskExport): Summary {
           lists: file.desk.lists.length,
           cards: file.desk.lists.reduce((n, l) => n + l.cards.length, 0),
         }
-      : null,
+      : file.sealedDesk
+        ? { lists: file.sealedDesk.lists.length, cards: file.sealedDesk.cards.length }
+        : null,
     workspaces: workspaces.length,
     boards: boards.length,
     cards: boards.reduce((n, b) => n + b.lists.reduce((m, l) => m + l.cards.length, 0), 0),

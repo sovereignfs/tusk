@@ -9,6 +9,7 @@ import { GitHubProvider } from '../providers/github';
 import { type Provider, ProviderError, type RepositoryRef } from '../providers/types';
 import { MAX_FILE_BYTES } from '../portability/validate';
 import { serialise } from '../portability/format';
+import { readEncryption } from '../encryption/state';
 import { webUrlOf } from './address';
 import { TOKEN_PURPOSE, credentialIdOf, readConnection } from './connection';
 import { backupMessage, backupPath } from './path';
@@ -32,6 +33,8 @@ export type RunProblem =
   | 'read_only'
   | 'empty'
   | 'too_large'
+  | 'key_unconfirmed'
+  | 'moving'
   | 'head_moved'
   | 'rate_limited'
   | 'unreachable';
@@ -51,6 +54,10 @@ export const RUN_MESSAGES: Record<RunProblem, string> = {
     'The saved token can no longer write to the repository. Disconnect, and connect again with a token that has “Contents: Read and write”.',
   empty: 'The repository has nothing in it, so there is no branch to put a backup on.',
   too_large: 'Everything together is over 50 MB, which is more than a backup can hold.',
+  key_unconfirmed:
+    'Your Desk now has a key of its own. Backups carry on with the Desk sealed, but the files already in your repository are plain text and stay readable there. Confirm in Settings that you know, and backups continue.',
+  moving:
+    'Your Desk is being sealed with your key. Backups wait until that is finished, so that no file has some of it in the clear.',
   head_moved: 'The repository changed while the backup was being written, twice. Try again.',
   rate_limited: 'GitHub asks to be left alone for a while. Try again in a few minutes.',
   unreachable:
@@ -142,6 +149,12 @@ export async function runBackup(
   const provider = (
     deps.makeProvider ?? ((t) => new GitHubProvider({ token: t, apiUrl: deps.apiUrl }))
   )(token);
+  // A Desk with a key of its own: not while it is being moved, and not before the person has confirmed what stays readable (§9.3).
+  const encryption = await readEncryption(deps.database, accountId);
+  if (encryption.mode === 'moving') return { ok: false, problem: 'moving' };
+  if (encryption.mode === 'personal' && connection.keyConfirmedAt === null)
+    return { ok: false, problem: 'key_unconfirmed' };
+
   const when = new Date(now);
   const path = backupPath(when);
 

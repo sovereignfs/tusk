@@ -1,0 +1,1 @@
+ALTER TABLE `backup_connection` ADD `key_confirmed_at` integer;

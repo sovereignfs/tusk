@@ -5,6 +5,7 @@ import { webUrlOf } from './address';
 import {
   type ConnectDeps,
   PROBLEM_MESSAGES,
+  confirmKey,
   connectRepository,
   disconnectRepository,
   readConnection,
@@ -43,6 +44,7 @@ function shown(
     lastBackupAt: number | null;
     lastBackupPath: string | null;
     lastCheckedAt: number | null;
+    keyConfirmedAt: number | null;
     mode: Mode;
     frequency: Frequency;
     nextBackupAt: number | null;
@@ -60,6 +62,7 @@ function shown(
     frequency: connection.frequency,
     nextBackupAt: connection.nextBackupAt,
     lastCheckedAt: connection.lastCheckedAt,
+    keyConfirmedAt: connection.keyConfirmedAt,
     lastBackup:
       connection.lastBackupAt !== null && connection.lastBackupPath !== null
         ? {
@@ -156,6 +159,19 @@ export async function connectionSchedule(
   const connection = await setSchedule(deps.database, accountId, patch, deps.now());
   if (!connection) return new Response(null, { status: 404 });
   return json(200, { connection: shown(connection, deps.apiUrl) });
+}
+
+/**
+ * `POST`: the person confirms that backups go on now that their Desk has a key of its own, and that the files already in the repository stay plain (§21.3).
+ * 204; 404 where nothing is connected.
+ */
+export async function connectionConfirmKey(
+  accountId: string,
+  deps: ConnectionDeps,
+): Promise<Response> {
+  if (!(await confirmKey(deps.database, accountId, deps.now())))
+    return new Response(null, { status: 404 });
+  return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } });
 }
 
 /** `DELETE`: disconnects. 404 when there is nothing connected for this account, as for anything that is not theirs. */

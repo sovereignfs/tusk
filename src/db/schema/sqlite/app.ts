@@ -220,6 +220,8 @@ export const backupConnection = sqliteTable(
     frequency: text('frequency').notNull().default('daily'),
     /** When `auto` is next due; null for `manual`. A process claims a due connection by a conditional update on this (§21.4). */
     nextBackupAt: epochMs('next_backup_at'),
+    /** When the person confirmed that backups continue once their Desk has a key of its own: files written before stay plain and readable (§9.3, §21.3). Null until they have. */
+    keyConfirmedAt: epochMs('key_confirmed_at'),
   },
   (table) => [index('backup_connection_due_idx').on(table.nextBackupAt)],
 );

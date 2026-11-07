@@ -11,7 +11,9 @@ import {
   summarise,
   validateFile,
 } from '../portability/validate';
-import type { TuskExport } from '../portability/format';
+import type { DeskPart, TuskExport } from '../portability/format';
+import { unsealDesk } from '../portability/unseal';
+import { useKey } from '../screens/KeyContext';
 import { useSync } from '../sync/react';
 import { Alert, Button, FormField, Select } from '../ui';
 import styles from './Account.module.css';
@@ -35,6 +37,7 @@ type Stage =
 export function ImportSection() {
   const client = useSync();
   const workspaces = useWorkspaces();
+  const key = useKey();
   const [stage, setStage] = useState<Stage>({ kind: 'idle' });
   const [target, setTarget] = useState('');
 
@@ -50,8 +53,8 @@ export function ImportSection() {
   }
 
   /** The Desk's part as mutations, worked out against what the Desk has: pure, and nothing is committed here. */
-  async function deskPart(file: TuskExport): Promise<ImportedDesk | undefined> {
-    if (!file.desk) return undefined;
+  async function deskPart(part: DeskPart | undefined): Promise<ImportedDesk | undefined> {
+    if (!part) return undefined;
     const existing = await client.read(async (db) => ({
       lists: await listsOf(db),
       listRows: (await db.getAll('desk_list')).length,
@@ -59,7 +62,7 @@ export function ImportSection() {
       checkRows: await checkCount(db),
       seriesRows: (await db.getAll('desk_series')).length,
     }));
-    return importDesk(file.desk, existing, ids);
+    return importDesk(part, existing, ids);
   }
 
   async function run() {
@@ -67,7 +70,33 @@ export function ImportSection() {
     const { file, source } = stage;
     setStage({ kind: 'working' });
     try {
-      const desk = await deskPart(file);
+      // A Desk sealed with a key (a backup of an account that has one) is opened with the key this Desk has, and imported like any other under new ids, which
+      // are then sealed again under the new lists' keys. Without the key, or with another, it says so and writes nothing.
+      let deskSource = file.desk;
+      if (file.sealedDesk) {
+        if (key.identity === undefined)
+          return setStage({
+            kind: 'failed',
+            message:
+              'This file holds a Desk sealed with a key, and the key is needed to read it. Give your Desk that key first (unlock it, or turn the same key on in Settings > Data > Encryption), then import it. Nothing was imported.',
+          });
+        const opened = await unsealDesk(file.sealedDesk, key.identity);
+        if (!opened.ok)
+          return setStage({
+            kind: 'failed',
+            message:
+              opened.reason === 'wrong_key'
+                ? 'This file was sealed with a different key than the one your Desk has. Nothing was imported.'
+                : 'This file could not be opened with your key. It may be damaged. Nothing was imported.',
+          });
+        deskSource = opened.desk;
+      } else if (file.desk && key.status === 'locked') {
+        return setStage({
+          kind: 'failed',
+          message: 'Unlock your Desk with its key first, then import. Nothing was imported.',
+        });
+      }
+      const desk = await deskPart(deskSource);
       if (desk && !desk.ok)
         return setStage({
           kind: 'failed',

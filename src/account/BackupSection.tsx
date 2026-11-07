@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useKey } from '../screens/KeyContext';
 import { Alert, Button, FormField, Input, SegmentedControl, Select } from '../ui';
 import styles from './Account.module.css';
 
@@ -9,6 +10,7 @@ interface Connection {
   url: string;
   branch: string;
   lastBackup: { at: number; path: string; url: string } | null;
+  keyConfirmedAt: number | null;
   mode: 'manual' | 'auto';
   frequency: Frequency;
   nextBackupAt: number | null;
@@ -35,6 +37,7 @@ interface Status {
  * why connecting is not offered. Disconnecting deletes the connection and the saved token and does not touch the repository.
  */
 export function BackupSection() {
+  const key = useKey();
   const [status, setStatus] = useState<Status | null>(null);
   const [unreachable, setUnreachable] = useState(false);
   const [repository, setRepository] = useState('');
@@ -119,6 +122,20 @@ export function BackupSection() {
         body: JSON.stringify(patch),
       });
       if (!reply.ok) setProblem('That could not be changed.');
+      await read();
+    } catch {
+      setProblem('That needs a connection.');
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  async function confirmKey() {
+    setWorking(true);
+    setProblem(null);
+    try {
+      const reply = await fetch('/api/backup/confirm-key', { method: 'POST' });
+      if (!reply.ok) setProblem('That could not be confirmed.');
       await read();
     } catch {
       setProblem('That needs a connection.');
@@ -223,6 +240,24 @@ export function BackupSection() {
                 ? ` Next check: ${new Date(status.connection.nextBackupAt).toLocaleString()}.`
                 : ''}
             </p>
+          ) : null}
+          {key.moving ? (
+            <p className={styles.hint}>
+              Your Desk is being sealed with your key. Backups wait until that is finished, so that
+              no file has some of it in the clear.
+            </p>
+          ) : null}
+          {key.sealed && !key.moving && status.connection.keyConfirmedAt === null ? (
+            <Alert variant="warning">
+              Your Desk now has a key of its own. Backups carry on with the Desk sealed (the file
+              holds it as ciphertext, and restoring it needs your key), but the files already in
+              your repository are plain text and stay readable there.
+              <div className={styles.row}>
+                <Button size="sm" disabled={working} onClick={() => void confirmKey()}>
+                  I know, carry on
+                </Button>
+              </div>
+            </Alert>
           ) : null}
           <div className={styles.row}>
             <Button disabled={working} onClick={() => void backUpNow()}>

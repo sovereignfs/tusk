@@ -133,6 +133,7 @@ describe(`/api/backup/connection (${leg})`, () => {
       'branch',
       'connectedAt',
       'frequency',
+      'keyConfirmedAt',
       'kind',
       'lastBackup',
       'lastCheckedAt',

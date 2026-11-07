@@ -1,0 +1,1 @@
+ALTER TABLE "tusk"."backup_connection" ADD COLUMN "key_confirmed_at" bigint;

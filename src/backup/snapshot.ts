@@ -5,7 +5,8 @@ import { dbGet, transaction } from '../db/exec';
 import * as postgresSchema from '../db/schema/postgres';
 import * as sqliteSchema from '../db/schema/sqlite';
 import type { LocalRow } from '../local/rows';
-import { type TuskExport, buildDesk, envelope } from '../portability/format';
+import { readEncryption } from '../encryption/state';
+import { type TuskExport, buildDesk, buildSealedDesk, envelope } from '../portability/format';
 import { pull } from '../sync/pull';
 import { exportOwned, ownedStamps } from '../workspaces/export';
 import { backupFingerprint } from './path';
@@ -14,7 +15,8 @@ import { backupFingerprint } from './path';
  * What a backup holds, read on the server (DESIGN.md §21.3): the "everything" file of §20, the Desk and every workspace the person owns, and the fingerprint
  * of it. **It is read in one short transaction that is over before any call to a git host.** The Desk is read the way a device reads it from nothing, by
  * pulling from zero (`pull`, which never skips a row), and made into the file by the same `buildDesk` the browser uses, so that the two files are alike.
- * A Desk with a personal key holds ciphertext, which `buildDesk` writes as empty without the key (task 14.5 gives backups the ciphertext).
+
+ * A Desk with a key of its own is written sealed (`buildSealedDesk`): the server cannot open it, and a backup is as private as the database (task 14.5).
  */
 export interface Snapshot {
   readonly file: TuskExport;
@@ -46,16 +48,24 @@ export async function takeSnapshot(
       if (!page.more) break;
     }
     const of = (table: LocalRow['table']) => rows.filter((each) => each.table === table);
-    const desk = buildDesk({
+    const deskRows = {
       lists: of('desk_list'),
       cards: of('desk_card'),
       checks: of('desk_check'),
       series: of('desk_series'),
-    });
+    };
+    // A Desk with a key of its own is written as the server has it: ciphertext in every field and each list's wrapped key, and `"encrypted": true` (§9.4).
+    const sealed = (await readEncryption(tx, accountId)).mode !== 'none';
     const workspaces = await exportOwned(tx, directory, accountId);
     const stamps = await ownedStamps(tx, accountId);
     return {
-      file: envelope('everything', { desk, workspaces }, now),
+      file: envelope(
+        'everything',
+        sealed
+          ? { sealedDesk: buildSealedDesk(deskRows), workspaces }
+          : { desk: buildDesk(deskRows), workspaces },
+        now,
+      ),
       fingerprint: backupFingerprint(seq, stamps),
     };
   });

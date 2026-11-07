@@ -5,6 +5,7 @@ import { lastSyncedAt } from '../local/store';
 import { addressOf } from '../screens/PublishingSection';
 import { deskFile, everythingFile, save } from '../portability/client';
 import { useLocal, useSync } from '../sync/react';
+import { useKey } from '../screens/KeyContext';
 import { BackupSection } from './BackupSection';
 import { EncryptionSection } from './EncryptionSection';
 import { ImportSection } from './ImportSection';
@@ -19,6 +20,7 @@ import styles from './Account.module.css';
  */
 export function DataSection() {
   const client = useSync();
+  const key = useKey();
   const [exporting, setExporting] = useState<'desk' | 'everything' | null>(null);
   const [exportFailed, setExportFailed] = useState(false);
   const at = useLocal(async (db) => ({ at: await lastSyncedAt(db) }));
@@ -104,6 +106,12 @@ export function DataSection() {
             Export everything
           </Button>
         </div>
+        {key.sealed ? (
+          <p className={styles.muted}>
+            Your Desk is sealed on the server, but this file is not: it is plain text, made here
+            from your Desk, and anyone who has it can read it. Keep it somewhere you trust.
+          </p>
+        ) : null}
         {exportFailed ? (
           <p className={styles.muted}>
             That needs a connection. Your Desk can be exported without one; everything cannot.

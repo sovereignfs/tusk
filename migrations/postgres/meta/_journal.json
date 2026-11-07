@@ -64,6 +64,13 @@
       "when": 1794003355100,
       "tag": "0008_account_encryption",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794009721435,
+      "tag": "0009_backup_key_confirmed",
+      "breakpoints": true
     }
   ]
 }

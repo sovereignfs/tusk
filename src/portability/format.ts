@@ -52,6 +52,41 @@ export interface ExportedSeries {
   readonly anchor: string;
 }
 
+/**
+ * A field of a sealed Desk as the server holds it (DESIGN.md §9.4, §21.3): ciphertext, except a list's `key`, which is the list's key wrapped to the person's
+ * public key and is plain because it is already sealed.
+ */
+export type SealedField = { readonly c: string } | { readonly v: string };
+
+/**
+ * The Desk of an account with a key of its own, **as a backup holds it**: each row with its fields as ciphertext and each list with its wrapped key, nothing
+ * in the clear. Importing it needs the key (`src/portability/unseal.ts`), which opens it into a Desk like any other and imports that under new ids.
+ */
+export interface SealedDeskPart {
+  readonly lists: readonly {
+    readonly id: string;
+    readonly position: string;
+    readonly fields: Record<string, SealedField>;
+  }[];
+  readonly cards: readonly {
+    readonly id: string;
+    readonly listId: string;
+    readonly position: string;
+    readonly fields: Record<string, SealedField>;
+  }[];
+  readonly checks: readonly {
+    readonly id: string;
+    readonly cardId: string;
+    readonly position: string;
+    readonly fields: Record<string, SealedField>;
+  }[];
+  readonly series: readonly {
+    readonly id: string;
+    readonly listId: string;
+    readonly fields: Record<string, SealedField>;
+  }[];
+}
+
 export interface DeskPart {
   readonly lists: readonly ExportedDeskList[];
   readonly series: readonly ExportedSeries[];
@@ -123,6 +158,9 @@ export interface TuskExport {
   readonly exportedAt: string;
   readonly scope: Scope;
   readonly desk?: DeskPart;
+  /** True when the Desk is `sealedDesk` and not `desk`: made by the server for an account with a key of its own. */
+  readonly encrypted?: true;
+  readonly sealedDesk?: SealedDeskPart;
   readonly board?: BoardPart;
   readonly workspace?: WorkspacePart;
   readonly workspaces?: readonly WorkspacePart[];
@@ -131,7 +169,7 @@ export interface TuskExport {
 /** The whole file, from its parts. `exportedAt` is the one thing that varies between two exports of unchanged data. */
 export function envelope(
   scope: Scope,
-  parts: Pick<TuskExport, 'desk' | 'board' | 'workspace' | 'workspaces'>,
+  parts: Pick<TuskExport, 'desk' | 'board' | 'workspace' | 'workspaces' | 'sealedDesk'>,
   exportedAt: Date,
 ): TuskExport {
   return {
@@ -139,6 +177,7 @@ export function envelope(
     version: VERSION,
     exportedAt: exportedAt.toISOString(),
     scope,
+    ...(parts.sealedDesk ? { encrypted: true as const } : {}),
     ...parts,
   };
 }
@@ -240,5 +279,60 @@ export function buildDesk(rows: DeskRows, open?: OpenField): DeskPart {
         rule: text(row, 'rule', open),
         anchor: text(row, 'anchor', open),
       })),
+  };
+}
+
+/**
+ * The Desk of an account with a key of its own, as a backup holds it (§21.3): the live rows exactly as the server has them, ciphertext in every field and
+ * each list with its wrapped key. What is deleted is not in it, as for a plain Desk; a card of a deleted list, an item of a deleted card and a series of a
+ * deleted list are not either. A field in the clear is left out, so a row that somehow has one does not put it in a file that says it has none.
+ */
+export function buildSealedDesk(rows: DeskRows): SealedDeskPart {
+  const lists = ordered(live(rows.lists)).filter((row) => row.table === 'desk_list');
+  const listIds = new Set(lists.map((list) => list.id));
+  const cards = live(rows.cards).filter(
+    (row): row is Extract<LocalRow, { table: 'desk_card' }> =>
+      row.table === 'desk_card' && listIds.has(row.listId),
+  );
+  const cardIds = new Set(cards.map((card) => card.id));
+  const sealed = (row: LocalRow): Record<string, SealedField> => {
+    const out: Record<string, SealedField> = {};
+    for (const [name, field] of Object.entries(row.fields)) {
+      if ('c' in field) out[name] = { c: field.c };
+      else if (name === 'key' && typeof field.v === 'string') out[name] = { v: field.v };
+    }
+    return out;
+  };
+  return {
+    lists: lists.map((row) => ({
+      id: row.id,
+      position: 'position' in row ? row.position : '',
+      fields: sealed(row),
+    })),
+    cards: ordered(cards).map((row) => ({
+      id: row.id,
+      listId: row.listId,
+      position: row.position,
+      fields: sealed(row),
+    })),
+    checks: ordered(
+      live(rows.checks).filter(
+        (row): row is Extract<LocalRow, { table: 'desk_check' }> =>
+          row.table === 'desk_check' && cardIds.has(row.cardId),
+      ),
+    ).map((row) => ({
+      id: row.id,
+      cardId: row.cardId,
+      position: row.position,
+      fields: sealed(row),
+    })),
+    series: [
+      ...live(rows.series).filter(
+        (row): row is Extract<LocalRow, { table: 'desk_series' }> =>
+          row.table === 'desk_series' && listIds.has(row.listId),
+      ),
+    ]
+      .sort((a, b) => (a.id < b.id ? -1 : 1))
+      .map((row) => ({ id: row.id, listId: row.listId, fields: sealed(row) })),
   };
 }

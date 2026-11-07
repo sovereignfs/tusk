@@ -62,6 +62,8 @@ export const ROUTES: RouteRule[] = [
   },
   // Back up now (DESIGN.md §21.4): the account is the session's, at most once a minute.
   { route: '/api/backup/run', methods: { POST: { kind: 'account' } } },
+  // The person knows what stays readable after their Desk got a key (DESIGN.md §21.3).
+  { route: '/api/backup/confirm-key', methods: { POST: { kind: 'account' } } },
   // Whether the Desk has a key of its own, setting one up, and skipping the offer (DESIGN.md §9.1): the account is the session's and only a public key is held.
   { route: '/api/encryption', methods: { GET: { kind: 'account' } } },
   { route: '/api/encryption/setup', methods: { POST: { kind: 'account' } } },
