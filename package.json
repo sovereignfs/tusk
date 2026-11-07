@@ -1,8 +1,12 @@
 {
   "name": "@sovereignfs/tusk",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "private": true,
   "license": "AGPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sovereignfs/tusk.git"
+  },
   "type": "module",
   "packageManager": "pnpm@11.28.9",
   "description": "Tasks: a private task manager that runs on its own or on a Sovereign instance.",

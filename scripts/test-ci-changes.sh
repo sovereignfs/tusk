@@ -56,7 +56,7 @@ expect "an unknown kind of file" "$CODE" something/new.thing
 printf '\nchanges that need only the script checks\n'
 expect "a release script" "$SCRIPTS" scripts/release.sh
 expect "the release library" "$SCRIPTS" scripts/lib/release.sh
-expect "a release file" "$SCRIPTS" scripts/release/web.sh
+expect "a release file" "$SCRIPTS" scripts/release/tusk.sh
 expect "the release tests" "$SCRIPTS" scripts/test-release.sh
 expect "other scripts are the app's" "$CODE" scripts/deploy-check.sh
 
