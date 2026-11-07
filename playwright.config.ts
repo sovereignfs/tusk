@@ -1,4 +1,4 @@
-import { mkdtempSync } from 'node:fs';
+import { mkdirSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
@@ -64,6 +64,14 @@ const BLANK = Object.fromEntries(
   ].map((name) => [name, '']),
 );
 
+// A directory of its own for each of the other instances: the auth database is `tusk_auth.db` beside the app's, so two instances in one directory would share
+// their accounts, and a session cookie (which a port does not separate) would sign a person in on both.
+const own = (name: string): string => {
+  const folder = join(directory, name);
+  mkdirSync(folder, { recursive: true });
+  return join(folder, 'tusk.db');
+};
+
 // With no database named, a file in a directory of its own: the auth database is `tusk_auth.db` beside the app's, and a developer's data is not
 // touched.
 const database = process.env.TUSK_DB_DIALECT
@@ -114,7 +122,7 @@ export default defineConfig({
       env: {
         ...BLANK,
         TUSK_DB_DIALECT: 'sqlite',
-        TUSK_SQLITE_URL: `file:${join(directory, 'tusk-keys.db')}`,
+        TUSK_SQLITE_URL: `file:${own('keys')}`,
         TUSK_URL: `http://localhost:${KEYS_PORT}`,
         TUSK_AUTH_LOCAL: '1',
         TUSK_AUTH_SECRET: SECRET,
@@ -129,7 +137,7 @@ export default defineConfig({
       env: {
         ...BLANK,
         TUSK_DB_DIALECT: 'sqlite',
-        TUSK_SQLITE_URL: `file:${join(directory, 'tusk-security.db')}`,
+        TUSK_SQLITE_URL: `file:${own('security')}`,
         TUSK_URL: `http://localhost:${SECURITY_PORT}`,
         TUSK_AUTH_LOCAL: '1',
         TUSK_AUTH_SECRET: SECRET,
@@ -144,7 +152,7 @@ export default defineConfig({
       env: {
         ...BLANK,
         TUSK_DB_DIALECT: 'sqlite',
-        TUSK_SQLITE_URL: `file:${join(directory, 'tusk-sovereign.db')}`,
+        TUSK_SQLITE_URL: `file:${own('sovereign')}`,
         TUSK_URL: `http://localhost:${SOVEREIGN_PORT}`,
         TUSK_AUTH_SECRET: SECRET,
         TUSK_AUTH_SIGNUP: 'closed',
@@ -159,7 +167,7 @@ export default defineConfig({
       env: {
         ...BLANK,
         TUSK_DB_DIALECT: 'sqlite',
-        TUSK_SQLITE_URL: `file:${join(directory, 'tusk-both.db')}`,
+        TUSK_SQLITE_URL: `file:${own('both')}`,
         TUSK_URL: `http://localhost:${BOTH_PORT}`,
         TUSK_AUTH_LOCAL: '1',
         TUSK_AUTH_SECRET: SECRET,

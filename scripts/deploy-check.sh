@@ -12,6 +12,10 @@
 #
 # `run` is not compose: it is the one `docker run` of DESIGN.md §23, as written, on a volume.
 #
+# `sovereign` is how an instance hosts it (task 2.10): what `sv apply` gives an app, which is the settings under Tusk's own names, secrets as `_FILE`s, a PostgreSQL
+# it made, and a PORT that is not the image's own. It must come up, offer Sovereign and no password, answer its notices' addresses, serve its icon to a visitor with
+# no session, and stop on SIGTERM. (A published board is not asked for: it needs an account, which needs a core to sign in through.)
+#
 # A setting that is wrong must stop the image with a message that names it, and no value.
 #
 # Written for bash 3.2.
@@ -24,7 +28,7 @@ cd "$root/deploy"
 
 image="${TUSK_IMAGE:-tusk}"
 port="${TUSK_CHECK_PORT:-3987}"
-setups="${*:-sqld file postgres run}"
+setups="${*:-sqld file postgres run sovereign}"
 
 if [ -e .env ]; then
   echo "deploy/.env exists; this check writes its own and will not overwrite yours. Move it aside and run again." >&2
@@ -45,11 +49,14 @@ ENV
 
 project=""
 files=""
+secrets_dir=""
 cleanup() {
   if [ -n "$project" ]; then docker compose -p "$project" $files down -v --remove-orphans >/dev/null 2>&1 || true; fi
   rm -f .env
-  docker rm -f tusk-check-run >/dev/null 2>&1 || true
+  docker rm -f tusk-check-run tusk-check-sov tusk-check-sov-pg >/dev/null 2>&1 || true
   docker volume rm tusk-check-run >/dev/null 2>&1 || true
+  docker network rm tusk-check-sov >/dev/null 2>&1 || true
+  if [ -n "${secrets_dir:-}" ]; then rm -rf "$secrets_dir"; fi
 }
 trap cleanup EXIT
 
@@ -122,6 +129,73 @@ check_run() {
   echo "   ok"
 }
 
+# An instance hosting the app: PostgreSQL it made, secrets as files, a port of its own, and a core that is not there (the app starts without one).
+check_sovereign() {
+  echo "== sovereign"
+  local sov_port=3555 base pw label file
+  # The image says what it needs by carrying its manifest as a label, equal to the file (the instance reads the label, not the source).
+  label="$(docker inspect -f '{{index .Config.Labels "io.github.sovereignfs.app-manifest"}}' "$image")"
+  file="$(node -e 'process.stdout.write(JSON.stringify(JSON.parse(require("fs").readFileSync("../sovereign.manifest.json", "utf8"))))')"
+  [ "$label" = "$file" ] || fail "sovereign: the image's manifest label is not sovereign.manifest.json (build it with the arguments sovereign-manifest docker-args prints)"
+  base="http://localhost:$port"
+  pw="$(openssl rand -hex 16)"
+  secrets_dir="$(mktemp -d)"
+  printf '%s' "$secret" >"$secrets_dir/auth_secret"
+  printf '%s' "$key" >"$secrets_dir/encryption_key"
+  printf '%s' "$(openssl rand -hex 16)" >"$secrets_dir/core_secret"
+  printf '%s' "postgres://tusk:$pw@tusk-check-sov-pg:5432/tusk" >"$secrets_dir/postgres_url"
+  chmod 644 "$secrets_dir"/*
+  chmod 755 "$secrets_dir"
+
+  docker network create tusk-check-sov >/dev/null
+  docker run -d --name tusk-check-sov-pg --network tusk-check-sov \
+    -e POSTGRES_USER=tusk -e POSTGRES_DB=tusk -e POSTGRES_PASSWORD="$pw" postgres:16-alpine >/dev/null
+  for attempt in $(seq 1 60); do
+    if docker exec tusk-check-sov-pg pg_isready -U tusk -d tusk >/dev/null 2>&1; then break; fi
+    if [ "$attempt" = 60 ]; then fail "sovereign: PostgreSQL did not come up"; fi
+    sleep 1
+  done
+
+  docker run -d --name tusk-check-sov --network tusk-check-sov -p "127.0.0.1:$port:$sov_port" -v "$secrets_dir:/run/secrets:ro" \
+    -e PORT="$sov_port" -e TUSK_URL="$base" -e TUSK_AUTH_SIGNUP=open \
+    -e TUSK_DB_DIALECT=postgres -e TUSK_POSTGRES_URL_FILE=/run/secrets/postgres_url \
+    -e TUSK_AUTH_SECRET_FILE=/run/secrets/auth_secret -e TUSK_ENCRYPTION_KEY_FILE=/run/secrets/encryption_key \
+    -e TUSK_CORE_URL=https://core.sovereign.invalid -e TUSK_CORE_CLIENT_ID=tusk -e TUSK_CORE_CLIENT_SECRET_FILE=/run/secrets/core_secret \
+    "$image" >/dev/null
+  for attempt in $(seq 1 90); do
+    if [ "$(database)" = postgres ]; then break; fi
+    if [ "$attempt" = 90 ]; then
+      docker logs --tail 40 tusk-check-sov >&2
+      fail "sovereign: did not come up on port $sov_port"
+    fi
+    sleep 1
+  done
+
+  # Offers Sovereign and no password; sign-up and reset are not there.
+  local page
+  page="$(curl -sS --max-time 10 "$base/sign-in")"
+  echo "$page" | grep -q 'Sign in with Sovereign' || fail "sovereign: the sign-in page does not offer Sovereign"
+  if echo "$page" | grep -qi 'type="password"'; then fail "sovereign: the sign-in page asks for a password"; fi
+  [ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$base/sign-up")" = 404 ] || fail "sovereign: /sign-up is not a 404"
+  [ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$base/forgot-password")" = 404 ] || fail "sovereign: /forgot-password is not a 404"
+
+  # Its icon, to a visitor with no session; and the addresses of its notices, which are there (a 400 for a request with no token, and not a 404).
+  [ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$base/icons/icon.svg")" = 200 ] || fail "sovereign: the icon is not served"
+  # (A body with no token is refused before core is asked anything; a token that only looks like one would be answered 503 here, where the core is not.)
+  for address in backchannel-logout account-deleted; do
+    [ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 -X POST -d 'unrelated=1' "$base/api/sovereign/$address")" = 400 ] ||
+      fail "sovereign: /api/sovereign/$address does not refuse a request with no token"
+  done
+
+  [ "$(docker exec tusk-check-sov id -un)" = node ] || fail "sovereign: the process is root"
+  stop_and_check tusk-check-sov sovereign
+  docker rm tusk-check-sov tusk-check-sov-pg >/dev/null
+  docker network rm tusk-check-sov >/dev/null
+  rm -rf "$secrets_dir"
+  secrets_dir=""
+  echo "   ok"
+}
+
 # A wrong setting stops the image, with a message that names it and no value. Needs no database: the settings are checked first.
 check_refusal() {
   echo "== a wrong setting"
@@ -142,7 +216,8 @@ for setup in $setups; do
     file) check_compose file "-f compose.file.yaml" sqlite ;;
     postgres) check_compose postgres "-f compose.yaml -f compose.postgres.yaml" postgres ;;
     run) check_run ;;
-    *) echo "unknown setup: $setup (sqld file postgres run)" >&2; exit 2 ;;
+    sovereign) check_sovereign ;;
+    *) echo "unknown setup: $setup (sqld file postgres run sovereign)" >&2; exit 2 ;;
   esac
 done
 check_refusal

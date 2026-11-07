@@ -1,6 +1,6 @@
 import { drizzleAdapter } from '@better-auth/drizzle-adapter';
 import { betterAuth } from 'better-auth';
-import { APIError } from 'better-auth/api';
+import { APIError, createAuthMiddleware, getSessionFromCtx } from 'better-auth/api';
 import { nextCookies } from 'better-auth/next-js';
 import { genericOAuth, twoFactor } from 'better-auth/plugins';
 import { passkey } from '@better-auth/passkey';
@@ -36,6 +36,24 @@ export interface AuthDependencies {
 
 /** The prefix of better-auth's cookies, so that ours do not collide with another app's on localhost. */
 export const COOKIE_PREFIX = 'tusk';
+
+/**
+ * How recently a session must have been made for the things that ask for a fresh one: unlinking Sovereign here, and deleting an account that has no password
+ * to ask for. Ten minutes: long enough to do them after signing in, short enough that a session left open is not enough.
+ */
+export const FRESH_SESSION_SECONDS = 10 * 60;
+
+/**
+ * The paths that set up a password's second factor or a passkey. An account that has no password (it came in through Sovereign alone) has neither: Sovereign
+ * has its own (DESIGN.md §6). The pages do not show them, and these refuse, so that the page is not the only thing that says so.
+ */
+const FOR_PASSWORD_ACCOUNTS = [
+  '/two-factor/enable',
+  '/two-factor/get-totp-uri',
+  '/two-factor/generate-backup-codes',
+  '/passkey/generate-register-options',
+  '/passkey/verify-registration',
+];
 
 export function createAuth({ settings, name, database, mailer }: AuthDependencies) {
   const schema = database.dialect === 'postgres' ? postgresAuth : sqliteAuth;
@@ -104,6 +122,21 @@ export function createAuth({ settings, name, database, mailer }: AuthDependencie
       },
       // What core hands over is not used after sign-in; what is kept is kept encrypted.
       encryptOAuthTokens: true,
+    },
+    // A session is fresh for ten minutes (`FRESH_SESSION_SECONDS`), for the few things that ask for it.
+    session: { freshAge: FRESH_SESSION_SECONDS },
+    hooks: {
+      before: createAuthMiddleware(async (ctx) => {
+        if (!FOR_PASSWORD_ACCOUNTS.includes(ctx.path)) return;
+        const session = await getSessionFromCtx(ctx);
+        if (!session) return; // the route says so itself
+        const accounts = await ctx.context.internalAdapter.findAccounts(session.user.id);
+        if (accounts.some((account) => account.providerId === 'credential')) return;
+        throw new APIError('FORBIDDEN', {
+          message: 'This account signs in through Sovereign, which has its own.',
+          code: 'NO_PASSWORD_ACCOUNT',
+        });
+      }),
     },
     // Counted in the database, not in memory, so that a limit holds across every process.
     rateLimit: { enabled: true, storage: 'database' },

@@ -9,7 +9,7 @@ import * as postgresApp from '../db/schema/postgres/app';
 import * as sqliteApp from '../db/schema/sqlite/app';
 import { testTarget } from '../db/test-support';
 import { RateLimiter } from '../limits/rate';
-import { makeStore } from '../sync/test-support';
+import { openStoreBesideAuth } from '../sync/test-support';
 import {
   type EncryptionDeps,
   encryptionBegin,
@@ -40,7 +40,7 @@ let database: Database;
 let close: () => Promise<void>;
 beforeAll(async () => {
   t = await twoAccounts();
-  ({ database, close } = await makeStore());
+  ({ database, close } = await openStoreBesideAuth());
 });
 afterAll(async () => {
   await t.close();

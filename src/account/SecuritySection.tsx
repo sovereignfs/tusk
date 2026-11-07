@@ -5,6 +5,7 @@ import { messageFor } from '../auth/messages';
 import { authClient } from '../auth/client';
 import { Alert, Button, FormField, Input } from '../ui';
 import { PasskeysPanel } from './PasskeysPanel';
+import { SovereignPanel } from './SovereignPanel';
 import { TwoFactorPanel } from './TwoFactorPanel';
 import styles from './Account.module.css';
 
@@ -41,12 +42,46 @@ export function deviceName(userAgent: string | null | undefined): string {
  * Settings, Security (DESIGN.md §19): the password, which asks for the old one and ends every other session, and the devices this account is signed in
  * on, each of which can be signed out from here. Both need a connection, and say so when there is none.
  */
-export function SecuritySection({ passwordMinLength }: { passwordMinLength: number }) {
+export function SecuritySection({
+  passwordMinLength,
+  hasPassword,
+  sovereign,
+  email,
+  result,
+}: {
+  passwordMinLength: number;
+  /** The account has a password. One that came in through Sovereign alone has none, and so no password, authenticator app or passkeys to manage. */
+  hasPassword: boolean;
+  /** Sovereign sign-in is set up on this instance: whether this account has it linked (its row's id), or null. Absent where it is not set up. */
+  sovereign: { linkedAccountId: string | null } | undefined;
+  email: string;
+  result: { linked: boolean; unlinked: boolean; error: string | null };
+}) {
   return (
     <>
-      <PasswordForm minLength={passwordMinLength} />
-      <TwoFactor />
-      <PasskeysPanel />
+      {hasPassword ? (
+        <>
+          <PasswordForm minLength={passwordMinLength} />
+          <TwoFactor />
+          <PasskeysPanel />
+        </>
+      ) : (
+        <div className={styles.group}>
+          <h2>You sign in with Sovereign</h2>
+          <p className={styles.muted}>
+            This account has no password, authenticator app or passkeys to manage here: Sovereign
+            has its own.
+          </p>
+        </div>
+      )}
+      {sovereign ? (
+        <SovereignPanel
+          linkedAccountId={sovereign.linkedAccountId}
+          canUnlink={hasPassword}
+          email={email}
+          result={result}
+        />
+      ) : null}
       <Devices />
     </>
   );

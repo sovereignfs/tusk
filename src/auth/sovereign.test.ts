@@ -9,6 +9,8 @@ import {
   startFakeSovereign,
 } from './testing/fake-sovereign';
 import { type TestAuth, type TestClient, makeAuth } from './test-support';
+import { totpFor } from './testing/totp';
+import { accountOfSub, endSessionsOf } from '../sovereign/identity';
 import * as postgresAuth from '../db/schema/postgres/auth';
 import * as sqliteAuth from '../db/schema/sqlite/auth';
 
@@ -21,8 +23,9 @@ import * as sqliteAuth from '../db/schema/sqlite/auth';
 const { leg } = testTarget();
 
 /** What a test expects to be there, and says so plainly when it is not. */
-function got<T>(value: T | undefined): T {
-  if (value === undefined) throw new Error('expected a value, and there was none');
+function got<T>(value: T | null | undefined): T {
+  if (value === undefined || value === null)
+    throw new Error('expected a value, and there was none');
   return value;
 }
 
@@ -358,6 +361,251 @@ describe(`Sovereign beside local sign-in (${leg})`, () => {
   });
 });
 
+const PASSWORD = 'correct horse battery';
+
+describe(`linking a Sovereign account to a local one (${leg})`, () => {
+  let fake: FakeSovereign;
+  let t: TestAuth;
+  beforeAll(async () => {
+    fake = await startFakeSovereign();
+    t = await makeAuth({
+      signUp: 'open',
+      sovereign: { issuer: fake.issuer, clientId: fake.clientId, clientSecret: fake.clientSecret },
+    });
+  });
+  afterAll(async () => {
+    await t.close();
+    await fake.close();
+  });
+
+  /** A local account, signed in. */
+  async function localAccount(email: string, name = 'Local Ada'): Promise<TestClient> {
+    const client = visitor(t);
+    const made = await client.post('/api/auth/sign-up/email', { name, email, password: PASSWORD });
+    expect(made.status).toBe(200);
+    return client;
+  }
+
+  /** Start linking from a signed-in client, go to Sovereign as `user`, come back: where the callback sent the browser. */
+  async function link(
+    client: TestClient,
+    user: FakeUser,
+    overrides?: LoginOverrides,
+  ): Promise<URL> {
+    fake.signInAs(user, overrides);
+    const start = await client.post('/api/auth/link-social', {
+      provider: 'sovereign',
+      callbackURL: '/account/security?linked=1',
+      errorCallbackURL: '/account/security',
+    });
+    expect(start.status).toBe(200);
+    const authorize = await fetch(start.body.url as string, { redirect: 'manual' });
+    const callback = await client.follow(authorize.headers.get('location') as string);
+    return new URL(callback.headers.get('location') ?? '/', t.settings.url);
+  }
+
+  const providers = async (client: TestClient) =>
+    ((await client.get('/api/auth/list-accounts')).body as { id: string; providerId: string }[])
+      .map((a) => a.providerId)
+      .sort();
+  const sovereignAccounts = async () =>
+    (await accounts(t)).filter((a) => a.provider_id === 'sovereign');
+
+  it("links a Sovereign account whose email address is the account's own, from a signed-in session", async () => {
+    const email = 'link-ok@example.com';
+    const client = await localAccount(email);
+    const who = person({ email });
+    const before = (await users(t)).length;
+
+    const back = await link(client, who);
+    expect(back.pathname).toBe('/account/security');
+    expect(back.searchParams.get('linked')).toBe('1');
+    expect(back.searchParams.get('error')).toBeNull();
+    expect(await providers(client)).toEqual(['credential', 'sovereign']);
+    expect((await sovereignAccounts()).some((a) => a.account_id === who.sub)).toBe(true);
+    expect((await users(t)).length).toBe(before);
+  });
+
+  it("then signs that same account in through Sovereign, by the sub, whatever Sovereign's address becomes", async () => {
+    const email = 'link-then-login@example.com';
+    const client = await localAccount(email, 'Local Grace');
+    const who = person({ email, name: "Sovereign's name for her" });
+    await link(client, who);
+    const before = (await users(t)).length;
+
+    const fresh = visitor(t);
+    const result = await login(t, fake, fresh, { ...who, email: `renamed-${email}` });
+    expect(result.signedIn).toBe(true);
+    expect((await users(t)).length).toBe(before);
+    // The account is still the local one: its name and its email are not Sovereign's.
+    const session = (await fresh.get('/api/auth/get-session')).body;
+    expect(session.user).toMatchObject({ email, name: 'Local Grace' });
+  });
+
+  it('matches the address without regard to case', async () => {
+    const client = await localAccount('Mixed.Case@Example.com');
+    const back = await link(client, person({ email: 'mixed.case@example.com' }));
+    expect(back.searchParams.get('error')).toBeNull();
+    expect(await providers(client)).toContain('sovereign');
+  });
+
+  it('refuses a Sovereign account with a different email address, and links nothing', async () => {
+    const client = await localAccount('link-different@example.com');
+    const before = (await sovereignAccounts()).length;
+    const back = await link(client, person({ email: 'someone-else@sovereign.test' }));
+    expect(back.pathname).toBe('/account/security');
+    expect(back.searchParams.get('error')).toBe('email_does_not_match');
+    expect(await providers(client)).toEqual(['credential']);
+    expect((await sovereignAccounts()).length).toBe(before);
+  });
+
+  it("links even when Sovereign's token does not say the address is verified, because Sovereign's contract is that it is", async () => {
+    const email = 'link-unverified-claim@example.com';
+    const client = await localAccount(email);
+    const back = await link(client, person({ email, emailVerified: false }));
+    expect(back.searchParams.get('error')).toBeNull();
+    expect(await providers(client)).toContain('sovereign');
+  });
+
+  it('refuses a Sovereign identity that is already linked to another account', async () => {
+    const first = await localAccount('link-first@example.com');
+    const second = await localAccount('link-second@example.com');
+    const who = person({ email: 'link-first@example.com' });
+    await link(first, who);
+
+    const back = await link(second, { ...who, email: 'link-second@example.com' });
+    expect(back.searchParams.get('error')).toBe('account_already_linked_to_different_user');
+    expect(await providers(second)).toEqual(['credential']);
+    expect(await providers(first)).toContain('sovereign');
+  });
+
+  it('needs a signed-in session: nobody who is not signed in can start it', async () => {
+    const reply = await visitor(t).post('/api/auth/link-social', {
+      provider: 'sovereign',
+      callbackURL: '/account/security',
+    });
+    expect(reply.status).toBe(401);
+    expect(reply.body?.url).toBeUndefined();
+  });
+
+  it('is still refused at sign-in for an address nobody has linked, and the message is the one the page shows', async () => {
+    await localAccount('never-linked@example.com');
+    const result = await login(t, fake, visitor(t), person({ email: 'never-linked@example.com' }));
+    expect(result.signedIn).toBe(false);
+    expect(result.location.searchParams.get('error')).toBe('account_not_linked');
+  });
+
+  it('can be undone for an account that has a password, after which the address is refused again', async () => {
+    const email = 'link-undo@example.com';
+    const client = await localAccount(email);
+    const who = person({ email });
+    await link(client, who);
+    const row = (
+      (await client.get('/api/auth/list-accounts')).body as { id: string; providerId: string }[]
+    ).find((a) => a.providerId === 'sovereign');
+
+    const undone = await client.post('/api/auth/unlink-account', { accountId: got(row).id });
+    expect(undone.status).toBe(200);
+    expect(await providers(client)).toEqual(['credential']);
+
+    const result = await login(t, fake, visitor(t), who);
+    expect(result.signedIn).toBe(false);
+    expect(result.location.searchParams.get('error')).toBe('account_not_linked');
+  });
+
+  it('cannot be undone by an account that signs in only through Sovereign: its last way in stays', async () => {
+    const client = visitor(t);
+    const who = person();
+    await login(t, fake, client, who);
+    const rows = (await client.get('/api/auth/list-accounts')).body as {
+      id: string;
+      providerId: string;
+    }[];
+    expect(rows.map((r) => r.providerId)).toEqual(['sovereign']);
+
+    const refused = await client.post('/api/auth/unlink-account', { accountId: got(rows[0]).id });
+    expect(refused.status).toBe(400);
+    expect(await providers(client)).toEqual(['sovereign']);
+    expect((await client.get('/api/auth/get-session')).body.user.email).toBe(who.email);
+  });
+
+  it("cannot unlink someone else's account", async () => {
+    const mine = await localAccount('link-mine@example.com');
+    const theirs = await localAccount('link-theirs@example.com');
+    await link(theirs, person({ email: 'link-theirs@example.com' }));
+    const theirRow = (
+      (await theirs.get('/api/auth/list-accounts')).body as { id: string; providerId: string }[]
+    ).find((a) => a.providerId === 'sovereign');
+
+    const refused = await mine.post('/api/auth/unlink-account', { accountId: got(theirRow).id });
+    expect(refused.status).toBe(400);
+    expect(await providers(theirs)).toContain('sovereign');
+  });
+
+  it('lets a person with two-factor on sign in through Sovereign without being asked for a code: Sovereign has its own', async () => {
+    const email = 'link-2fa@example.com';
+    const client = await localAccount(email);
+    const enabled = await client.post('/api/auth/two-factor/enable', { password: PASSWORD });
+    expect(enabled.status).toBe(200);
+    expect(
+      (
+        await client.post('/api/auth/two-factor/verify-totp', {
+          code: await totpFor(enabled.body.totpURI),
+        })
+      ).status,
+    ).toBe(200);
+
+    const who = person({ email });
+    await link(client, who);
+    const fresh = visitor(t);
+    const result = await login(t, fake, fresh, who);
+    expect(result.signedIn).toBe(true);
+    expect((await fresh.get('/api/auth/get-session')).body.user.email).toBe(email);
+  });
+
+  it('cannot be undone from a session that is not fresh: the person signs in again first', async () => {
+    const email = 'link-stale@example.com';
+    const client = await localAccount(email);
+    await link(client, person({ email }));
+    const row = (
+      (await client.get('/api/auth/list-accounts')).body as { id: string; providerId: string }[]
+    ).find((a) => a.providerId === 'sovereign');
+
+    // The session was made an hour ago.
+    const aged = Date.now() - 60 * 60_000;
+    await dbRun(
+      t.database,
+      sql`UPDATE ${tables(t).session} SET created_at = ${t.database.dialect === 'postgres' ? new Date(aged) : aged}`,
+    );
+    const refused = await client.post('/api/auth/unlink-account', { accountId: got(row).id });
+    expect(refused.status).toBe(403);
+    expect(refused.body?.code).toBe('SESSION_NOT_FRESH');
+    expect(await providers(client)).toContain('sovereign');
+  });
+
+  it('gives an account that came in through Sovereign alone no second factor or passkey to set up, and does not refuse one that has a password', async () => {
+    const client = visitor(t);
+    await login(t, fake, client, person());
+    for (const path of [
+      '/api/auth/two-factor/enable',
+      '/api/auth/two-factor/generate-backup-codes',
+      '/api/auth/passkey/generate-register-options',
+    ]) {
+      const reply = path.includes('/passkey/')
+        ? await client.get(path)
+        : await client.post(path, { password: 'x' });
+      expect(reply.status, path).toBe(403);
+      expect(reply.body?.code, path).toBe('NO_PASSWORD_ACCOUNT');
+    }
+    // The same routes for an account with a password are answered by what they are for (here, a wrong password), not by this rule.
+    const withPassword = await localAccount('has-password-2fa@example.com');
+    const asked = await withPassword.post('/api/auth/two-factor/enable', {
+      password: 'not my password',
+    });
+    expect(asked.body?.code).not.toBe('NO_PASSWORD_ACCOUNT');
+  });
+});
+
 describe(`Sovereign sign-in against a provider that cannot be checked (${leg})`, () => {
   it('does not offer sign-in at all when discovery publishes no signing keys, rather than trusting unverified tokens', async () => {
     const fake = await startFakeSovereign({ omitFromDiscovery: ['jwks_uri'] });
@@ -433,5 +681,58 @@ describe(`Sovereign sign-in when core cannot be reached (${leg})`, () => {
     });
     expect(password.status).toBe(200);
     expect(client.has('session_token')).toBe(true);
+  });
+});
+
+describe(`what Sovereign's notices find here (${leg})`, () => {
+  let fake: FakeSovereign;
+  let t: TestAuth;
+  beforeAll(async () => {
+    fake = await startFakeSovereign();
+    t = await makeAuth({
+      signUp: 'open',
+      sovereign: { issuer: fake.issuer, clientId: fake.clientId, clientSecret: fake.clientSecret },
+    });
+  });
+  afterAll(async () => {
+    await t.close();
+    await fake.close();
+  });
+
+  const signedIn = async (c: TestClient) =>
+    (await c.get('/api/auth/get-session')).body?.user?.email ?? null;
+
+  it('finds the account by the sub, and ends every session of that account and no one else’s', async () => {
+    const ada = person();
+    const grace = person();
+    const adaPhone = visitor(t);
+    const adaLaptop = visitor(t);
+    const graceLaptop = visitor(t);
+    await login(t, fake, adaPhone, ada);
+    await login(t, fake, adaLaptop, ada);
+    await login(t, fake, graceLaptop, grace);
+
+    const account = got(await accountOfSub(t.database, ada.sub));
+    expect(await accountOfSub(t.database, 'nobody-knows-this-sub')).toBeNull();
+
+    expect(await endSessionsOf(t.database, account)).toBe(2);
+    expect(await signedIn(adaPhone)).toBeNull();
+    expect(await signedIn(adaLaptop)).toBeNull();
+    expect(await signedIn(graceLaptop)).toBe(grace.email);
+    // Said again, it ends nothing and does not fail; and the person can sign in again, as the same account.
+    expect(await endSessionsOf(t.database, account)).toBe(0);
+    expect(await login(t, fake, visitor(t), ada)).toMatchObject({ signedIn: true });
+    expect(await accountOfSub(t.database, ada.sub)).toBe(account);
+  });
+
+  it('does not find a local account by a sub it has not linked', async () => {
+    const email = 'local-notice@example.com';
+    await visitor(t).post('/api/auth/sign-up/email', {
+      name: 'Local',
+      email,
+      password: 'correct horse battery',
+    });
+    expect(await accountOfSub(t.database, email)).toBeNull();
+    expect(await accountOfSub(t.database, 'local-notice')).toBeNull();
   });
 });

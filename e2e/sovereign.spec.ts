@@ -22,16 +22,16 @@ async function nextPersonIs(page: Page, who: { sub: string; email: string; name?
  */
 async function throughSovereign(page: Page) {
   const button = page.getByRole('button', { name: 'Sign in with Sovereign' });
-  await button.click();
   const limited = page.getByText(/Too many tries/);
-  await expect(
-    limited
-      .or(page.getByRole('button', { name: 'User menu' }))
-      .or(page.getByText(/Sign-up is closed|already an account/)),
-  ).toBeVisible();
-  if (await limited.isVisible()) {
-    await page.waitForTimeout(10_500);
+  for (let attempt = 0; attempt < 3; attempt++) {
     await button.click();
+    await expect(
+      limited
+        .or(page.getByRole('button', { name: 'User menu' }))
+        .or(page.getByText(/Sign-up is closed|already an account/)),
+    ).toBeVisible();
+    if (!(await limited.isVisible())) return;
+    await page.waitForTimeout(10_500);
   }
 }
 
@@ -88,7 +88,178 @@ test.describe('an instance that signs in through Sovereign only', () => {
     await expect(page.getByText(/You declined to share/)).toBeVisible();
     await expect(page.getByRole('button', { name: 'User menu' })).toHaveCount(0);
   });
+
+  test('an account that came in through Sovereign has no password to manage, and cannot unlink its only way in', async ({
+    page,
+  }) => {
+    await nextPersonIs(page, FIRST);
+    await page.goto('/sign-in');
+    await throughSovereign(page);
+    await expect(page.getByRole('button', { name: 'User menu' })).toBeVisible();
+
+    await page.goto('/account?section=security');
+    await expect(page.getByRole('heading', { name: 'You sign in with Sovereign' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Change password' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Set up an authenticator app' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Add a passkey' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Unlink Sovereign' })).toBeDisabled();
+    await expect(page.getByText('only way you can sign in')).toBeVisible();
+    await signOut(page);
+  });
+
+  // What Sovereign tells the app when a person's session there ends, or they delete their account (task 2.9). The fake signs the notice with the key it
+  // publishes, as Sovereign does, and the test posts it where the manifest says to.
+  type Wrong = 'signature' | 'audience' | 'expired' | 'type';
+  async function noticeFrom(
+    page: Page,
+    kind: 'logout' | 'account-deleted',
+    sub: string,
+    wrong?: Wrong,
+  ): Promise<string> {
+    const reply = await page.request.post('http://localhost:3191/notice', {
+      data: { kind, sub, sid: 'core-session-1', wrong },
+    });
+    expect(reply.ok()).toBe(true);
+    return reply.text();
+  }
+  const sendLogout = (page: Page, token: string) =>
+    page.request.post('/api/sovereign/backchannel-logout', { form: { logout_token: token } });
+  const sendDeletion = (page: Page, token: string) =>
+    page.request.post('/api/sovereign/account-deleted', { form: { account_deleted_token: token } });
+  async function signInAs(page: Page, who: { sub: string; email: string; name?: string }) {
+    await nextPersonIs(page, who);
+    await page.goto('/sign-in');
+    await throughSovereign(page);
+    await expect(page.getByRole('button', { name: 'User menu' })).toBeVisible();
+  }
+
+  test('signing out at Sovereign signs the person out here, wherever they are signed in', async ({
+    page,
+    browser,
+  }) => {
+    await signInAs(page, FIRST);
+    const other = await browser.newContext({ baseURL: SOVEREIGN });
+    const elsewhere = await other.newPage();
+    await signInAs(elsewhere, FIRST);
+
+    const reply = await sendLogout(page, await noticeFrom(page, 'logout', FIRST.sub));
+    expect(reply.status()).toBe(200);
+    for (const tab of [page, elsewhere]) {
+      await tab.goto('/desk');
+      await expect(tab).toHaveURL(/\/sign-in/);
+    }
+    await other.close();
+    // And they can sign in again: the account is theirs still.
+    await signInAs(page, FIRST);
+    await signOut(page);
+  });
+
+  test('a notice that is wrong, or is sent twice, is refused and ends nothing', async ({
+    page,
+  }) => {
+    await signInAs(page, FIRST);
+    for (const wrong of ['signature', 'audience', 'expired', 'type'] as const) {
+      const reply = await sendLogout(page, await noticeFrom(page, 'logout', FIRST.sub, wrong));
+      expect(reply.status(), wrong).toBe(400);
+      expect(await reply.json()).toEqual({ error: 'invalid_request' });
+    }
+    // A deletion token is not a logout token, nor the reverse.
+    expect(
+      (await sendLogout(page, await noticeFrom(page, 'account-deleted', FIRST.sub))).status(),
+    ).toBe(400);
+    expect((await sendDeletion(page, await noticeFrom(page, 'logout', FIRST.sub))).status()).toBe(
+      400,
+    );
+    // Nothing at all, and not a form.
+    expect(
+      (await page.request.post('/api/sovereign/backchannel-logout', { form: {} })).status(),
+    ).toBe(400);
+    expect(
+      (
+        await page.request.post('/api/sovereign/account-deleted', {
+          data: { account_deleted_token: 'x.y.z' },
+        })
+      ).status(),
+    ).toBe(400);
+    // They are still signed in.
+    await page.goto('/desk');
+    await expect(page.getByRole('button', { name: 'User menu' })).toBeVisible();
+
+    // The same good notice twice: the first ends the session, the second is a replay.
+    const token = await noticeFrom(page, 'logout', FIRST.sub);
+    expect((await sendLogout(page, token)).status()).toBe(200);
+    expect((await sendLogout(page, token)).status()).toBe(400);
+  });
+
+  test('these addresses answer only a POST, and no one who asks for them is shown anything', async ({
+    page,
+  }) => {
+    for (const path of ['/api/sovereign/backchannel-logout', '/api/sovereign/account-deleted']) {
+      expect((await page.request.get(path)).status(), path).toBe(405);
+    }
+  });
+
+  test('a person who deletes their account at Sovereign is deleted here, and the first-account rule is open again', async ({
+    page,
+  }) => {
+    await signInAs(page, FIRST);
+    const reply = await sendDeletion(page, await noticeFrom(page, 'account-deleted', FIRST.sub));
+    expect(reply.status()).toBe(200);
+    await page.goto('/desk');
+    await expect(page).toHaveURL(/\/sign-in/);
+
+    // Said again (a retry that was not needed), it is a notice about a person nobody here knows, and is answered 200.
+    expect(
+      (await sendDeletion(page, await noticeFrom(page, 'account-deleted', FIRST.sub))).status(),
+    ).toBe(200);
+    // The instance has no one in it now, so the next person to come is its first (the same person, as the tests that follow expect their account).
+    await signInAs(page, FIRST);
+    await signOut(page);
+  });
+
+  test('deleting the account asks for no password, deletes it, and leaves the instance open to its first person again', async ({
+    page,
+  }) => {
+    await nextPersonIs(page, FIRST);
+    await page.goto('/sign-in');
+    await throughSovereign(page);
+    await expect(page.getByRole('button', { name: 'User menu' })).toBeVisible();
+
+    await page.goto('/account?section=data');
+    await page.getByRole('button', { name: 'Delete my account…' }).click();
+    await expect(page.getByLabel('Your password')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Delete my account for good' }).click();
+    await expect(page.getByRole('heading', { name: /Tusk|Tasks/ }).first()).toBeVisible();
+    await page.goto('/desk');
+    await expect(page).toHaveURL(/\/sign-in/);
+
+    // The instance has no one in it now, so the next person to come is its first, and is let in (the same person: the tests that follow, and the other
+    // browser's run of these, expect the instance to have their account).
+    await nextPersonIs(page, FIRST);
+    await page.goto('/sign-in');
+    await throughSovereign(page);
+    await expect(page.getByRole('button', { name: 'User menu' })).toBeVisible();
+    await signOut(page);
+  });
 });
+
+/** A local account made on the instance that offers both ways, signed in. */
+async function signUpLocal(page: Page, name: string): Promise<{ email: string; name: string }> {
+  const email = `local-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.com`;
+  await page.goto('/sign-up');
+  await page.getByLabel('Name').fill(name);
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password').fill('correct horse battery');
+  const limited = page.getByText(/Too many tries/);
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await page.getByRole('button', { name: 'Create account' }).click();
+    await expect(limited.or(page.getByRole('button', { name: 'User menu' }))).toBeVisible();
+    if (!(await limited.isVisible())) break;
+    await page.waitForTimeout(10_500);
+  }
+  await expect(page.getByRole('button', { name: 'User menu' })).toBeVisible();
+  return { email, name };
+}
 
 test.describe('an instance that offers both ways', () => {
   test.use({ baseURL: BOTH, viewport: { width: 1280, height: 800 } });
@@ -137,5 +308,76 @@ test.describe('an instance that offers both ways', () => {
     await expect(page).toHaveURL(/\/sign-in/);
     await expect(page.getByText(/already an account here/)).toBeVisible();
     await expect(page.getByRole('button', { name: 'User menu' })).toHaveCount(0);
+  });
+
+  test('a local account links Sovereign from Settings, then signs in with it as the same account', async ({
+    page,
+  }) => {
+    const { email, name } = await signUpLocal(page, 'Local Margaret');
+    await nextPersonIs(page, {
+      sub: `e2e-link-${Date.now()}`,
+      email,
+      name: 'Someone Else At Sovereign',
+    });
+    await page.goto('/account?section=security');
+    await expect(page.getByRole('button', { name: 'Change password' })).toBeVisible();
+    await page.getByRole('button', { name: 'Link Sovereign' }).click();
+
+    await expect(page).toHaveURL(/\/account\?section=security&linked=1/);
+    await expect(page.getByText('Sovereign is linked.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Unlink Sovereign' })).toBeEnabled();
+
+    await page.goto('/desk');
+    await signOut(page);
+    await page.goto('/sign-in');
+    await throughSovereign(page);
+    // The account is the local one: its name, not the name Sovereign has for the person.
+    await expect(page.getByRole('button', { name: 'User menu' })).toBeVisible();
+    await page.getByRole('button', { name: 'User menu' }).click();
+    await expect(page.getByText(name, { exact: true })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await signOut(page);
+  });
+
+  test('a Sovereign account with a different address is refused with the reason, and nothing is linked', async ({
+    page,
+  }) => {
+    await signUpLocal(page, 'Local Mary');
+    await nextPersonIs(page, {
+      sub: `e2e-other-${Date.now()}`,
+      email: `other-${Date.now()}@sovereign.test`,
+      name: 'Not The Same',
+    });
+    await page.goto('/account?section=security');
+    await page.getByRole('button', { name: 'Link Sovereign' }).click();
+
+    await expect(page).toHaveURL(/\/account\?section=security/);
+    await expect(page.getByText(/different email address/)).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Link Sovereign' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Unlink Sovereign' })).toHaveCount(0);
+    await signOut(page);
+  });
+
+  test('can be unlinked, after which the same Sovereign login is turned back with what to do', async ({
+    page,
+  }) => {
+    const { email } = await signUpLocal(page, 'Local Dorothy');
+    const who = { sub: `e2e-undo-${Date.now()}`, email, name: 'Same Person' };
+    await nextPersonIs(page, who);
+    await page.goto('/account?section=security');
+    await page.getByRole('button', { name: 'Link Sovereign' }).click();
+    await expect(page.getByText('Sovereign is linked.')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Unlink Sovereign' }).click();
+    await page.getByRole('button', { name: 'Unlink', exact: true }).click();
+    await expect(page.getByText('Sovereign is unlinked.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Link Sovereign' })).toBeVisible();
+
+    await page.goto('/desk');
+    await signOut(page);
+    await nextPersonIs(page, who);
+    await page.goto('/sign-in');
+    await throughSovereign(page);
+    await expect(page.getByText(/already an account here/)).toBeVisible();
   });
 });

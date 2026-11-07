@@ -69,8 +69,9 @@ export async function unreadCount(database: Database, accountId: string): Promis
 export async function markSeen(database: Database, accountId: string, now: number): Promise<void> {
   await dbRun(
     database,
-    sql`INSERT INTO ${settingsTable(database)} (account_id, seq, created_at, inbox_seen_at) VALUES (${accountId}, 0, ${now}, ${now})
-        ON CONFLICT (account_id) DO UPDATE SET inbox_seen_at = CASE WHEN inbox_seen_at < ${now} THEN ${now} ELSE inbox_seen_at END`,
+    // The target is named (`AS s`) because PostgreSQL finds a bare column in the update ambiguous between it and the row that was refused.
+    sql`INSERT INTO ${settingsTable(database)} AS s (account_id, seq, created_at, inbox_seen_at) VALUES (${accountId}, 0, ${now}, ${now})
+        ON CONFLICT (account_id) DO UPDATE SET inbox_seen_at = CASE WHEN s.inbox_seen_at < ${now} THEN ${now} ELSE s.inbox_seen_at END`,
   );
 }
 

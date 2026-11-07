@@ -13,7 +13,7 @@ import { testTarget } from '../db/test-support';
 import { RateLimiter } from '../limits/rate';
 import { purge } from '../sync/purge';
 import { applyMutation } from '../sync/apply';
-import { card, check, list, makeStore, mutation, series } from '../sync/test-support';
+import { card, check, list, openStoreBesideAuth, mutation, series } from '../sync/test-support';
 import type { Op } from '../workspaces/format';
 import { applyOp } from '../workspaces/apply';
 import { deletePerson } from './people';
@@ -72,7 +72,7 @@ let database: Database;
 let close: () => Promise<void>;
 beforeAll(async () => {
   t = await twoAccounts();
-  ({ database, close } = await makeStore());
+  ({ database, close } = await openStoreBesideAuth());
 });
 afterAll(async () => {
   await t.close();
@@ -101,15 +101,21 @@ const count = async (table: string, where: string): Promise<number> =>
       )
     )[0]?.n ?? 0,
   );
+/** A table of the sign-in store, named as its dialect does (a schema of its own on PostgreSQL). */
+const authTable = (name: string): string =>
+  t.auth.database.dialect === 'postgres' ? `"tusk_auth"."${name}"` : `"${name}"`;
 const authCount = async (table: string, where: string): Promise<number> =>
   Number(
     (
       await dbAll<{ n: number | string }>(
         t.auth.database,
-        sql.raw(`SELECT COUNT(*) AS n FROM "${table}" WHERE ${where}`),
+        sql.raw(`SELECT COUNT(*) AS n FROM ${authTable(table)} WHERE ${where}`),
       )
     )[0]?.n ?? 0,
   );
+/** A time as the sign-in store holds it: a date on PostgreSQL, milliseconds in SQLite. */
+const authTime = (ms: number): Date | number =>
+  t.auth.database.dialect === 'postgres' ? new Date(ms) : ms;
 
 describe(`the tables (${leg})`, () => {
   it('are each decided: they go with the person, they stay as shared work, or they are not about a person', () => {
@@ -168,7 +174,7 @@ describe(`deleting a person (${leg})`, () => {
     }
     await dbAll(
       t.auth.database,
-      sql`INSERT INTO verification (id, identifier, value, expires_at, created_at, updated_at) VALUES (${id()}, ${t.ada.email}, 'x', ${NOW}, ${NOW}, ${NOW}) RETURNING id`,
+      sql`INSERT INTO ${sql.raw(authTable('verification'))} (id, identifier, value, expires_at, created_at, updated_at) VALUES (${id()}, ${t.ada.email}, 'x', ${authTime(NOW)}, ${authTime(NOW)}, ${authTime(NOW)}) RETURNING id`,
     );
 
     for (const [table, columns, values] of [
@@ -176,13 +182,13 @@ describe(`deleting a person (${leg})`, () => {
       [
         'passkey',
         'id, public_key, user_id, credential_id, counter, device_type, backed_up',
-        `'pk1', 'k', '${ada}', 'c', 0, 'singleDevice', 0`,
+        `'pk1', 'k', '${ada}', 'c', 0, 'singleDevice', ${t.auth.database.dialect === 'postgres' ? 'false' : '0'}`,
       ],
     ] as const)
       await dbAll(
         t.auth.database,
         sql.raw(
-          `INSERT INTO ${table === 'passkey' ? 'passkey' : 'two_factor'} (${columns}) VALUES (${values}) RETURNING id`,
+          `INSERT INTO ${authTable(table === 'passkey' ? 'passkey' : 'two_factor')} (${columns}) VALUES (${values}) RETURNING id`,
         ),
       );
 

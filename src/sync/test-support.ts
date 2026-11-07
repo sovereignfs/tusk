@@ -1,8 +1,8 @@
 import { sql } from 'drizzle-orm';
-import type { Database } from '../db/client';
+import { type Database, openDatabase } from '../db/client';
 import { dbAll } from '../db/exec';
 import { runMigrations } from '../db/migrate';
-import { freshDatabase } from '../db/test-support';
+import { freshDatabase, testTarget } from '../db/test-support';
 import * as postgresSchema from '../db/schema/postgres';
 import * as sqliteSchema from '../db/schema/sqlite';
 import { type Change, type Mutation, type SyncTable } from './format';
@@ -13,6 +13,20 @@ import { tableOf } from './tables';
  */
 export async function makeStore(): Promise<{ database: Database; close(): Promise<void> }> {
   const { database } = await freshDatabase('app');
+  await runMigrations(database);
+  return { database, close: () => database.close() };
+}
+
+/**
+ * The app's store beside an auth store that is already there, migrated, and **not reset**. A test that needs sessions and the app's tables calls `twoAccounts()`
+ * first, which starts both stores from empty, and then this: `makeStore()` resets both, so after the sessions it would take them away on sqld and PostgreSQL, where
+ * the stores are shared (a `file:` database has a file each, which is why that leg alone would not show it).
+ */
+export async function openStoreBesideAuth(): Promise<{
+  database: Database;
+  close(): Promise<void>;
+}> {
+  const database = await openDatabase(testTarget().config, 'app');
   await runMigrations(database);
   return { database, close: () => database.close() };
 }

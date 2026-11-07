@@ -5,10 +5,12 @@ import { type TwoAccounts, twoAccounts } from '../access/two-accounts';
 import { authDirectory } from '../auth/directory';
 import type { Database } from '../db/client';
 import { dbAll } from '../db/exec';
+import * as postgresAuth from '../db/schema/postgres/auth';
+import * as sqliteAuth from '../db/schema/sqlite/auth';
 import { testTarget } from '../db/test-support';
 import { RateLimiter } from '../limits/rate';
 import { applyMutation } from '../sync/apply';
-import { list, makeStore, mutation } from '../sync/test-support';
+import { list, openStoreBesideAuth, mutation } from '../sync/test-support';
 import { tableOf } from '../sync/tables';
 import { type DeleteDeps, deleteAccount, deletionPreview } from './delete-account';
 
@@ -23,7 +25,7 @@ let database: Database;
 let close: () => Promise<void>;
 beforeAll(async () => {
   t = await twoAccounts();
-  ({ database, close } = await makeStore());
+  ({ database, close } = await openStoreBesideAuth());
 });
 afterAll(async () => {
   await t.close();
@@ -46,6 +48,8 @@ const deps = (extra: Partial<DeleteDeps> = {}): DeleteDeps => ({
       return false;
     }
   },
+  hasPassword: async () => true,
+  fresh: async () => true,
   ...extra,
 });
 const routes = (extra: Partial<DeleteDeps> = {}) => ({
@@ -58,7 +62,12 @@ const routes = (extra: Partial<DeleteDeps> = {}) => ({
 const post = (who: typeof t.ada | null, body: unknown, headers = {}) =>
   t.request(who, '/api/account/delete', { method: 'POST', body, headers });
 const users = async () =>
-  (await dbAll<{ id: string }>(t.auth.database, sql`SELECT id FROM "user"`)).map((row) => row.id);
+  (
+    await dbAll<{ id: string }>(
+      t.auth.database,
+      sql`SELECT id FROM ${t.auth.database.dialect === 'postgres' ? postgresAuth.user : sqliteAuth.user}`,
+    )
+  ).map((row) => row.id);
 
 describe(`deleting the account over HTTP (${leg})`, () => {
   it('is for someone signed in and from the app', async () => {
@@ -74,7 +83,7 @@ describe(`deleting the account over HTTP (${leg})`, () => {
 
   it('says what it would do: which workspaces pass to whom or go, and whether a repository is connected', async () => {
     const preview = await routes().preview(t.request(t.grace, '/api/account/delete'));
-    expect(await preview.json()).toEqual({ workspaces: [], backup: null });
+    expect(await preview.json()).toEqual({ password: true, workspaces: [], backup: null });
   });
 
   it('refuses a wrong password and an absent one, deleting nothing, and counts the tries', async () => {
@@ -124,5 +133,24 @@ describe(`deleting the account over HTTP (${leg})`, () => {
     expect((await r.preview(t.request(t.grace, '/api/account/delete'))).status).toBe(401);
     // Ada's are untouched.
     expect((await r.preview(t.request(t.ada, '/api/account/delete'))).status).toBe(200);
+  });
+
+  it('asks an account with no password for a session made just now instead, and deletes nothing for a stale one', async () => {
+    const noPassword = { hasPassword: async () => false };
+    // The preview says there is no password to ask for.
+    const preview = await routes(noPassword).preview(t.request(t.ada, '/api/account/delete'));
+    expect(await preview.json()).toMatchObject({ password: false });
+
+    const stale = routes({ ...noPassword, fresh: async () => false });
+    const refused = await stale.remove(post(t.ada, {}));
+    expect(refused.status).toBe(403);
+    expect(await refused.json()).toEqual({ code: 'SESSION_NOT_FRESH' });
+    // A password it does not have is not a way round.
+    expect((await stale.remove(post(t.ada, { password: PASSWORD }))).status).toBe(403);
+    expect(await users()).toContain(t.ada.id);
+
+    const fresh = routes({ ...noPassword, fresh: async () => true });
+    expect((await fresh.remove(post(t.ada, {}))).status).toBe(204);
+    expect(await users()).not.toContain(t.ada.id);
   });
 });

@@ -164,9 +164,9 @@ It signs in like Fjord in every way, an instance can host it, and a person can l
 | 85  | [2.4](docs/epics/accounts.md)  | Two-factor and passkeys           | P1       | 2.1, 2.7        | ✅     |
 | 86  | [2.8](docs/epics/accounts.md)  | People, and deleting an account   | P1       | 2.7, 16.3, 18.6 | ✅     |
 | 87  | [2.5](docs/epics/accounts.md)  | Sovereign sign-in                 | P1       | 2.1, 15.1       | ✅     |
-| 88  | [2.6](docs/epics/accounts.md)  | Linking a Sovereign identity      | P1       | 2.5, 2.7        | 📋     |
-| 89  | [2.9](docs/epics/accounts.md)  | Notices from core                 | P1       | 2.5, 2.8        | 📋     |
-| 90  | [2.10](docs/epics/accounts.md) | Hosting on an instance            | P1       | 1.10, 2.9       | 📋     |
+| 88  | [2.6](docs/epics/accounts.md)  | Linking a Sovereign identity      | P1       | 2.5, 2.7        | ✅     |
+| 89  | [2.9](docs/epics/accounts.md)  | Notices from core                 | P1       | 2.5, 2.8        | ✅     |
+| 90  | [2.10](docs/epics/accounts.md) | Hosting on an instance            | P1       | 1.10, 2.9       | ✅     |
 | 91  | [10.6](docs/epics/backup.md)   | Failures                          | P1       | 8.1, 10.5       | ✅     |
 | 92  | [10.7](docs/epics/backup.md)   | Connecting through the GitHub App | P3       | 10.6            | 📋     |
 
@@ -180,7 +180,7 @@ Ready for a phone, reviewed, documented, released, and on a real instance. **Don
 | 94  | [7.7](docs/epics/interface.md) | Accessibility pass                | P2       | 3.11, 7.6, 7.9, 17.6, 18.7  | 📋     |
 | 95  | [11.2](docs/epics/release.md)  | Documents                         | P2       | 2.10, 10.6, 14.7            | 📋     |
 | 96  | [11.3](docs/epics/release.md)  | Security review                   | P2       | 2.9, 9.3, 10.6, 14.7, 17.5  | 📋     |
-| 97  | [11.4](docs/epics/release.md)  | The release process               | P2       | 1.10                        | 📋     |
+| 97  | [11.4](docs/epics/release.md)  | The release process               | P2       | 1.10                        | ✅     |
 | 98  | [11.5](docs/epics/release.md)  | First release, on a real instance | P2       | 7.7, 11.2, 11.3, 11.4, 13.6 | 📋     |
 
 ## Phase 2

@@ -8,7 +8,8 @@ import { deletePerson } from './people';
 
 /**
  * `/api/account/delete` (DESIGN.md §22): what deleting the account would do, and doing it. **It asks for the password** (a stolen session cannot delete an
- * account), counted, and runs `People.deletePerson` for the session's account and no other. The preview says which workspaces would pass to whom or be
+ * account), counted, and runs `People.deletePerson` for the session's account and no other. **An account that came in through Sovereign alone has no
+ * password, so it asks for a session made in the last few minutes instead**: signing in again is the proof. The preview says which workspaces would pass to whom or be
  * deleted, and whether a backup repository is connected, which is left alone.
  */
 export interface DeleteDeps {
@@ -19,6 +20,10 @@ export interface DeleteDeps {
   readonly now: () => number;
   /** Whether this is the password of the account the request is for. */
   verify(request: Request, password: string): Promise<boolean>;
+  /** Whether the account has a password to ask for. */
+  hasPassword(accountId: string): Promise<boolean>;
+  /** Whether the request's session was made recently enough to stand in for a password the account does not have. */
+  fresh(request: Request): Promise<boolean>;
 }
 
 const RATE: Rule = { limit: 5, windowMs: 10 * 60_000 };
@@ -33,12 +38,17 @@ export async function deletionPreview(accountId: string, deps: DeleteDeps): Prom
   const workspaces = await previewLeaving(deps.database, deps.directory, accountId);
   const connection = await readConnection(deps.database, accountId);
   return json(200, {
+    // Whether it asks for the password (or, for an account with none, a session made just now).
+    password: await deps.hasPassword(accountId),
     workspaces: workspaces.map((each) => ({ name: each.name, to: each.to })),
     backup: connection ? connection.repository : null,
   });
 }
 
-/** `POST { password }`: 204 when it is done; 400 for what is not a request; 403 for a password that is not this account's; 429 when tried too often. */
+/**
+ * `POST { password }`: 204 when it is done; 400 for what is not a request; 403 for a password that is not this account's (`WRONG_PASSWORD`), or, for an account
+ * with none, a session that is not recent (`SESSION_NOT_FRESH`); 429 when tried too often.
+ */
 export async function deleteAccount(
   request: Request,
   accountId: string,
@@ -59,9 +69,13 @@ export async function deleteAccount(
   } catch {
     return json(400, { code: 'BAD_REQUEST' });
   }
-  if (typeof password !== 'string' || password === '' || password.length > 1000)
-    return json(400, { code: 'BAD_REQUEST' });
-  if (!(await deps.verify(request, password))) return json(403, { code: 'WRONG_PASSWORD' });
+  if (await deps.hasPassword(accountId)) {
+    if (typeof password !== 'string' || password === '' || password.length > 1000)
+      return json(400, { code: 'BAD_REQUEST' });
+    if (!(await deps.verify(request, password))) return json(403, { code: 'WRONG_PASSWORD' });
+  } else if (!(await deps.fresh(request))) {
+    return json(403, { code: 'SESSION_NOT_FRESH' });
+  }
   await deletePerson(deps, accountId);
   return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } });
 }

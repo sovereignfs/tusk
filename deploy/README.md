@@ -54,6 +54,18 @@ TUSK_POSTGRES_URL=postgres://user:password@host:5432/tusk
 
 (or `TUSK_POSTGRES_URL_FILE`, a file holding it). The app makes its own schemas, `tusk` and `tusk_auth`, in that database.
 
+## On a Sovereign instance
+
+`sv app add` hosts Tusk from `sovereign.manifest.json`, which is also the image's label: the instance builds nothing of its own, gives the app a database, and
+tells it where it is. What it sets is the settings above under Tusk's own names: `TUSK_URL`, `TUSK_CORE_URL`, `TUSK_CORE_CLIENT_ID` and
+`TUSK_CORE_CLIENT_SECRET` (or `_FILE`), the database (`TUSK_DB_DIALECT` and its address) and `PORT`, and it makes `TUSK_AUTH_SECRET` and `TUSK_ENCRYPTION_KEY`
+once and keeps them. With `TUSK_AUTH_LOCAL` unset, people sign in through the instance only: there is no password, sign-up or reset to find.
+
+**Set `TUSK_AUTH_SIGNUP=open`** there: the instance already decides who may sign in, and the default (`closed`: the first account only) would turn every
+other person away. Mail (`TUSK_SMTP_*`) is not used when there is no password. The instance can end a person's sessions here, and delete their account, by
+signed notices to `/api/sovereign/backchannel-logout` and `/api/sovereign/account-deleted`; both are answered only when they carry a token the instance
+signed.
+
 ## Backups
 
 The database is the whole of it, apart from the one key below.
@@ -74,7 +86,7 @@ minor may, and going back is restoring the backup you took before it.
 
 ## Checking a setup
 
-`scripts/deploy-check.sh` brings each setup up from nothing, checks the database it is on, restarts it, and stops it with SIGTERM, and CI runs it:
+`scripts/deploy-check.sh` brings each setup up from nothing, checks the database it is on, restarts it, and stops it with SIGTERM, and CI runs it. Its last setup, `sovereign`, is an instance hosting the app (secrets as files, a PostgreSQL of its own, a port that is not the image's): it checks that the image's label is the manifest, that sign-in offers Sovereign and no password, that the icon and the addresses of core's notices answer, and that it stops on SIGTERM:
 
 ```bash
 eval "docker build $(pnpm exec sovereign-manifest docker-args) -t tusk:ci ."

@@ -8,7 +8,7 @@ import { testTarget } from '../db/test-support';
 import { RateLimiter } from '../limits/rate';
 import { FakeGitHub } from '../providers/testing/fake-github';
 import type { RepositoryRef } from '../providers/types';
-import { makeStore } from '../sync/test-support';
+import { openStoreBesideAuth } from '../sync/test-support';
 import {
   type ConnectionDeps,
   connectionConnect,
@@ -34,7 +34,7 @@ let counter = 0;
 beforeAll(async () => {
   t = await twoAccounts();
   fake = await FakeGitHub.start();
-  ({ database, close } = await makeStore());
+  ({ database, close } = await openStoreBesideAuth());
 });
 afterAll(async () => {
   await t.close();

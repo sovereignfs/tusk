@@ -184,6 +184,8 @@ test('the account is deleted from Settings with the password, says what goes fir
     browserName !== 'webkit',
     'the account is deleted once, at the end, in the last browser',
   );
+  // (This instance's accounts are its own now, so when this runs alone there is none yet, and it makes the one it deletes.)
+  await ensureAccount(page, { skipKeyOffer: false });
   await trySignIn(page, EMAIL, PASSWORD);
   await expect(page.getByRole('button', { name: 'User menu' })).toBeVisible();
   await page.goto('/account?section=data');

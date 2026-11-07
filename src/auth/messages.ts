@@ -13,6 +13,12 @@ const BY_CODE: Record<string, string> = {
     'There is already an account with that email address. Try signing in instead.',
   SIGNUP_CLOSED: 'Sign-up is closed on this instance.',
   UNAUTHORIZED: 'You need to sign in first.',
+  SESSION_NOT_FRESH: 'For your security, sign out, sign in again, and then try this once more.',
+  FAILED_TO_UNLINK_LAST_ACCOUNT:
+    'Sovereign is the only way you can sign in here, so it cannot be unlinked.',
+  LINKING_DIFFERENT_EMAILS_NOT_ALLOWED:
+    'That Sovereign account uses a different email address from this account. Both must use the same one.',
+  NO_PASSWORD_ACCOUNT: 'This account signs in through Sovereign, which has its own.',
   EMAIL_NOT_VERIFIED:
     'Confirm your email address first: a link was sent to it. Open the link, and you are signed in.',
   INVALID_TOKEN: 'That link is not good any more. Ask for a new one.',

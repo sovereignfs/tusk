@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { messageFor } from '../auth/messages';
 import { forgetKey } from '../cipher/vault';
 import { forgetIdentity } from '../identity';
 import { deleteLocal } from '../local/db';
@@ -9,6 +10,8 @@ import { Alert, Button, FormField, Input } from '../ui';
 import styles from './Account.module.css';
 
 interface Preview {
+  /** Whether it asks for the password; an account that came in through Sovereign has none, and a session made just now stands in. */
+  password: boolean;
   workspaces: { name: string; to: string | null }[];
   backup: string | null;
 }
@@ -50,7 +53,14 @@ export function DeleteAccountSection() {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ password }),
       });
-      if (reply.status === 403) return setProblem('That is not your password.');
+      if (reply.status === 403) {
+        const { code } = (await reply.json().catch(() => ({}))) as { code?: string };
+        return setProblem(
+          code === 'SESSION_NOT_FRESH'
+            ? messageFor({ code }, 'Sign in again, and then try this once more.')
+            : 'That is not your password.',
+        );
+      }
       if (reply.status === 429)
         return setProblem('That was tried too many times. Wait a few minutes.');
       if (!reply.ok)
@@ -122,19 +132,30 @@ export function DeleteAccountSection() {
             </>
           ) : null}
           {problem ? <Alert variant="error">{problem}</Alert> : null}
-          <FormField label="Your password" required>
-            {(field) => (
-              <Input
-                {...field}
-                type="password"
-                value={password}
-                autoComplete="current-password"
-                onChange={(event) => setPassword(event.target.value)}
-              />
-            )}
-          </FormField>
+          {preview && !preview.password ? (
+            <p className={styles.hint}>
+              You sign in through Sovereign, so there is no password to ask for. This asks that you
+              signed in within the last ten minutes: if you did not, sign out, sign in again, and
+              come back.
+            </p>
+          ) : (
+            <FormField label="Your password" required>
+              {(field) => (
+                <Input
+                  {...field}
+                  type="password"
+                  value={password}
+                  autoComplete="current-password"
+                  onChange={(event) => setPassword(event.target.value)}
+                />
+              )}
+            </FormField>
+          )}
           <div className={styles.row}>
-            <Button type="submit" disabled={working || password === '' || preview === null}>
+            <Button
+              type="submit"
+              disabled={working || preview === null || (preview.password && password === '')}
+            >
               {working ? 'Deleting…' : 'Delete my account for good'}
             </Button>
             <Button variant="secondary" onClick={() => setOpen(false)}>

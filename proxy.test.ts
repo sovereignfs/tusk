@@ -144,7 +144,7 @@ describe('what the proxy looks at', () => {
   const matches = (path: string) => new RegExp(`^${matcher?.source}$`).test(path);
 
   it('is every request but the build’s static files and the icon, which cannot carry a nonce', () => {
-    for (const path of ['/', '/desk/1', '/api/health', '/sign-in', '/shell']) {
+    for (const path of ['/', '/desk/1', '/api/health', '/sign-in', '/shell', '/iconsx']) {
       expect(matches(path), path).toBe(true);
     }
     // The worker and the manifest are files, not pages, and carry no policy of a page.
@@ -153,6 +153,9 @@ describe('what the proxy looks at', () => {
       '/_next/image',
       '/favicon.ico',
       '/icon.svg',
+      // The app’s icons (the manifest’s `icon` is one), served to a launcher that has no session here.
+      '/icons/icon.svg',
+      '/icons/icon-192.png',
       '/sw.js',
       '/manifest.webmanifest',
       // An import's body may be far larger than the proxy buffers; the route adds the one header the proxy would.

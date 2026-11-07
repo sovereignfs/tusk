@@ -1,5 +1,6 @@
 import { accountRoute } from '@/src/access/route';
 import { authDirectory } from '@/src/auth/directory';
+import { FRESH_SESSION_SECONDS } from '@/src/auth/auth';
 import { getAuth } from '@/src/auth/server';
 import { getAuthDatabase, getDatabase } from '@/src/db/boot';
 import { RateLimiter } from '@/src/limits/rate';
@@ -29,6 +30,22 @@ async function deps(): Promise<DeleteDeps> {
       } catch {
         return false;
       }
+    },
+    hasPassword: async (accountId) => {
+      const auth = await getAuth();
+      if (!auth) return true; // nothing could be proved, so a password is what is asked for
+      const context = await auth.$context;
+      return (await context.internalAdapter.findAccounts(accountId)).some(
+        (account) => account.providerId === 'credential',
+      );
+    },
+    fresh: async (request) => {
+      const auth = await getAuth();
+      const session = await auth?.api.getSession({ headers: request.headers });
+      if (!session) return false;
+      return (
+        Date.now() - new Date(session.session.createdAt).getTime() < FRESH_SESSION_SECONDS * 1000
+      );
     },
   };
 }
