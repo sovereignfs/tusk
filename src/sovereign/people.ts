@@ -91,6 +91,15 @@ export async function deletePerson(deps: PeopleDeps, accountId: string): Promise
     authDatabase,
     sql`DELETE FROM ${auth.account} WHERE user_id = ${accountId} RETURNING id`,
   );
+  // Second factors and passkeys (2.4), before the account they belong to, by name and not by what the store cascades.
+  await dbAll(
+    authDatabase,
+    sql`DELETE FROM ${auth.twoFactor} WHERE user_id = ${accountId} RETURNING id`,
+  );
+  await dbAll(
+    authDatabase,
+    sql`DELETE FROM ${auth.passkey} WHERE user_id = ${accountId} RETURNING id`,
+  );
   if (user)
     await dbAll(
       authDatabase,

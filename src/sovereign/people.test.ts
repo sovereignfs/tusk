@@ -45,6 +45,8 @@ const GOES = [
   'card_assignee',
   'notice',
   'user',
+  'two_factor',
+  'passkey',
   'session',
   'account',
   'verification',
@@ -169,6 +171,21 @@ describe(`deleting a person (${leg})`, () => {
       sql`INSERT INTO verification (id, identifier, value, expires_at, created_at, updated_at) VALUES (${id()}, ${t.ada.email}, 'x', ${NOW}, ${NOW}, ${NOW}) RETURNING id`,
     );
 
+    for (const [table, columns, values] of [
+      ['two_factor', 'id, secret, backup_codes, user_id', `'tf1', 's', 'b', '${ada}'`],
+      [
+        'passkey',
+        'id, public_key, user_id, credential_id, counter, device_type, backed_up',
+        `'pk1', 'k', '${ada}', 'c', 0, 'singleDevice', 0`,
+      ],
+    ] as const)
+      await dbAll(
+        t.auth.database,
+        sql.raw(
+          `INSERT INTO ${table === 'passkey' ? 'passkey' : 'two_factor'} (${columns}) VALUES (${values}) RETURNING id`,
+        ),
+      );
+
     // Shared work. W1: Ada alone owns it, Grace is in it. W2: Ada alone is in it. W3: Grace's, with Ada a member.
     const [w1, w2, w3] = [id(), id(), id()];
     const [b1, b2, b3] = [id(), id(), id()];
@@ -288,6 +305,8 @@ describe(`deleting a person (${leg})`, () => {
       ['session', `user_id = '${ada}'`],
       ['account', `user_id = '${ada}'`],
       ['verification', `identifier = '${t.ada.email}'`],
+      ['two_factor', `user_id = '${ada}'`],
+      ['passkey', `user_id = '${ada}'`],
     ] as const)
       expect(await authCount(table, where), table).toBe(0);
 

@@ -24,6 +24,11 @@ const GITHUB_PORT = 3998;
  * first instance runs on, and its own first account, so that nothing the first instance's tests share is touched. `e2e/key.spec.ts` is the one that uses it.
  */
 const KEYS_PORT = 3997;
+/**
+ * A third, for the journeys that change how an account signs in (an authenticator app, passkeys): the shared account of the first instance would be left needing
+ * a code by one that failed half way. Its own SQLite file and its own first account, like the second's. `e2e/security.spec.ts` uses it.
+ */
+const SECURITY_PORT = 3996;
 const SECRET = 'e2e-only-secret-not-for-anything-real-0123456789';
 // Playwright loads this file again in every worker: the first load makes the directory and the others, which inherit the variable, use it.
 const directory = process.env.TUSK_E2E_DIR ?? mkdtempSync(join(tmpdir(), 'tusk-e2e-'));
@@ -92,6 +97,21 @@ export default defineConfig({
         TUSK_DB_DIALECT: 'sqlite',
         TUSK_SQLITE_URL: `file:${join(directory, 'tusk-keys.db')}`,
         TUSK_URL: `http://localhost:${KEYS_PORT}`,
+        TUSK_AUTH_LOCAL: '1',
+        TUSK_AUTH_SECRET: SECRET,
+        TUSK_AUTH_SIGNUP: 'closed',
+      } as Record<string, string>,
+    },
+    {
+      command: `node scripts/serve-standalone.mjs ${SECURITY_PORT}`,
+      url: `http://localhost:${SECURITY_PORT}/api/health`,
+      timeout: 90_000,
+      reuseExistingServer: false,
+      env: {
+        ...BLANK,
+        TUSK_DB_DIALECT: 'sqlite',
+        TUSK_SQLITE_URL: `file:${join(directory, 'tusk-security.db')}`,
+        TUSK_URL: `http://localhost:${SECURITY_PORT}`,
         TUSK_AUTH_LOCAL: '1',
         TUSK_AUTH_SECRET: SECRET,
         TUSK_AUTH_SIGNUP: 'closed',

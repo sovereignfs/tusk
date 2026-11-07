@@ -4,6 +4,8 @@ import { type FormEvent, useCallback, useEffect, useState } from 'react';
 import { messageFor } from '../auth/messages';
 import { authClient } from '../auth/client';
 import { Alert, Button, FormField, Input } from '../ui';
+import { PasskeysPanel } from './PasskeysPanel';
+import { TwoFactorPanel } from './TwoFactorPanel';
 import styles from './Account.module.css';
 
 interface Device {
@@ -43,8 +45,21 @@ export function SecuritySection({ passwordMinLength }: { passwordMinLength: numb
   return (
     <>
       <PasswordForm minLength={passwordMinLength} />
+      <TwoFactor />
+      <PasskeysPanel />
       <Devices />
     </>
+  );
+}
+
+/** The authenticator panel, once it is known whether it is on: that is the account's own, read from the session. */
+function TwoFactor() {
+  const { data, isPending } = authClient.useSession();
+  if (isPending || !data) return null;
+  return (
+    <TwoFactorPanel
+      enabled={Boolean((data.user as { twoFactorEnabled?: boolean }).twoFactorEnabled)}
+    />
   );
 }
 

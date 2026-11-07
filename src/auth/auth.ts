@@ -2,6 +2,8 @@ import { drizzleAdapter } from '@better-auth/drizzle-adapter';
 import { betterAuth } from 'better-auth';
 import { APIError } from 'better-auth/api';
 import { nextCookies } from 'better-auth/next-js';
+import { twoFactor } from 'better-auth/plugins';
+import { passkey } from '@better-auth/passkey';
 import type { Database } from '../db/client';
 import type { Mailer } from '../mail/mailer';
 import { resetMessage, verificationMessage } from '../mail/templates';
@@ -105,8 +107,19 @@ export function createAuth({ settings, name, database, mailer }: AuthDependencie
         },
       },
     },
-    // Must be last: it turns cookies set while handling a Server Action into real ones.
-    plugins: [nextCookies()],
+    plugins: [
+      // An authenticator app, with ten single-use backup codes (DESIGN.md §6, §19). It is on for an account only once a code from the app has been shown to work, and
+      // turning it off, or making new backup codes, asks for the password again.
+      twoFactor({ issuer: name }),
+      // Passkeys, which can sign in with no password. The relying party is the address people use (`TUSK_URL`): a passkey made here works here and nowhere else.
+      passkey({
+        rpID: new URL(settings.url).hostname,
+        rpName: name,
+        origin: settings.url,
+      }),
+      // Must be last: it turns cookies set while handling a Server Action into real ones.
+      nextCookies(),
+    ],
   });
 }
 

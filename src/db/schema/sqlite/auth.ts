@@ -7,8 +7,7 @@ import { epochMs } from './columns';
  * table up by the key it is exported under, so the keys are its model names, and its dates
  * are real `Date` values (`timestamp_ms` here, `timestamp` on PostgreSQL) and not the epoch
  * milliseconds of our own tables. The tables are what better-auth 1.7 reports it needs for
- * email and password and database-backed rate limits. Two-factor and passkeys add their tables with their own
- * migration (task 2.4).
+ * email and password and database-backed rate limits. Two-factor and passkeys have theirs below (task 2.4).
  *
  * Changed only with a better-auth upgrade, from what it reports (see `auth.test.ts`).
  */
@@ -21,6 +20,8 @@ export const user = sqliteTable('user', {
   email: text('email').notNull().unique(),
   emailVerified: boolean('email_verified').notNull().default(false),
   image: text('image'),
+  /** Whether an authenticator app is on for the account (the two-factor plugin). */
+  twoFactorEnabled: boolean('two_factor_enabled').default(false),
   createdAt: timestamp('created_at').notNull(),
   updatedAt: timestamp('updated_at').notNull(),
 });
@@ -75,6 +76,50 @@ export const verification = sqliteTable(
     updatedAt: timestamp('updated_at').notNull(),
   },
   (table) => [index('verification_identifier_idx').on(table.identifier)],
+);
+
+/** The authenticator secret and the backup codes of an account (the two-factor plugin), sealed by it; `verified` is false until a code has been shown to work. */
+export const twoFactor = sqliteTable(
+  'two_factor',
+  {
+    id: text('id').primaryKey(),
+    secret: text('secret').notNull(),
+    backupCodes: text('backup_codes').notNull(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    verified: boolean('verified').default(true),
+    failedVerificationCount: integer('failed_verification_count').default(0),
+    lockedUntil: timestamp('locked_until'),
+  },
+  (table) => [
+    index('two_factor_secret_idx').on(table.secret),
+    index('two_factor_user_id_idx').on(table.userId),
+  ],
+);
+
+/** A passkey of an account (the passkey plugin). */
+export const passkey = sqliteTable(
+  'passkey',
+  {
+    id: text('id').primaryKey(),
+    name: text('name'),
+    publicKey: text('public_key').notNull(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    credentialID: text('credential_id').notNull(),
+    counter: integer('counter').notNull(),
+    deviceType: text('device_type').notNull(),
+    backedUp: boolean('backed_up').notNull(),
+    transports: text('transports'),
+    createdAt: timestamp('created_at'),
+    aaguid: text('aaguid'),
+  },
+  (table) => [
+    index('passkey_user_id_idx').on(table.userId),
+    index('passkey_credential_id_idx').on(table.credentialID),
+  ],
 );
 
 /** Request counts per key, so a limit holds across every process (DESIGN.md §6). */
