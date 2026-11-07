@@ -167,12 +167,15 @@ export function loadConfig(env: Env, readFile?: ReadFile): LoadResult {
     problems,
   );
 
-  // The operator's own encryption (§9.5): on or off, and on needs the instance key it seals with. Which fields it covers is task 14.7's.
+  // The operator's own encryption (§9.5) is not built yet (task 14.7). Taking `on` and encrypting nothing would tell an operator that their data is sealed
+  // when it is not, so the server stops, and says why. The setting is read and checked here so that the day it is built, only this changes.
   const rawOperator = read('TUSK_DB_ENCRYPTION');
   if (rawOperator !== undefined && rawOperator !== 'on' && rawOperator !== 'off') {
     problems.push('TUSK_DB_ENCRYPTION is on or off.');
-  } else if (rawOperator === 'on' && encryption === undefined) {
-    problems.push('TUSK_DB_ENCRYPTION=on needs TUSK_ENCRYPTION_KEY to seal with.');
+  } else if (rawOperator === 'on') {
+    problems.push(
+      'TUSK_DB_ENCRYPTION=on is not available in this version, and nothing would be encrypted by it. Remove it or set it to off; a Desk can have a key of its own instead (Settings, Data).',
+    );
   }
 
   // The address of GitHub's API: an address that would send a token over plain http to another machine stops the server, naming the setting.

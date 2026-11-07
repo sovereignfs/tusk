@@ -503,7 +503,7 @@ to a backup repository before this. Settings says so at the time.
 
 ### 9.5 The operator key
 
-`TUSK_DB_ENCRYPTION=on`, with `TUSK_ENCRYPTION_KEY`.
+`TUSK_DB_ENCRYPTION=on`, with `TUSK_ENCRYPTION_KEY`. **Not built yet (task 14.7): the server refuses to start with it `on`.**
 
 - **It is server-side field encryption, not the database's own,** because PostgreSQL has no built-in equivalent and it must behave the same on all three
   forms. Each content field is sealed with the same AES-GCM binding as §9.2, through `src/crypto/`, with rotation by `TUSK_ENCRYPTION_KEY_PREVIOUS`. On

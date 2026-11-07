@@ -87,17 +87,15 @@ describe('loadConfig', () => {
 
   describe('TUSK_DB_ENCRYPTION', () => {
     const KEY = 'a'.repeat(64);
-    it('is off unless it says on, and on needs the instance key', () => {
+    it('is off unless it says on, and on is refused: the operator’s encryption is not built, and nothing would be sealed (task 14.7)', () => {
       expect(loadConfig({})).toMatchObject({ config: { operatorEncryption: false } });
       expect(loadConfig({ TUSK_DB_ENCRYPTION: 'off' })).toMatchObject({
         config: { operatorEncryption: false },
       });
-      expect(loadConfig({ TUSK_DB_ENCRYPTION: 'on', TUSK_ENCRYPTION_KEY: KEY })).toMatchObject({
-        config: { operatorEncryption: true },
-      });
-      expect(problems(loadConfig({ TUSK_DB_ENCRYPTION: 'on' })).join(' ')).toContain(
-        'TUSK_ENCRYPTION_KEY',
-      );
+      const on = problems(loadConfig({ TUSK_DB_ENCRYPTION: 'on', TUSK_ENCRYPTION_KEY: KEY }));
+      expect(on.join(' ')).toContain('TUSK_DB_ENCRYPTION=on is not available');
+      expect(on.join(' ')).toContain('nothing would be encrypted');
+      expect(on.join(' ')).not.toContain(KEY);
       expect(problems(loadConfig({ TUSK_DB_ENCRYPTION: 'yes' }))[0]).toContain(
         'TUSK_DB_ENCRYPTION',
       );

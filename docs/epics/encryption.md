@@ -86,6 +86,8 @@ Two mutually exclusive modes. A person's own age key, opt-in, so that the server
 
 #### 📋 14.7 — Operator-key mode
 
+**Status, 2026-11-07: not started, and refused rather than faked.** It touches every read and write of workspace content (`apply`, the reads, activity and notices, the Inbox, publishing, export and import) and a third stored form of a Desk field in the sync path, which is more than a change to be made quickly. Until it is built, **`TUSK_DB_ENCRYPTION=on` stops the server at start-up** (`src/config/index.ts`) with a message that says it is not available and that nothing would be encrypted by it, so that an operator is never told their data is sealed when it is not. Personal keys (14.1 to 14.5) are the encryption there is.
+
 **Goal:** `TUSK_DB_ENCRYPTION=on` encrypts content on the server, the Desk's and every workspace's, on all three forms.
 
 **Design:** §9.5. **Depends on:** 10.1, 13.2, 14.2, 18.6.
