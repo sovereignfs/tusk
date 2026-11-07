@@ -15,7 +15,7 @@ import { processEnv } from './src/config/env';
 export async function start(): Promise<void> {
   const result = loadConfig(processEnv());
   if (!result.ok) {
-    console.error('Tasks cannot start, because of its settings:');
+    console.error('Tusk cannot start, because of its settings:');
     for (const problem of result.problems) console.error(`  - ${problem}`);
     process.exit(1);
   }
@@ -29,7 +29,7 @@ export async function start(): Promise<void> {
     await assertKeys(stores.app, result.config.encryption);
     if (result.config.encryption) await rotateCredentials(stores.app, result.config.encryption);
   } catch (error) {
-    console.error('Tasks cannot start, because its database is not usable:');
+    console.error('Tusk cannot start, because its database is not usable:');
     console.error(`  - ${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);
   }

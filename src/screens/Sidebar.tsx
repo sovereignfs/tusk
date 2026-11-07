@@ -8,7 +8,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import Link from 'next/link';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { createList, moveList } from '../actions/lists';
 import type { LocalRow } from '../local/rows';
@@ -23,6 +23,7 @@ import {
   useReorderSensors,
 } from '../ui/dnd';
 import { colourOf, text } from './fields';
+import { addressOf, replaceQuery, setQuery, useSearchQuery } from './search-query';
 import styles from './Sidebar.module.css';
 
 /**
@@ -77,14 +78,15 @@ export function Sidebar() {
 }
 
 /**
- * The search field at the top of the lists column (DESIGN.md §10.7). Typing searches the Desk: the results are the content column at `/desk?q=`, which
- * is the address kept as it is typed (replaced, so that the back button is not a step for each letter). From another page the first letter goes there.
+ * The search field at the top of the lists column (DESIGN.md §10.7). Typing searches the Desk: the results are the content column at `/desk#q=`, which
+ * is the address kept as it is typed (replaced, so that the back button is not a step for each letter) **as a fragment, which is never sent to the server**
+ * (`search-query.ts`). From another page the first letter goes there.
  * Empty, it is the Desk's first list again; Escape empties it.
  */
 function SearchBox() {
   const router = useRouter();
   const pathname = usePathname();
-  const asked = useSearchParams().get('q') ?? '';
+  const asked = useSearchQuery();
   const current = pathname === '/desk' ? asked : '';
   const [value, setValue] = useState(current);
   // The address changed elsewhere (a link, the back button): the field says what it says.
@@ -92,9 +94,11 @@ function SearchBox() {
 
   function change(next: string) {
     setValue(next);
-    const address = next.trim() === '' ? '/desk' : `/desk?q=${encodeURIComponent(next)}`;
-    if (pathname === '/desk') window.history.replaceState(null, '', address);
-    else router.push(address);
+    if (pathname === '/desk') replaceQuery(next);
+    else {
+      setQuery(next);
+      router.push(addressOf(next));
+    }
   }
 
   return (

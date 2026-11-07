@@ -1,10 +1,10 @@
 'use client';
 
-import { useSearchParams } from 'next/navigation';
 import { listsOf } from '../local/store';
 import { useHasSynced, useLocal } from '../sync/react';
 import styles from './ListScreen.module.css';
 import { ListScreen } from './ListScreen';
+import { useSearchQuery } from './search-query';
 import { SearchResults } from './SearchResults';
 
 /**
@@ -16,8 +16,8 @@ export function DeskScreen() {
   const lists = useLocal(listsOf);
   const synced = useHasSynced();
   const first = lists?.[0];
-  // `/desk?q=` is a search of the Desk (§10.7), shown in place of the first list.
-  const query = useSearchParams().get('q') ?? '';
+  // `/desk#q=` is a search of the Desk (§10.7), shown in place of the first list. A fragment, so that what is searched for is not sent to the server.
+  const query = useSearchQuery();
   if (query.trim() !== '') return <SearchResults query={query} />;
   if (first) return <ListScreen listId={first.id} />;
   if (lists === undefined || synced === undefined) return null;

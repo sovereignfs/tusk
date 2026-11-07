@@ -594,7 +594,8 @@ Cancel. Each is one mutation, in chunks if it is large.
 ### 10.7 Search
 
 Titles, descriptions and checklist items, across the Desk, newest change first. **It runs in the browser, on the local store,** on any encryption mode,
-offline as well. A board's search is its own (§14.5).
+offline as well. A board's search is its own (§14.5). **What is searched for is in the address as a fragment, `/desk#q=milk`, and never a query string:** a
+fragment is not sent, so the text reaches no server, log or proxy, which a Desk with a key of its own depends on (the security review, `docs/security-review-phase-1.md`).
 
 ## 11. Dates and time
 

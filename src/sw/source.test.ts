@@ -221,7 +221,6 @@ describe('with no network', () => {
       '/',
       '/desk',
       '/desk/11111111-1111-4111-8111-111111111111',
-      '/desk?q=milk',
       '/desk/11111111-1111-4111-8111-111111111111?card=x',
     ]) {
       const answer = await w.fetchEvent(path, { mode: 'navigate' });

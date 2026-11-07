@@ -3,7 +3,7 @@ import { EMAIL, PASSWORD, ensureAccount, trySignIn } from './helpers';
 
 /**
  * Search on the Desk (task 6.2, DESIGN.md §10.7): by title, description and checklist item, folded for case and accents, as text and not a pattern, shown
- * in the content column at `/desk?q=`, and run in the browser so that it works with the network off.
+ * in the content column at `/desk#q=`, and run in the browser so that it works with the network off.
  */
 test.use({ viewport: { width: 1280, height: 800 } });
 
@@ -18,6 +18,8 @@ test('typing in the search field finds cards by title, description and checklist
   await trySignIn(page, EMAIL, PASSWORD);
   await expect(page.getByRole('link', { name: /^Backlog/ })).toBeVisible();
   const origin = new URL(baseURL ?? 'http://localhost').origin;
+  const requested: string[] = [];
+  page.on('request', (request) => requested.push(request.url()));
   const mark = crypto.randomUUID().slice(0, 8);
   const name = unique('Findable');
   const listId = crypto.randomUUID();
@@ -75,7 +77,9 @@ test('typing in the search field finds cards by title, description and checklist
 
   // From a list's page, the first letters go to the results; a word found in a title, a description and an item.
   await search.fill(`${mark} milk`);
-  await expect(page).toHaveURL(new RegExp(`/desk\\?q=`));
+  await expect(page).toHaveURL(/\/desk#q=/);
+  // What is searched for is in the fragment, which the browser never sends: no request carries it.
+  expect(requested.filter((url) => /q=|milk/.test(new URL(url).search))).toEqual([]);
   await expect(results.getByRole('status')).toContainText('1 card matches');
   await expect(hit(`Buy milk ${mark}`)).toHaveCount(1);
   await search.fill(`porridge ${mark}`);

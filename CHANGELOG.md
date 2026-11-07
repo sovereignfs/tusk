@@ -101,6 +101,7 @@ Each release's section is also its GitHub release notes: the release workflow re
 
 ### Fixed
 
+- What you search for on the Desk is no longer in the address as a query string, which is sent to the server and any proxy's log (even for a Desk with a key of its own): it is a fragment (`/desk#q=…`), which the browser never sends.
 - Opening the Inbox no longer fails on PostgreSQL (a column named twice in one statement was ambiguous there).
 
 [Unreleased]: https://github.com/sovereignfs/tusk/commits/main
