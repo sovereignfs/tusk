@@ -19,6 +19,7 @@ export {
   AuthFooter,
   AuthForm,
   AuthLink,
+  AuthLinkButton,
   AuthNotice,
   Avatar,
   BrandBadge,

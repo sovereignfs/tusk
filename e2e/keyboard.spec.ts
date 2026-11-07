@@ -29,7 +29,9 @@ test('on the Desk: n, type, Enter captures; j and k move among cards; e complete
   page,
 }) => {
   await signedIn(page);
-  await expect(page.getByRole('link', { name: /^Backlog/ })).toBeVisible();
+  await expect(
+    page.getByRole('navigation', { name: 'Lists' }).getByRole('link').first(),
+  ).toBeVisible();
   const name = unique('Keys');
   await page.getByRole('button', { name: 'Add a list' }).click();
   await page.getByLabel('New list name').fill(name);

@@ -11,6 +11,7 @@ import {
   AuthFooter,
   AuthForm,
   AuthLink,
+  AuthLinkButton,
   Input,
 } from '../../ui';
 
@@ -149,8 +150,7 @@ export function SignInForm({
           Sign in
         </AuthButton>
         <AuthFooter>
-          <button
-            type="button"
+          <AuthLinkButton
             onClick={() => {
               setBackup(!backup);
               setCode('');
@@ -158,7 +158,7 @@ export function SignInForm({
             }}
           >
             {backup ? 'Use the app instead' : 'Use a backup code'}
-          </button>
+          </AuthLinkButton>
         </AuthFooter>
       </AuthForm>
     );
@@ -201,9 +201,9 @@ export function SignInForm({
       </AuthForm>
       {passkeys ? (
         <AuthFooter>
-          <button type="button" onClick={() => void withPasskey()} disabled={busy}>
+          <AuthLinkButton onClick={() => void withPasskey()} disabled={busy}>
             Use a passkey instead
-          </button>
+          </AuthLinkButton>
         </AuthFooter>
       ) : null}
       {sovereign ? (

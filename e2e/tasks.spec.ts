@@ -16,8 +16,11 @@ async function openNewList(page: Page): Promise<{ name: string; url: string }> {
   // Home is where signing in lands; these tests are about the Desk.
   await page.goto('/desk');
   await expect(page.getByRole('navigation', { name: 'Lists' })).toBeVisible();
-  // The page is ready when its working copy is open and has the first list in it: before that a click lands on a page nothing listens to yet.
-  await expect(page.getByRole('link', { name: /^Backlog/ })).toBeVisible();
+  // The page is ready when its working copy is open and has a list in it (the first one, whichever made it: another spec may have put one there first, and
+  // the Desk makes its first only when there is none): before that a click lands on a page nothing listens to yet.
+  await expect(
+    page.getByRole('navigation', { name: 'Lists' }).getByRole('link').first(),
+  ).toBeVisible();
   const name = unique('Tasks');
   await page.getByRole('button', { name: 'Add a list' }).click();
   await page.getByLabel('New list name').fill(name);

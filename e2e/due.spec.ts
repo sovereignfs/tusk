@@ -22,7 +22,9 @@ test('a Desk card gets a date and a time from the picker, shows them on its row,
   page,
 }) => {
   await signedIn(page);
-  await expect(page.getByRole('link', { name: /^Backlog/ })).toBeVisible();
+  await expect(
+    page.getByRole('navigation', { name: 'Lists' }).getByRole('link').first(),
+  ).toBeVisible();
   const name = unique('Due');
   await page.getByRole('button', { name: 'Add a list' }).click();
   await page.getByLabel('New list name').fill(name);
@@ -158,7 +160,9 @@ test('on the Desk, what is due today floats to the top under Custom, a card turn
   page,
 }) => {
   await signedIn(page);
-  await expect(page.getByRole('link', { name: /^Backlog/ })).toBeVisible();
+  await expect(
+    page.getByRole('navigation', { name: 'Lists' }).getByRole('link').first(),
+  ).toBeVisible();
   // It is 08:00 in Berlin: a card due today at 09:00 is not yet overdue.
   await page.clock.setFixedTime(new Date('2026-11-06T08:00:00+01:00'));
   const name = unique('Pinned');

@@ -40,12 +40,14 @@ test('the Inbox lists what is assigned to the person across their boards, and ha
     .getByRole('button', { name: 'Create board' })
     .click();
   await expect(page).toHaveURL(/\/b\/[0-9a-f-]{36}$/);
+  // A title of its own: a run that failed half way leaves its workspace, and the Inbox lists what is assigned across every board.
+  const card = unique('Mine to do');
   const column = page.locator('section[aria-label="Backlog"]');
   await column.getByRole('button', { name: 'Add a card' }).click();
-  await column.getByLabel('Title of a new card in Backlog').fill('Mine to do');
+  await column.getByLabel('Title of a new card in Backlog').fill(card);
   await column.getByLabel('Title of a new card in Backlog').press('Enter');
-  await column.getByLabel('Mine to do', { exact: true }).click();
-  const dialog = page.getByRole('dialog', { name: 'Mine to do' });
+  await column.getByLabel(card, { exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: card });
   await dialog.getByRole('button', { name: 'Assignees' }).click();
   await page.getByRole('checkbox', { name: 'Assign Ada' }).check();
   await dialog.getByRole('button', { name: 'Assignees' }).click();
@@ -58,13 +60,13 @@ test('the Inbox lists what is assigned to the person across their boards, and ha
     .click();
   await expect(page).toHaveURL(/\/inbox$/);
   const assigned = page.getByRole('region', { name: 'Assigned to me' });
-  await expect(assigned.getByRole('link', { name: 'Mine to do' })).toBeVisible();
+  await expect(assigned.getByRole('link', { name: card })).toBeVisible();
   await expect(assigned.getByText('Plan')).toBeVisible();
   // Nobody told Ada of what Ada did.
   await expect(
     page.getByRole('region', { name: 'Notifications' }).getByText('Nothing new.'),
   ).toBeVisible();
-  await assigned.getByRole('link', { name: 'Mine to do' }).click();
+  await assigned.getByRole('link', { name: card }).click();
   await expect(page).toHaveURL(/\/b\/[0-9a-f-]{36}\/c\/[0-9a-f-]{36}$/);
 
   await page.goto(workspaceUrl);

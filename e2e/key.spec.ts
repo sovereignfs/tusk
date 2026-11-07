@@ -38,7 +38,9 @@ test('a key is made here, saved and said to be saved, and turns on a Desk that w
   await expect(offer).toContainText('Boards are shared, and the server can read them');
   await offer.getByRole('button', { name: 'Skip' }).click();
   await expect(offer).toHaveCount(0);
-  await expect(page.getByRole('link', { name: /^Backlog/ })).toBeVisible();
+  await expect(
+    page.getByRole('navigation', { name: 'Lists' }).getByRole('link').first(),
+  ).toBeVisible();
   await page.getByLabel('Add a card').fill(secret);
   await page.getByLabel('Add a card').press('Enter');
   await expect(page.getByRole('link', { name: secret, exact: true })).toBeVisible();

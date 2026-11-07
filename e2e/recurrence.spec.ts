@@ -16,7 +16,9 @@ async function signedIn(page: Page) {
   // Home is where signing in lands; these tests are about the Desk.
   await page.goto('/desk');
   await expect(page.getByRole('navigation', { name: 'Lists' })).toBeVisible();
-  await expect(page.getByRole('link', { name: /^Backlog/ })).toBeVisible();
+  await expect(
+    page.getByRole('navigation', { name: 'Lists' }).getByRole('link').first(),
+  ).toBeVisible();
 }
 
 test('ticking a card that repeats makes one next, due after today, with its checklist unticked, and it survives a reload', async ({

@@ -139,7 +139,9 @@ test('Settings exports the Desk from the device, with the network off, and every
   await expect(page.getByRole('button', { name: 'User menu' })).toBeVisible();
   // Home is where signing in lands; these tests are about the Desk.
   await page.goto('/desk');
-  await expect(page.getByRole('link', { name: /^Backlog/ })).toBeVisible();
+  await expect(
+    page.getByRole('navigation', { name: 'Lists' }).getByRole('link').first(),
+  ).toBeVisible();
   const name = unique('Exported');
   await page.getByRole('button', { name: 'Add a list' }).click();
   await page.getByLabel('New list name').fill(name);

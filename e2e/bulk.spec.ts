@@ -29,7 +29,9 @@ test('ctrl-click chooses cards, a click then chooses and opens nothing, and the 
   await expect(page.getByRole('button', { name: 'User menu' })).toBeVisible();
   // Home is where signing in lands; these tests are about the Desk.
   await page.goto('/desk');
-  await expect(page.getByRole('link', { name: /^Backlog/ })).toBeVisible();
+  await expect(
+    page.getByRole('navigation', { name: 'Lists' }).getByRole('link').first(),
+  ).toBeVisible();
   // It is Friday 6 November in Berlin.
   await page.clock.setFixedTime(new Date('2026-11-06T09:00:00+01:00'));
   const origin = new URL(baseURL ?? 'http://localhost').origin;

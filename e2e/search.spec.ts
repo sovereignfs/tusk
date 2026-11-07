@@ -19,7 +19,9 @@ test('typing in the search field finds cards by title, description and checklist
   await expect(page.getByRole('button', { name: 'User menu' })).toBeVisible();
   // Home is where signing in lands; these tests are about the Desk.
   await page.goto('/desk');
-  await expect(page.getByRole('link', { name: /^Backlog/ })).toBeVisible();
+  await expect(
+    page.getByRole('navigation', { name: 'Lists' }).getByRole('link').first(),
+  ).toBeVisible();
   const origin = new URL(baseURL ?? 'http://localhost').origin;
   const requested: string[] = [];
   page.on('request', (request) => requested.push(request.url()));

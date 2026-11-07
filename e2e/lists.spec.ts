@@ -15,7 +15,9 @@ async function signedIn(page: Page) {
   await expect(page.getByRole('navigation', { name: 'Lists' })).toBeVisible();
   // Ready when the working copy is open and has the first list in it: before that the page is still being put together, and a field typed into may be
   // replaced under the keyboard.
-  await expect(page.getByRole('link', { name: /^Backlog/ })).toBeVisible();
+  await expect(
+    page.getByRole('navigation', { name: 'Lists' }).getByRole('link').first(),
+  ).toBeVisible();
 }
 
 const unique = (stem: string) => `${stem} ${crypto.randomUUID().slice(0, 8)}`;
@@ -45,9 +47,15 @@ test('there is always a first list, made once however many devices come first', 
   page,
 }) => {
   await signedIn(page);
-  await expect(page.getByRole('link', { name: /^Backlog/ })).toHaveCount(1);
+  // The Desk makes its first list, Backlog, only when there is none, and only once: there is a list, and never two Backlogs, on any load. (Another spec may have
+  // put a list of its own there first, which is why this is not "exactly one Backlog".)
+  const backlogs = page.getByRole('link', { name: /^Backlog/ });
+  const lists = page.getByRole('navigation', { name: 'Lists' }).getByRole('link');
+  await expect(lists.first()).toBeVisible();
+  expect(await backlogs.count()).toBeLessThanOrEqual(1);
   await page.reload();
-  await expect(page.getByRole('link', { name: /^Backlog/ })).toHaveCount(1);
+  await expect(lists.first()).toBeVisible();
+  expect(await backlogs.count()).toBeLessThanOrEqual(1);
 });
 
 test('a list is made from the +, appears at once, and opens', async ({ page, baseURL }) => {
@@ -79,7 +87,9 @@ test('a list is made from the +, appears at once, and opens', async ({ page, bas
 test('an empty name makes nothing, and Escape puts the field away', async ({ page }) => {
   await signedIn(page);
   // Counted once the lists are in the sidebar, and not while they are still being read from the device.
-  await expect(page.getByRole('link', { name: /^Backlog/ })).toBeVisible();
+  await expect(
+    page.getByRole('navigation', { name: 'Lists' }).getByRole('link').first(),
+  ).toBeVisible();
   const before = await page.getByRole('navigation', { name: 'Lists' }).getByRole('link').count();
   await page.getByRole('button', { name: 'Add a list' }).click();
   await page.getByLabel('New list name').fill('   ');
