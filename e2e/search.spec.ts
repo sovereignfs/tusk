@@ -16,6 +16,9 @@ test('typing in the search field finds cards by title, description and checklist
 }) => {
   await ensureAccount(page);
   await trySignIn(page, EMAIL, PASSWORD);
+  await expect(page.getByRole('button', { name: 'User menu' })).toBeVisible();
+  // Home is where signing in lands; these tests are about the Desk.
+  await page.goto('/desk');
   await expect(page.getByRole('link', { name: /^Backlog/ })).toBeVisible();
   const origin = new URL(baseURL ?? 'http://localhost').origin;
   const requested: string[] = [];

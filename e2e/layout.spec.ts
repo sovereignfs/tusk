@@ -8,7 +8,9 @@ import { EMAIL, PASSWORD, ensureAccount, trySignIn } from './helpers';
 async function signedIn(page: Page) {
   await ensureAccount(page);
   await trySignIn(page, EMAIL, PASSWORD);
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole('button', { name: 'User menu' })).toBeVisible();
+  // Home is where signing in lands; these tests are about the Desk.
+  await page.goto('/desk');
 }
 
 /** Makes a list and a task on the server as a device would, so that this one finds them on its first load. */

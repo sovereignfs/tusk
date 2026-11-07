@@ -20,6 +20,9 @@ const SIGN_IN_PAGES = new Set(['/sign-in', '/sign-up', '/forgot-password', '/res
 /** What a Sovereign-only instance has of them: the page that takes a person away to sign in there. Sign-up, and resetting a password, are local. */
 const SOVEREIGN_PAGES = new Set(['/sign-in']);
 
+/** Set on the request the proxy rewrites `/` into, so that the page it is rewritten to is not sent back to `/` (which would be a loop). */
+const HOME_MARK = 'x-tusk-home';
+
 export function proxy(request: NextRequest) {
   const { secure, development, authLocal, authSovereign } = edgeSettings();
   // A published board is its own document with a policy of its own (`app/p/[token]/route.ts`): the proxy puts no nonce on it and no policy over it.
@@ -40,10 +43,15 @@ export function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const absent =
     !authLocal && SIGN_IN_PAGES.has(path) && !(authSovereign && SOVEREIGN_PAGES.has(path));
-  // The front address is the first list for someone with a session cookie, and the address stays `/` (DESIGN.md §17.11). Only the cookie is looked at:
-  // it cannot be checked here, and `/desk` checks it and sends a forged one to sign in.
-  const signedIn = request.nextUrl.pathname === '/' && hasSessionCookie(request.cookies);
-  const target = absent ? '/not-found' : signedIn ? '/desk' : null;
+  // The front address is Home (the workspaces) for someone with a session cookie, and the address stays `/` (DESIGN.md §17.11). Only the cookie is looked at: it
+  // cannot be checked here, and the page checks it and sends a forged one to sign in. The pages' own addresses for it (`/home`, and `/boards`, which it was
+  // called) go to `/`, so that there is one address for it.
+  const cookie = hasSessionCookie(request.cookies);
+  if (cookie && (path === '/home' || path === '/boards') && !request.headers.has(HOME_MARK))
+    return NextResponse.redirect(new URL('/', request.url), 308);
+  const signedIn = path === '/' && cookie;
+  const target = absent ? '/not-found' : signedIn ? '/home' : null;
+  if (signedIn && !absent) requestHeaders.set(HOME_MARK, '1');
   const response = target
     ? NextResponse.rewrite(new URL(target, request.url), { request: { headers: requestHeaders } })
     : NextResponse.next({ request: { headers: requestHeaders } });

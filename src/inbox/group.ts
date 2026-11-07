@@ -89,7 +89,7 @@ export function noticeHref(
   if (notice.boardId && notice.cardId) return `/b/${notice.boardId}/c/${notice.cardId}`;
   if (notice.boardId) return `/b/${notice.boardId}`;
   if (notice.workspaceId) return `/w/${notice.workspaceId}`;
-  return '/boards';
+  return '/';
 }
 
 /** The count shown on the sidebar's Inbox entry: nothing for none, the number, and "99+" for a hundred or more. */

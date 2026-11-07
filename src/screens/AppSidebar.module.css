@@ -185,3 +185,18 @@
 .drawerNav .row {
   min-height: 48px;
 }
+
+/* A rail's workspaces: the +, a divider, then an icon each. */
+.railGroup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sv-space-2);
+}
+
+.divider {
+  width: 28px;
+  margin: 0;
+  border: 0;
+  border-top: var(--sv-border-width-hairline) solid var(--sv-color-border);
+}

@@ -136,6 +136,9 @@ test('Settings exports the Desk from the device, with the network off, and every
 }) => {
   await ensureAccount(page);
   await trySignIn(page, EMAIL, PASSWORD);
+  await expect(page.getByRole('button', { name: 'User menu' })).toBeVisible();
+  // Home is where signing in lands; these tests are about the Desk.
+  await page.goto('/desk');
   await expect(page.getByRole('link', { name: /^Backlog/ })).toBeVisible();
   const name = unique('Exported');
   await page.getByRole('button', { name: 'Add a list' }).click();

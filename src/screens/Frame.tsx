@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname, useSearchParams } from 'next/navigation';
-import { type ReactNode, useEffect } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { Drawer, ThreeColumnLayout, useIsMobile } from '../ui';
 import { useMobileNav } from '../ui/mobile-nav';
 import { DrawerNavigation } from './AppSidebar';
@@ -34,6 +34,13 @@ export function Frame({ children }: { children: ReactNode }) {
   useEffect(() => setOpen(false), [pathname, search, setOpen]);
   const key = useKey();
   const onDesk = pathname.startsWith('/desk');
+  // The Desk's lists are a column beside the Desk and the Inbox, and nowhere else: Home, a workspace and a board have the width. Settings opens as a
+  // dialog over the page it was opened from, which is still there behind it: it keeps what that page had.
+  const beside = onDesk || pathname === '/inbox';
+  const inSettings = pathname.startsWith('/account');
+  const [kept, setKept] = useState(beside);
+  if (!inSettings && kept !== beside) setKept(beside);
+  const withLists = inSettings ? kept : beside;
   // A Desk that is sealed to a key this device does not have shows nothing of itself (DESIGN.md §9.1): not its lists, not its cards, not a first list.
   // Hidden too while a sealed Desk's key is being looked for: what a device last knew is enough, and nothing blank is shown meanwhile.
   const locked = key.status === 'locked' || (key.sealed && key.status === 'loading');
@@ -41,8 +48,8 @@ export function Frame({ children }: { children: ReactNode }) {
   return (
     <UndoProvider>
       {locked ? null : <FirstList />}
-      <ThreeColumnLayout sidebarHidden={mobile}>
-        {locked || mobile ? <div /> : <Sidebar />}
+      <ThreeColumnLayout sidebarHidden={mobile || !withLists}>
+        {locked || mobile || !withLists ? <div /> : <Sidebar />}
         <div style={{ padding: mobile ? 'var(--sv-space-4)' : 'var(--sv-space-6)' }}>
           {onDesk ? <KeyOffer /> : null}
           {onDesk && key.progress ? (
@@ -73,7 +80,7 @@ export function Frame({ children }: { children: ReactNode }) {
           title="Navigation"
         >
           <DrawerNavigation />
-          <Sidebar />
+          {withLists ? <Sidebar /> : null}
         </Drawer>
       ) : null}
     </UndoProvider>

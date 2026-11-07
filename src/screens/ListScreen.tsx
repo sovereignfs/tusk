@@ -69,7 +69,7 @@ export function ListScreen({ listId }: { listId: string }) {
         icon="inbox"
         heading="That list is not here"
         description="It may have been deleted, or it may belong to someone else."
-        action={<Link href="/">Go to your lists</Link>}
+        action={<Link href="/desk">Go to your lists</Link>}
       />
     );
   }

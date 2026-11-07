@@ -13,6 +13,9 @@ const unique = (stem: string) => `${stem} ${crypto.randomUUID().slice(0, 8)}`;
 async function signedIn(page: Page) {
   await ensureAccount(page);
   await trySignIn(page, EMAIL, PASSWORD);
+  await expect(page.getByRole('button', { name: 'User menu' })).toBeVisible();
+  // Home is where signing in lands; these tests are about the Desk.
+  await page.goto('/desk');
   await expect(page.getByRole('navigation', { name: 'Lists' })).toBeVisible();
 }
 
@@ -20,7 +23,7 @@ test('the Inbox lists what is assigned to the person across their boards, and ha
   page,
 }) => {
   await signedIn(page);
-  await page.goto('/boards');
+  await page.goto('/');
   const workspace = unique('Inbox');
   await page
     .getByRole('navigation', { name: 'Tusk', exact: true })

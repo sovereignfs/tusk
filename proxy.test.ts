@@ -52,13 +52,29 @@ describe('the proxy', () => {
     expect(rewrite(proxy(request('/sign-up')))).toBeNull();
   });
 
-  it('sends the front address to the first list for a request with a session cookie, and keeps the address', () => {
+  it('sends the other addresses of Home to the front one for someone with a cookie, and leaves them to the page for anyone else', () => {
+    for (const path of ['/home', '/boards']) {
+      const reply = proxy(
+        new NextRequest(`https://tusk.example.com${path}`, {
+          headers: { cookie: 'tusk.session_token=x' },
+        }),
+      );
+      expect(reply.status, path).toBe(308);
+      expect(reply.headers.get('location'), path).toBe('https://tusk.example.com/');
+      expect(
+        proxy(new NextRequest(`https://tusk.example.com${path}`)).headers.get('location'),
+        path,
+      ).toBeNull();
+    }
+  });
+
+  it('shows Home at the front address for a request with a session cookie, and keeps the address', () => {
     const rewrite = (response: Response) => response.headers.get('x-middleware-rewrite');
     for (const name of ['tusk.session_token', '__Secure-tusk.session_token']) {
       const signedIn = new NextRequest('https://tusk.example.com/', {
         headers: { cookie: `${name}=anything` },
       });
-      expect(rewrite(proxy(signedIn)), name).toMatch(/\/desk$/);
+      expect(rewrite(proxy(signedIn)), name).toMatch(/\/home$/);
     }
     vi.stubEnv('TUSK_AUTH_LOCAL', '1');
     // Only for the front address, and only for a cookie that is there: not for another page, an empty value, or a cookie of another name.

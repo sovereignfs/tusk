@@ -38,6 +38,7 @@ test('a session that ended elsewhere stops data being shown at the next sync, an
   context,
 }) => {
   await signedIn(page);
+  await page.goto('/desk');
   await expect(page.getByRole('navigation', { name: 'Lists' })).toBeVisible();
   const before = await localDatabases(page);
 
@@ -55,6 +56,9 @@ test('a session that ended elsewhere stops data being shown at the next sync, an
 
   await page.getByRole('link', { name: 'Sign in' }).click();
   await trySignIn(page, EMAIL, PASSWORD);
+  await expect(page.getByRole('button', { name: 'User menu' })).toBeVisible();
+  // Home is where signing in lands; these tests are about the Desk.
+  await page.goto('/desk');
   await expect(page.getByRole('navigation', { name: 'Lists' })).toBeVisible();
   expect(await localDatabases(page)).toEqual(before);
   await signOut(page);

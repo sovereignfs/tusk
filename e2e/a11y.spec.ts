@@ -61,7 +61,7 @@ async function seed(page: Page) {
   made.card = new URL(page.url()).search;
   made.list = '/desk';
   // A workspace, a board, a list with a card, published.
-  await page.goto('/boards');
+  await page.goto('/');
   await page.getByRole('button', { name: 'Create a workspace' }).first().click();
   await page
     .getByRole('dialog', { name: 'Create a workspace' })

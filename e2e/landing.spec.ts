@@ -29,20 +29,24 @@ test('it offers an account only where the server would let one be made', async (
   expect(offered).toBe(form);
 });
 
-test('someone signed in has their first list at the same address, and it is the front page again after signing out', async ({
+test('someone signed in has Home at the front address, and it is the front page again after signing out', async ({
   page,
 }) => {
   await ensureAccount(page);
   await trySignIn(page, EMAIL, PASSWORD);
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole('button', { name: 'User menu' })).toBeVisible();
+  // Home is where signing in lands; these tests are about the Desk.
+  await page.goto('/desk');
   await expect(page.getByRole('navigation', { name: 'Lists' })).toBeVisible();
   await expect(page.getByRole('heading', { level: 1 })).not.toHaveText(
     'Your tasks, kept to yourself',
   );
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  // The front address is Home for someone signed in: the workspaces, and no Desk lists beside it.
   await page.goto('/');
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByRole('navigation', { name: 'Lists' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Workspaces' })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Lists' })).toHaveCount(0);
 
   await signOut(page);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Your tasks, kept to yourself');

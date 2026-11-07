@@ -28,8 +28,8 @@ const SORT_LABELS: Record<WorkspaceSort, string> = {
 };
 
 /**
- * The boards index (DESIGN.md §17.3), `/boards`: the Desk first, as a tile of its own, and then each workspace as a section, _My workspaces_ before
- * _Shared with me_. **The Desk is read from the working copy, so its tile is there offline;** everything else is read from the server and says it needs
+ * Home (DESIGN.md §17.3), the workspaces, at `/`: **Pinned** first, with the Desk as its first item and a tile of its own, and then _My workspaces_ and
+ * _Shared with me_, each workspace a section of its boards. **The Desk is read from the working copy, so its tile is there offline;** everything else is read from the server and says it needs
  * a connection when it cannot be had, and shows a skeleton until it is. The sort of the person's own workspaces is kept with the account, so it is the
  * same on every device.
  */
@@ -118,9 +118,12 @@ export function BoardsScreen() {
 
   return (
     <div className={styles.page}>
-      <h1 className={styles.title}>Boards</h1>
+      <h1 className={styles.title}>Workspaces</h1>
 
-      <section aria-label="Desk">
+      <section aria-label="Pinned" className={styles.group}>
+        <div className={styles.groupHeader}>
+          <h2 className={styles.groupTitle}>Pinned</h2>
+        </div>
         <Link href="/desk" className={styles.desk}>
           <Icon name="layout-dashboard" aria-hidden />
           <span className={styles.deskName}>Desk</span>

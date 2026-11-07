@@ -7,13 +7,13 @@ import { unreadLabel } from '../inbox/group';
 import { failureMessage, useWorkspaces } from '../boards/workspaces';
 import { WORKSPACE_LIMITS, type WorkspaceRow } from '../workspaces/format';
 import { Alert, Button, Dialog, FormField, Icon, type IconName, Input } from '../ui';
+import { LucideIcon } from '../ui/icons';
 import { useSidebar } from '../ui/useSidebar';
 import styles from './AppSidebar.module.css';
 
 /**
- * The app's sidebar (DESIGN.md §17.2), at the left of every signed-in page: the places, then the person's workspaces. **An entry is here only when its
- * page is**: a link to a page that is not there is worse than none. So today it holds Boards, which has the Desk as a tile of its own (16.4); the
- * Inbox (8.1) and the Planner (phase 2) join as they are built.
+ * The app's sidebar (DESIGN.md §17.2), at the left of every signed-in page: the places (Home, the Desk and the Inbox), then the person's workspaces. **An entry
+ * is here only when its page is**: a link to a page that is not there is worse than none, so the Planner (phase 2) joins when it is built.
  */
 interface Entry {
   href: string;
@@ -24,19 +24,9 @@ interface Entry {
 }
 
 export const ENTRIES: readonly Entry[] = [
-  {
-    // The Desk is a tile on this page (§17.3), and is reached from there and from the mark in the header.
-    href: '/boards',
-    label: 'Boards',
-    icon: 'layout-grid',
-    under: ['/boards', '/b', '/w'],
-  },
-  {
-    href: '/inbox',
-    label: 'Inbox',
-    icon: 'inbox',
-    under: ['/inbox'],
-  },
+  { href: '/', label: 'Home', icon: 'house', under: ['/'] },
+  { href: '/desk', label: 'Desk', icon: 'list', under: ['/desk'] },
+  { href: '/inbox', label: 'Inbox', icon: 'inbox', under: ['/inbox'] },
 ];
 
 /**
@@ -141,7 +131,7 @@ export function AppSidebar() {
         title={rail ? 'Widen the sidebar' : 'Narrow the sidebar'}
         onClick={sidebar.toggleRail}
       >
-        <Icon name={rail ? 'chevron-right' : 'chevron-left'} aria-hidden />
+        <LucideIcon name={rail ? 'panel-left-open' : 'panel-left-close'} />
       </button>
     </nav>
   );
@@ -157,72 +147,89 @@ function Workspaces({ rail, pathname }: { rail: boolean; pathname: string }) {
   const mine = workspaces.filter((each) => each.role === 'owner');
   const shared = workspaces.filter((each) => each.role !== 'owner');
   if (!ready) return <div className={styles.spacer} />;
+  const add = (
+    <button
+      type="button"
+      className={styles.add}
+      aria-label="Create a workspace"
+      title="Create a workspace"
+      onClick={() => setMaking(true)}
+    >
+      <Icon name="plus" aria-hidden />
+    </button>
+  );
   return (
     <div className={styles.workspaces}>
-      <Group
-        title="My workspaces"
-        rail={rail}
-        pathname={pathname}
-        rows={mine}
-        action={
-          <button
-            type="button"
-            className={styles.add}
-            aria-label="Create a workspace"
-            title="Create a workspace"
-            onClick={() => setMaking(true)}
-          >
-            <Icon name="plus" aria-hidden />
-          </button>
-        }
-      />
-      {shared.length > 0 ? (
-        <Group title="Shared with me" rail={rail} pathname={pathname} rows={shared} />
-      ) : null}
+      {rail ? (
+        // A rail: the +, a divider, and every workspace as its icon, mine and then those shared with me, for a way into each from any page.
+        <section aria-label="Workspaces" className={styles.railGroup}>
+          {add}
+          <hr className={styles.divider} />
+          <ul className={styles.list}>
+            {[...mine, ...shared].map((each) => (
+              <WorkspaceRow key={each.id} row={each} rail pathname={pathname} />
+            ))}
+          </ul>
+        </section>
+      ) : (
+        <>
+          <Group title="My workspaces" pathname={pathname} rows={mine} action={add} />
+          {shared.length > 0 ? (
+            <Group title="Shared with me" pathname={pathname} rows={shared} />
+          ) : null}
+        </>
+      )}
       {making ? <CreateDialog onClose={() => setMaking(false)} /> : null}
     </div>
+  );
+}
+
+/** A workspace: its icon (`folder-kanban` until a person can choose one, as they choose its colour) and, in a full sidebar, its name. */
+function WorkspaceRow({
+  row,
+  rail,
+  pathname,
+}: {
+  row: WorkspaceRow;
+  rail: boolean;
+  pathname: string;
+}) {
+  return (
+    <li>
+      <Link
+        href={`/w/${row.id}`}
+        className={styles.row}
+        aria-current={pathname === `/w/${row.id}` ? 'page' : undefined}
+        aria-label={rail ? row.name : undefined}
+        title={rail ? row.name : undefined}
+      >
+        <LucideIcon name="folder-kanban" />
+        {rail ? null : <span className={styles.label}>{row.name}</span>}
+      </Link>
+    </li>
   );
 }
 
 function Group({
   title,
   rows,
-  rail,
   pathname,
   action,
 }: {
   title: string;
   rows: readonly WorkspaceRow[];
-  rail: boolean;
   pathname: string;
   action?: React.ReactNode;
 }) {
   return (
     <section aria-label={title}>
-      {rail ? (
-        action
-      ) : (
-        <div className={styles.heading}>
-          <span>{title}</span>
-          {action}
-        </div>
-      )}
+      <div className={styles.heading}>
+        <span>{title}</span>
+        {action}
+      </div>
       <ul className={styles.list}>
         {rows.map((each) => (
-          <li key={each.id}>
-            <Link
-              href={`/w/${each.id}`}
-              className={styles.row}
-              aria-current={pathname === `/w/${each.id}` ? 'page' : undefined}
-              aria-label={rail ? each.name : undefined}
-              title={rail ? each.name : undefined}
-            >
-              <span className={styles.initial} aria-hidden>
-                {([...each.name][0] ?? '?').toUpperCase()}
-              </span>
-              {rail ? null : <span className={styles.label}>{each.name}</span>}
-            </Link>
-          </li>
+          <WorkspaceRow key={each.id} row={each} rail={false} pathname={pathname} />
         ))}
       </ul>
     </section>

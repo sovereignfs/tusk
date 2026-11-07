@@ -56,7 +56,7 @@ test('the Desk is a list at a time, its lists and the places are in a drawer, an
   await openNavigation(page);
   await expect(drawer(page).getByRole('navigation', { name: 'Tusk' })).toBeVisible();
   await expect(drawer(page).getByRole('navigation', { name: 'Lists' })).toBeVisible();
-  await expect(drawer(page).getByRole('link', { name: 'Boards' })).toBeVisible();
+  await expect(drawer(page).getByRole('link', { name: 'Home' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(drawer(page)).toHaveCount(0);
 
@@ -78,8 +78,8 @@ test('a place chosen in the drawer is gone to, and the drawer is closed behind i
   page,
 }) => {
   await signedIn(page);
-  await page.goto('/boards');
-  await expect(page.getByRole('heading', { level: 1, name: 'Boards' })).toBeVisible();
+  await page.goto('/');
+  await expect(page.getByRole('heading', { level: 1, name: 'Workspaces' })).toBeVisible();
   await fits(page);
   await openNavigation(page);
   await drawer(page)
@@ -101,7 +101,7 @@ test('a workspace, a board, a card’s dialog and a published board are all usab
 }) => {
   test.setTimeout(90_000);
   await signedIn(page);
-  await page.goto('/boards');
+  await page.goto('/');
   const workspace = unique('Acme');
   // From the drawer, where the sidebar's + is (the page itself offers it only to someone with no workspace yet).
   await openNavigation(page);

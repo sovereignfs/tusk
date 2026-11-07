@@ -12,9 +12,12 @@ const unique = (stem: string) => `${stem} ${crypto.randomUUID().slice(0, 8)}`;
 async function signedIn(page: Page) {
   await ensureAccount(page);
   await trySignIn(page, EMAIL, PASSWORD);
+  await expect(page.getByRole('button', { name: 'User menu' })).toBeVisible();
+  // Home is where signing in lands; these tests are about the Desk.
+  await page.goto('/desk');
   await expect(page.getByRole('navigation', { name: 'Lists' })).toBeVisible();
   await page.evaluate(() =>
-    window.localStorage.setItem('tusk.sidebar', '{"canvas":{"state":"full","shown":"full"}}'),
+    window.localStorage.setItem('tusk.sidebar', '{"page":{"state":"full","shown":"full"}}'),
   );
   await page.reload();
   await expect(page.getByRole('button', { name: 'Create a workspace' })).toBeVisible();
@@ -1094,7 +1097,7 @@ test('a board is published from its Share dialog, readable signed out with the w
   const after = await playwright.request.newContext({ baseURL: baseURL ?? 'http://localhost' });
   expect((await after.get(new URL(again).pathname)).status()).toBe(404);
   await after.dispose();
-  await page.goto('/boards');
+  await page.goto('/');
   await page
     .getByRole('region', { name: 'My workspaces' })
     .getByRole('region', { name: workspace })

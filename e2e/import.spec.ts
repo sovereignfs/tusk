@@ -35,6 +35,9 @@ const unique = (stem: string) => `${stem} ${crypto.randomUUID().slice(0, 8)}`;
 async function signedIn(page: Page) {
   await ensureAccount(page);
   await trySignIn(page, EMAIL, PASSWORD);
+  await expect(page.getByRole('button', { name: 'User menu' })).toBeVisible();
+  // Home is where signing in lands; these tests are about the Desk.
+  await page.goto('/desk');
   await expect(page.getByRole('link', { name: /^Backlog/ })).toBeVisible();
 }
 
@@ -54,6 +57,8 @@ async function makeList(page: Page, name: string, cards: string[]) {
   }
 }
 
+/** From Settings to the Desk by the sidebar, which is a navigation in the app and needs no network. */
+const openDesk = (page: Page) => page.getByRole('link', { name: 'Desk', exact: true }).click();
 const lists = (page: Page, name: string) =>
   page
     .getByRole('navigation', { name: 'Lists' })
@@ -113,12 +118,15 @@ test('a Desk file is read, said and asked about, added and never merged, offline
   await page.getByLabel('File to import').setInputFiles(path);
   await importButton(page).click();
   await expect(imported(page)).toContainText('added to your Desk');
+  await openDesk(page);
   await expect(lists(page, name)).toHaveCount(2);
+  await page.goto('/account?section=data');
   await context.setOffline(true);
   await page.getByLabel('File to import').setInputFiles(path);
   await expect(holds(page)).toBeVisible();
   await importButton(page).click();
   await expect(imported(page)).toBeVisible();
+  await openDesk(page);
   await expect(lists(page, name)).toHaveCount(3);
   await context.setOffline(false);
 

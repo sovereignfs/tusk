@@ -12,6 +12,9 @@ const unique = (stem: string) => `${stem} ${crypto.randomUUID().slice(0, 8)}`;
 async function openNewList(page: Page): Promise<{ name: string; url: string }> {
   await ensureAccount(page);
   await trySignIn(page, EMAIL, PASSWORD);
+  await expect(page.getByRole('button', { name: 'User menu' })).toBeVisible();
+  // Home is where signing in lands; these tests are about the Desk.
+  await page.goto('/desk');
   await expect(page.getByRole('navigation', { name: 'Lists' })).toBeVisible();
   // The page is ready when its working copy is open and has the first list in it: before that a click lands on a page nothing listens to yet.
   await expect(page.getByRole('link', { name: /^Backlog/ })).toBeVisible();

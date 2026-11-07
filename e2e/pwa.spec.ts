@@ -12,6 +12,9 @@ const unique = (stem: string) => `${stem} ${crypto.randomUUID().slice(0, 8)}`;
 async function signedIn(page: Page) {
   await ensureAccount(page);
   await trySignIn(page, EMAIL, PASSWORD);
+  await expect(page.getByRole('button', { name: 'User menu' })).toBeVisible();
+  // Home is where signing in lands; these tests are about the Desk.
+  await page.goto('/desk');
   await expect(page.getByRole('navigation', { name: 'Lists' })).toBeVisible();
   await expect(page.getByRole('link', { name: /^Backlog/ })).toBeVisible();
 }
@@ -97,9 +100,9 @@ test('after a signed-in tour of the Desk, a board and the Inbox, the caches hold
 
   // A board and the Inbox and Settings, so that the worker has seen every kind of page.
   await page.evaluate(() =>
-    window.localStorage.setItem('tusk.sidebar', '{"canvas":{"state":"full","shown":"full"}}'),
+    window.localStorage.setItem('tusk.sidebar', '{"page":{"state":"full","shown":"full"}}'),
   );
-  await page.goto('/boards');
+  await page.goto('/');
   await page
     .getByRole('navigation', { name: 'Tusk', exact: true })
     .getByRole('button', { name: 'Create a workspace' })
@@ -168,7 +171,7 @@ test('after a signed-in tour of the Desk, a board and the Inbox, the caches hold
   await context.setOffline(false);
 
   // The workspace is deleted, so that the sidebar is as it was for the next test.
-  await page.goto('/boards');
+  await page.goto('/');
   await page.getByRole('link', { name: workspace, exact: true }).first().click();
   await expect(page).toHaveURL(/\/w\/[0-9a-f-]{36}$/);
   await page.getByRole('button', { name: 'Workspace settings' }).click();

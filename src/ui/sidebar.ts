@@ -1,24 +1,22 @@
 /**
  * How the app's sidebar is shown (DESIGN.md §17.2): **full**, a **rail** of icons, or **hidden**. It is a decision about this screen and not about the
- * person's data, so it is kept on the device and not with the account (§19), and it is kept **per kind of page**: the index pages (Boards, a workspace,
- * the Inbox) have room and open it full; the Desk and a board need the width and open it as a rail. A person's choice changes the default for that kind
- * of page, on this device, and nothing else.
+ * person's data, so it is kept on the device and not with the account (§19), and it is kept **per kind of page**: Home (`/`) opens it full, and every other
+ * page opens it as a rail of icons. A person's choice changes the default for that kind of page, on this device, and nothing else.
  *
  * Pure: the page, and what was stored, go in and a state comes out, so that the rules are tested with no browser.
  */
 export type SidebarState = 'full' | 'rail' | 'hidden';
-export type PageKind = 'index' | 'canvas';
+export type PageKind = 'home' | 'page';
 
 /**
- * The kind of page an address is: the Desk and a board are canvases, which need the width; everything else is an index. **`/` is the Desk** for someone
- * signed in, which is the only one who sees this: the proxy shows them the Desk at the front address, and the address stays `/` (DESIGN.md §17.11).
+ * The kind of page an address is: **Home is `/`** (the workspaces, which is what someone signed in sees at the front address, the proxy showing them the page
+ * at `/` and the address staying `/`, DESIGN.md §17.11), and everything else is a page, with the Desk, the Inbox, a workspace and a board among them.
  */
 export function pageKind(pathname: string): PageKind {
-  const first = `/${pathname.split('/').filter(Boolean)[0] ?? ''}`;
-  return ['/', '/desk', '/b'].includes(first) ? 'canvas' : 'index';
+  return pathname === '/' || pathname === '' ? 'home' : 'page';
 }
 
-export const DEFAULTS: Record<PageKind, SidebarState> = { index: 'full', canvas: 'rail' };
+export const DEFAULTS: Record<PageKind, SidebarState> = { home: 'full', page: 'rail' };
 
 /** What is kept for a kind of page: how it is shown, and how it was shown last when it was not hidden, so that showing it again is what it was. */
 export interface Remembered {
@@ -42,7 +40,7 @@ export function parseStored(raw: string | null | undefined): Stored {
   }
   if (typeof parsed !== 'object' || parsed === null) return {};
   const out: Stored = {};
-  for (const kind of ['index', 'canvas'] as const) {
+  for (const kind of ['home', 'page'] as const) {
     const entry = (parsed as Record<string, unknown>)[kind];
     if (typeof entry !== 'object' || entry === null) continue;
     const { state, shown } = entry as Record<string, unknown>;

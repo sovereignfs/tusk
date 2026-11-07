@@ -899,7 +899,7 @@ icons this design names are the package's own: `square-kanban` for Boards, `cale
 `panel-left` for the sidebar's toggle.
 
 **One set of routes.** Sovereign's rule: **never fork a navigation decision by viewport; fork only what is rendered.** Addresses and data are the same at
-every width. So the home is one address for everyone: **`/desk`** (§17.11).
+every width. So the home is one address for everyone: **`/`** (§17.3, §17.11).
 
 **Loading states gate every surface,** as the kanban plugin decided: the Desk paints from the device, so it has none after the first load; a board, the
 boards index and the Inbox show a skeleton until what they need is there, and never half a board.
@@ -912,8 +912,8 @@ Two rows: the header, and the main area of two columns, the sidebar and the cont
 ┌──────────────────────────────────────────────────────────────────────────┐
 │ ▣ Tusk                                                          (avatar) │  header
 ├───────────────────┬──────────────────────────────────────────────────────┤
-│ ▦ Boards          │                                                      │
-│ ▤ Planner         │                    content                           │
+│ ⌂ Home            │                                                      │
+│ ☰ Desk            │                    content                           │
 │ ▢ Inbox        3  │                                                      │
 │                   │                                                      │
 │ MY WORKSPACES   + │                                                      │
@@ -925,28 +925,34 @@ Two rows: the header, and the main area of two columns, the sidebar and the cont
 └───────────────────┴──────────────────────────────────────────────────────┘
 ```
 
-- **Header:** the logo and "Tusk" on the left, linking home; the avatar on the right. The avatar opens `UserMenu`: a header of the person's name and
+- **Header:** the sidebar's toggle (`menu`), the logo and "Tusk" on the left, linking home; the avatar on the right. The avatar opens `UserMenu`: a header of the person's name and
   email, then Settings, and Sign out; and when a core is set, a way back to it.
-- **Sidebar, first block:** Boards, Planner and Inbox, each with its icon; the Inbox with its unread count. The Planner entry appears when the Planner
-  is built (phase 2), not before: there is no entry that leads nowhere. **An entry is there only when its page is,** so the sidebar holds the Desk alone until Boards (16.4) holds its tile, and the Inbox until 8.1.
+- **Sidebar, first block:** Home (`/`, `house`), the Desk (`/desk`, `list`) and the Inbox (`/inbox`, `inbox`, with its unread count). The Planner entry
+  appears when the Planner is built (phase 2), not before: there is no entry that leads nowhere. **An entry is there only when its page is.**
 - **Sidebar, second block:** the workspaces. The person's own (those they own) under _My workspaces_, with a + to create one; those they are a member
-  of, under _Shared with me_, at the bottom. A workspace opens to its boards (`/w/<id>`), and expands in place to list them.
-- **Three states:** full, a rail of icons, and hidden, toggled from the header (`panel-left`) and remembered on the device. **By default it is full on
-  the index pages (Boards, a workspace, the Inbox) and a rail on the Desk and a board,** which need the width; a person's toggle changes the default
-  for that kind of page on that device.
+  of, under _Shared with me_, at the bottom. A workspace opens to its boards (`/w/<id>`), and expands in place to list them. Each has an icon,
+  `folder-kanban` for now; a person choosing one, as they choose a colour, is a later feature. **As a rail** the same block is a +, a divider, and the
+  workspaces' icons (mine, then shared), so every workspace is one click away from any page.
+- **Three states:** full, a rail of icons, and hidden. Two controls change it and both are remembered on the device: the header's toggle (`menu`)
+  hides the sidebar and shows it as it was, and the button at the sidebar's foot (`panel-left-close`, `panel-left-open`) narrows a full sidebar to a rail
+  and widens it again. **By default it is full on Home and a rail on every other page;** a person's choice changes the default for that kind of page
+  (Home, or any other) on that device.
+- **The Desk's lists** (§17.4) stand beside the Desk and the Inbox only: Home, a workspace and a board have no second sidebar.
 
-### 17.3 The boards index
+### 17.3 Home
 
-`/boards`. The Desk first, as a tile of its own (its open count, and today's due), then each workspace as a section: its name, its people's avatars,
+`/`, for someone signed in (the proxy serves the page that is `app/(app)/home`, and `/home` and the old `/boards` send to `/`, so there is one address). Titled
+_Workspaces_. Its first group is _Pinned_, whose first item is the Desk, as a tile of its own (its open count, and today's due); then _My workspaces_, each
+workspace as a section: its name, its people's avatars,
 a gear for its settings, and its boards as tiles of their colour, ending with a "Create board" tile. _My workspaces_ come first and can be sorted by
 name, date created or recently updated; the choice is saved with the account (§19), so it is the same on every device. _Shared with me_ follow, sorted
-by name.
+by name. A person who has none sees the Desk and a way to create the first.
 
 **A workspace's settings** are a dialog from its gear: its name; its people, their roles, adding by email, removing, leaving; and Delete. A member sees
 the people and Leave.
 
 **As built (task 16.4):** the index reads in one statement for each kind of thing (boards, a few people of each, how many there are, the sort), never one for each workspace. The sort is
-`account_settings.workspace_sort` and is written by `PATCH /api/settings`. The Desk's entry in the sidebar is replaced by _Boards_, so the Desk is reached from its tile and the header's mark.
+`account_settings.workspace_sort` and is written by `PATCH /api/settings`. The Desk has its own entry in the sidebar and its tile on Home.
 
 ### 17.4 The Desk
 
@@ -1048,18 +1054,17 @@ Each of these cost a release there. They are written here so they are not paid f
 
 ### 17.11 Addresses
 
-| Address                                   | What                                                                                        |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------- |
-| `/`                                       | A landing page for someone not signed in, static. Signed in, `proxy.ts` sends it to `/desk` |
-| `/sign-in`, `/sign-up`                    | §6                                                                                          |
-| `/desk`, `/desk/<listId>`                 | The Desk: its first list, or a list. `?card=<id>` opens a card's detail                     |
-| `/boards`                                 | The boards index (§17.3)                                                                    |
-| `/w/<workspaceId>`                        | One workspace's boards                                                                      |
-| `/b/<boardId>`, `/b/<boardId>/c/<cardId>` | A board, and a card on it                                                                   |
-| `/inbox`                                  | §16                                                                                         |
-| `/planner`                                | Phase 2 (§25.1)                                                                             |
-| `/account?section=`                       | Settings (§19), a dialog over the page as Fjord's is                                        |
-| `/p/<token>`                              | A published board (§14.6), for anyone                                                       |
+| Address                                   | What                                                                      |
+| ----------------------------------------- | ------------------------------------------------------------------------- |
+| `/`                                       | A landing page for someone not signed in, static. Signed in, Home (§17.3) |
+| `/sign-in`, `/sign-up`                    | §6                                                                        |
+| `/desk`, `/desk/<listId>`                 | The Desk: its first list, or a list. `?card=<id>` opens a card's detail   |
+| `/w/<workspaceId>`                        | One workspace's boards                                                    |
+| `/b/<boardId>`, `/b/<boardId>/c/<cardId>` | A board, and a card on it                                                 |
+| `/inbox`                                  | §16                                                                       |
+| `/planner`                                | Phase 2 (§25.1)                                                           |
+| `/account?section=`                       | Settings (§19), a dialog over the page as Fjord's is                      |
+| `/p/<token>`                              | A published board (§14.6), for anyone                                     |
 
 Anything that is not there, or not there for this person, says so with a way back, and answers 404.
 
@@ -1489,7 +1494,7 @@ Decisions from the turn to Tusk (2026-11-06) come first; those carried over from
 | Any colour for boards, labels and Desk lists, through `ColorPicker`, text on it by contrast (2026-11-06)                                        | The owner's direction for boards and labels; Desk lists follow so there is one picker                                             | Tasks' six swatches                                                                     |
 | The sidebar full on index pages and a rail on the Desk and boards, toggled to rail or hidden, remembered per device (2026-11-06)                | The owner's direction for the toggle; the Desk and a board need the width                                                         | Always full                                                                             |
 | The Desk's list view (the Tasks look) in phase 1, its board view in phase 2 (2026-11-06)                                                        | The owner's direction                                                                                                             | Both now                                                                                |
-| The home is `/desk` for everyone (2026-11-06)                                                                                                   | The phone opens on the Desk, and navigation may not fork by viewport, so the web does too                                         | `/boards` on the web and `/desk` on a phone                                             |
+| The home is `/` for everyone, and is the workspaces; the Desk is `/desk` (2026-11-07)                                                           | One address for Home at every width; the Desk is a place of its own, beside the Inbox, with its lists                             | `/desk` as the home; `/boards` as a second address for the same page                    |
 | The workspace sort is saved with the account; the sidebar's state with the device (2026-11-06)                                                  | What arranges the data follows the person to every device; what shapes the screen belongs to that screen                          | Everything per device                                                                   |
 | Whole-card drag with no handle on the web; between lists by menu on a phone (2026-11-06)                                                        | The kanban plugin's settled interaction model                                                                                     | A handle on every card; drag on a carousel                                              |
 | The web first, laying the phone's foundations; the phone's screens in phase 2 (2026-11-06)                                                      | The owner's direction                                                                                                             | Both together                                                                           |

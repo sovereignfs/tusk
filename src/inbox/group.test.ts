@@ -77,7 +77,7 @@ describe('what a notice says and where it goes', () => {
     expect(noticeHref({ workspaceId: 'w', boardId: 'b', cardId: 'c' })).toBe('/b/b/c/c');
     expect(noticeHref({ workspaceId: 'w', boardId: 'b', cardId: null })).toBe('/b/b');
     expect(noticeHref({ workspaceId: 'w', boardId: null, cardId: null })).toBe('/w/w');
-    expect(noticeHref({ workspaceId: null, boardId: null, cardId: null })).toBe('/boards');
+    expect(noticeHref({ workspaceId: null, boardId: null, cardId: null })).toBe('/');
   });
 
   it('counts unread as nothing, the number, or 99+', () => {

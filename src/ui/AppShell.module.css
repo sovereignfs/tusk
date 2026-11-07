@@ -72,14 +72,14 @@
 
 .mark {
   flex-shrink: 0;
-  height: 26px;
+  height: 30px;
 }
 
 .name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--sv-font-size-md);
+  font-size: var(--sv-font-size-xl);
   font-weight: var(--sv-font-weight-semibold);
 }
 

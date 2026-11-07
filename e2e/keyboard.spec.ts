@@ -19,6 +19,9 @@ const press = async (page: Page, keys: string[], wait = 250) => {
 async function signedIn(page: Page) {
   await ensureAccount(page);
   await trySignIn(page, EMAIL, PASSWORD);
+  await expect(page.getByRole('button', { name: 'User menu' })).toBeVisible();
+  // Home is where signing in lands; these tests are about the Desk.
+  await page.goto('/desk');
   await expect(page.getByRole('navigation', { name: 'Lists' })).toBeVisible();
 }
 
@@ -118,7 +121,7 @@ test('on a board: n adds a card to the first list, j picks it, and Space and the
 }) => {
   await signedIn(page);
   await page.evaluate(() =>
-    window.localStorage.setItem('tusk.sidebar', '{"canvas":{"state":"full","shown":"full"}}'),
+    window.localStorage.setItem('tusk.sidebar', '{"page":{"state":"full","shown":"full"}}'),
   );
   await page.reload();
   await expect(page.getByRole('button', { name: 'Create a workspace' })).toBeVisible();

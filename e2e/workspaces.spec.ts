@@ -12,10 +12,13 @@ const unique = (stem: string) => `${stem} ${crypto.randomUUID().slice(0, 8)}`;
 async function signedIn(page: Page) {
   await ensureAccount(page);
   await trySignIn(page, EMAIL, PASSWORD);
+  await expect(page.getByRole('button', { name: 'User menu' })).toBeVisible();
+  // Home is where signing in lands; these tests are about the Desk.
+  await page.goto('/desk');
   await expect(page.getByRole('navigation', { name: 'Lists' })).toBeVisible();
   // Wide, so that the workspaces are named in words and not only by their first letter.
   await page.evaluate(() =>
-    window.localStorage.setItem('tusk.sidebar', '{"canvas":{"state":"full","shown":"full"}}'),
+    window.localStorage.setItem('tusk.sidebar', '{"page":{"state":"full","shown":"full"}}'),
   );
   await page.reload();
   await expect(page.getByRole('button', { name: 'Create a workspace' })).toBeVisible();
@@ -153,7 +156,7 @@ test('a workspace that is not there for this account is the page for what is not
   await expect(page.getByRole('heading', { name: 'That is not here' })).toBeVisible();
 });
 
-test('a rail shows each workspace by its first letter, named for a screen reader', async ({
+test('a rail shows each workspace by its icon, named for a screen reader and a pointer', async ({
   page,
 }) => {
   await signedIn(page);
@@ -162,7 +165,7 @@ test('a rail shows each workspace by its first letter, named for a screen reader
   await page.evaluate(() =>
     window.localStorage.setItem(
       'tusk.sidebar',
-      '{"index":{"state":"rail","shown":"rail"},"canvas":{"state":"rail","shown":"rail"}}',
+      '{"home":{"state":"rail","shown":"rail"},"page":{"state":"rail","shown":"rail"}}',
     ),
   );
   await page.reload();
@@ -170,7 +173,9 @@ test('a rail shows each workspace by its first letter, named for a screen reader
     .getByRole('navigation', { name: 'Tusk', exact: true })
     .getByRole('link', { name });
   await expect(link).toBeVisible();
-  await expect(link).toHaveText('Z');
+  await expect(link).toHaveText('');
+  await expect(link).toHaveAttribute('title', name);
+  await expect(link.locator('svg')).toBeVisible();
   await link.click();
   await remove(page, name);
 });

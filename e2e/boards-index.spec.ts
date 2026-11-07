@@ -12,12 +12,15 @@ const unique = (stem: string) => `${stem} ${crypto.randomUUID().slice(0, 8)}`;
 async function signedIn(page: Page) {
   await ensureAccount(page);
   await trySignIn(page, EMAIL, PASSWORD);
+  await expect(page.getByRole('button', { name: 'User menu' })).toBeVisible();
+  // Home is where signing in lands; these tests are about the Desk.
+  await page.goto('/desk');
   await expect(page.getByRole('navigation', { name: 'Lists' })).toBeVisible();
   await page.evaluate(() =>
-    window.localStorage.setItem('tusk.sidebar', '{"canvas":{"state":"full","shown":"full"}}'),
+    window.localStorage.setItem('tusk.sidebar', '{"page":{"state":"full","shown":"full"}}'),
   );
-  await page.goto('/boards');
-  await expect(page.getByRole('heading', { level: 1, name: 'Boards' })).toBeVisible();
+  await page.goto('/');
+  await expect(page.getByRole('heading', { level: 1, name: 'Workspaces' })).toBeVisible();
 }
 
 async function makeWorkspace(page: Page, name: string) {
@@ -40,15 +43,15 @@ async function deleteWorkspace(page: Page, name: string) {
   await expect(page.getByRole('heading', { level: 1, name })).toHaveCount(0);
 }
 
-test('the Desk is a tile with its counts, and the sidebar’s entry is Boards', async ({ page }) => {
+test('the Desk is a pinned tile with its counts, and the sidebar’s entry is Home', async ({
+  page,
+}) => {
   await signedIn(page);
-  const desk = page.getByRole('region', { name: 'Desk' }).getByRole('link', { name: /Desk/ });
+  const desk = page.getByRole('region', { name: 'Pinned' }).getByRole('link', { name: /Desk/ });
   await expect(desk).toBeVisible();
   await expect(desk).toContainText(/\d+ open · \d+ due today/);
   await expect(
-    page
-      .getByRole('navigation', { name: 'Tusk', exact: true })
-      .getByRole('link', { name: 'Boards' }),
+    page.getByRole('navigation', { name: 'Tusk', exact: true }).getByRole('link', { name: 'Home' }),
   ).toHaveAttribute('aria-current', 'page');
   await desk.click();
   await expect(page).toHaveURL(/\/desk$/);
@@ -60,7 +63,7 @@ test('a workspace is a section with its boards, a tile to create one and a gear 
   await signedIn(page);
   const name = unique('Index');
   await makeWorkspace(page, name);
-  await page.goto('/boards');
+  await page.goto('/');
   const section = page.getByRole('region', { name: 'My workspaces' }).getByRole('region', { name });
   await expect(section).toBeVisible();
   await expect(section.getByRole('link', { name })).toHaveAttribute('href', /\/w\//);
@@ -72,7 +75,7 @@ test('a workspace is a section with its boards, a tile to create one and a gear 
   await dialog.getByLabel('Name').fill(board);
   await dialog.getByRole('button', { name: 'Create board' }).click();
   await expect(page).toHaveURL(/\/b\/[0-9a-f-]{36}$/);
-  await page.goto('/boards');
+  await page.goto('/');
   await expect(page.getByRole('region', { name }).getByRole('link', { name: board })).toBeVisible();
 
   // The gear opens the workspace's settings, here and not on another page.
@@ -91,7 +94,7 @@ test('the sort of one’s own workspaces is kept with the account, and survives 
   await signedIn(page);
   const name = unique('Sorted');
   await makeWorkspace(page, name);
-  await page.goto('/boards');
+  await page.goto('/');
   const sort = page.getByLabel('Sort my workspaces');
   await expect(sort).toHaveValue('name');
   await sort.selectOption('updated');
@@ -122,7 +125,7 @@ test('offline, the Desk tile stays and the rest says it needs a connection', asy
   await page.evaluate(() => window.dispatchEvent(new Event('focus')));
   await expect(page.getByText(/need a connection/)).toBeVisible();
   await expect(
-    page.getByRole('region', { name: 'Desk' }).getByRole('link', { name: /Desk/ }),
+    page.getByRole('region', { name: 'Pinned' }).getByRole('link', { name: /Desk/ }),
   ).toBeVisible();
   await context.setOffline(false);
   await page.evaluate(() => window.dispatchEvent(new Event('online')));
@@ -189,7 +192,7 @@ test.describe('the browser’s time zone', () => {
       if (request.method() === 'PATCH' && request.url().endsWith('/api/settings')) again += 1;
     });
     await page.reload();
-    await expect(page.getByRole('heading', { level: 1, name: 'Boards' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Workspaces' })).toBeVisible();
     await page.waitForTimeout(500);
     expect(again).toBe(0);
   });

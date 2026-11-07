@@ -12,6 +12,9 @@ const unique = (stem: string) => `${stem} ${crypto.randomUUID().slice(0, 8)}`;
 async function signedIn(page: Page) {
   await ensureAccount(page);
   await trySignIn(page, EMAIL, PASSWORD);
+  await expect(page.getByRole('button', { name: 'User menu' })).toBeVisible();
+  // Home is where signing in lands; these tests are about the Desk.
+  await page.goto('/desk');
   await expect(page.getByRole('navigation', { name: 'Lists' })).toBeVisible();
   await expect(page.getByRole('link', { name: /^Backlog/ })).toBeVisible();
 }
@@ -160,6 +163,8 @@ test('a page loaded offline does every Desk action with no error, and a second d
   const phone = await other.newPage();
   await phone.goto('/');
   await trySignIn(phone, EMAIL, PASSWORD);
+  await expect(phone.getByRole('button', { name: 'User menu' })).toBeVisible();
+  await phone.goto('/desk');
   await expect(phone.getByRole('navigation', { name: 'Lists' })).toBeVisible();
   await expect(async () => {
     await phone.reload();
@@ -191,9 +196,9 @@ test('a board shows what it had, read-only, and says why, the moment the connect
 }) => {
   await signedIn(page);
   await page.evaluate(() =>
-    window.localStorage.setItem('tusk.sidebar', '{"canvas":{"state":"full","shown":"full"}}'),
+    window.localStorage.setItem('tusk.sidebar', '{"page":{"state":"full","shown":"full"}}'),
   );
-  await page.goto('/boards');
+  await page.goto('/');
   await page
     .getByRole('navigation', { name: 'Tusk', exact: true })
     .getByRole('button', { name: 'Create a workspace' })

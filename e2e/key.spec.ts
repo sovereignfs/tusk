@@ -98,7 +98,7 @@ test('a key is made here, saved and said to be saved, and turns on a Desk that w
   // Settings says so.
   await page.goto('/account?section=data');
   await expect(page.getByText('this device has it')).toBeVisible();
-  await page.goto('/boards');
+  await page.goto('/');
   await signOut(page);
   // A copy for the second browser, which must not be a file the first has open.
   await copyFile(keyFile(), `${keyFile()}.copy`);
@@ -119,8 +119,8 @@ test('on a device that does not have the key the Desk shows nothing of itself, a
   await expect(page.getByLabel('Add a card')).toHaveCount(0);
 
   // Boards and the Inbox are not the Desk's, and are as they were.
-  await page.goto('/boards');
-  await expect(page.getByRole('heading', { name: 'Boards' }).first()).toBeVisible();
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Workspaces' }).first()).toBeVisible();
   await page.goto('/inbox');
   await expect(page.getByRole('heading', { name: 'Inbox' }).first()).toBeVisible();
   await page.goto('/desk');
@@ -167,7 +167,7 @@ test('on a device that does not have the key the Desk shows nothing of itself, a
   await expect(page.getByRole('region', { name: 'Unlock your Desk' })).toBeVisible();
   await locked.getByLabel('Key file').setInputFiles(keyFile());
   await expect(page.getByRole('link', { name: secret, exact: true })).toBeVisible();
-  await page.goto('/boards');
+  await page.goto('/');
   await signOut(page);
   await trySignIn(page, EMAIL, PASSWORD);
   await expect(page.getByRole('button', { name: 'User menu' })).toBeVisible();

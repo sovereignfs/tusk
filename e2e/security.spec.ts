@@ -68,7 +68,7 @@ test('an authenticator app is set up, asked for at sign-in, replaced by a backup
   await codes.getByRole('button', { name: 'I have saved them' }).click();
 
   // Signed in again: the password is not enough, a code is.
-  await page.goto('/boards');
+  await page.goto('/');
   await signOut(page);
   await password(page);
   await expect(page.getByLabel('Code from your authenticator app')).toBeVisible();
@@ -145,7 +145,7 @@ test('a passkey is added, named, signs in with no password, and is removed', asy
   await expect(list).toContainText('Work laptop');
 
   // Signed out, a passkey signs in with no password.
-  await page.goto('/boards');
+  await page.goto('/');
   await signOut(page);
   await page.goto('/sign-in');
   await page.getByRole('button', { name: 'Use a passkey instead' }).click();

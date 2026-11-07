@@ -11,7 +11,9 @@ test.use({ viewport: { width: 1280, height: 800 } });
 async function signedIn(page: Page) {
   await ensureAccount(page);
   await trySignIn(page, EMAIL, PASSWORD);
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole('button', { name: 'User menu' })).toBeVisible();
+  // Home is where signing in lands; these tests are about the Desk.
+  await page.goto('/desk');
   await expect(page.getByRole('navigation', { name: 'Lists' })).toBeVisible();
 }
 
@@ -35,7 +37,7 @@ test('the menu opens Settings as a dialog over the Desk, and closing it goes bac
 
   await page.keyboard.press('Escape');
   await expect(dialog).toHaveCount(0);
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/desk$/);
 });
 
 test('an address with a section opens it, on a page of its own, and one that is not a section opens Profile', async ({

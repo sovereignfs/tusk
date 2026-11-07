@@ -35,7 +35,8 @@ export const ROUTES: RouteRule[] = [
   { route: '/account', page: { kind: 'account' } },
   { route: '/desk', page: { kind: 'account' } },
   { route: '/w/[id]', page: { kind: 'account' } },
-  { route: '/boards', page: { kind: 'account' } },
+  // Home, the workspaces: the front address `/` shows it to someone signed in (the proxy rewrites it), and `/home` itself is sent back to `/`.
+  { route: '/home', page: { kind: 'account' } },
   { route: '/inbox', page: { kind: 'account' } },
   { route: '/b/[id]', page: { kind: 'account' } },
   { route: '/b/[id]/c/[cardId]', page: { kind: 'account' } },
