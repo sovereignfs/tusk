@@ -189,7 +189,9 @@ check_sovereign() {
 
   [ "$(docker exec tusk-check-sov id -un)" = node ] || fail "sovereign: the process is root"
   stop_and_check tusk-check-sov sovereign
-  docker rm tusk-check-sov tusk-check-sov-pg >/dev/null
+  # Only the app was stopped, and the PostgreSQL it was given is still running: a plain `docker rm` of it is refused.
+  docker rm tusk-check-sov >/dev/null
+  docker rm -f tusk-check-sov-pg >/dev/null
   docker network rm tusk-check-sov >/dev/null
   rm -rf "$secrets_dir"
   secrets_dir=""
