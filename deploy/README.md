@@ -66,6 +66,25 @@ other person away. Mail (`TUSK_SMTP_*`) is not used when there is no password. T
 signed notices to `/api/sovereign/backchannel-logout` and `/api/sovereign/account-deleted`; both are answered only when they carry a token the instance
 signed.
 
+## The GitHub App (optional)
+
+Without it a person connects a repository for backup with a token they make on GitHub. With it they install an App on one repository and Tusk keeps no token at
+all: it signs for a token that lasts an hour when it backs up. You register the App once, on the account or organisation that runs the instance:
+
+1. GitHub, _Settings_, _Developer settings_, _GitHub Apps_, _New GitHub App_. Name it (the name goes in its address: that is `TUSK_GITHUB_APP_SLUG`).
+2. **Callback URL** and **Setup URL**: `<TUSK_URL>/api/backup/app/callback`. Turn on _Request user authorization (OAuth) during installation_ (without it GitHub
+   sends no `code`, and a person cannot be shown to own the installation) and _Redirect on update_.
+3. **Webhook**: active, URL `<TUSK_URL>/api/webhooks/github`, and a secret of your choosing (`TUSK_GITHUB_APP_WEBHOOK_SECRET`).
+4. **Permissions**: _Repository permissions_, _Contents: Read and write_; _Metadata_ is read-only and always there. Nothing else. No events need subscribing to:
+   GitHub always sends an App the _installation_ and _installation_repositories_ events, which are the ones Tusk uses.
+5. **Where can this GitHub App be installed?** Any account, for an instance with many people; only yours, for your own.
+6. Create it. Then _Generate a private key_ (`TUSK_GITHUB_APP_PRIVATE_KEY`, or `_FILE`), and _Generate a new client secret_ (`TUSK_GITHUB_APP_CLIENT_SECRET`); the _App ID_ and the
+   _Client ID_ are at the top of the page.
+
+Set the six `TUSK_GITHUB_APP_*` settings (`.env.example`) and `TUSK_URL`, and restart. Settings, Data then offers _Connect with GitHub_. A person must choose **one
+repository** when GitHub asks where to install it, and it must be private; Tusk says what to fix if not. If the App is uninstalled, or the repository taken out of
+it, GitHub tells Tusk by the webhook and the connection is removed. For a GitHub Enterprise Server set `TUSK_GITHUB_API_URL` too.
+
 ## Backups
 
 The database is the whole of it, apart from the one key below.

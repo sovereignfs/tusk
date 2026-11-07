@@ -3,6 +3,7 @@ import { authDirectory } from '@/src/auth/directory';
 import { runNow } from '@/src/backup/endpoint';
 import { getConfig } from '@/src/config/current';
 import { getAuthDatabase, getDatabase } from '@/src/db/boot';
+import { installationTokens } from '@/src/github-app/server';
 import { RateLimiter } from '@/src/limits/rate';
 
 // Back up now (DESIGN.md §21.4). The account is the session's; the token is opened on the server and goes nowhere but the git host.
@@ -16,6 +17,7 @@ export const POST = accountRoute(async ({ accountId }) => {
     directory: authDirectory(await getAuthDatabase()),
     ring: config.encryption,
     apiUrl: config.githubApiUrl,
+    ...(installationTokens() ? { tokens: installationTokens() } : {}),
     now: Date.now,
     limiter: new RateLimiter(database),
   });

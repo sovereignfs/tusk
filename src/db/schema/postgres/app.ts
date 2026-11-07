@@ -195,6 +195,8 @@ export const backupConnection = app.table(
     failures: counter('failures').notNull().default(0),
     /** When automatic backups were stopped by a failure that will not mend itself: a token that no longer works, a repository gone or made public. Null while they run. */
     stoppedAt: epochMs('stopped_at'),
+    /** For a connection made through the GitHub App (§21.2): the installation, which holds no secret and is looked up when GitHub says an installation was removed. Null for a token. */
+    installationId: counter('installation_id'),
   },
   (table) => [index('backup_connection_due_idx').on(table.nextBackupAt)],
 );

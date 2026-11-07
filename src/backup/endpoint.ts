@@ -22,6 +22,8 @@ import { type Frequency, type Mode, isFrequency, isMode } from './schedule';
  */
 export interface ConnectionDeps extends ConnectDeps {
   readonly limiter: Limiter;
+  /** The GitHub App is set up: a repository can be connected by installing it (§21.2). */
+  readonly appAvailable?: boolean;
 }
 
 /** Each try is a call to GitHub with a token the person typed, so it is counted. */
@@ -94,6 +96,7 @@ export async function connectionStatus(accountId: string, deps: ConnectionDeps):
   const connection = await readConnection(deps.database, accountId);
   return json(200, {
     canConnect: deps.ring !== undefined,
+    canConnectApp: deps.appAvailable === true,
     connection: connection ? shown(connection, deps.apiUrl) : null,
   });
 }

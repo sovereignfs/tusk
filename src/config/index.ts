@@ -1,4 +1,5 @@
 import { resolveAuth, type AuthSettings } from '../auth/config';
+import { resolveGitHubApp, type GitHubAppSettings } from '../github-app/config';
 import { resolveMail } from '../mail/config';
 import type { MailSettings } from '../mail/mailer';
 import { type KeyRing, parseKey, ringOf } from '../crypto/keys';
@@ -23,6 +24,8 @@ export interface Config {
   readonly githubApiUrl: string;
   /** `TUSK_DB_ENCRYPTION=on` (DESIGN.md §9.5): the server seals content with the instance key, and personal keys are not offered to anyone. */
   readonly operatorEncryption: boolean;
+  /** The GitHub App, when the operator registered one (DESIGN.md §21.2); then a repository can be connected without a token. */
+  readonly githubApp: GitHubAppSettings | undefined;
   /** Where mail goes, or `undefined`: then an address is not verified, a password is not reset by mail, and no screen or route offers either (DESIGN.md §6). */
   readonly mail: MailSettings | undefined;
 }
@@ -196,6 +199,9 @@ export function loadConfig(env: Env, readFile?: ReadFile): LoadResult {
     }
   }
 
+  // The GitHub App is optional, all of it or none; a key that is not a key stops the server here and not at the first person's try.
+  const githubApp = resolveGitHubApp(read, url, problems);
+
   // Mail is optional, but a host with no sender would send nothing anyone could answer, so it stops here rather than at the first message.
   const mail = resolveMail(read, problems);
 
@@ -224,6 +230,7 @@ export function loadConfig(env: Env, readFile?: ReadFile): LoadResult {
       githubApiUrl,
       operatorEncryption: rawOperator === 'on',
       mail,
+      githubApp,
     },
   };
 }

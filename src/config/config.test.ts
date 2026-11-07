@@ -1,3 +1,4 @@
+import { generateKeyPairSync } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { loadConfig, type LoadResult } from './index';
 import { readSetting, SettingFileError } from './env';
@@ -306,5 +307,54 @@ describe('readSetting', () => {
       expect(error).toBeInstanceOf(SettingFileError);
       expect((error as Error).message).toBe('TUSK_X_FILE names a file that cannot be read.');
     }
+  });
+
+  describe('the GitHub App', () => {
+    const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+    const pem = privateKey.export({ type: 'pkcs8', format: 'pem' }) as string;
+    const APP = {
+      TUSK_URL: 'https://tusk.example.com',
+      TUSK_GITHUB_APP_ID: '12345',
+      TUSK_GITHUB_APP_SLUG: 'tusk-example',
+      TUSK_GITHUB_APP_CLIENT_ID: 'Iv1.abc',
+      TUSK_GITHUB_APP_CLIENT_SECRET: 'client-secret-xyz',
+      TUSK_GITHUB_APP_WEBHOOK_SECRET: 'hook-secret-xyz',
+      TUSK_GITHUB_APP_PRIVATE_KEY: pem,
+    };
+    const appOf = (env: Record<string, string | undefined>) => {
+      const result = loadConfig(env);
+      if (!result.ok) throw new Error(result.problems.join(' '));
+      return result.config.githubApp;
+    };
+
+    it('is off when none of it is set, and on with all of it, the key as PEM or as one line with \\n', () => {
+      expect(appOf({})).toBeUndefined();
+      expect(appOf(APP)).toMatchObject({ appId: '12345', slug: 'tusk-example' });
+      const oneLine = { ...APP, TUSK_GITHUB_APP_PRIVATE_KEY: pem.trim().replace(/\n/g, '\\n') };
+      expect(appOf(oneLine)?.privateKey).toContain('\n');
+    });
+
+    it('reads the secrets from files', () => {
+      const result = loadConfig(
+        { ...APP, TUSK_GITHUB_APP_PRIVATE_KEY: undefined, TUSK_GITHUB_APP_PRIVATE_KEY_FILE: '/k' },
+        () => pem,
+      );
+      expect(result.ok).toBe(true);
+    });
+
+    it('stops the server on a key that is not a key, an id that is not a number, and no address, naming the setting and no value', () => {
+      const bad = problems(
+        loadConfig({ ...APP, TUSK_GITHUB_APP_PRIVATE_KEY: 'not-a-key-secret-value' }),
+      ).join(' ');
+      expect(bad).toContain('TUSK_GITHUB_APP_PRIVATE_KEY');
+      expect(bad).not.toContain('not-a-key-secret-value');
+      expect(problems(loadConfig({ ...APP, TUSK_GITHUB_APP_ID: 'abc' })).join(' ')).toContain(
+        'TUSK_GITHUB_APP_ID',
+      );
+      expect(problems(loadConfig({ ...APP, TUSK_URL: undefined })).join(' ')).toContain('TUSK_URL');
+      expect(
+        problems(loadConfig({ ...APP, TUSK_GITHUB_APP_WEBHOOK_SECRET: undefined })).join(' '),
+      ).toContain('TUSK_GITHUB_APP_WEBHOOK_SECRET');
+    });
   });
 });

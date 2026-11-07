@@ -1,0 +1,1 @@
+ALTER TABLE `backup_connection` ADD `installation_id` integer;

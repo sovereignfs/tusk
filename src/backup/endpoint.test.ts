@@ -98,9 +98,9 @@ describe(`/api/backup/connection (${leg})`, () => {
   it('says whether the server can keep a token, and what is connected', async () => {
     const r = routes();
     const empty = await (await r.GET(t.request(t.ada, path))).json();
-    expect(empty).toEqual({ canConnect: true, connection: null });
+    expect(empty).toEqual({ canConnect: true, canConnectApp: false, connection: null });
     const keyless = await (await routes({ ring: undefined }).GET(t.request(t.ada, path))).json();
-    expect(keyless).toEqual({ canConnect: false, connection: null });
+    expect(keyless).toEqual({ canConnect: false, canConnectApp: false, connection: null });
   });
 
   it('connects, shows the connection with no secret, and disconnects', async () => {

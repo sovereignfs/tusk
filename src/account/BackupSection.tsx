@@ -1,8 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { PROBLEM_MESSAGES, type ConnectProblem } from '../backup/problems';
 import { useKey } from '../screens/KeyContext';
-import { Alert, Button, FormField, Input, SegmentedControl, Select } from '../ui';
+import { Alert, Button, ButtonLink, FormField, Input, SegmentedControl, Select } from '../ui';
 import styles from './Account.module.css';
 
 interface Connection {
@@ -28,6 +29,8 @@ const FREQUENCY_LABELS: Record<Frequency, string> = {
 
 interface Status {
   canConnect: boolean;
+  /** The GitHub App is set up: a repository can be connected by installing it. */
+  canConnectApp: boolean;
   connection: Connection | null;
 }
 
@@ -46,6 +49,16 @@ export function BackupSection() {
   const [working, setWorking] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
+  // Where GitHub sent the person back to after installing the App: `?github=connected`, or the code of what to fix.
+  const [returned, setReturned] = useState<string | null>(null);
+  useEffect(() => {
+    const code = new URLSearchParams(window.location.search).get('github');
+    if (!code) return;
+    if (code === 'connected') setReturned('connected');
+    else if (code === 'rate_limited') setProblem(PROBLEM_MESSAGES.rate_limited);
+    else if (code in PROBLEM_MESSAGES) setProblem(PROBLEM_MESSAGES[code as ConnectProblem]);
+    else setProblem(PROBLEM_MESSAGES.unreachable);
+  }, []);
 
   const read = useCallback(async () => {
     try {
@@ -171,6 +184,9 @@ export function BackupSection() {
         again each time. Disconnecting deletes the saved token and leaves the repository alone.
       </p>
       {unreachable ? <p className={styles.muted}>This needs a connection.</p> : null}
+      {returned === 'connected' ? (
+        <Alert variant="success">Connected through the GitHub App.</Alert>
+      ) : null}
       {problem ? <Alert variant="error">{problem}</Alert> : null}
       {warning ? <Alert variant="warning">{warning}</Alert> : null}
       {status?.connection ? (
@@ -280,54 +296,73 @@ export function BackupSection() {
             </Button>
           </div>
         </>
-      ) : status && !status.canConnect ? (
+      ) : status && !status.canConnect && !status.canConnectApp ? (
         <p className={styles.muted}>
           This server has no encryption key, so it cannot keep a token safely and connecting a
           repository is not offered. Whoever runs it can turn it on by setting{' '}
           <code>TUSK_ENCRYPTION_KEY</code>.
         </p>
       ) : status ? (
-        <form
-          className={styles.form}
-          onSubmit={(event) => {
-            event.preventDefault();
-            void connect();
-          }}
-        >
-          <p className={styles.hint}>
-            On GitHub, make a fine-grained token (Settings, Developer settings, Fine-grained tokens)
-            for this one repository alone, with the permission <em>Contents: Read and write</em>.
-            Tusk uses nothing else.
-          </p>
-          <FormField label="Repository" hint="owner/name, or its address on GitHub" required>
-            {(field) => (
-              <Input
-                {...field}
-                value={repository}
-                autoComplete="off"
-                spellCheck={false}
-                onChange={(event) => setRepository(event.target.value)}
-              />
-            )}
-          </FormField>
-          <FormField label="Token" required>
-            {(field) => (
-              <Input
-                {...field}
-                type="password"
-                value={token}
-                autoComplete="off"
-                spellCheck={false}
-                onChange={(event) => setToken(event.target.value)}
-              />
-            )}
-          </FormField>
-          <div className={styles.row}>
-            <Button type="submit" disabled={working || repository.trim() === '' || token === ''}>
-              {working ? 'Connecting…' : 'Connect'}
-            </Button>
-          </div>
-        </form>
+        <>
+          {status.canConnectApp ? (
+            <div className={styles.form}>
+              <p className={styles.hint}>
+                The simplest way: install the Tusk App on GitHub, on this one repository alone.
+                GitHub asks you to choose it, and Tusk keeps no token: it asks GitHub for a
+                short-lived one each time it backs up.
+              </p>
+              <div className={styles.row}>
+                <ButtonLink href="/api/backup/app/install">Connect with GitHub</ButtonLink>
+              </div>
+            </div>
+          ) : null}
+          {status.canConnect ? (
+            <form
+              className={styles.form}
+              onSubmit={(event) => {
+                event.preventDefault();
+                void connect();
+              }}
+            >
+              <p className={styles.hint}>
+                On GitHub, make a fine-grained token (Settings, Developer settings, Fine-grained
+                tokens) for this one repository alone, with the permission{' '}
+                <em>Contents: Read and write</em>. Tusk uses nothing else.
+              </p>
+              <FormField label="Repository" hint="owner/name, or its address on GitHub" required>
+                {(field) => (
+                  <Input
+                    {...field}
+                    value={repository}
+                    autoComplete="off"
+                    spellCheck={false}
+                    onChange={(event) => setRepository(event.target.value)}
+                  />
+                )}
+              </FormField>
+              <FormField label="Token" required>
+                {(field) => (
+                  <Input
+                    {...field}
+                    type="password"
+                    value={token}
+                    autoComplete="off"
+                    spellCheck={false}
+                    onChange={(event) => setToken(event.target.value)}
+                  />
+                )}
+              </FormField>
+              <div className={styles.row}>
+                <Button
+                  type="submit"
+                  disabled={working || repository.trim() === '' || token === ''}
+                >
+                  {working ? 'Connecting…' : 'Connect'}
+                </Button>
+              </div>
+            </form>
+          ) : null}
+        </>
       ) : null}
     </div>
   );

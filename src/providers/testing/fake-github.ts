@@ -4,6 +4,7 @@ import { type IncomingMessage, type Server, type ServerResponse, createServer } 
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createPublicKey, createVerify, randomBytes } from 'node:crypto';
 import { processEnv } from '../../config/env';
 import type { RepositoryRef } from '../types';
 
@@ -68,12 +69,29 @@ export class FakeGitHub {
   readonly requests: { method: string; path: string }[] = [];
   private readonly tokens = new Map<
     string,
-    { write: boolean; only: ReadonlySet<string> | undefined }
+    {
+      write: boolean;
+      only: ReadonlySet<string> | undefined;
+      installation?: number;
+      expiresAt?: number;
+    }
   >();
   private readonly repositories = new Map<
     string,
     { gitDir: string; private: boolean; defaultBranch: string; archived: boolean }
   >();
+  /** The GitHub App (§21.2): its key and OAuth client, the installations, and the people who have authorised and the tokens that made. */
+  private app:
+    { appId: string; publicKey: string; clientId: string; clientSecret: string } | undefined;
+  private readonly installations = new Map<
+    number,
+    { repositories: Set<string>; users: Set<string> }
+  >();
+  private readonly codes = new Map<string, string>();
+  private readonly userTokens = new Map<string, string>();
+  /** How many installation tokens have been made, and the lifetime the next gets: a test of what is kept in memory reads and sets these. */
+  installationTokensIssued = 0;
+  installationTokenLifetimeMs = 60 * 60_000;
   private failures: Failure[] = [];
   private lost: { method: string; times: number }[] = [];
   private slow = 0;
@@ -142,6 +160,39 @@ export class FakeGitHub {
         options.files ?? { 'README.md': '# A repository\n' },
         'Initial commit',
       );
+  }
+
+  /** Registers the App: its public key (what the JWTs are checked against), its id, and the OAuth client the person is identified through. */
+  registerApp(options: {
+    appId: string;
+    publicKey: string;
+    clientId: string;
+    clientSecret: string;
+  }): void {
+    this.app = options;
+  }
+
+  /** An installation of the App, on these repositories, which these users (by login) can reach. */
+  addInstallation(
+    id: number,
+    options: { repositories: readonly RepositoryRef[]; users: readonly string[] },
+  ): void {
+    this.installations.set(id, {
+      repositories: new Set(options.repositories.map(key)),
+      users: new Set(options.users),
+    });
+  }
+
+  /** The installation is removed: it makes no more tokens and no one reaches it. The tokens already made stop working too. */
+  removeInstallation(id: number): void {
+    this.installations.delete(id);
+    for (const [token, grant] of this.tokens)
+      if (grant.installation === id) this.tokens.delete(token);
+  }
+
+  /** A `code` that GitHub would hand back after this user authorised the App: good once. */
+  authorizeCode(code: string, user: string): void {
+    this.codes.set(code, user);
   }
 
   setPrivate(ref: RepositoryRef, value: boolean): void {
@@ -299,8 +350,62 @@ export class FakeGitHub {
     }
 
     const token = /^Bearer (.+)$/.exec(request.headers.authorization ?? '')?.[1];
+
+    // The App's side: the person is identified (a code for a token), the App asks for an installation's token (with its JWT), and the person is asked which
+    // repositories of an installation they can reach (with the token they were given).
+    if (path === '/login/oauth/access_token' && method === 'POST') {
+      const user =
+        this.app &&
+        body.client_id === this.app.clientId &&
+        body.client_secret === this.app.clientSecret
+          ? this.codes.get(String(body.code))
+          : undefined;
+      this.codes.delete(String(body.code));
+      if (!user) return this.send(response, 200, { error: 'bad_verification_code' });
+      const userToken = `ghu_${randomBytes(12).toString('hex')}`;
+      this.userTokens.set(userToken, user);
+      return this.send(response, 200, { access_token: userToken, token_type: 'bearer' });
+    }
+    const minting = /^\/app\/installations\/(\d+)\/access_tokens$/.exec(path);
+    if (minting && method === 'POST') {
+      if (!token || !this.app || !jwtHolds(token, this.app))
+        return this.send(response, 401, { message: 'A JSON web token could not be decoded' });
+      const installation = this.installations.get(Number(minting[1]));
+      if (!installation) return this.send(response, 404, { message: 'Not Found' });
+      const minted = `ghs_${randomBytes(16).toString('hex')}`;
+      const expiresAt = Date.now() + this.installationTokenLifetimeMs;
+      this.tokens.set(minted, {
+        write: true,
+        only: installation.repositories,
+        installation: Number(minting[1]),
+        expiresAt,
+      });
+      this.installationTokensIssued += 1;
+      return this.send(response, 201, {
+        token: minted,
+        expires_at: new Date(expiresAt).toISOString(),
+      });
+    }
+    const reachable = /^\/user\/installations\/(\d+)\/repositories$/.exec(path);
+    if (reachable && method === 'GET') {
+      const login = token ? this.userTokens.get(token) : undefined;
+      if (!login) return this.send(response, 401, { message: 'Bad credentials' });
+      const installation = this.installations.get(Number(reachable[1]));
+      if (!installation || !installation.users.has(login))
+        return this.send(response, 404, { message: 'Not Found' });
+      return this.send(response, 200, {
+        total_count: installation.repositories.size,
+        repositories: [...installation.repositories].map((name) => ({
+          full_name: name,
+          name: name.split('/')[1],
+          private: this.repositories.get(name)?.private ?? true,
+        })),
+      });
+    }
+
     const grant = token ? this.tokens.get(token) : undefined;
-    if (!grant) return this.send(response, 401, { message: 'Bad credentials' });
+    if (!grant || (grant.expiresAt !== undefined && grant.expiresAt <= Date.now()))
+      return this.send(response, 401, { message: 'Bad credentials' });
 
     // The repositories the token can reach, as `GET /user/repos` lists them (one page of a hundred).
     if (path === '/user/repos' && method === 'GET') {
@@ -442,6 +547,36 @@ export class FakeGitHub {
         : this.send(response, 422, { message: 'Update is not a fast forward' });
     }
     return this.send(response, 404, { message: 'Not Found' });
+  }
+}
+
+/** Whether a JWT is the App's: RS256 under its key, issued by its id, and valid for no more than ten minutes, as GitHub requires. */
+function jwtHolds(jwt: string, app: { appId: string; publicKey: string }): boolean {
+  const parts = jwt.split('.');
+  if (parts.length !== 3) return false;
+  const [head, claims, signature] = parts as [string, string, string];
+  try {
+    const header = JSON.parse(Buffer.from(head, 'base64url').toString('utf8')) as { alg?: string };
+    if (header.alg !== 'RS256') return false;
+    const verified = createVerify('RSA-SHA256')
+      .update(`${head}.${claims}`)
+      .verify(createPublicKey(app.publicKey), Buffer.from(signature, 'base64url'));
+    if (!verified) return false;
+    const body = JSON.parse(Buffer.from(claims, 'base64url').toString('utf8')) as {
+      iss?: unknown;
+      iat?: number;
+      exp?: number;
+    };
+    const now = Math.floor(Date.now() / 1000);
+    return (
+      String(body.iss) === app.appId &&
+      typeof body.iat === 'number' &&
+      typeof body.exp === 'number' &&
+      body.exp > now &&
+      body.exp - body.iat <= 10 * 60
+    );
+  } catch {
+    return false;
   }
 }
 

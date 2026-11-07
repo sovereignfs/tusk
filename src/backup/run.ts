@@ -6,6 +6,7 @@ import { readCredential } from '../crypto/store';
 import type { Database } from '../db/client';
 import { dbAll } from '../db/exec';
 import { GitHubProvider } from '../providers/github';
+import type { InstallationTokens } from '../github-app/tokens';
 import { type Provider, ProviderError, type RepositoryRef } from '../providers/types';
 import { MAX_FILE_BYTES } from '../portability/validate';
 import { serialise } from '../portability/format';
@@ -94,6 +95,8 @@ export interface RunDeps {
   readonly ring: KeyRing | undefined;
   readonly apiUrl: string;
   readonly makeProvider?: (token: string) => Provider;
+  /** Where an installation's token comes from, when the GitHub App is set up (§21.2). */
+  readonly tokens?: InstallationTokens;
 }
 
 function problemOf(error: unknown): { problem: RunProblem; retryAfterMs?: number } {
@@ -144,18 +147,30 @@ async function attempt(
 ): Promise<RunResult> {
   const connection = await readConnection(deps.database, accountId);
   if (!connection) return { ok: false, problem: 'not_connected' };
-  if (!deps.ring) return { ok: false, problem: 'no_key' };
-
+  // The token: a sealed one the person gave, or one asked of GitHub for the App's installation (kept in memory, never written).
   let token: string | undefined;
-  try {
-    token = await readCredential(deps.database, deps.ring, {
-      id: credentialIdOf(accountId),
-      accountId,
-      purpose: TOKEN_PURPOSE,
-    });
-  } catch (error) {
-    // A token that cannot be opened (a key that is not the one it was sealed under) is as good as none; the error says what it must not, so it is not kept.
-    if (!(error instanceof CryptoError)) throw error;
+  if (connection.kind === 'app') {
+    if (!deps.tokens || connection.installationId === null)
+      return { ok: false, problem: 'token_rejected' };
+    try {
+      token = await deps.tokens.forInstallation(connection.installationId);
+    } catch (error) {
+      if (error instanceof ProviderError && error.code === 'not_found')
+        return { ok: false, problem: 'token_rejected' };
+      return { ok: false, ...problemOf(error) };
+    }
+  } else {
+    if (!deps.ring) return { ok: false, problem: 'no_key' };
+    try {
+      token = await readCredential(deps.database, deps.ring, {
+        id: credentialIdOf(accountId),
+        accountId,
+        purpose: TOKEN_PURPOSE,
+      });
+    } catch (error) {
+      // A token that cannot be opened (a key that is not the one it was sealed under) is as good as none; the error says what it must not, so it is not kept.
+      if (!(error instanceof CryptoError)) throw error;
+    }
   }
   if (token === undefined) return { ok: false, problem: 'token_rejected' };
 

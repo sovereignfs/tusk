@@ -3,6 +3,7 @@ import { runDueBackups } from '../backup/auto';
 import type { Config } from '../config';
 import { getConfig } from '../config/current';
 import { getAuthDatabase, getDatabase } from '../db/boot';
+import { installationTokens } from '../github-app/server';
 import { purge } from '../sync/purge';
 import { trimNotices } from '../workspaces/inbox';
 import { JobRunner, realDeps, type JobDefinition, type RunnerDeps } from './runner';
@@ -37,13 +38,15 @@ export const jobs: readonly JobDefinition[] = [
     everyMs: 60 * 1000,
     run: async ({ now }) => {
       const config = getConfig();
-      if (!config.encryption) return;
+      // With neither a key nor the App there is nothing that could have been connected.
+      if (!config.encryption && !config.githubApp) return;
       const summary = await runDueBackups(
         {
           database: await getDatabase(),
           directory: authDirectory(await getAuthDatabase()),
           ring: config.encryption,
           apiUrl: config.githubApiUrl,
+          ...(installationTokens() ? { tokens: installationTokens() } : {}),
         },
         now.getTime(),
         {},

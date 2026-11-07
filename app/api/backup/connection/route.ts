@@ -22,6 +22,7 @@ async function deps(): Promise<ConnectionDeps> {
     apiUrl: config.githubApiUrl,
     now: Date.now,
     limiter: new RateLimiter(database),
+    appAvailable: config.githubApp !== undefined,
   };
 }
 

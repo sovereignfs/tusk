@@ -101,6 +101,19 @@ export const ROUTES: RouteRule[] = [
   { route: '/api/health', methods: { GET: { kind: 'public' } } },
   // The service worker's text (DESIGN.md §17.9): the same for everyone, the build's version and the names of its files, and nothing of an account.
   { route: '/sw.js', methods: { GET: { kind: 'public' } } },
+  // The GitHub App (DESIGN.md §21.2): to GitHub to install it, and where GitHub sends the person back (the `state` must be their cookie's). Not found where no App is set up.
+  { route: '/api/backup/app/install', methods: { GET: { kind: 'account' } } },
+  { route: '/api/backup/app/callback', methods: { GET: { kind: 'account' } } },
+  // What GitHub tells the app about the App: an installation was removed. Authenticated by the signature over the body alone.
+  {
+    route: '/api/webhooks/github',
+    methods: {
+      POST: {
+        kind: 'public',
+        because: 'a signature over the body, checked against the App’s webhook secret',
+      },
+    },
+  },
   // What Sovereign tells the app (DESIGN.md §22): a person's session there ended, or they deleted their account. The signed token in the body is the credential, checked
   // against core's keys by the SDK; there is no session and no \`Origin\`. Absent, with a 404, where Sovereign sign-in is not set up.
   {

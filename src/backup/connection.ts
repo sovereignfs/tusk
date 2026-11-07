@@ -17,48 +17,17 @@ import { backupConnectionTable } from './tables';
  * nothing behind. The token is sealed by `src/crypto/` under an id made from the account, so that one account has one and a repeat is a replacement, and the
  * row beside it holds no secret. A token that can reach more repositories than this one is accepted, with a warning that says how many.
  */
-export type ConnectProblem =
-  | 'address'
-  | 'host'
-  | 'password'
-  | 'no_key'
-  | 'token'
-  | 'token_rejected'
-  | 'not_visible'
-  | 'public'
-  | 'empty'
-  | 'read_only'
-  | 'rate_limited'
-  | 'unreachable';
+import { type ConnectProblem, PROBLEM_MESSAGES } from './problems';
 
-/** What to tell a person, for each. */
-export const PROBLEM_MESSAGES: Record<ConnectProblem, string> = {
-  address:
-    'That is not the address of a repository. Paste its address (https://github.com/owner/name), or write it as owner/name.',
-  host: 'Only repositories on GitHub can be connected, and that address is on another host.',
-  password:
-    'That address has a user name or password in it. Paste the address without it: the token goes in the next box.',
-  no_key:
-    'This server has no encryption key, so it cannot keep a token safely. Ask whoever runs it to set TUSK_ENCRYPTION_KEY.',
-  token: 'Paste the token you made on GitHub.',
-  token_rejected:
-    'GitHub did not accept that token. It may have a typo, have expired or have been revoked. Make a new one and paste it.',
-  not_visible:
-    'The token cannot see that repository. Check the address, and that the token was made for this repository.',
-  public:
-    'That repository is public, and a backup is plain text that anyone could read. Only a private repository can be connected: make it private, or connect another.',
-  empty:
-    'That repository has nothing in it yet. Add a file (a README will do) on GitHub, then connect it again.',
-  read_only:
-    'The token can read that repository but not write to it. Make a token for it with “Contents: Read and write”.',
-  rate_limited: 'GitHub asks to be left alone for a while. Try again in a few minutes.',
-  unreachable: 'GitHub could not be reached. Try again in a little while.',
-};
+export { type ConnectProblem, PROBLEM_MESSAGES };
 
 /** What is known of a connection, with nothing secret in it: this is what is shown, and what a response carries. */
 export interface Connection {
   readonly accountId: string;
-  readonly kind: 'token';
+  /** `token` (a token the person made) or `app` (the GitHub App's installation). */
+  readonly kind: 'token' | 'app';
+  /** The installation, for `app`; null for a token. */
+  readonly installationId: number | null;
   /** `owner/name`. */
   readonly repository: string;
   readonly branch: string;
@@ -133,6 +102,32 @@ function problemOf(error: unknown, notFound: ConnectProblem): ConnectProblem {
   }
 }
 
+/**
+ * The checks of a connection, in the order a person would fix things, whichever way it was made: the host accepts the credential and the repository is
+ * visible to it, **the repository is private**, its default branch has something in it, and the credential can write.
+ */
+export async function checkRepository(
+  provider: Provider,
+  ref: RepositoryRef,
+): Promise<{ ok: true; branch: string } | { ok: false; problem: ConnectProblem }> {
+  try {
+    const repository = await provider.getRepository(ref);
+    if (!repository.private) return { ok: false, problem: 'public' };
+    try {
+      await provider.getHead(ref, repository.defaultBranch);
+    } catch (error) {
+      if (error instanceof ProviderError && error.code === 'empty_repository')
+        return { ok: false, problem: 'empty' };
+      throw error;
+    }
+    if (!(await provider.canWrite(ref, repository.defaultBranch)))
+      return { ok: false, problem: 'read_only' };
+    return { ok: true, branch: repository.defaultBranch };
+  } catch (error) {
+    return { ok: false, problem: problemOf(error, 'not_visible') };
+  }
+}
+
 export async function readConnection(
   database: Database,
   accountId: string,
@@ -155,18 +150,20 @@ export async function readConnection(
     failureKind: string | null;
     failures: number | string;
     stoppedAt: number | string | null;
+    installationId: number | string | null;
   }>(
     database,
     sql`SELECT account_id AS "accountId", kind, repository, branch, credential_id AS "credentialId", created_at AS "createdAt",
         last_backup_at AS "lastBackupAt", last_backup_path AS "lastBackupPath", last_fingerprint AS "lastFingerprint",
         last_checked_at AS "lastCheckedAt", mode, frequency, next_backup_at AS "nextBackupAt", key_confirmed_at AS "keyConfirmedAt",
-        failure_kind AS "failureKind", failures, stopped_at AS "stoppedAt"
+        failure_kind AS "failureKind", failures, stopped_at AS "stoppedAt", installation_id AS "installationId"
         FROM ${backupConnectionTable(database)} WHERE account_id = ${accountId}`,
   );
   return row
     ? {
         accountId: row.accountId,
-        kind: 'token',
+        kind: row.kind === 'app' ? 'app' : 'token',
+        installationId: row.installationId === null ? null : Number(row.installationId),
         repository: row.repository,
         branch: row.branch,
         credentialId: row.credentialId,
@@ -207,22 +204,9 @@ export async function connectRepository(
   )(token);
   const ref: RepositoryRef = parsed.ref;
 
-  let branch: string;
-  try {
-    const repository = await provider.getRepository(ref);
-    if (!repository.private) return { ok: false, problem: 'public' };
-    branch = repository.defaultBranch;
-    try {
-      await provider.getHead(ref, branch);
-    } catch (error) {
-      if (error instanceof ProviderError && error.code === 'empty_repository')
-        return { ok: false, problem: 'empty' };
-      throw error;
-    }
-    if (!(await provider.canWrite(ref, branch))) return { ok: false, problem: 'read_only' };
-  } catch (error) {
-    return { ok: false, problem: problemOf(error, 'not_visible') };
-  }
+  const checked = await checkRepository(provider, ref);
+  if (!checked.ok) return checked;
+  const branch = checked.branch;
 
   // A token that reaches more than it needs is accepted; not being able to count is not a reason to refuse one.
   const alsoReaches = await provider.reachable().then(
@@ -298,4 +282,78 @@ export async function confirmKey(
         WHERE account_id = ${accountId} RETURNING account_id`,
   );
   return rows.length > 0;
+}
+
+/** What connecting through the App needs: the database, the address of the API, and a provider that speaks as the installation. */
+export interface InstallationDeps {
+  readonly database: Database;
+  readonly now: () => number;
+  /** A provider that speaks as the installation (a token asked for, kept in memory). */
+  readonly providerFor: (installationId: number) => Promise<Provider>;
+}
+
+/**
+ * Connects `ref` through the App's installation (DESIGN.md §21.2). **The caller has already shown that this installation is the person's** (the
+ * repositories it can reach for them, `src/github-app/user.ts`); the checks of every connection then apply with the installation's own token. Nothing secret is
+ * kept: the row says which installation, and the token is asked for each time it is wanted.
+ */
+export async function connectInstallation(
+  deps: InstallationDeps,
+  accountId: string,
+  installationId: number,
+  ref: RepositoryRef,
+): Promise<ConnectResult> {
+  let provider: Provider;
+  try {
+    provider = await deps.providerFor(installationId);
+  } catch (error) {
+    return { ok: false, problem: problemOf(error, 'app_not_yours') };
+  }
+  const checked = await checkRepository(provider, ref);
+  if (!checked.ok) return checked;
+  const now = deps.now();
+  const sealed = (await readEncryption(deps.database, accountId)).mode !== 'none';
+  // Connecting again replaces: a token that was kept before goes, since this connection has none.
+  await deleteCredential(deps.database, {
+    id: credentialIdOf(accountId),
+    accountId,
+    purpose: TOKEN_PURPOSE,
+  });
+  await dbAll(
+    deps.database,
+    sql`INSERT INTO ${backupConnectionTable(deps.database)} AS c (account_id, kind, repository, branch, credential_id, created_at, key_confirmed_at, installation_id)
+        VALUES (${accountId}, 'app', ${`${ref.owner}/${ref.name}`}, ${checked.branch}, ${credentialIdOf(accountId)}, ${now}, ${sealed ? now : null}, ${installationId})
+        ON CONFLICT (account_id) DO UPDATE SET
+          kind = 'app', repository = ${`${ref.owner}/${ref.name}`}, branch = ${checked.branch}, credential_id = ${credentialIdOf(accountId)}, created_at = ${now},
+          installation_id = ${installationId},
+          last_backup_at = NULL, last_backup_path = NULL, last_fingerprint = NULL, last_checked_at = NULL,
+          key_confirmed_at = ${sealed ? now : null},
+          failure_kind = NULL, failures = 0, stopped_at = NULL
+        RETURNING account_id`,
+  );
+  const connection = await readConnection(deps.database, accountId);
+  if (!connection) throw new Error('a connection that was just written is not there');
+  return { ok: true, connection, alsoReaches: 0 };
+}
+
+/**
+ * GitHub says an installation was removed, or a repository taken from it: disconnects what that left without access. `repositories` are `owner/name`s that were
+ * removed; omitted, the whole installation went. Safe to run twice. Returns how many connections it removed.
+ */
+export async function disconnectInstallation(
+  database: Database,
+  installationId: number,
+  repositories?: readonly string[],
+): Promise<number> {
+  const rows = await dbAll<{ accountId: string; repository: string }>(
+    database,
+    sql`SELECT account_id AS "accountId", repository FROM ${backupConnectionTable(database)} WHERE installation_id = ${installationId} AND kind = 'app'`,
+  );
+  const lost = new Set((repositories ?? []).map((each) => each.toLowerCase()));
+  let removed = 0;
+  for (const row of rows) {
+    if (repositories !== undefined && !lost.has(row.repository.toLowerCase())) continue;
+    if (await disconnectRepository(database, row.accountId)) removed += 1;
+  }
+  return removed;
 }

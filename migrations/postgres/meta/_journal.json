@@ -78,6 +78,13 @@
       "when": 1794010826270,
       "tag": "0010_backup_failures",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1794038447966,
+      "tag": "0011_github_app_installation",
+      "breakpoints": true
     }
   ]
 }
