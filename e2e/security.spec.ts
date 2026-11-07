@@ -1,13 +1,14 @@
 import { expect, test, type Page } from '@playwright/test';
 import { totpFor } from '../src/auth/testing/totp';
 import { EMAIL, PASSWORD, ensureAccount, signOut, trySignIn } from './helpers';
+import { PORTS } from './ports';
 
 /**
  * An authenticator app, backup codes and passkeys in a real browser (task 2.4, DESIGN.md §6, §19), on the third instance (`playwright.config.ts`) because they
  * change how the account signs in. Passkeys use Chromium's virtual authenticator over the DevTools protocol, the one way to run a passkey with no person; WebKit
  * has none, so they are tried in Chromium only. The authenticator app runs in both browsers: enrol, sign in with the code, with a backup code once, turn off.
  */
-test.use({ baseURL: 'http://localhost:3996', viewport: { width: 1280, height: 800 } });
+test.use({ baseURL: `http://localhost:${PORTS.security}`, viewport: { width: 1280, height: 800 } });
 
 /** The password step alone: with an authenticator app on, the page that follows asks for a code, which the shared helper does not know. */
 async function password(page: Page) {

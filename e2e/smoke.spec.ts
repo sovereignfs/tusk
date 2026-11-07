@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { PORTS } from './ports';
 
 /**
  * The first browser test: the built app is up on its database, its page is the frame it should be, and the browser enforces the policy it is
@@ -100,7 +101,7 @@ test('the typeface is the design system’s, served from this origin', async ({ 
   const family = await page.evaluate(() => getComputedStyle(document.body).fontFamily);
   expect(family).toContain('Hanken Grotesk');
   const foreign = requested.filter(
-    (url) => !url.startsWith('http://localhost:3999/') && !url.startsWith('data:'),
+    (url) => !url.startsWith(`http://localhost:${PORTS.app}/`) && !url.startsWith('data:'),
   );
   expect(foreign).toEqual([]);
 });

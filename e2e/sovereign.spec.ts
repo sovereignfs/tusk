@@ -1,18 +1,21 @@
 import { expect, test, type Page } from '@playwright/test';
 import { signOut } from './helpers';
+import { PORTS } from './ports';
 
 /**
  * Signing in through Sovereign (task 2.5, DESIGN.md §6), a fake one (`e2e/fake-sovereign-server.ts`), on two instances of their own: one that takes only
- * Sovereign and only its first account (3995), and one that takes both ways and anyone (3994). The instances keep their accounts between the two browsers,
+ * Sovereign and only its first account, and one that takes both ways and anyone (their ports are in `e2e/ports.ts`). The instances keep their accounts between the two browsers,
  * so each test is the same whichever runs first: the same person signs in as the same account, and a stranger is turned away either way.
  */
-const SOVEREIGN = 'http://localhost:3995';
-const BOTH = 'http://localhost:3994';
+const SOVEREIGN = `http://localhost:${PORTS.sovereign}`;
+const BOTH = `http://localhost:${PORTS.both}`;
 const FIRST = { sub: 'e2e-first', email: 'first@sovereign.test', name: 'Grace Hopper' };
 const SECOND = { sub: 'e2e-second', email: 'second@sovereign.test', name: 'Alan Turing' };
 
 async function nextPersonIs(page: Page, who: { sub: string; email: string; name?: string }) {
-  const reply = await page.request.post('http://localhost:3191/sign-in-as', { data: who });
+  const reply = await page.request.post(`http://localhost:${PORTS.coreControl}/sign-in-as`, {
+    data: who,
+  });
   expect(reply.ok()).toBe(true);
 }
 
@@ -116,7 +119,7 @@ test.describe('an instance that signs in through Sovereign only', () => {
     sub: string,
     wrong?: Wrong,
   ): Promise<string> {
-    const reply = await page.request.post('http://localhost:3191/notice', {
+    const reply = await page.request.post(`http://localhost:${PORTS.coreControl}/notice`, {
       data: { kind, sub, sid: 'core-session-1', wrong },
     });
     expect(reply.ok()).toBe(true);

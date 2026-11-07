@@ -1,12 +1,13 @@
-// The fake Sovereign (src/auth/testing/fake-sovereign.ts) as a process of its own, for the browser tests: the OIDC provider on 3190, and on 3191 a control
+// The fake Sovereign (src/auth/testing/fake-sovereign.ts) as a process of its own, for the browser tests: the OIDC provider on `PORTS.coreAuth`, and on `PORTS.coreControl` a control
 // port, where a test says who the next person to sign in is (POST /sign-in-as, a JSON user), asks for a signed notice to the app (POST /notice, a JSON
 // { kind: "logout" | "account-deleted", sub, sid?, wrong? }, answered with the token) and which the webServer waits on (GET /health). Run by
 // playwright.config.ts; Node strips the types itself.
 import { createServer } from 'node:http';
 import { startFakeSovereign } from '../src/auth/testing/fake-sovereign.ts';
+import { PORTS } from './ports.ts';
 
 const fake = await startFakeSovereign({
-  port: 3190,
+  port: PORTS.coreAuth,
   clientId: 'tusk-e2e-client',
   clientSecret: 'tusk-e2e-secret',
 });
@@ -37,4 +38,4 @@ createServer((req, res) => {
     return;
   }
   res.writeHead(404).end();
-}).listen(3191, () => console.log(`fake Sovereign at ${fake.issuer}`));
+}).listen(PORTS.coreControl, () => console.log(`fake Sovereign at ${fake.issuer}`));

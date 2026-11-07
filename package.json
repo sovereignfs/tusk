@@ -30,7 +30,8 @@
     "db:dev": "node scripts/dev-db.mjs",
     "boot-check": "node scripts/boot-check.mjs",
     "seed": "node scripts/seed-run.mjs",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "e2e:fast": "node scripts/e2e-shard.mjs --all"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "~1.7.16",

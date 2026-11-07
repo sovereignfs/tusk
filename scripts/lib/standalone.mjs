@@ -10,6 +10,9 @@ const standalone = resolve(root, '.next/standalone');
 export function prepareStandalone() {
   const entry = resolve(standalone, 'server.js');
   if (!existsSync(entry)) throw new Error(`${entry} is not there: run pnpm build first`);
+  // Several servers start at once when the browser tests are sharded: the one that started them has already put the files there (`scripts/e2e-shard.mjs`),
+  // and copying them again, all at once, over each other, is how a file is read half written.
+  if (process.env.TUSK_STANDALONE_READY === '1') return entry;
   cpSync(resolve(root, '.next/static'), resolve(standalone, '.next/static'), { recursive: true });
   if (existsSync(resolve(root, 'public'))) {
     cpSync(resolve(root, 'public'), resolve(standalone, 'public'), { recursive: true });

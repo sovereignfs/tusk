@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { FakeGitHub } from '../src/providers/testing/fake-github';
 import { EMAIL, PASSWORD, ensureAccount, trySignIn } from './helpers';
+import { PORTS } from './ports';
 
 /**
  * Connecting a repository (task 10.3, DESIGN.md §21.2), in the page: it says plainly what will be sent and where, refuses a public repository in words that
@@ -13,7 +14,7 @@ const TOKEN = 'github_pat_E2E_PLANTED_0123456789';
 let fake: FakeGitHub;
 
 test.beforeAll(async () => {
-  fake = await FakeGitHub.start(3998);
+  fake = await FakeGitHub.start(PORTS.github);
   fake.addToken(TOKEN, { write: true });
 });
 test.afterAll(async () => fake.stop());

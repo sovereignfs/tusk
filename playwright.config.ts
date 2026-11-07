@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
+import { PORTS } from './e2e/ports.ts';
 
 /**
  * Browser tests (`pnpm build && pnpm e2e`): the real app, built, in a real browser. They are where the things a unit test cannot show are shown:
@@ -14,29 +15,31 @@ import { defineConfig, devices } from '@playwright/test';
  * Two browsers: Chromium, and WebKit, which is Safari's engine and where iOS's scrolling and compositing differ most (DESIGN.md §15.8). WebKit here
  * is a desktop build: it does not check touch, which the iOS Simulator does, by hand, and says so in the PR.
  *
+ * The ports are `e2e/ports.ts`'s, shifted by `TUSK_E2E_PORT_OFFSET`, which is how `scripts/e2e-shard.mjs` runs several of these at once.
+ *
  * The secret below is for this throwaway instance only.
  */
-const PORT = 3999;
+const PORT = PORTS.app;
 /** Where the fake GitHub of `e2e/backup.spec.ts` listens: the app under test is told this before the test starts it. */
-const GITHUB_PORT = 3998;
+const GITHUB_PORT = PORTS.github;
 /**
  * A second instance, for the journeys that change an account for good (a key of one's own is one way, DESIGN.md §9.1): its own SQLite file whatever the
  * first instance runs on, and its own first account, so that nothing the first instance's tests share is touched. `e2e/key.spec.ts` is the one that uses it.
  */
-const KEYS_PORT = 3997;
+const KEYS_PORT = PORTS.keys;
 /**
  * A third, for the journeys that change how an account signs in (an authenticator app, passkeys): the shared account of the first instance would be left needing
  * a code by one that failed half way. Its own SQLite file and its own first account, like the second's. `e2e/security.spec.ts` uses it.
  */
-const SECURITY_PORT = 3996;
+const SECURITY_PORT = PORTS.security;
 /**
- * Two more, for signing in through Sovereign, a fake one run by `e2e/fake-sovereign-server.ts` (port 3190, and a control port, 3191, that says who the next
+ * Two more, for signing in through Sovereign, a fake one run by `e2e/fake-sovereign-server.ts` (its ports are in `e2e/ports.ts`, and a control port says who the next
  * person to sign in is): one that takes only Sovereign and only the first account, and one that takes both ways and anyone. `e2e/sovereign.spec.ts`.
  */
-const SOVEREIGN_PORT = 3995;
-const BOTH_PORT = 3994;
+const SOVEREIGN_PORT = PORTS.sovereign;
+const BOTH_PORT = PORTS.both;
 const CORE = {
-  TUSK_CORE_URL: 'http://localhost:3190/api/auth',
+  TUSK_CORE_URL: `http://localhost:${PORTS.coreAuth}/api/auth`,
   TUSK_CORE_CLIENT_ID: 'tusk-e2e-client',
   TUSK_CORE_CLIENT_SECRET: 'tusk-e2e-secret',
 };
@@ -93,7 +96,7 @@ export default defineConfig({
     // First, so that it is up when the instances that sign in through it start and discover it.
     {
       command: 'node e2e/fake-sovereign-server.ts',
-      url: 'http://localhost:3191/health',
+      url: `http://localhost:${PORTS.coreControl}/health`,
       timeout: 30_000,
       reuseExistingServer: false,
     },

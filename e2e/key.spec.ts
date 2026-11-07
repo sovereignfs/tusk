@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
 import { PROTOCOL_VERSION } from '../src/sync/format';
 import { EMAIL, PASSWORD, ensureAccount, signOut, trySignIn } from './helpers';
+import { PORTS } from './ports';
 
 /**
  * A key of one's own (task 14.2, DESIGN.md §9.1), on the second instance (`playwright.config.ts`) because it is one way and the first instance's account is
@@ -12,7 +13,7 @@ import { EMAIL, PASSWORD, ensureAccount, signOut, trySignIn } from './helpers';
  * locked and shows nothing of itself while boards and the Inbox are as they were, a key that is not theirs is told apart from one that is not a key, and
  * their own file opens it. WebKit, which cannot store the key as a key, keeps it sealed (the epic's finding), and this shows that works.
  */
-test.use({ baseURL: 'http://localhost:3997', viewport: { width: 1280, height: 800 } });
+test.use({ baseURL: `http://localhost:${PORTS.keys}`, viewport: { width: 1280, height: 800 } });
 
 // A throwaway key made by `age-keygen` for these tests: valid, and not the one this Desk is set up with.
 const OTHER_KEY = 'AGE-SECRET-KEY-12V57LEMWYJJ90MPPM2SR3FNVRPX4MJ5ZU404FQ5LJSPNGSSN5G7Q4C83JF';
@@ -43,7 +44,7 @@ test('a key is made here, saved and said to be saved, and turns on a Desk that w
   await expect(page.getByRole('link', { name: secret, exact: true })).toBeVisible();
   const serverView = async () => {
     const reply = await page.request.post('/api/sync', {
-      headers: { origin: 'http://localhost:3997' },
+      headers: { origin: `http://localhost:${PORTS.keys}` },
       data: { protocol: PROTOCOL_VERSION, cursor: 0, mutations: [] },
     });
     const text = await reply.text();
@@ -86,7 +87,7 @@ test('a key is made here, saved and said to be saved, and turns on a Desk that w
     .toBe('personal');
   const everything = await (
     await page.request.post('/api/sync', {
-      headers: { origin: 'http://localhost:3997' },
+      headers: { origin: `http://localhost:${PORTS.keys}` },
       data: { protocol: PROTOCOL_VERSION, cursor: 0, mutations: [] },
     })
   ).text();

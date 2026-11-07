@@ -55,10 +55,17 @@ test('the Planner is between the Desk and the Inbox, and its page is blank for n
   page,
 }) => {
   await signedIn(page);
+  // The sidebar is drawn a moment after the page: wait for it, and then read the order of its places (the Inbox may carry a count after its name).
+  await expect(sidebar(page).getByRole('link', { name: 'Planner' })).toBeVisible();
   const places = await sidebar(page)
     .getByRole('link')
     .evaluateAll((links) => links.slice(0, 4).map((link) => link.textContent?.trim() ?? ''));
-  expect(places).toEqual(['Home', 'Desk', 'Planner', 'Inbox']);
+  expect(places.map((each) => each.replace(/\d+$/, ''))).toEqual([
+    'Home',
+    'Desk',
+    'Planner',
+    'Inbox',
+  ]);
   await sidebar(page).getByRole('link', { name: 'Planner' }).click();
   await expect(page).toHaveURL(/\/planner$/);
   await expect(sidebar(page).getByRole('link', { name: 'Planner' })).toHaveAttribute(
