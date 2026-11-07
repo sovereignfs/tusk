@@ -38,6 +38,7 @@ Each release's section is also its GitHub release notes: the release workflow re
 - A local account can link Sovereign from Settings > Security, when the Sovereign account uses the same email address, and can unlink it (after a recent sign-in) as long as it has another way in. An account that came in through Sovereign alone has no password, authenticator app or passkeys to manage, and deletes itself on a recent sign-in instead of a password.
 - Sovereign can sign a person out of Tusk everywhere, and delete their Tusk account when they delete theirs, by signed notices Tusk checks against its keys (`/api/sovereign/backchannel-logout`, `/api/sovereign/account-deleted`). `sovereign.manifest.json` is now complete, so a Sovereign instance can host Tusk (`sv app add`): see `deploy/README.md`.
 - Where whoever runs Tusk has registered a GitHub App, Settings > Data > Backup offers _Connect with GitHub_: the person installs the App on one private repository and Tusk keeps no token, asking GitHub for a short-lived one each time. Removing the App or the repository on GitHub disconnects it. Connecting with a token still works.
+- On a phone, the sidebar and the Desk's lists are in a drawer the header's button opens, a card opens as a page of its own, a board's lists scroll sideways and stop at each, and the card's dialog fills the screen. The addresses and the data are the same at every width.
 
 ### Changed
 

@@ -90,11 +90,16 @@ test('a storage that is empty, or full of nonsense, leaves the default', async (
 test.describe('at a phone’s width', () => {
   test.use({ viewport: { width: 375, height: 700 } });
 
-  test('there is no sidebar and no button for one: the footer is the phone’s (task 7.2)', async ({
+  test('there is no sidebar beside the page: the same places are in a drawer the header’s button opens (task 7.9)', async ({
     page,
   }) => {
     await signedIn(page);
     await expect(sidebar(page)).toHaveCount(0);
-    await expect(page.getByRole('button', { name: /sidebar/i })).toHaveCount(0);
+    await expect(
+      page.getByRole('button', { name: /Hide the sidebar|Show the sidebar/ }),
+    ).toHaveCount(0);
+    await page.getByRole('button', { name: 'Open the navigation' }).click();
+    const drawer = page.getByRole('dialog', { name: 'Navigation' });
+    await expect(drawer.getByRole('link', { name: 'Boards' })).toBeVisible();
   });
 });

@@ -349,3 +349,25 @@
   gap: var(--sv-space-3);
   min-width: 12rem;
 }
+
+/* On a phone (DESIGN.md §18): the columns scroll sideways and each stops at the left edge, nearly the width of the screen, so that one list is read at a time and
+   the next is a hint at the edge. Only what is laid out differs: the same board, at the same address. */
+@media (max-width: 768px) {
+  .columns {
+    padding-right: var(--sv-space-4);
+    padding-left: var(--sv-space-4);
+    scroll-snap-type: x mandatory;
+    scroll-padding-left: var(--sv-space-4);
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .column {
+    width: min(85vw, 320px);
+    scroll-snap-align: start;
+  }
+
+  /* The last thing in the row (the button that adds a list) is a stop too, at the right edge: otherwise a mandatory snap would send the row back from it. */
+  .columns > :last-child {
+    scroll-snap-align: end;
+  }
+}

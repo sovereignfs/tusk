@@ -74,19 +74,11 @@ const isUnder = (pathname: string, prefixes: readonly string[]) =>
     (prefix) => pathname === prefix || (prefix !== '/' && pathname.startsWith(`${prefix}/`)),
   );
 
-export function AppSidebar() {
-  const pathname = usePathname();
-  const sidebar = useSidebar();
+/** The places and the workspaces: what the sidebar holds, and what the phone's drawer holds too. */
+function NavigationContent({ rail, pathname }: { rail: boolean; pathname: string }) {
   const unread = useUnread();
-  if (!sidebar.available || sidebar.state === 'hidden') return null;
-  const rail = sidebar.state === 'rail';
-
   return (
-    <nav
-      className={`${styles.sidebar} ${rail ? styles.rail : ''}`}
-      aria-label="Tusk"
-      data-sidebar={sidebar.state}
-    >
+    <>
       <ul className={styles.list}>
         {ENTRIES.map((entry) => (
           <li key={entry.href}>
@@ -116,6 +108,32 @@ export function AppSidebar() {
         ))}
       </ul>
       <Workspaces rail={rail} pathname={pathname} />
+    </>
+  );
+}
+
+/** The navigation as the phone's drawer shows it: the same entries and workspaces, full width, with no rail and no collapse. */
+export function DrawerNavigation() {
+  return (
+    <nav className={styles.drawerNav} aria-label="Tusk">
+      <NavigationContent rail={false} pathname={usePathname()} />
+    </nav>
+  );
+}
+
+export function AppSidebar() {
+  const pathname = usePathname();
+  const sidebar = useSidebar();
+  if (!sidebar.available || sidebar.state === 'hidden') return null;
+  const rail = sidebar.state === 'rail';
+
+  return (
+    <nav
+      className={`${styles.sidebar} ${rail ? styles.rail : ''}`}
+      aria-label="Tusk"
+      data-sidebar={sidebar.state}
+    >
+      <NavigationContent rail={rail} pathname={pathname} />
       <button
         type="button"
         className={styles.collapse}

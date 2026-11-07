@@ -173,3 +173,15 @@
   font-size: var(--sv-font-size-xs);
   font-weight: var(--sv-font-weight-semibold);
 }
+
+/* The navigation in the phone's drawer: full width, the places and then the workspaces, with room for a thumb. */
+.drawerNav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sv-space-3);
+  padding: var(--sv-space-2) var(--sv-space-4) var(--sv-space-4);
+}
+
+.drawerNav .row {
+  min-height: 48px;
+}

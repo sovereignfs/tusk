@@ -18,6 +18,7 @@ export function AppShell({
   toolbar,
   bell,
   account,
+  footer,
   children,
 }: {
   /** The app's name, whose first two letters are the mark. */
@@ -28,6 +29,8 @@ export function AppShell({
   bell?: ReactNode;
   /** The person's avatar menu, at the right of the header (task 2.7). */
   account?: ReactNode;
+  /** The phone's footer of five (phase 2, DESIGN.md §18): a place for it in the frame, empty in phase 1, so that adding it changes no route. */
+  footer?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -46,6 +49,7 @@ export function AppShell({
         </div>
       </header>
       <div className={styles.main}>{children}</div>
+      {footer ? <footer className={styles.footer}>{footer}</footer> : null}
     </div>
   );
 }

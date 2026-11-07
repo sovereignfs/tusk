@@ -7,6 +7,7 @@ import { rememberIdentity } from '../identity';
 import { site } from '../site';
 import { SyncProvider } from '../sync/react';
 import { AppShell } from '../ui/AppShell';
+import { MobileNavProvider } from '../ui/mobile-nav';
 import { SidebarToggle } from '../ui/SidebarToggle';
 import { AppFrame } from './AppFrame';
 import { Frame } from './Frame';
@@ -41,17 +42,19 @@ export function SignedInArea({
         <ZoneReporter accountId={accountId} />
         <RegisterWorker />
         <WorkspacesProvider>
-          <AppShell
-            name={site.name}
-            toolbar={<SidebarToggle />}
-            account={<AccountMenu accountId={accountId} name={name} email={email} />}
-          >
-            <AppFrame>
-              {/* The Desk's own columns. */}
-              <Frame>{children}</Frame>
-            </AppFrame>
-            {modal}
-          </AppShell>
+          <MobileNavProvider>
+            <AppShell
+              name={site.name}
+              toolbar={<SidebarToggle />}
+              account={<AccountMenu accountId={accountId} name={name} email={email} />}
+            >
+              <AppFrame>
+                {/* The Desk's own columns. */}
+                <Frame>{children}</Frame>
+              </AppFrame>
+              {modal}
+            </AppShell>
+          </MobileNavProvider>
         </WorkspacesProvider>
       </KeyProvider>
     </SyncProvider>

@@ -29,6 +29,7 @@ export {
   DatePicker,
   ConfirmDialog,
   Dialog,
+  Drawer,
   EmptyState,
   FormField,
   Icon,

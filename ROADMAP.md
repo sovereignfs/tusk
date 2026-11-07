@@ -176,7 +176,7 @@ Ready for a phone, reviewed, documented, released, and on a real instance. **Don
 
 | #   | ID                             | Task                              | Priority | Depends on                  | Status |
 | --- | ------------------------------ | --------------------------------- | -------- | --------------------------- | ------ |
-| 93  | [7.9](docs/epics/interface.md) | The phone's foundations           | P2       | 7.8, 17.1, 18.2             | 📋     |
+| 93  | [7.9](docs/epics/interface.md) | The phone's foundations           | P2       | 7.8, 17.1, 18.2             | ✅     |
 | 94  | [7.7](docs/epics/interface.md) | Accessibility pass                | P2       | 3.11, 7.6, 7.9, 17.6, 18.7  | 📋     |
 | 95  | [11.2](docs/epics/release.md)  | Documents                         | P2       | 2.10, 10.6, 14.7            | 📋     |
 | 96  | [11.3](docs/epics/release.md)  | Security review                   | P2       | 2.9, 9.3, 10.6, 14.7, 17.5  | 📋     |
