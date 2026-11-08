@@ -2,7 +2,7 @@
 
 ## Status
 
-⏳ In progress (2026-11-08): five tasks, in phase 2; 19.1 to 19.3 are done. 19.1 to 19.4 make the Planner usable; 19.5, start and end times, makes it a place to box time, and can follow.
+⏳ In progress (2026-11-08): five tasks, in phase 2; 19.1 to 19.4 are done. 19.1 to 19.4 make the Planner usable; 19.5, start and end times, makes it a place to box time, and can follow.
 
 ## Overview
 
@@ -107,7 +107,7 @@ is in the Desk; the list chosen last is offered next time on that device; it wor
 
 **Done as:** **`createDueCard`** (`src/actions/due.ts`, the one file that names a card's date and time) makes the card with its date and time in the same change as its title, so there is never a card with no date in between; the footer's new-card dialog (`NewCardDialog`) takes an optional `due` and uses it, says "Due Today, 2:00 PM", and **starts at the list last used from the Planner** (`tusk.planner.list` on the device, the first list when it is gone or cannot be read). The feed has three places to add: **an empty day** is itself a button ("Nothing planned +"), **every day with cards ends with "+ Add a card"**, and **a gap of two hours or more between two timed cards** is a dashed slot an hour after the first ("Add at 2:00 PM", `slotBetween`, pure); each is a button, reachable by keyboard, and the new card is in the feed at once, from the working copy. **The footer's action on `/planner`** is its own place (`placeOf`), offering a new card due today. Tests: `createDueCard` (date and time in one change, a time with no date is none, an empty title and a full account refused), `slotBetween`, the footer's places, and in Chromium and WebKit a card added from a day, one from a gap (at the slot's time, in the Desk) and the list remembered, and at 390px the footer's new card due today. **Not as the epic said:** a gap is two hours, not one (a card has no length until 19.5 and is given an hour); a day's end-of-day button shows on every day with cards and not only the last one the reader sees; board cards are not made here.
 
-#### 📋 19.4 — Repeating cards as previews
+#### ✅ 19.4 — Repeating cards as previews
 
 **Priority:** P2. **Goal:** a repeating Desk card is seen on every day it will come, as far as the reader scrolls.
 
@@ -123,6 +123,8 @@ is in the Desk; the list chosen last is offered next time on that device; it wor
 
 **Accepts when:** a daily, a weekly and a monthly card each show on their next days in the range, and not before the current card; a series with an end or a
 count stops there; completing the current card turns the first preview into the card; under three zones (`pnpm test:zones`) the days are the same.
+
+**Done as:** **`occurrencesAfter`** (`src/recurrence.ts`, still the only file that imports `rrule`) gives every date after a card's, up to a day, that the rule makes, **the same dates completing the card would make in turn**: the first is `nextOccurrence` (after the later of the card's date and today) and the rest follow it, which a test holds by chaining `nextOccurrence` for a daily, a weekly on two days, a monthly from the 31st, a fortnightly and a card done a long time late; it stops at a count or an `UNTIL`, at the range's end (included) and at a limit, and is empty for dates that are not dates; it passes under the three zones of `pnpm test:zones`. **`previewEntries`** (`src/planner/feed.ts`) makes preview entries from the cards and the series the screen already reads (`seriesOf`, new in the store): for each series that can be read, the card that is open (not done, not deleted, with a date; the later if two) is where it counts from, and each date in the range after it is a `preview` entry that **opens the open card** (`/planner?card=`) and has no id of its own, since there is no card; at most 400 for a series in a window. A preview comes after a real card at the same time. It is drawn lighter, with the repeat mark and "Repeats" in its line, and is never ticked or edited; completing the open card makes the next one (§12.3) and the previews go on from it. Nothing is stored, so stopping the repeat takes them away. Tests: the chain, the ends, the limit, a deleted or ended series, a done card, two open cards, the range, and the order; and in Chromium and WebKit a daily card with a preview tomorrow and the day after, a preview opening the card, completing it making a card where the first preview was with the previews going on from it, and stopping the repeat taking them away. **Not as the epic said:** none.
 
 #### 📋 19.5 — Start and end times, and a card's length
 

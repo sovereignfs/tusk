@@ -15,6 +15,7 @@ import {
   groupByDate,
   layout,
   nowIndex,
+  previewEntries,
   slotBetween,
 } from './feed';
 
@@ -252,5 +253,95 @@ describe('a free slot between two timed cards', () => {
     expect(slotBetween('09:00', '10:59')).toBeNull();
     expect(slotBetween('09:00', '09:00')).toBeNull();
     expect(slotBetween('09:00', '10:00')).toBeNull();
+  });
+});
+
+describe('the occurrences of a repeating card, ahead', () => {
+  const row = (table: string, id: string, fields: Record<string, unknown>, extra = {}): LocalRow =>
+    ({
+      table,
+      id,
+      deletedAt: null,
+      ...extra,
+      fields: Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, { v }])),
+    }) as unknown as LocalRow;
+  const weekly = row('desk_series', 'S1', { rule: 'FREQ=WEEKLY;BYDAY=MO', anchor: '2026-11-02' });
+  const mon9 = row(
+    'desk_card',
+    'C9',
+    { title: 'Water the plants', dueDate: '2026-11-09', dueTime: '08:00', seriesId: 'S1' },
+    { listId: 'L1' },
+  );
+  const today = '2026-11-08';
+  const ahead = (cards: LocalRow[], series: LocalRow[], from = '2026-11-01', to = '2026-12-06') =>
+    previewEntries(cards, series, lists, from, to, today);
+
+  it('are the dates after the open card that the rule gives, as lighter entries that open the card there is', () => {
+    const found = ahead([mon9], [weekly]);
+    expect(found.map((e) => e.date)).toEqual(['2026-11-16', '2026-11-23', '2026-11-30']);
+    expect(found[0]).toMatchObject({
+      key: 'preview:S1:2026-11-16',
+      source: 'desk',
+      // It is the open card that opens, and not a card of its own: there is none yet.
+      id: 'C9',
+      href: '/planner?card=C9',
+      title: 'Water the plants',
+      time: '08:00',
+      done: false,
+      preview: true,
+      color: '#16a34a',
+      where: 'Errands',
+    });
+    // None on or before the card's own day.
+    expect(found.some((e) => e.date <= '2026-11-09')).toBe(false);
+  });
+
+  it('are none for a card that is done, a series that is deleted or ended, or a card with no date', () => {
+    const done = row(
+      'desk_card',
+      'C9',
+      { title: 'x', dueDate: '2026-11-09', seriesId: 'S1', completedAt: 5 },
+      { listId: 'L1' },
+    );
+    expect(ahead([done], [weekly])).toEqual([]);
+    expect(ahead([mon9], [{ ...weekly, deletedAt: 5 } as LocalRow])).toEqual([]);
+    const once = row('desk_series', 'S1', {
+      rule: 'FREQ=WEEKLY;BYDAY=MO;COUNT=2',
+      anchor: '2026-11-02',
+    });
+    // Two in all: the 2nd and the 9th, so none after the open card on the 9th.
+    expect(ahead([mon9], [once])).toEqual([]);
+    const undated = row('desk_card', 'C9', { title: 'x', seriesId: 'S1' }, { listId: 'L1' });
+    expect(ahead([undated], [weekly])).toEqual([]);
+    expect(ahead([mon9], [])).toEqual([]);
+  });
+
+  it('are counted from the later of two open cards, and only those in the range are shown', () => {
+    const later = row(
+      'desk_card',
+      'C16',
+      { title: 'Later', dueDate: '2026-11-16', seriesId: 'S1' },
+      { listId: 'L1' },
+    );
+    expect(ahead([mon9, later], [weekly]).map((e) => `${e.id}:${e.date}`)).toEqual([
+      'C16:2026-11-23',
+      'C16:2026-11-30',
+    ]);
+    expect(ahead([mon9], [weekly], '2026-11-20', '2026-11-25').map((e) => e.date)).toEqual([
+      '2026-11-23',
+    ]);
+  });
+
+  it('come after a card that is there on the same day and at the same time', () => {
+    const real: Entry = {
+      ...(deskEntries([mon9], lists, '2026-11-01', '2026-12-31')[0] as Entry),
+      date: '2026-11-16',
+    };
+    const preview = ahead([mon9], [weekly])[0] as Entry;
+    expect(
+      groupByDate([preview, real])
+        .get('2026-11-16')
+        ?.map((e) => e.preview === true),
+    ).toEqual([false, true]);
   });
 });

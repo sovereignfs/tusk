@@ -247,3 +247,16 @@
   border-radius: 50%;
   background: var(--sv-color-accent);
 }
+
+/* An occurrence that is not there yet: lighter, with the repeat mark, and dashed at the edge that is the band. */
+.preview {
+  border-style: dashed;
+  border-left-style: solid;
+  background: transparent;
+  opacity: 0.75;
+}
+
+.repeat {
+  margin-right: var(--sv-space-1);
+  vertical-align: -2px;
+}

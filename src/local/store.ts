@@ -306,6 +306,11 @@ export async function listsOf(db: LocalDatabase): Promise<LocalRow[]> {
   return rows.sort(byPosition);
 }
 
+/** The Desk's repeating series, opened: a rule and an anchor each, which the Planner works the occurrences ahead from (DESIGN.md §25.1). Deleted ones are for `readSeries` to refuse. */
+export async function seriesOf(db: LocalDatabase): Promise<LocalRow[]> {
+  return openAll(db, (await db.getAll('desk_series')) as LocalRow[]);
+}
+
 /** A list's cards, in order. A card's checklist is `checksOf` it. */
 export async function cardsOf(db: LocalDatabase, listId: string): Promise<LocalRow[]> {
   const range = IDBKeyRange.bound([listId, ''], [listId, '￿']);

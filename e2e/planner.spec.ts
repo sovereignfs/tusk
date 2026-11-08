@@ -348,3 +348,69 @@ test('on a phone the footer’s new card on the Planner is due today', async ({ 
     .click();
   await expect(page.getByRole('dialog', { name: 'New card' }).getByText('Due Today')).toBeVisible();
 });
+
+test('a repeating card shows its next days as previews, and completing it turns the first into the card', async ({
+  page,
+}) => {
+  await signedIn(page);
+  const list = unique('Repeats');
+  await newList(page, list);
+  const title = unique('Water');
+  await deskCardToday(page, list, title, null);
+  const detail = page.getByRole('region', { name: 'Card' });
+  await detail.getByRole('button', { name: 'Set a repeat' }).click();
+  await page.getByRole('radio', { name: 'Daily' }).check();
+  await page.getByRole('button', { name: 'Apply' }).click();
+  await expect(detail.getByRole('button', { name: 'Repeats every day' })).toBeVisible();
+
+  await page.goto('/planner');
+  const today = page.locator('[aria-current="date"]');
+  const tomorrow = today.locator('xpath=following-sibling::li[1]');
+  const after = today.locator('xpath=following-sibling::li[2]');
+  const mine = (day: ReturnType<typeof page.locator>) =>
+    day.locator(`[data-planner-card]`).filter({ hasText: title });
+  // The card is on today; tomorrow and the day after have previews of it, drawn with the repeat mark.
+  await expect(mine(today)).toHaveAttribute('data-planner-card', /^desk:/);
+  await expect(mine(tomorrow)).toHaveAttribute('data-planner-card', /^preview:/);
+  await expect(mine(after)).toHaveAttribute('data-planner-card', /^preview:/);
+  await expect(mine(tomorrow)).toContainText('Repeats');
+
+  // A preview opens the card there is.
+  await mine(tomorrow).click();
+  await expect(page).toHaveURL(/\/planner\?card=/);
+  await expect(page.getByRole('region', { name: 'Card' }).getByLabel('Title')).toHaveValue(title);
+  await page.getByRole('region', { name: 'Card' }).getByRole('button', { name: 'Close' }).click();
+
+  // Completing today's card makes tomorrow's: a card where the preview was, and the previews go on from it.
+  await page.goto('/desk');
+  await page
+    .getByRole('navigation', { name: 'Lists' })
+    .getByRole('link', { name: new RegExp(`^${list}`) })
+    .click();
+  await page.getByRole('checkbox', { name: `Done: ${title}` }).click();
+  // The next card is made with the tick: it is on the list, due tomorrow, before the page is left.
+  await expect(
+    page.getByRole('listitem').filter({ hasText: title }).filter({ hasText: 'Tomorrow' }),
+  ).toHaveCount(1);
+  await page.goto('/planner');
+  await expect(mine(page.locator('[aria-current="date"]'))).toHaveAttribute(
+    'data-planner-card',
+    /^desk:/,
+  );
+  const next = page.locator('[aria-current="date"]').locator('xpath=following-sibling::li[1]');
+  await expect(mine(next)).toHaveAttribute('data-planner-card', /^desk:/);
+  await expect(
+    page.locator('[aria-current="date"]').locator('xpath=following-sibling::li[2]'),
+  ).toContainText(title);
+
+  // Stopping the repeat takes the previews away: they were only ever worked out from the rule. (It also leaves the shared account's Planner as it was.)
+  await mine(next).click();
+  const open = page.getByRole('region', { name: 'Card' });
+  await open.getByRole('button', { name: 'Repeats every day' }).click();
+  await page.getByRole('radio', { name: 'Does not repeat' }).check();
+  await page.getByRole('button', { name: 'Apply' }).click();
+  await expect(open.getByRole('button', { name: 'Set a repeat' })).toBeVisible();
+  await expect(
+    page.locator('[data-planner-card^="preview:"]').filter({ hasText: title }),
+  ).toHaveCount(0);
+});

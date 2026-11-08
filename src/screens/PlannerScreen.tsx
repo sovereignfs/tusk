@@ -15,7 +15,7 @@ import type { Due } from '../actions/due';
 import { openCard } from './address';
 import { NewCardDialog } from './FooterDialogs';
 import { useKey } from './KeyContext';
-import { listsOf, visibleCards } from '../local/store';
+import { listsOf, seriesOf, visibleCards } from '../local/store';
 import {
   type Entry,
   boardEntries,
@@ -28,12 +28,13 @@ import {
   groupByDate,
   layout,
   nowIndex,
+  previewEntries,
   slotBetween,
 } from '../planner/feed';
 import type { Planned, PlannedBoardCard } from '../planner/format';
 import { useLocal } from '../sync/react';
 import { localNow, browserZone, nowHere } from '../time';
-import { Alert, Button } from '../ui';
+import { Alert, Button, Icon } from '../ui';
 import styles from './PlannerScreen.module.css';
 
 /**
@@ -116,6 +117,7 @@ export function PlannerScreen() {
 
   const cards = useLocal(visibleCards);
   const lists = useLocal(listsOf);
+  const series = useLocal(seriesOf);
 
   /** Reads one chunk of the boards' part, once. A failure is remembered, and a retry makes the read again. */
   const read = useCallback((index: number): Promise<void> => {
@@ -250,10 +252,12 @@ export function PlannerScreen() {
   const rows = useMemo(() => {
     const all: Entry[] = [
       ...(cards && lists ? deskEntries(cards, lists, from, to) : []),
+      // A repeating card's occurrences after the one that is open, worked out from its rule (task 19.4).
+      ...(cards && lists && series ? previewEntries(cards, series, lists, from, to, today) : []),
       ...Object.values(boards).flatMap((each) => (each === 'failed' ? [] : boardEntries(each))),
     ].filter((entry) => entry.date >= from && entry.date <= to);
     return layout(daysOf(from, to), groupByDate(all), today, open);
-  }, [cards, lists, boards, from, to, today, open]);
+  }, [cards, lists, series, boards, from, to, today, open]);
 
   const failed = Object.values(boards).includes('failed');
   const retry = () => {
@@ -414,11 +418,17 @@ function Day({
                       openCard(entry.id);
                     }}
                   >
-                    <span className={styles.title}>{entry.title}</span>
+                    <span className={styles.title}>
+                      {entry.preview ? (
+                        <Icon name="refresh-cw" className={styles.repeat} aria-hidden />
+                      ) : null}
+                      {entry.title}
+                    </span>
                     <span className={styles.meta}>
                       {entry.time ? `${formatTime(entry.time)} · ` : ''}
                       {entry.where}
                       {entry.done ? ' · Done' : ''}
+                      {entry.preview ? ' · Repeats' : ''}
                     </span>
                   </Link>
                 </li>

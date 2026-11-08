@@ -1,5 +1,8 @@
 import { colourOf, plain, text } from '../screens/fields';
 import type { LocalRow } from '../local/rows';
+import { readSeries, seriesIdOf } from '../actions/series';
+import { dueOf } from '../actions/due';
+import { occurrencesAfter } from '../recurrence';
 import { addDays } from '../time';
 import type { PlannedBoardCard } from './format';
 
@@ -51,6 +54,8 @@ export interface Entry {
   readonly where: string;
   /** Where tapping it goes. */
   readonly href: string;
+  /** An occurrence of a repeating card that is not there yet: shown lighter, opening the card that is, and never done or edited itself. */
+  readonly preview?: true;
 }
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -91,6 +96,68 @@ export function deskEntries(
   return out;
 }
 
+/** The most occurrences ahead that one series shows in one window: a daily card over years is not drawn a thousand times. */
+export const PREVIEW_LIMIT = 400;
+
+/**
+ * The repeating Desk cards' occurrences ahead, as preview entries (DESIGN.md §12, §25.1, task 19.4): **computed from the rule and never stored.** For each series
+ * that can be read, the card that is open now (not done, not deleted, with a date; the latest if there are two) is where it is counted from, and each occurrence
+ * after it, up to `to`, that falls on or after `from` is a preview of that card: the same dates completing it would make in turn (`occurrencesAfter`). A series that
+ * has ended, is gone or cannot be read has none, and neither does one with no open card.
+ */
+export function previewEntries(
+  cards: readonly LocalRow[],
+  series: readonly LocalRow[],
+  lists: readonly LocalRow[],
+  from: string,
+  to: string,
+  today: string,
+): Entry[] {
+  const listById = new Map(lists.map((list) => [list.id, list]));
+  const openBy = new Map<string, { card: LocalRow; listId: string; date: string }>();
+  for (const card of cards) {
+    if (card.table !== 'desk_card' || card.deletedAt !== null) continue;
+    if (typeof plain(card, 'completedAt') === 'number') continue;
+    const id = seriesIdOf(card);
+    const date = dueOf(card).date;
+    if (!id || date === null || !DATE.test(date)) continue;
+    const had = openBy.get(id);
+    if (!had || date > had.date) openBy.set(id, { card, listId: card.listId, date });
+  }
+  const out: Entry[] = [];
+  for (const row of series) {
+    const read = readSeries(row);
+    const open = read ? openBy.get(read.id) : undefined;
+    if (!read || !open) continue;
+    const time = plain(open.card, 'dueTime');
+    const list = listById.get(open.listId);
+    for (const date of occurrencesAfter({
+      rule: read.rule,
+      anchor: read.anchor,
+      due: open.date,
+      today,
+      to,
+      limit: PREVIEW_LIMIT,
+    })) {
+      if (date < from) continue;
+      out.push({
+        key: `preview:${read.id}:${date}`,
+        source: 'desk',
+        id: open.card.id,
+        title: text(open.card, 'title', 'Untitled card'),
+        date,
+        time: typeof time === 'string' && TIME.test(time) ? time : null,
+        done: false,
+        color: colourOf(list),
+        where: text(list, 'title', 'Untitled list'),
+        href: `/planner?card=${open.card.id}`,
+        preview: true,
+      });
+    }
+  }
+  return out;
+}
+
 /** The boards' cards (what `GET /api/planner` returned) as entries. */
 export function boardEntries(cards: readonly PlannedBoardCard[]): Entry[] {
   return cards.map((card) => ({
@@ -112,6 +179,8 @@ export function byDay(a: Entry, b: Entry): number {
   if ((a.time === null) !== (b.time === null)) return a.time === null ? -1 : 1;
   if (a.time !== b.time) return (a.time ?? '') < (b.time ?? '') ? -1 : 1;
   if (a.source !== b.source) return a.source === 'desk' ? -1 : 1;
+  // A card that is there before one that is only to come.
+  if ((a.preview === true) !== (b.preview === true)) return a.preview === true ? 1 : -1;
   if (a.title !== b.title) return a.title < b.title ? -1 : 1;
   return a.key < b.key ? -1 : a.key > b.key ? 1 : 0;
 }

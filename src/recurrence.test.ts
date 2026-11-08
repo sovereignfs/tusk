@@ -9,6 +9,7 @@ import {
   firstOnOrAfter,
   formatRule,
   nextOccurrence,
+  occurrencesAfter,
   parseRule,
   reanchor,
   summary,
@@ -297,5 +298,69 @@ describe('where rrule is used', () => {
       )
       .map((file) => file.slice(join(__dirname, '..').length + 1));
     expect(importers).toEqual(['src/recurrence.ts']);
+  });
+});
+
+describe('the occurrences ahead, for the Planner', () => {
+  const ahead = (
+    text: string,
+    anchor: string,
+    due: string | null,
+    today: string,
+    to: string,
+    limit = 500,
+  ) => occurrencesAfter({ rule: rule(text), anchor, due, today, to, limit });
+
+  it('are what completing the card would make, one after another: the same dates as the next occurrence, chained', () => {
+    const cases: [string, string, string | null, string][] = [
+      ['FREQ=DAILY', '2026-11-02', '2026-11-08', '2026-11-08'],
+      ['FREQ=WEEKLY;BYDAY=MO,WE', '2026-11-02', '2026-11-09', '2026-11-08'],
+      ['FREQ=MONTHLY', '2026-01-31', '2026-10-31', '2026-11-08'],
+      ['FREQ=WEEKLY;INTERVAL=2', '2026-10-05', '2026-10-19', '2026-11-08'],
+      // Done late: the card is long overdue, and what comes is after today and not a trail of missed ones.
+      ['FREQ=DAILY', '2026-09-01', '2026-09-03', '2026-11-08'],
+    ];
+    for (const [text, anchor, due, today] of cases) {
+      const to = addDays(today, 90);
+      const got = ahead(text, anchor, due, today, to);
+      const chain: string[] = [];
+      let at = due;
+      for (;;) {
+        const following = next(text, anchor, at, today);
+        if (following === null || following > to) break;
+        chain.push(following);
+        at = following;
+      }
+      expect(got, text).toEqual(chain);
+      expect(got.length, text).toBeGreaterThan(0);
+    }
+  });
+
+  it('stop where the rule ends: after a count, and on an until', () => {
+    // Anchored on the 2nd, three times: the 2nd (the card), the 9th and the 16th.
+    expect(
+      ahead('FREQ=WEEKLY;COUNT=3', '2026-11-02', '2026-11-02', '2026-11-02', '2027-01-01'),
+    ).toEqual(['2026-11-09', '2026-11-16']);
+    expect(
+      ahead('FREQ=DAILY;UNTIL=20261112', '2026-11-08', '2026-11-08', '2026-11-08', '2027-01-01'),
+    ).toEqual(['2026-11-09', '2026-11-10', '2026-11-11', '2026-11-12']);
+  });
+
+  it('are none past the range, none before today, and no more than the limit', () => {
+    expect(ahead('FREQ=DAILY', '2026-11-01', '2026-11-08', '2026-11-08', '2026-11-08')).toEqual([]);
+    expect(ahead('FREQ=DAILY', '2026-11-01', '2026-11-08', '2026-11-08', '2026-11-05')).toEqual([]);
+    expect(ahead('FREQ=DAILY', '2026-11-01', '2026-11-08', '2026-11-08', '2026-11-11')).toEqual([
+      '2026-11-09',
+      '2026-11-10',
+      '2026-11-11',
+    ]);
+    expect(
+      ahead('FREQ=DAILY', '2026-11-01', '2026-11-08', '2026-11-08', '2027-11-08', 5),
+    ).toHaveLength(5);
+  });
+
+  it('are none for dates that are not dates', () => {
+    expect(ahead('FREQ=DAILY', 'soon', '2026-11-08', '2026-11-08', '2026-12-01')).toEqual([]);
+    expect(ahead('FREQ=DAILY', '2026-11-01', '2026-11-08', '2026-11-08', 'later')).toEqual([]);
   });
 });

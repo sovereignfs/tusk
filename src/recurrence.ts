@@ -258,6 +258,33 @@ export function nextOccurrence(input: {
   return next ? fromUtc(next) : null;
 }
 
+/**
+ * Every occurrence of a series after the one a card is at, up to and including `to`, for the Planner to show ahead of time (§25.1, task 19.4): **the same dates that
+ * completing the card would make in turn**, the first being `nextOccurrence` (after the later of `due` and `today`) and each after it the one the rule gives next. At
+ * most `limit`; empty when the rule has ended, or when the dates are not dates. Pure: nothing is stored.
+ */
+export function occurrencesAfter(input: {
+  rule: Rule;
+  anchor: string;
+  due: string | null;
+  today: string;
+  to: string;
+  limit: number;
+}): string[] {
+  const anchor = toUtc(input.anchor);
+  const today = toUtc(input.today);
+  const to = toUtc(input.to);
+  const due = input.due === null ? undefined : toUtc(input.due);
+  if (!anchor || !today || !to || (input.due !== null && !due)) return [];
+  const after = due && due.getTime() > today.getTime() ? due : today;
+  if (after.getTime() >= to.getTime()) return [];
+  // `between` counts both ends together: the end is wanted, and the start (the card's own date, or today) is not "after".
+  const found = (engine(input.rule, anchor)?.between(after, to, true) ?? []).filter(
+    (date) => date.getTime() > after.getTime(),
+  );
+  return found.slice(0, input.limit).map(fromUtc);
+}
+
 /** For a repeat set on a card that has no date (§12.3): the first date the rule matches, from today on (today itself if it does). Null if it never does. */
 export function firstOnOrAfter(rule: Rule, today: string): string | null {
   const start = toUtc(today);
