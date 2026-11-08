@@ -1,5 +1,5 @@
 import { expect, test, type APIRequestContext } from '@playwright/test';
-import { EMAIL, PASSWORD, ensureAccount, trySignIn } from './helpers';
+import { EMAIL, PASSWORD, deskReady, ensureAccount, trySignIn } from './helpers';
 
 /**
  * Export (task 9.1, DESIGN.md §20.1): the server's part over HTTP with real sessions (who may export what), and the Desk's part in the browser from the
@@ -139,9 +139,7 @@ test('Settings exports the Desk from the device, with the network off, and every
   await expect(page.getByRole('button', { name: 'User menu' })).toBeVisible();
   // Home is where signing in lands; these tests are about the Desk.
   await page.goto('/desk');
-  await expect(
-    page.getByRole('navigation', { name: 'Lists' }).getByRole('link').first(),
-  ).toBeVisible();
+  await deskReady(page, page.getByRole('navigation', { name: 'Lists' }).getByRole('link'));
   const name = unique('Exported');
   await page.getByRole('button', { name: 'Add a list' }).click();
   await page.getByLabel('New list name').fill(name);

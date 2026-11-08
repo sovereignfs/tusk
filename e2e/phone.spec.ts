@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { EMAIL, PASSWORD, ensureAccount, trySignIn } from './helpers';
+import { EMAIL, PASSWORD, deskReady, ensureAccount, trySignIn } from './helpers';
 
 /**
  * Every page of DESIGN.md §17.11 at a phone's width (task 7.9, DESIGN.md §18), in Chromium and WebKit: the same addresses and the same data, one column at a time.
@@ -22,6 +22,9 @@ async function signedIn(page: Page) {
   await ensureAccount(page);
   await trySignIn(page, EMAIL, PASSWORD);
   await expect(page.getByRole('button', { name: 'Open the navigation' })).toBeVisible();
+  // The account may have been made by another test without the Desk's key offer answered, which leaves the Desk with no list.
+  await page.goto('/desk');
+  await deskReady(page, page.getByPlaceholder('Add a card…'));
 }
 
 const drawer = (page: Page) => page.getByRole('dialog', { name: 'Navigation' });

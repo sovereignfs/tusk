@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 
 /**
  * What the browser tests that need a signed-in person share. The instance is closed to sign-up, so the first account is the only one there will be,
@@ -26,6 +26,21 @@ export async function ensureAccount(page: Page, options: { skipKeyOffer?: boolea
     await expect(page.getByRole('region', { name: 'A key for your Desk' })).toHaveCount(0);
   }
   await signOut(page);
+}
+
+/**
+ * Waits for the Desk to be usable (`ready` is something only a usable Desk shows), skipping the offer of a key of one's own if it is in the way. The
+ * offer is skipped by `ensureAccount` only when that makes the account; an account made another way (a test that made it through the API) shows it on the
+ * first visit, and until it is answered the Desk has no list. Whichever test of a shard goes first must not decide that for the others.
+ */
+export async function deskReady(page: Page, ready: Locator) {
+  const offer = page.getByRole('region', { name: 'A key for your Desk' });
+  await expect(ready.first().or(offer)).toBeVisible();
+  if (await offer.isVisible()) {
+    await offer.getByRole('button', { name: 'Skip' }).click();
+    await expect(offer).toHaveCount(0);
+    await expect(ready.first()).toBeVisible();
+  }
 }
 
 /**

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { EMAIL, PASSWORD, ensureAccount, trySignIn } from './helpers';
+import { EMAIL, PASSWORD, deskReady, ensureAccount, trySignIn } from './helpers';
 
 /**
  * The Planner's feed (task 19.1, DESIGN.md §25.1): a Desk card and a board card assigned to the person on their days, today where the feed opens, runs of empty
@@ -16,6 +16,7 @@ async function signedIn(page: Page) {
   await expect(page.getByRole('button', { name: 'User menu' })).toBeVisible();
   await page.goto('/desk');
   await expect(page.getByRole('navigation', { name: 'Lists' })).toBeVisible();
+  await deskReady(page, page.getByRole('navigation', { name: 'Lists' }).getByRole('link'));
 }
 
 test('a Desk card and an assigned board card are on their days, and the feed opens on today', async ({
@@ -105,8 +106,9 @@ test('a Desk card and an assigned board card are on their days, and the feed ope
       el.getBoundingClientRect().top - (root as HTMLElement).getBoundingClientRect().top,
     await scroller.elementHandle(),
   );
-  // Today is in what is shown. (It is at the top when there is enough below it to scroll that far; a feed of a few cards cannot.)
-  expect(offset).toBeGreaterThanOrEqual(0);
+  // Today is in what is shown. (It is at the top when there is enough below it to scroll that far; a feed of a few cards cannot.) A layout is measured in
+  // fractions of a pixel, and a fraction either way (-0.5 on CI's fonts) is still at the top.
+  expect(offset).toBeGreaterThanOrEqual(-1);
   expect(offset).toBeLessThan(400);
 
   // A card opens where it is.

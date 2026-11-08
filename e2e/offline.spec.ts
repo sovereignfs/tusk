@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { EMAIL, PASSWORD, ensureAccount, trySignIn } from './helpers';
+import { EMAIL, PASSWORD, deskReady, ensureAccount, trySignIn } from './helpers';
 
 /**
  * Working offline (task 13.6, DESIGN.md §8.6): a page loaded with the network already off does every Desk action, shows no error for being offline, and
@@ -16,9 +16,7 @@ async function signedIn(page: Page) {
   // Home is where signing in lands; these tests are about the Desk.
   await page.goto('/desk');
   await expect(page.getByRole('navigation', { name: 'Lists' })).toBeVisible();
-  await expect(
-    page.getByRole('navigation', { name: 'Lists' }).getByRole('link').first(),
-  ).toBeVisible();
+  await deskReady(page, page.getByRole('navigation', { name: 'Lists' }).getByRole('link'));
 }
 
 /** The worker has installed and kept the shell, so that an address can be opened with no network. */
