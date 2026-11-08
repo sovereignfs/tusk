@@ -118,6 +118,8 @@ const FIELDS: Record<SyncTable, Record<string, FieldSpec>> = {
     seriesId: short(nullable(uuid)),
     startedAt: short(nullable(epochMs)),
     completedAt: short(nullable(epochMs)),
+    dismissedOn: short(nullable(isoDate)),
+    reviewedAt: short(nullable(epochMs)),
   },
   desk_check: {
     title: TITLE,

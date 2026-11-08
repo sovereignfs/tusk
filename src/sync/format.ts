@@ -56,6 +56,9 @@ export const FIELD_NAMES = {
     'seriesId',
     'startedAt',
     'completedAt',
+    // Phone views (DESIGN.md §25.3): the day Today was told to leave a card out until tomorrow, and when Review last went past it.
+    'dismissedOn',
+    'reviewedAt',
   ],
   desk_check: ['title', 'completedAt'],
   desk_series: ['rule', 'anchor'],
