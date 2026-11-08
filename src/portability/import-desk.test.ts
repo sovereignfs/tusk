@@ -44,6 +44,7 @@ function source() {
           seriesId: s1,
           dueDate: '2026-11-06',
           dueTime: '09:00',
+          dueEnd: '10:00',
         },
       ),
       row(
@@ -196,6 +197,7 @@ describe('importing the Desk', () => {
             starred: false,
             dueDate: null,
             dueTime: null,
+            dueEnd: null,
             seriesId: null,
             startedAt: null,
             completedAt: null,

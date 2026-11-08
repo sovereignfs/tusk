@@ -40,6 +40,8 @@ export function formatDue(
   time: string | null,
   now: string | LocalNow,
   locale?: string,
+  /** When a card that starts at `time` ends (task 19.5): written after it, "9:30 AM – 10:15 AM". Ignored without a time, and when not after it. */
+  end?: string | null,
 ): DueText {
   const today = typeof now === 'string' ? now : now.date;
   let day: string;
@@ -56,7 +58,11 @@ export function formatDue(
     }).format(new Date(Date.UTC(y, m - 1, d)));
   }
   return {
-    text: time ? `${day}, ${formatTime(time, locale)}` : day,
+    text: time
+      ? end && end > time
+        ? `${day}, ${formatTime(time, locale)} – ${formatTime(end, locale)}`
+        : `${day}, ${formatTime(time, locale)}`
+      : day,
     overdue: isOverdue(
       { date, time },
       typeof now === 'string' ? { date: now, time: '00:00' } : now,

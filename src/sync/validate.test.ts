@@ -42,6 +42,7 @@ const SAMPLE: Record<SyncTable, Record<string, unknown>> = {
     starred: false,
     dueDate: '2026-11-05',
     dueTime: '09:30',
+    dueEnd: '10:15',
     seriesId: ID(),
     startedAt: 1_792_000_000_000,
     completedAt: 1_793_000_000_000,
@@ -109,6 +110,8 @@ describe('the fields', () => {
       ['desk_card', 'dueDate', '2026-02-30'],
       ['desk_card', 'dueDate', '5 November'],
       ['desk_card', 'dueTime', '24:00'],
+      ['desk_card', 'dueEnd', '9:00'],
+      ['desk_card', 'dueEnd', '24:00'],
       ['desk_card', 'seriesId', 'not-an-id'],
       ['desk_card', 'completedAt', -1],
       ['desk_card', 'completedAt', 1.5],
@@ -140,7 +143,7 @@ describe('the fields', () => {
   });
 
   it('take null where the field may be empty, and not where it may not', () => {
-    for (const name of ['dueDate', 'dueTime', 'seriesId', 'startedAt', 'completedAt']) {
+    for (const name of ['dueDate', 'dueTime', 'dueEnd', 'seriesId', 'startedAt', 'completedAt']) {
       expect(parseField('desk_card', name, { v: null }).ok, name).toBe(true);
     }
     for (const name of ['title', 'description', 'starred'])
@@ -598,6 +601,36 @@ describe('a due time', () => {
     // A time that is cleared needs no date, and a sealed date is taken to be there.
     expect(parseStructure(card({ dueTime: { v: null } })).ok).toBe(true);
     expect(parseStructure(card({ dueDate: { c: 'YWdl' }, dueTime: { v: '09:30' } })).ok).toBe(true);
+  });
+
+  it('may have an end, which needs a time and is after it (task 19.5)', () => {
+    const due = { dueDate: { v: '2026-11-07' } };
+    expect(
+      parseStructure(card({ ...due, dueTime: { v: '09:30' }, dueEnd: { v: '10:15' } })).ok,
+    ).toBe(true);
+    // Cleared with the time, or on its own.
+    expect(parseStructure(card({ ...due, dueTime: { v: '09:30' }, dueEnd: { v: null } })).ok).toBe(
+      true,
+    );
+    expect(
+      parseStructure(card({ dueDate: { v: null }, dueTime: { v: null }, dueEnd: { v: null } })).ok,
+    ).toBe(true);
+    expect(parseStructure(card({ dueEnd: { v: null } })).ok).toBe(true);
+    // An end with no time, one at the time, and one before it.
+    expect(parseStructure(card({ ...due, dueTime: { v: null }, dueEnd: { v: '10:15' } })).ok).toBe(
+      false,
+    );
+    expect(parseStructure(card({ ...due, dueEnd: { v: '10:15' } })).ok).toBe(false);
+    expect(
+      parseStructure(card({ ...due, dueTime: { v: '09:30' }, dueEnd: { v: '09:30' } })).ok,
+    ).toBe(false);
+    expect(
+      parseStructure(card({ ...due, dueTime: { v: '09:30' }, dueEnd: { v: '09:00' } })).ok,
+    ).toBe(false);
+    // A time that is ciphertext is taken to be there.
+    expect(
+      parseStructure(card({ ...due, dueTime: { c: 'YWdl' }, dueEnd: { v: '10:15' } })).ok,
+    ).toBe(true);
   });
 });
 

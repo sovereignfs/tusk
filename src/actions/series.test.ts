@@ -75,6 +75,18 @@ function made(result: ReturnType<typeof completeCard>) {
 describe('completing a card that repeats', () => {
   const weekly = series('FREQ=WEEKLY;BYDAY=FR', '2026-11-06');
 
+  it('carries the end of a card with the time it starts at (task 19.5)', () => {
+    const { rest } = made(
+      completeCard(repeating({ dueEnd: '19:30' }), 1_800_000_000_000, ids(), [], {
+        series: weekly,
+        today: TODAY,
+      }),
+    );
+    expect(rest[0]).toMatchObject({
+      fields: { dueDate: { v: '2026-11-13' }, dueTime: { v: '18:00' }, dueEnd: { v: '19:30' } },
+    });
+  });
+
   it('is one mutation: the completion, and the next occurrence with what it copies and nothing it does not', () => {
     const { completion, rest } = made(
       completeCard(repeating(), 1_800_000_000_000, ids(), [], { series: weekly, today: TODAY }),
@@ -97,6 +109,7 @@ describe('completing a card that repeats', () => {
         description: { v: 'The ones by the window' },
         starred: { v: true },
         dueTime: { v: '18:00' },
+        dueEnd: { v: null },
       },
     });
     // No start time and no completion: it begins Open.
@@ -246,6 +259,7 @@ describe('setting a card to repeat', () => {
       fields: {
         dueDate: { v: '2026-11-09' },
         dueTime: { v: null },
+        dueEnd: { v: null },
         seriesId: { v: 'new-1' },
       },
     });
@@ -478,7 +492,7 @@ describe('editing a recurring card', () => {
       {
         table: 'desk_card',
         id: 'c1',
-        fields: { dueDate: { v: null }, dueTime: { v: null } },
+        fields: { dueDate: { v: null }, dueTime: { v: null }, dueEnd: { v: null } },
       },
       { table: 'desk_card', id: 'c1', fields: { seriesId: { v: null } } },
     ]);

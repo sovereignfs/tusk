@@ -223,3 +223,73 @@ test('on the Desk, what is due today floats to the top under Custom, a card turn
   await page.getByLabel('Sort by').selectOption({ label: 'Title' });
   await expect.poll(titles).toEqual(['Late one', 'Plain one', 'Soon one']);
 });
+
+test('a Desk card gets an end after its time, shows the span, refuses one that is not after the start, and keeps it after a reload (task 19.5)', async ({
+  page,
+}) => {
+  await signedIn(page);
+  const name = unique('Ends');
+  await page.getByRole('button', { name: 'Add a list' }).click();
+  await page.getByLabel('New list name').fill(name);
+  await page.getByLabel('New list name').press('Enter');
+  await expect(
+    page
+      .getByRole('navigation', { name: 'Lists' })
+      .getByRole('link', { name: new RegExp(`^${name}`) }),
+  ).toBeVisible();
+  await page
+    .getByRole('navigation', { name: 'Lists' })
+    .getByRole('link', { name: new RegExp(`^${name}`) })
+    .click();
+  await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
+  await page.getByLabel('Add a card').fill('Dentist');
+  await page.getByLabel('Add a card').press('Enter');
+  await page.getByRole('link', { name: 'Dentist' }).click();
+  const detail = page.getByRole('region', { name: 'Card' });
+  await detail.getByRole('button', { name: 'Set a due date' }).click();
+  await page.getByRole('button', { name: 'Tomorrow' }).click();
+  // No end is offered until there is a time.
+  await expect(page.getByLabel('Until')).toHaveCount(0);
+  await page.getByLabel('Time', { exact: true }).fill('09:30');
+  await page.getByLabel('Until').fill('10:45');
+  await page.keyboard.press('Escape');
+  await expect(detail.getByRole('button', { name: /^Tomorrow, .*9:30.* – .*10:45/ })).toBeVisible();
+  await expect(
+    page
+      .getByRole('listitem')
+      .filter({ hasText: 'Dentist' })
+      .getByText(/^Tomorrow, .*9:30.* – .*10:45/),
+  ).toBeVisible();
+
+  // An end that is not after the start is not taken: the field is as it was.
+  await detail.getByRole('button', { name: /^Tomorrow/ }).click();
+  await page.getByLabel('Until').fill('09:00');
+  await expect(page.getByLabel('Until')).toHaveValue('10:45');
+  // Moving the start past the end takes the end away.
+  await page.getByLabel('Time', { exact: true }).fill('11:30');
+  await expect(page.getByLabel('Until')).toHaveValue('');
+  await page.getByLabel('Time', { exact: true }).fill('09:30');
+  await page.getByLabel('Until').fill('10:45');
+  await page.keyboard.press('Escape');
+
+  await page.reload();
+  await expect(
+    page
+      .getByRole('region', { name: 'Card' })
+      .getByRole('button', { name: /^Tomorrow, .*9:30.* – .*10:45/ }),
+  ).toBeVisible();
+
+  // Cleared with the time.
+  await page
+    .getByRole('region', { name: 'Card' })
+    .getByRole('button', { name: /^Tomorrow/ })
+    .click();
+  await page.getByLabel('Time', { exact: true }).fill('');
+  await expect(page.getByLabel('Until')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(
+    page
+      .getByRole('region', { name: 'Card' })
+      .getByRole('button', { name: 'Tomorrow, change the due date' }),
+  ).toBeVisible();
+});

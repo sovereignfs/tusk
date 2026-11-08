@@ -32,6 +32,7 @@ const goodDesk = () => {
             starred: true,
             dueDate: '2026-11-06',
             dueTime: '09:00',
+            dueEnd: '10:00',
             seriesId: series,
             startedAt: null,
             completedAt: null,
@@ -202,6 +203,17 @@ const MALFORMED: [string, (f: Record<string, any>) => void, RegExp][] = [
     /a time with no date/,
   ],
   ['a time of 25:00', (f) => (f.desk.lists[0].cards[0].dueTime = '25:00'), /\.dueTime/],
+  ['an end that is not a time', (f) => (f.desk.lists[0].cards[0].dueEnd = '9'), /\.dueEnd/],
+  [
+    'an end that is not after the time',
+    (f) => (f.desk.lists[0].cards[0].dueEnd = '09:00'),
+    /\.dueEnd: an end needs a time, and is after it/,
+  ],
+  [
+    'an end with no time',
+    (f) => ((f.desk.lists[0].cards[0].dueTime = null), (f.desk.lists[0].cards[0].dueEnd = '10:00')),
+    /\.dueEnd/,
+  ],
   [
     'a completion that is not a time',
     (f) => (f.desk.lists[0].cards[0].completedAt = 'yesterday'),

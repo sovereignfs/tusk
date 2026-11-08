@@ -115,6 +115,7 @@ const FIELDS: Record<SyncTable, Record<string, FieldSpec>> = {
     starred: short(bool),
     dueDate: short(nullable(isoDate)),
     dueTime: short(nullable(hhmm)),
+    dueEnd: short(nullable(hhmm)),
     seriesId: short(nullable(uuid)),
     startedAt: short(nullable(epochMs)),
     completedAt: short(nullable(epochMs)),
@@ -281,6 +282,15 @@ export function parseStructure(value: unknown, options: ChangeOptions = {}): Par
     if (time && 'v' in time && time.v !== null) {
       const dated = date !== undefined && ('c' in date || date.v !== null);
       if (!dated) return no('dueTime: a time needs a date');
+    }
+    // Nor an end without a start, nor one that is not after it (task 19.5). A start that is ciphertext cannot be compared, and is taken to be there and
+    // before it: a device that seals its Desk checked it before sealing.
+    const end = fields.dueEnd;
+    if (end && 'v' in end && end.v !== null) {
+      const timed = time !== undefined && ('c' in time || time.v !== null);
+      if (!timed) return no('dueEnd: an end needs a time');
+      if (time && 'v' in time && time.v !== null && end.v <= time.v)
+        return no('dueEnd: an end must be after the time');
     }
   }
 

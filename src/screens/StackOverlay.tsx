@@ -177,7 +177,7 @@ export function StackOverlay({
 
   const detail = (card: LocalRow) => {
     const due = dueOf(card);
-    const shown = due.date ? formatDue(due.date, due.time, now) : null;
+    const shown = due.date ? formatDue(due.date, due.time, now, undefined, due.end) : null;
     const reason = reasons.get(card.id);
     const list = data?.lists.find((each) => each.id === (card as { listId?: string }).listId);
     return (

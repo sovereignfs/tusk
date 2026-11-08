@@ -69,7 +69,7 @@ export function nextOccurrenceChanges(
   const id = uuid5(`occurrence:${read.id}:${date}`, TUSK_NAMESPACE);
   // The due time is carried with the new date, as a pair.
   const fields: Record<string, FieldValue> = {
-    ...dueFields({ date, time: due.time }),
+    ...dueFields({ date, time: due.time, end: due.end }),
     seriesId: { v: read.id },
   };
   for (const name of ['title', 'description', 'starred']) {

@@ -78,14 +78,78 @@ describe('setting what a Desk card is due', () => {
     expect(dueOf(card({ dueDate: '2026-11-07', dueTime: '09:30' }))).toEqual({
       date: '2026-11-07',
       time: '09:30',
+      end: null,
     });
     expect(dueOf(card({ dueDate: null, dueTime: '09:30' }))).toEqual({
       date: null,
       time: null,
+      end: null,
     });
     expect(dueOf(card({ dueDate: { c: 'YWdl' }, dueTime: { c: 'YWdl' } }))).toEqual({
       date: null,
       time: null,
+      end: null,
+    });
+  });
+});
+
+describe('a card that ends (task 19.5)', () => {
+  const timed = { dueDate: '2026-11-07', dueTime: '09:30' };
+
+  it('reads an end only with a time and after it', () => {
+    expect(dueOf(card({ ...timed, dueEnd: '10:15' })).end).toBe('10:15');
+    // Not after the time, no time, no date: none.
+    expect(dueOf(card({ ...timed, dueEnd: '09:30' })).end).toBeNull();
+    expect(dueOf(card({ ...timed, dueEnd: '09:00' })).end).toBeNull();
+    expect(dueOf(card({ dueDate: '2026-11-07', dueEnd: '10:15' })).end).toBeNull();
+    expect(dueOf(card({ dueEnd: '10:15' })).end).toBeNull();
+    expect(dueOf(card(timed)).end).toBeNull();
+  });
+
+  it('is written with the date and the time, in the one change, and cleared with them', () => {
+    const set = setDue(card(), { date: '2026-11-07', time: '09:30', end: '10:15' }, ids);
+    expect(set.ok && set.mutation.changes[0]).toMatchObject({
+      fields: { dueDate: { v: '2026-11-07' }, dueTime: { v: '09:30' }, dueEnd: { v: '10:15' } },
+    });
+    // An end alone changes the card, and the same end changes nothing.
+    const only = setDue(card(timed), { date: '2026-11-07', time: '09:30', end: '11:00' }, ids);
+    expect(only.ok).toBe(true);
+    expect(
+      setDue(
+        card({ ...timed, dueEnd: '11:00' }),
+        { date: '2026-11-07', time: '09:30', end: '11:00' },
+        ids,
+      ),
+    ).toEqual({ ok: false, reason: 'nothing' });
+    // No time, so no end; no date, so none of them.
+    const noTime = setDue(card(), { date: '2026-11-07', time: null, end: '10:15' }, ids);
+    expect(noTime.ok && noTime.mutation.changes[0]).toMatchObject({
+      fields: { dueEnd: { v: null } },
+    });
+    const none = setDue(
+      card({ ...timed, dueEnd: '11:00' }),
+      { date: null, time: '09:30', end: '11:00' },
+      ids,
+    );
+    expect(none.ok && none.mutation.changes[0]).toMatchObject({
+      fields: { dueDate: { v: null }, dueTime: { v: null }, dueEnd: { v: null } },
+    });
+    // An end that is not after the time is not written.
+    const early = setDue(card(), { date: '2026-11-07', time: '09:30', end: '09:00' }, ids);
+    expect(early.ok && early.mutation.changes[0]).toMatchObject({
+      fields: { dueEnd: { v: null } },
+    });
+  });
+
+  it('is carried by a card made due from the start', () => {
+    const made = createDueCard(
+      'L1',
+      [],
+      { title: 'x', due: { date: '2026-11-07', time: '09:30', end: '10:30' } },
+      ids,
+    );
+    expect(made.ok && made.mutation.changes[0]).toMatchObject({
+      fields: { dueTime: { v: '09:30' }, dueEnd: { v: '10:30' } },
     });
   });
 });

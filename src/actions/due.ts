@@ -5,7 +5,8 @@ import { createCard } from './cards';
 /**
  * A card's due date and time (DESIGN.md §11), on the Desk. **This is the one action that writes them, and it always writes both**: `dueDate` and
  * `dueTime` in one change, so that the pair is stamped with one order and two devices cannot end with one device's date and the other's time. Clearing
- * the date clears the time, and there is no time without a date; the server's validator refuses a change that says otherwise (`src/sync/validate.ts`).
+ * the date clears the time, and there is no time without a date; an end (task 19.5) is the same, never without a time and always after it. The server's
+ * validator refuses a change that says otherwise (`src/sync/validate.ts`).
  * A test holds that no other action names these fields.
  */
 export interface Due {
@@ -13,6 +14,8 @@ export interface Due {
   readonly date: string | null;
   /** `HH:MM`, or null; only with a date. */
   readonly time: string | null;
+  /** When a card that starts at `time` ends, `HH:MM` the same day, after it; only with a time (task 19.5). Missing is none. */
+  readonly end?: string | null;
 }
 
 const plainOf = (row: LocalRow, name: string) => {
@@ -21,27 +24,43 @@ const plainOf = (row: LocalRow, name: string) => {
 };
 
 /** What a card is due, as the working copy has it. A date that is ciphertext cannot be read, and counts as none until the keys are in place. */
-export function dueOf(card: LocalRow): Due {
+export function dueOf(card: LocalRow): Due & { end: string | null } {
   const date = plainOf(card, 'dueDate');
   const time = plainOf(card, 'dueTime');
+  const end = plainOf(card, 'dueEnd');
+  const timed = typeof date === 'string' && typeof time === 'string';
   return {
     date: typeof date === 'string' ? date : null,
-    time: typeof date === 'string' && typeof time === 'string' ? time : null,
+    time: timed ? time : null,
+    end: timed && typeof end === 'string' && end > time ? end : null,
   };
 }
 
+/** The end that goes with a due: none unless there is a time, and none that is not after it. */
+export function endOf(due: Due): string | null {
+  return due.date !== null && due.time !== null && due.end && due.end > due.time ? due.end : null;
+}
+
 /** The fields that set a due date and time, the pair together: what a change that gives a card a date, or makes one that has it, carries. */
-export function dueFields(due: Due): Record<'dueDate' | 'dueTime', { v: string | null }> {
+export function dueFields(
+  due: Due,
+): Record<'dueDate' | 'dueTime' | 'dueEnd', { v: string | null }> {
   const date = due.date;
-  return { dueDate: { v: date }, dueTime: { v: date === null ? null : due.time } };
+  const time = date === null ? null : due.time;
+  return {
+    dueDate: { v: date },
+    dueTime: { v: time },
+    dueEnd: { v: endOf({ date, time, end: due.end ?? null }) },
+  };
 }
 
 export function setDue(card: LocalRow | undefined, due: Due, ids: Ids): ActionResult {
   if (!card || card.table !== 'desk_card') return { ok: false, reason: 'missing' };
   // No time without a date.
-  const next: Due = due.date === null ? { date: null, time: null } : due;
+  const next: Due = due.date === null ? { date: null, time: null, end: null } : due;
   const now = dueOf(card);
-  if (now.date === next.date && now.time === next.time) return { ok: false, reason: 'nothing' };
+  if (now.date === next.date && now.time === next.time && now.end === endOf(next))
+    return { ok: false, reason: 'nothing' };
   return {
     ok: true,
     mutation: {
@@ -75,7 +94,7 @@ export function createDueCard(
   const [change] = made.mutation.changes;
   if (!change || change.table !== 'desk_card' || !('fields' in change) || !change.fields)
     return { ok: false, reason: 'rule' };
-  const due = input.due.date === null ? { date: null, time: null } : input.due;
+  const due = input.due.date === null ? { date: null, time: null, end: null } : input.due;
   return {
     ok: true,
     mutation: {

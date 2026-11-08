@@ -55,6 +55,10 @@ function get<T>(o: Rec, key: string, parser: Parser<T>, path: string): T {
   return parsed.value;
 }
 
+/** An end of a card (task 19.5): missing in a file from before it, which is none. */
+const optionalEnd: Parser<string | null> = (v) =>
+  v === undefined ? { ok: true, value: null } : nullable(hhmm)(v);
+
 const POSITION = /^[0-9A-Za-z]+$/;
 const position: Parser<string> = (v) =>
   typeof v === 'string' && POSITION.test(v) && v.length <= LIMITS.positionChars
@@ -228,6 +232,9 @@ function desk(v: unknown): DeskPart {
           const dueTime = get(c, 'dueTime', nullable(hhmm), cat);
           if (dueDate === null && dueTime !== null)
             throw new Bad(`${cat}.dueTime: a time with no date`);
+          const dueEnd = get(c, 'dueEnd', optionalEnd, cat);
+          if (dueEnd !== null && (dueTime === null || dueEnd <= dueTime))
+            throw new Bad(`${cat}.dueEnd: an end needs a time, and is after it`);
           const seriesId = get(c, 'seriesId', nullable(uuid), cat);
           if (seriesId !== null && !seriesIds.has(seriesId))
             throw new Bad(`${cat}.seriesId: a series that is not in the file`);
@@ -247,6 +254,7 @@ function desk(v: unknown): DeskPart {
             starred: get(c, 'starred', bool, cat),
             dueDate,
             dueTime,
+            dueEnd,
             seriesId,
             startedAt: get(c, 'startedAt', instant, cat),
             completedAt: get(c, 'completedAt', instant, cat),

@@ -82,6 +82,7 @@ export function importDesk(part: DeskPart, existing: Existing, ids: Ids): Import
       if (card.dueDate !== null) {
         fields.dueDate = { v: card.dueDate };
         if (card.dueTime !== null) fields.dueTime = { v: card.dueTime };
+        if (card.dueTime !== null && card.dueEnd !== null) fields.dueEnd = { v: card.dueEnd };
       }
       if (card.seriesId !== null) fields.seriesId = { v: seriesIds.get(card.seriesId) ?? null };
       if (card.startedAt !== null) fields.startedAt = { v: card.startedAt };

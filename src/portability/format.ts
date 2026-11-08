@@ -28,6 +28,8 @@ export interface ExportedDeskCard {
   readonly starred: boolean;
   readonly dueDate: string | null;
   readonly dueTime: string | null;
+  /** When it ends, the same day (task 19.5): `HH:MM` after `dueTime`, or null. A file from before it has none. */
+  readonly dueEnd: string | null;
   /** The series it is an occurrence of, by the id the file gives it. */
   readonly seriesId: string | null;
   readonly startedAt: number | null;
@@ -256,6 +258,7 @@ export function buildDesk(rows: DeskRows, open?: OpenField): DeskPart {
         starred: value(card, 'starred', open) === true,
         dueDate: orNull(value(card, 'dueDate', open)),
         dueTime: orNull(value(card, 'dueTime', open)),
+        dueEnd: orNull(value(card, 'dueEnd', open)),
         // A pointer to a series that is not in the file would point at nothing.
         seriesId: ((id) => (id !== null && seriesIds.has(id) ? id : null))(
           orNull(value(card, 'seriesId', open)),

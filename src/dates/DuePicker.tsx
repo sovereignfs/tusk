@@ -15,6 +15,8 @@ import styles from './DuePicker.module.css';
 export interface DueValue {
   readonly date: string | null;
   readonly time: string | null;
+  /** When a card that starts at `time` ends, the same day (task 19.5): offered once there is a time, and always after it. Missing is none. */
+  readonly end?: string | null;
 }
 
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -39,9 +41,16 @@ export function DuePicker({
   // Today as the person's own clock has it, read when the picker is shown, so that a screen left open overnight is not a day behind.
   const now = nowHere();
   const today = now.date;
-  const due = value.date ? formatDue(value.date, value.time, now) : null;
+  const due = value.date
+    ? formatDue(value.date, value.time, now, undefined, value.end ?? null)
+    : null;
+  const end = value.time !== null ? (value.end ?? null) : null;
   const choose = (date: string | null) =>
-    onChange({ date, time: date === null ? null : value.time });
+    onChange({
+      date,
+      time: date === null ? null : value.time,
+      end: date === null ? null : end,
+    });
 
   return (
     <Popover
@@ -92,8 +101,32 @@ export function DuePicker({
               value={value.time ?? ''}
               onChange={(event) => {
                 const next = event.target.value;
-                if (next === '') onChange({ date: value.date, time: null });
-                else if (TIME.test(next)) onChange({ date: value.date, time: next });
+                if (next === '') onChange({ date: value.date, time: null, end: null });
+                // A start that is not before the end takes the end away: it was the end of another start.
+                else if (TIME.test(next))
+                  onChange({
+                    date: value.date,
+                    time: next,
+                    end: end !== null && end > next ? end : null,
+                  });
+              }}
+            />
+          </div>
+        ) : null}
+        {value.date && value.time ? (
+          <div className={styles.time}>
+            <span>Until</span>
+            <Input
+              type="time"
+              aria-label="Until"
+              min={value.time}
+              value={end ?? ''}
+              onChange={(event) => {
+                const next = event.target.value;
+                if (next === '') onChange({ date: value.date, time: value.time, end: null });
+                // Only a time after the start is an end; anything else is left as it was.
+                else if (TIME.test(next) && value.time !== null && next > value.time)
+                  onChange({ date: value.date, time: value.time, end: next });
               }}
             />
           </div>

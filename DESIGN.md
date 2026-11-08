@@ -1318,12 +1318,12 @@ Beyond better-auth's (`user`, `session`, `account`, `verification`, `two_factor`
 
 **The Desk** is synced, so each row has structural columns the server uses and a `fields` column it mostly does not:
 
-| Table         | Structural columns                                                                                                             | Fields                                                                                          |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
-| `desk_list`   | `id`, `owner_id`, `position`, `deleted_at`, `seq`, `created_at`                                                                | `title`, `color`, `sort`, `showCompleted`, `filter`, `key` (the wrapped list key, plain, §9.2)  |
-| `desk_card`   | `id`, `owner_id`, `list_id`, `position`, `deleted_at`, `seq`, `created_at`, and mirrors `due_date`, `due_time`, `completed_at` | `title`, `description`, `starred`, `dueDate`, `dueTime`, `seriesId`, `startedAt`, `completedAt` |
-| `desk_check`  | `id`, `owner_id`, `card_id`, `position`, `deleted_at`, `seq`, `created_at`                                                     | `title`, `completedAt`                                                                          |
-| `desk_series` | `id`, `owner_id`, `list_id`, `deleted_at`, `seq`, `created_at`                                                                 | `rule`, `anchor`                                                                                |
+| Table         | Structural columns                                                                                                             | Fields                                                                                                    |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| `desk_list`   | `id`, `owner_id`, `position`, `deleted_at`, `seq`, `created_at`                                                                | `title`, `color`, `sort`, `showCompleted`, `filter`, `key` (the wrapped list key, plain, §9.2)            |
+| `desk_card`   | `id`, `owner_id`, `list_id`, `position`, `deleted_at`, `seq`, `created_at`, and mirrors `due_date`, `due_time`, `completed_at` | `title`, `description`, `starred`, `dueDate`, `dueTime`, `dueEnd`, `seriesId`, `startedAt`, `completedAt` |
+| `desk_check`  | `id`, `owner_id`, `card_id`, `position`, `deleted_at`, `seq`, `created_at`                                                     | `title`, `completedAt`                                                                                    |
+| `desk_series` | `id`, `owner_id`, `list_id`, `deleted_at`, `seq`, `created_at`                                                                 | `rule`, `anchor`                                                                                          |
 
 The mirrors exist for the Planner and reminders (phase 2): the server copies them from `fields` when it can read them, and they are null on a
 personal-key Desk.

@@ -53,6 +53,8 @@ export const FIELD_NAMES = {
     'starred',
     'dueDate',
     'dueTime',
+    // When a card that starts at `dueTime` ends, the same day (task 19.5): a time with a time before it, never alone and never before or at it.
+    'dueEnd',
     'seriesId',
     'startedAt',
     'completedAt',
