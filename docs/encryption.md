@@ -37,7 +37,11 @@ cards you have, and the size and timing of each change. Whoever runs it can see 
 - **Export** is made in your browser, as plain JSON in your hands, with a warning.
 - **Backups to git** hold the Desk's part as ciphertext and the wrapped keys, so the backup is as private as the database. Importing one needs your key.
   Tusk asks you to confirm, once, that backups should go on after the key is set, because the files written before stay plain.
-- **Reminders and the Planner** (when they are built) will work from times only, since the server cannot read what a card says.
+- **Reminders** work from times only, since the server cannot read what a card says. Your device tells the server _when_ a card is due (an instant, with no card and
+  no count), and the server wakes your device at that time; email and the bell say only "You have cards due". The daily brief is not made for a Desk with a key,
+  since it would have to count cards. If you choose it on a device, a reminder there can name the card: that device then gives Tusk's service worker the Desk's list
+  keys (not your own key), kept until you turn it off, lock the Desk, forget the key or sign out. Without it the reminder still comes, and says only that cards are due.
+  A device you have not opened Tusk on for 14 days stops getting reminders. The Planner (when it is built) will work from times only too.
 
 ## The server's own key
 

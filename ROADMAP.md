@@ -201,7 +201,7 @@ After the MVP. The tasks with IDs are planned in their epics; the rest are outli
 | [8.4](docs/epics/notifications.md) | Web Push                                    | 1.11, 8.2, 8.3     | ✅     |
 | [8.5](docs/epics/notifications.md) | The daily brief                             | 1.6, 4.3, 8.2, 8.3 | ✅     |
 | [8.6](docs/epics/notifications.md) | Due-time reminders                          | 8.5                | ✅     |
-| [14.6](docs/epics/encryption.md)   | Reminders by times only                     | 8.4, 8.6, 14.3     | 📋     |
+| [14.6](docs/epics/encryption.md)   | Reminders by times only                     | 8.4, 8.6, 14.3     | ✅     |
 
 | What                                                          | Note                                                                |
 | ------------------------------------------------------------- | ------------------------------------------------------------------- |

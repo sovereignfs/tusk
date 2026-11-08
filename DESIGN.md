@@ -196,6 +196,7 @@ As Fjord Web's. `app/` for routes, and `src/` for everything else, with tests be
 | `src/mail/`                                           | The SMTP mailer (§6)                                                                                              |
 | `src/screens/`                                        | The signed-in screens: the shell's sidebar, the Desk, the boards index, a board, the card modal, the Inbox        |
 | `src/pwa/`, `src/sw/`                                 | The manifest's details, and the service worker's source (§17.9)                                                   |
+| `src/reminders/`                                      | Reminders for a Desk the server cannot read (§25.2)                                                               |
 | `src/ui/`                                             | The design system's client boundary, `AppShell`, and what every drag shares                                       |
 | `migrations/`                                         | The generated SQL: `sqlite/`, `postgres/`, `auth/`                                                                |
 | `deploy/`                                             | The Compose setups for sqld, a file and PostgreSQL, their README and `.env.example`                               |
@@ -1430,6 +1431,24 @@ email (`TUSK_SMTP_*`) and core's bell when hosted (`notifications:send`), each b
 sends,** by a conditional update, so any process may run the job; the notice is written in the claim's transaction, and channels fan out after it. Zones
 are worked out in JavaScript, one query per zone. **On a personal-key Desk the browser uploads times only** (`reminder_slot`), and Push wakes the device
 to show the title. Inbox notices are also sent by Push and email, by the same switches.
+
+**How that works (task 14.6).** The server cannot read a sealed Desk, so it can neither count it for a brief (which a sealed Desk has none of) nor name a card.
+**A device that has the key** works out, from the cards it has opened, the instants at which an open card with a date and a time is due over the next fourteen
+days, and sends them whole (`PUT /api/reminders/slots`, `src/reminders/`): a slot is an account, an instant to the minute and when it was claimed, and **has no way
+back to a card** (two cards due together are one row, so not even a count). Only for an account whose Desk has a key; replacing the set keeps a slot already
+claimed, so none is armed twice, and a device silent for fourteen days stops being reminded, since nothing replaces its slots. The job claims a slot that has come
+(not yet claimed, not more than half an hour late, the account with reminders on) by a conditional update and writes **one notice that has no subject**: the Inbox, the
+bell, email and core's bell say "You have cards due" and nothing more. Web Push sends the same notice as `{ kind: "wake" }`, which says nothing of what is due.
+**The service worker then looks for itself** (`src/sw/source.ts`): it reads the Desk's working copy from IndexedDB (read-only, never making a database that is not
+there), opens the title, date, time and completion with the Desk's **list keys**, and shows the card, or "N cards due" with the titles, or "Nothing due after all" when
+it read everything and nothing is due. Where it cannot, it shows what the server sent, and **never says "nothing" for what it could not open.** It always shows
+something, since a browser stops allowing a push that shows nothing.
+
+**What it costs, and why it is a choice.** Opening a field takes list keys, which the page has opened and the worker cannot (the person's own key is in the vault,
+which the worker is not given: §9.2 stands). So **a device whose person chose it** ("Name the card in a reminder on this device", Settings, Notifications, kept per
+device) gives the worker the list keys, as browser keys that script cannot read back, in a database of its own with the account's zone (`src/reminders/wake.ts`). It
+is the one place a worker holds anything of a sealed Desk; it is removed when the person turns it off, locks the Desk, forgets the key, or signs out
+(`forgetKey` does it). A device that did not choose it still wakes, and says only that cards are due.
 
 ### 25.3 Today and Review on the phone
 
