@@ -45,6 +45,8 @@ export const accountSettings = app.table('account_settings', {
   emailOn: bool('email_on').notNull().default(false),
   /** The kinds of Inbox notice that are also sent outside the app (§19), comma-separated; empty: none. */
   sentKinds: text('sent_kinds').notNull().default(''),
+  /** The local day (`YYYY-MM-DD`, in the account's zone) the daily brief was last claimed for: the one claim that makes it once a day (task 8.5). */
+  lastDigestOn: isoDate('last_digest_on'),
   createdAt: epochMs('created_at').notNull(),
 });
 
@@ -78,6 +80,8 @@ export const deskCard = app.table(
     dueDate: isoDate('due_date'),
     dueTime: hhmm('due_time'),
     completedAt: epochMs('completed_at'),
+    /** The due date and time (`YYYY-MM-DD HH:MM`) a reminder was last claimed for: a card reminded for the time it is due is not reminded again, and one given another time is (task 8.6). */
+    remindedFor: text('reminded_for'),
     fields: fields('fields').notNull().default('{}'),
   },
   (table) => [index('desk_card_owner_seq_idx').on(table.ownerId, table.seq)],

@@ -13,6 +13,8 @@ const LABELS: Record<NoticeKind, string> = {
   added_to_board: 'When I am added to a board',
   backup_stopped: 'When my automatic backups stop',
   workspace_passed: 'When a workspace is passed to me because its owner left',
+  brief: 'My daily brief of what needs attention',
+  reminder: 'A reminder when a card is due',
 };
 
 /** What the account keeps of this and what the server can deliver (`GET /api/settings`). */

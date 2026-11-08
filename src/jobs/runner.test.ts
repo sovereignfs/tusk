@@ -333,6 +333,7 @@ describe('starting the jobs', () => {
     expect(jobs.map((job) => job.name)).toEqual([
       'purge',
       'trim-notices',
+      'reminders',
       'send-notices',
       'backups',
     ]);

@@ -28,6 +28,10 @@ export function noticeText(kind: NoticeKind, subject: string): string {
       return `You were added to the board ${quoted}`;
     case 'backup_stopped':
       return 'Your automatic backups stopped';
+    case 'brief':
+      return subject;
+    case 'reminder':
+      return `Due now: ${quoted}`;
     case 'workspace_passed':
       return `The workspace ${quoted} was passed to you`;
   }
@@ -66,7 +70,13 @@ export async function deliverNotices(
       kinds = (await readSettings(database, row.accountId)).sentKinds;
       asked.set(row.accountId, kinds);
     }
-    if (!(kinds as readonly string[]).includes(row.kind)) continue;
+    // The brief and a reminder have a switch of their own, and are only written for the person who turned it on: they are sent, not asked for by kind.
+    if (
+      row.kind !== 'brief' &&
+      row.kind !== 'reminder' &&
+      !(kinds as readonly string[]).includes(row.kind)
+    )
+      continue;
     fannedOut += 1;
     await fanOut(
       channels,

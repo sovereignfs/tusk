@@ -10,6 +10,7 @@ Each release's section is also its GitHub release notes: the release workflow re
 
 ### Added
 
+- A daily brief ("3 due today · 2 overdue") at the time you choose, in your own time zone, and a reminder when a card is due, at its time, for your Desk and for cards you are assigned to. Each is written to your Inbox and sent by the channels you have. A quiet day sends no brief, and a card changed to another time reminds you again.
 - Settings, Notifications has what leaves the app: a daily brief and its time, a reminder when a card is due, email, and which Inbox notices are also sent. Each shows only where this server can deliver it (mail, push keys or a Sovereign core), and says why not where it cannot. Inbox notices of the kinds you pick are now sent by email, to a Sovereign core's bell when you sign in through one, and by Web Push to the devices you turn it on from (the operator sets `TUSK_VAPID_*` and `TUSK_ENCRYPTION_KEY`).
 - On a phone, the footer's Today (what is overdue, due today or starred) and Review (every open card, least recently reviewed first) go through cards one at a time: swipe or press Done, Cancel (with Undo, and a repeating card skips to its next), Dismiss (Today: hide until tomorrow, with Undo; Review: skip) and Star. A pass can be stopped and carried on, on any device.
 - On a phone, a card is reordered by pressing its handle and dragging, a long press chooses it, and swiping a row aside shows Done and Delete (Delete can be undone).

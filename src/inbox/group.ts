@@ -60,6 +60,8 @@ export function noticeText(notice: Pick<NoticeRow, 'kind' | 'actorName' | 'subje
     added_to_workspace: `${who} added you to the workspace ${notice.subject}`,
     added_to_board: `${who} added you to the board ${notice.subject}`,
     backup_stopped: backupStoppedText(notice.subject),
+    brief: notice.subject,
+    reminder: `${what} is due`,
     workspace_passed: `The workspace ${notice.subject} was passed to you: its owner deleted their account, and you have been in it longest`,
   };
   return texts[notice.kind];

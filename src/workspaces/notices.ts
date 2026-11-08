@@ -61,7 +61,14 @@ export async function raise(tx: Database, notice: Notice, now: number): Promise<
  */
 export async function raiseSystem(
   tx: Database,
-  notice: { recipient: string; kind: NoticeKind; subject: string; workspaceId?: string },
+  notice: {
+    recipient: string;
+    kind: NoticeKind;
+    subject: string;
+    workspaceId?: string;
+    boardId?: string;
+    cardId?: string;
+  },
   now: number,
 ): Promise<boolean> {
   if ((await kindsOff(tx, notice.recipient)).includes(notice.kind)) return false;
@@ -69,7 +76,7 @@ export async function raiseSystem(
   await dbAll(
     tx,
     sql`INSERT INTO ${tablesOf(tx).notice} (id, account_id, kind, actor_id, workspace_id, board_id, card_id, details, created_at)
-        VALUES (${id}, ${notice.recipient}, ${notice.kind}, NULL, ${notice.workspaceId ?? null}, NULL, NULL, ${sealText('notice', id, 'details', JSON.stringify({ title: notice.subject }))}, ${now})
+        VALUES (${id}, ${notice.recipient}, ${notice.kind}, NULL, ${notice.workspaceId ?? null}, ${notice.boardId ?? null}, ${notice.cardId ?? null}, ${sealText('notice', id, 'details', JSON.stringify({ title: notice.subject }))}, ${now})
         RETURNING id`,
   );
   return true;

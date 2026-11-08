@@ -5,6 +5,7 @@ import { getConfig } from '../config/current';
 import { getAuthDatabase, getDatabase } from '../db/boot';
 import { installationTokens } from '../github-app/server';
 import { deliverNotices } from '../notifications/deliver';
+import { tick } from '../notifications/job';
 import { serverChannels } from '../notifications/server';
 import { purge } from '../sync/purge';
 import { trimNotices } from '../workspaces/inbox';
@@ -32,6 +33,15 @@ export const jobs: readonly JobDefinition[] = [
     runAtStart: true,
     run: async ({ now }) => {
       await trimNotices(await getDatabase(), now.getTime());
+    },
+  },
+  {
+    // The daily brief and the reminders at a due time (DESIGN.md §25.2): each claimed by a conditional update, so any process may run this at any time and one writes
+    // each. The notices they write are sent by the job below.
+    name: 'reminders',
+    everyMs: 60 * 1000,
+    run: async ({ now }) => {
+      await tick(await getDatabase(), now.getTime());
     },
   },
   {

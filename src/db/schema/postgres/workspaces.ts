@@ -89,6 +89,8 @@ export const card = app.table(
     description: text('description'),
     dueDate: isoDate('due_date'),
     dueTime: hhmm('due_time'),
+    /** The due date and time (`YYYY-MM-DD HH:MM`) a reminder was last claimed for, as on a Desk card (task 8.6). */
+    remindedFor: text('reminded_for'),
     position: position('position').notNull(),
     /** When it was archived, or null (§15.8). */
     archivedAt: epochMs('archived_at'),
