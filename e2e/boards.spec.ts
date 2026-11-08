@@ -106,7 +106,7 @@ test('a board is made from the workspace’s tile with Backlog, its lists are ad
   await expect.poll(() => lists(page)).toEqual(['In progress', 'Backlog', 'Done']);
 
   await page.reload();
-  expect(await lists(page)).toEqual(['In progress', 'Backlog', 'Done']);
+  await expect.poll(() => lists(page)).toEqual(['In progress', 'Backlog', 'Done']);
 
   // Deleted after asking.
   await page.getByRole('button', { name: 'List options for Done' }).click();
@@ -114,7 +114,7 @@ test('a board is made from the workspace’s tile with Backlog, its lists are ad
   await page.getByRole('button', { name: 'Delete list' }).click();
   await expect.poll(() => lists(page)).toEqual(['In progress', 'Backlog']);
   await page.reload();
-  expect(await lists(page)).toEqual(['In progress', 'Backlog']);
+  await expect.poll(() => lists(page)).toEqual(['In progress', 'Backlog']);
 
   // The board is a tile in its workspace.
   await cleanUp(page, workspace);
@@ -134,7 +134,7 @@ test('a list is picked up by its title and put down with the keyboard', async ({
   }
   await expect.poll(() => lists(page)).toEqual(['Done', 'Backlog', 'Doing']);
   await page.reload();
-  expect(await lists(page)).toEqual(['Done', 'Backlog', 'Doing']);
+  await expect.poll(() => lists(page)).toEqual(['Done', 'Backlog', 'Doing']);
   await cleanUp(page, workspace);
 });
 
