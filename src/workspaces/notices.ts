@@ -4,6 +4,7 @@ import { dbAll, dbGet } from '../db/exec';
 import * as postgresApp from '../db/schema/postgres/app';
 import * as sqliteApp from '../db/schema/sqlite/app';
 import type { NoticeKind } from './format';
+import { sealText } from './content';
 import { tablesOf } from './tables';
 
 /**
@@ -42,11 +43,12 @@ export async function raise(tx: Database, notice: Notice, now: number): Promise<
   if (notice.recipient === notice.actor) return false;
   if ((await kindsOff(tx, notice.recipient)).includes(notice.kind)) return false;
   const t = tablesOf(tx);
+  const id = crypto.randomUUID();
   await dbAll(
     tx,
     sql`INSERT INTO ${t.notice} (id, account_id, kind, actor_id, workspace_id, board_id, card_id, details, created_at)
-        VALUES (${crypto.randomUUID()}, ${notice.recipient}, ${notice.kind}, ${notice.actor}, ${notice.workspaceId},
-                ${notice.boardId ?? null}, ${notice.cardId ?? null}, ${JSON.stringify({ title: notice.subject })}, ${now})
+        VALUES (${id}, ${notice.recipient}, ${notice.kind}, ${notice.actor}, ${notice.workspaceId},
+                ${notice.boardId ?? null}, ${notice.cardId ?? null}, ${sealText('notice', id, 'details', JSON.stringify({ title: notice.subject }))}, ${now})
         RETURNING id`,
   );
   return true;
@@ -63,10 +65,11 @@ export async function raiseSystem(
   now: number,
 ): Promise<boolean> {
   if ((await kindsOff(tx, notice.recipient)).includes(notice.kind)) return false;
+  const id = crypto.randomUUID();
   await dbAll(
     tx,
     sql`INSERT INTO ${tablesOf(tx).notice} (id, account_id, kind, actor_id, workspace_id, board_id, card_id, details, created_at)
-        VALUES (${crypto.randomUUID()}, ${notice.recipient}, ${notice.kind}, NULL, ${notice.workspaceId ?? null}, NULL, NULL, ${JSON.stringify({ title: notice.subject })}, ${now})
+        VALUES (${id}, ${notice.recipient}, ${notice.kind}, NULL, ${notice.workspaceId ?? null}, NULL, NULL, ${sealText('notice', id, 'details', JSON.stringify({ title: notice.subject }))}, ${now})
         RETURNING id`,
   );
   return true;

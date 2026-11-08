@@ -5,6 +5,7 @@ import { dbAll, transaction } from '../db/exec';
 import { deleteWorkspace } from './apply';
 import { raiseSystem } from './notices';
 import { tablesOf } from './tables';
+import { inNameOrder, nameOrderSql, openText } from './content';
 
 /**
  * What becomes of a person's part in the shared work when their account goes (DESIGN.md §22). **Shared work is left to the people still using it:** a
@@ -38,14 +39,22 @@ export async function previewLeaving(
   accountId: string,
 ): Promise<Passing[]> {
   const t = tablesOf(database);
-  const sole = await dbAll<{ workspaceId: string; name: string }>(
+  const soleRows = await dbAll<{ workspaceId: string; name: string }>(
     database,
     sql`SELECT w.id AS "workspaceId", w.name AS name FROM ${t.workspace} w
         JOIN ${t.workspaceMember} m ON m.workspace_id = w.id AND m.account_id = ${accountId} AND m.role = 'owner'
         WHERE NOT EXISTS (
           SELECT 1 FROM ${t.workspaceMember} o WHERE o.workspace_id = w.id AND o.role = 'owner' AND o.account_id <> ${accountId}
         )
-        ORDER BY w.name, w.id`,
+        ${sql.raw(nameOrderSql('w.name', 'w.id'))}`,
+  );
+  const sole = inNameOrder(
+    soleRows.map((row) => ({
+      id: row.workspaceId,
+      workspaceId: row.workspaceId,
+      name: openText('workspace', row.workspaceId, 'name', row.name),
+    })),
+    (row) => row.name,
   );
   const out: Passing[] = [];
   for (const each of sole) {
@@ -109,7 +118,12 @@ export async function leaveAllWorkspaces(
           );
           await raiseSystem(
             tx,
-            { recipient: next.accountId, kind: 'workspace_passed', subject: row.name, workspaceId },
+            {
+              recipient: next.accountId,
+              kind: 'workspace_passed',
+              subject: openText('workspace', workspaceId, 'name', row.name),
+              workspaceId,
+            },
             now,
           );
           done.passed += 1;

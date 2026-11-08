@@ -10,6 +10,7 @@ import { type Op, type OpRequest, NOTICE_LIMITS } from './format';
 import { inboxOf, markSeen, trimNotices, unreadCount } from './inbox';
 import { tablesOf } from './tables';
 import { type Role, type World, seedWorld } from './testing/roles';
+import { sealText } from './content';
 
 /**
  * The Inbox (DESIGN.md §16), on whichever database the leg runs on: what is written, who is told, what is shown, and what is read.
@@ -272,12 +273,14 @@ describe(`the Inbox (${leg})`, () => {
 
   it('pages newest first after a cursor without skipping or repeating', async () => {
     const w = await seedWorld(database);
-    for (let i = 0; i < 60; i++)
+    for (let i = 0; i < 60; i++) {
+      const noticeId = id();
       await dbAll(
         database,
         sql`INSERT INTO ${t().notice} (id, account_id, kind, actor_id, workspace_id, board_id, card_id, details, created_at)
-            VALUES (${id()}, ${w.accounts.member}, 'comment', ${w.accounts.boardOwner}, ${w.workspace}, ${w.boards.publicBoard}, ${w.cards.open}, ${JSON.stringify({ title: `n${i}` })}, ${NOW + i}) RETURNING id`,
+            VALUES (${noticeId}, ${w.accounts.member}, 'comment', ${w.accounts.boardOwner}, ${w.workspace}, ${w.boards.publicBoard}, ${w.cards.open}, ${sealText('notice', noticeId, 'details', JSON.stringify({ title: `n${i}` }))}, ${NOW + i}) RETURNING id`,
       );
+    }
     const first = await inboxOf(database, directory, w.accounts.member);
     expect(first.notices).toHaveLength(NOTICE_LIMITS.page);
     expect(first.more).toBe(true);

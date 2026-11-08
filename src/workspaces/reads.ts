@@ -36,6 +36,7 @@ import {
   WORKSPACE_LIMITS,
   type WorkspaceRow,
 } from './format';
+import { inNameOrder, nameOrderSql, open, openText, operatorRing } from './content';
 import { tablesOf } from './tables';
 
 /**
@@ -52,7 +53,7 @@ interface Raw {
 
 const toRow = (raw: Raw): WorkspaceRow => ({
   id: raw.id,
-  name: raw.name,
+  name: openText('workspace', raw.id, 'name', raw.name),
   role: raw.role === 'owner' ? 'owner' : 'member',
   createdAt: Number(raw.createdAt),
   updatedAt: Number(raw.updatedAt),
@@ -69,9 +70,9 @@ export async function listWorkspaces(
     sql`SELECT w.id AS id, w.name AS name, m.role AS role, w.created_at AS "createdAt", w.updated_at AS "updatedAt"
         FROM ${t.workspace} w JOIN ${t.workspaceMember} m ON m.workspace_id = w.id
         WHERE m.account_id = ${accountId} AND w.id IN ${workspacesOf(database, accountId)}
-        ORDER BY w.name, w.id LIMIT ${WORKSPACE_LIMITS.workspacesListed}`,
+        ${sql.raw(nameOrderSql('w.name', 'w.id'))} ${operatorRing() ? sql`` : sql`LIMIT ${WORKSPACE_LIMITS.workspacesListed}`}`,
   );
-  return rows.map(toRow);
+  return inNameOrder(rows.map(toRow), (row) => row.name, WORKSPACE_LIMITS.workspacesListed);
 }
 
 /** One workspace, if the account is in it: the same answer for one that is not there and one that is not theirs. */
@@ -152,9 +153,9 @@ const BOARD_COLUMNS = `b.id AS id, b.workspace_id AS "workspaceId", b.name AS na
 const toBoard = (raw: RawBoard): BoardRow => ({
   id: raw.id,
   workspaceId: raw.workspaceId,
-  name: raw.name,
+  name: openText('board', raw.id, 'name', raw.name),
   color: raw.color,
-  description: raw.description,
+  description: open('board', raw.id, 'description', raw.description),
   visibility: raw.visibility === 'private' ? 'private' : 'public',
   archived: raw.archivedAt !== null,
   version: Number(raw.version),
@@ -245,17 +246,28 @@ export async function readBoard(
   const board = toBoard(raw);
   return {
     board,
-    labels,
+    labels: labels.map((label) => ({
+      ...label,
+      name: openText('label', label.id, 'name', label.name),
+    })),
     cards: cards.map((card) => ({
       ...card,
+      title: openText('card', card.id, 'title', card.title),
       hasDescription: card.hasDescription === true || Number(card.hasDescription) === 1,
       labels: byCard.get(card.id) ?? [],
       assignees: assigneesOf.get(card.id) ?? [],
       checklist: progressOf.get(card.id) ?? { done: 0, total: 0 },
       comments: commentsOf.get(card.id) ?? 0,
     })),
-    workspace: { id: raw.workspaceId, name: raw.workspaceName },
-    lists: lists.map((list) => ({ ...list, cards: Number(list.cards) })),
+    workspace: {
+      id: raw.workspaceId,
+      name: openText('workspace', raw.workspaceId, 'name', raw.workspaceName),
+    },
+    lists: lists.map((list) => ({
+      ...list,
+      name: openText('board_list', list.id, 'name', list.name),
+      cards: Number(list.cards),
+    })),
     can: {
       edit: Boolean(Number(raw.canEdit)) && !board.archived,
       admin: Boolean(Number(raw.canAdmin)),
@@ -290,9 +302,9 @@ export async function boardsOfWorkspace(
     database,
     sql`SELECT ${sql.raw(BOARD_COLUMNS)} FROM ${t.board} b
         WHERE b.workspace_id = ${workspaceId} AND b.id IN ${boardsVisibleTo(database, accountId)}
-        ORDER BY b.name, b.id LIMIT ${WORKSPACE_LIMITS.boardsPerWorkspace}`,
+        ${sql.raw(nameOrderSql('b.name', 'b.id'))} ${operatorRing() ? sql`` : sql`LIMIT ${WORKSPACE_LIMITS.boardsPerWorkspace}`}`,
   );
-  return rows.map(toBoard);
+  return inNameOrder(rows.map(toBoard), (row) => row.name, WORKSPACE_LIMITS.boardsPerWorkspace);
 }
 
 const toSort = (value: unknown): WorkspaceSort =>
@@ -319,7 +331,7 @@ export async function boardsIndex(
       database,
       sql`SELECT ${sql.raw(BOARD_COLUMNS)} FROM ${t.board} b
           WHERE b.workspace_id IN ${mine} AND b.id IN ${boardsVisibleTo(database, accountId)}
-          ORDER BY b.name, b.id`,
+          ${sql.raw(nameOrderSql('b.name', 'b.id'))}`,
     ),
     dbAll<{ workspaceId: string; accountId: string }>(
       database,
@@ -348,7 +360,8 @@ export async function boardsIndex(
     return found;
   };
   for (const row of counts) entry(row.workspaceId).count = Number(row.n);
-  for (const row of boards) entry(row.workspaceId).boards.push(toBoard(row));
+  for (const row of inNameOrder(boards.map(toBoard), (each) => each.name))
+    entry(row.workspaceId).boards.push(row);
   for (const row of people)
     entry(row.workspaceId).people.push({
       accountId: row.accountId,
@@ -384,7 +397,11 @@ export async function archivedCards(
         WHERE board_id = ${boardId} AND board_id IN ${boardsVisibleTo(database, accountId)} AND archived_at IS NOT NULL
         ORDER BY archived_at DESC, id LIMIT ${WORKSPACE_LIMITS.cardsPerBoard}`,
   );
-  return rows.map((row) => ({ ...row, archivedAt: Number(row.archivedAt) }));
+  return rows.map((row) => ({
+    ...row,
+    title: openText('card', row.id, 'title', row.title),
+    archivedAt: Number(row.archivedAt),
+  }));
 }
 
 /**
@@ -442,7 +459,7 @@ export async function cardDetail(
   const items: ChecklistItem[] = itemRows.map((each) => ({
     id: each.id,
     cardId: each.cardId,
-    title: each.title,
+    title: openText('checklist_item', each.id, 'title', each.title),
     done: each.completedAt !== null,
     position: each.position,
   }));
@@ -462,13 +479,13 @@ export async function cardDetail(
     assignees: assignedTo.map((each) => each.id),
     boardId: row.boardId,
     listId: row.listId,
-    listName: row.listName,
-    title: row.title,
+    listName: openText('board_list', row.listId, 'name', row.listName),
+    title: openText('card', row.id, 'title', row.title),
     position: row.position,
     dueDate: row.dueDate,
     dueTime: row.dueTime,
     hasDescription: row.description !== null && row.description !== '',
-    description: row.description,
+    description: open('card', row.id, 'description', row.description),
     archived: row.archivedAt !== null,
     createdAt: Number(row.createdAt),
     updatedAt: Number(row.updatedAt),
@@ -594,7 +611,7 @@ export async function commentsOf(
     cardId,
     authorId: row.authorId,
     authorName: profiles.get(row.authorId)?.name ?? 'Someone',
-    body: row.body,
+    body: openText('comment', row.id, 'body', row.body),
     createdAt: Number(row.createdAt),
     editedAt: row.editedAt === null ? null : Number(row.editedAt),
     canEdit: editable && row.authorId === accountId,
@@ -618,11 +635,16 @@ export async function moveTargets(
     sql`SELECT workspace_id AS "workspaceId" FROM ${t.board} WHERE id = ${boardId} AND id IN ${boardsVisibleTo(database, accountId)}`,
   );
   if (!here) return undefined;
-  const boards = await dbAll<{ id: string; name: string }>(
+  const boardRows = await dbAll<{ id: string; name: string }>(
     database,
     sql`SELECT id, name FROM ${t.board}
         WHERE workspace_id = ${here.workspaceId} AND id <> ${boardId} AND id IN ${boardsEditableBy(database, accountId)}
-        ORDER BY name, id LIMIT ${WORKSPACE_LIMITS.boardsPerWorkspace}`,
+        ${sql.raw(nameOrderSql('name', 'id'))} ${operatorRing() ? sql`` : sql`LIMIT ${WORKSPACE_LIMITS.boardsPerWorkspace}`}`,
+  );
+  const boards = inNameOrder(
+    boardRows.map((row) => ({ id: row.id, name: openText('board', row.id, 'name', row.name) })),
+    (row) => row.name,
+    WORKSPACE_LIMITS.boardsPerWorkspace,
   );
   if (boards.length === 0) return { boards: [] };
   const lists = await dbAll<{ id: string; boardId: string; name: string }>(
@@ -642,7 +664,7 @@ export async function moveTargets(
       name: board.name,
       lists: lists
         .filter((list) => list.boardId === board.id)
-        .map((list) => ({ id: list.id, name: list.name })),
+        .map((list) => ({ id: list.id, name: openText('board_list', list.id, 'name', list.name) })),
       members: members
         .filter((member) => member.boardId === board.id)
         .map((member) => member.accountId),

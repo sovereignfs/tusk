@@ -1,4 +1,5 @@
-import { open, seal } from './envelope';
+import { fingerprintOfSealed, open, rewrap, seal } from './envelope';
+import type { RowField, RowFields } from '../sync/format';
 import type { KeyRing } from './keys';
 
 /**
@@ -73,4 +74,36 @@ export function openColumn(
   sealed: string,
 ): string {
   return open(sealed, columnBinding(table, rowId, column), ring);
+}
+
+/** A sealed workspace column moved from the previous key to the current one, the payload untouched. */
+export function rewrapColumn(
+  ring: KeyRing,
+  table: string,
+  rowId: string,
+  column: string,
+  sealed: string,
+): string {
+  if (!ring.previous) return sealed;
+  return rewrap(sealed, columnBinding(table, rowId, column), ring.previous, ring.current);
+}
+
+/** The sealed fields of a Desk row moved from the previous key to the current one; a field sealed under another key, or not sealed, is left as it is. */
+export function rewrapDeskFields(
+  ring: KeyRing,
+  table: string,
+  rowId: string,
+  fields: RowFields,
+): RowFields {
+  const out: Record<string, RowField> = {};
+  for (const [name, field] of Object.entries(fields)) {
+    out[name] =
+      'o' in field && ring.previous && fingerprintOfSealed(field.o) === ring.previous.fingerprint
+        ? {
+            o: rewrap(field.o, deskBinding(table, rowId, name), ring.previous, ring.current),
+            s: field.s,
+          }
+        : field;
+  }
+  return out;
 }

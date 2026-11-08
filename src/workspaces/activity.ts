@@ -3,6 +3,7 @@ import type { Database } from '../db/client';
 import { dbAll, dbGet } from '../db/exec';
 import type { ActivityKind, OpRequest, OpRows } from './format';
 import type { Details } from './describe';
+import { openText, sealText } from './content';
 import { tablesOf } from './tables';
 
 /**
@@ -59,7 +60,12 @@ export async function capture(tx: Database, request: OpRequest): Promise<Before>
         tx,
         sql`SELECT account_id AS id FROM ${t.cardAssignee} WHERE card_id = ${cardId}`,
       );
-      before.card = { ...card, assigned: assigned.map((each) => each.id) };
+      before.card = {
+        ...card,
+        title: openText('card', card.id, 'title', card.title),
+        listName: openText('board_list', card.listId, 'name', card.listName),
+        assigned: assigned.map((each) => each.id),
+      };
     }
   }
   if (request.op === 'card.move' || request.op === 'card.create') {
@@ -67,14 +73,15 @@ export async function capture(tx: Database, request: OpRequest): Promise<Before>
       tx,
       sql`SELECT id, name FROM ${t.boardList} WHERE id = ${request.listId}`,
     );
-    if (list) before.toList = list;
+    if (list)
+      before.toList = { id: list.id, name: openText('board_list', list.id, 'name', list.name) };
   }
   if (request.op === 'list.rename' || request.op === 'list.move' || request.op === 'list.delete') {
     const list = await dbGet<{ id: string; name: string; boardId: string }>(
       tx,
       sql`SELECT id, name, board_id AS "boardId" FROM ${t.boardList} WHERE id = ${request.id}`,
     );
-    if (list) before.list = list;
+    if (list) before.list = { ...list, name: openText('board_list', list.id, 'name', list.name) };
   }
   if (request.op.startsWith('item.') && request.op !== 'item.add' && 'id' in request) {
     const item = await dbGet<{ title: string; cardId: string; cardTitle: string; boardId: string }>(
@@ -82,21 +89,26 @@ export async function capture(tx: Database, request: OpRequest): Promise<Before>
       sql`SELECT i.title AS title, i.card_id AS "cardId", c.title AS "cardTitle", i.board_id AS "boardId"
           FROM ${t.checklistItem} i JOIN ${t.card} c ON c.id = i.card_id WHERE i.id = ${request.id}`,
     );
-    if (item) before.item = item;
+    if (item)
+      before.item = {
+        ...item,
+        title: openText('checklist_item', request.id, 'title', item.title),
+        cardTitle: openText('card', item.cardId, 'title', item.cardTitle),
+      };
   }
   if (request.op === 'label.update' || request.op === 'label.delete') {
     const label = await dbGet<{ name: string }>(
       tx,
       sql`SELECT name FROM ${t.label} WHERE id = ${request.id}`,
     );
-    if (label) before.label = label;
+    if (label) before.label = { name: openText('label', request.id, 'name', label.name) };
   }
   if (request.op === 'card.addLabel' || request.op === 'card.removeLabel') {
     const label = await dbGet<{ name: string }>(
       tx,
       sql`SELECT name FROM ${t.label} WHERE id = ${request.labelId}`,
     );
-    if (label) before.label = label;
+    if (label) before.label = { name: openText('label', request.labelId, 'name', label.name) };
   }
   if (request.op === 'board.publish') {
     const there = await dbGet<{ one: number }>(
@@ -117,7 +129,7 @@ export async function capture(tx: Database, request: OpRequest): Promise<Before>
       tx,
       sql`SELECT id, name, workspace_id AS "workspaceId" FROM ${t.board} WHERE id = ${request.id}`,
     );
-    if (board) before.board = board;
+    if (board) before.board = { ...board, name: openText('board', board.id, 'name', board.name) };
   }
   return before;
 }
@@ -131,10 +143,11 @@ export async function write(
   details: Details,
   now: number,
 ): Promise<void> {
+  const id = crypto.randomUUID();
   await dbAll(
     tx,
     sql`INSERT INTO ${tablesOf(tx).activity} (id, board_id, card_id, actor_id, kind, details, created_at)
-        VALUES (${crypto.randomUUID()}, ${boardId}, ${cardId}, ${actorId}, ${kind}, ${JSON.stringify(details)}, ${now})
+        VALUES (${id}, ${boardId}, ${cardId}, ${actorId}, ${kind}, ${sealText('activity', id, 'details', JSON.stringify(details))}, ${now})
         RETURNING id`,
   );
 }

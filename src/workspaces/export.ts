@@ -10,6 +10,7 @@ import type {
   WorkspacePart,
 } from '../portability/format';
 import { boardsVisibleTo, workspacesOwnedBy } from './can';
+import { inNameOrder, nameOrderSql, open, openText, operatorRing } from './content';
 import { tablesOf } from './tables';
 
 /**
@@ -80,6 +81,8 @@ export async function exportBoard(
         FROM ${t.board} b WHERE b.id = ${boardId} AND b.id IN ${boardsVisibleTo(database, accountId)}`,
   );
   if (!board) return undefined;
+  const boardName = openText('board', board.id, 'name', board.name);
+  const boardDescription = open('board', board.id, 'description', board.description);
 
   const lists = await dbAll<{ id: string; name: string; position: string }>(
     database,
@@ -165,8 +168,8 @@ export async function exportBoard(
 
   const cardPart = (card: (typeof cards)[number]): ExportedBoardCard => ({
     id: card.id,
-    title: card.title,
-    description: card.description ?? '',
+    title: openText('card', card.id, 'title', card.title),
+    description: open('card', card.id, 'description', card.description) ?? '',
     dueDate: card.dueDate,
     dueTime: card.dueTime,
     position: card.position,
@@ -177,13 +180,13 @@ export async function exportBoard(
       .sort(byPerson),
     checklist: (itemsOf.get(card.id) ?? []).map((item): ExportedChecklistItem => ({
       id: item.id,
-      title: item.title,
+      title: openText('checklist_item', item.id, 'title', item.title),
       completedAt: item.completedAt === null ? null : Number(item.completedAt),
       position: item.position,
     })),
     comments: (commentsOf.get(card.id) ?? []).map((row) => ({
       author: personOf(profiles, row.authorId),
-      body: row.body,
+      body: openText('comment', row.id, 'body', row.body),
       createdAt: iso(row.createdAt),
       editedAt: row.editedAt === null ? null : iso(row.editedAt),
     })),
@@ -191,22 +194,25 @@ export async function exportBoard(
 
   return {
     id: board.id,
-    name: board.name,
+    name: boardName,
     color: board.color,
-    description: board.description,
+    description: boardDescription,
     visibility: board.visibility === 'private' ? 'private' : 'public',
     archived: board.archivedAt !== null,
     lists: lists.map((list) => ({
       id: list.id,
-      name: list.name,
+      name: openText('board_list', list.id, 'name', list.name),
       position: list.position,
       cards: cards.filter((card) => card.listId === list.id).map(cardPart),
     })),
-    labels,
+    labels: labels.map((label) => ({
+      ...label,
+      name: openText('label', label.id, 'name', label.name),
+    })),
     activity: activity.map((row) => {
       let details: unknown = {};
       try {
-        details = JSON.parse(row.details);
+        details = JSON.parse(openText('activity', row.id, 'details', row.details));
       } catch {
         // A row whose details cannot be read says what it was and nothing more.
       }
@@ -246,16 +252,26 @@ export async function exportWorkspace(
     }))
     .sort((a, b) => Number(b.role === 'owner') - Number(a.role === 'owner') || byPerson(a, b));
 
-  const boardIds = await dbAll<{ id: string }>(
+  const boardRows = await dbAll<{ id: string; name: string }>(
     database,
-    sql`SELECT id FROM ${t.board} WHERE workspace_id = ${workspaceId} ORDER BY name, id LIMIT ${CAP}`,
+    sql`SELECT id, name FROM ${t.board} WHERE workspace_id = ${workspaceId} ${sql.raw(nameOrderSql('name', 'id'))} ${operatorRing() ? sql`` : sql`LIMIT ${CAP}`}`,
+  );
+  const boardIds = inNameOrder(
+    boardRows,
+    (row) => openText('board', row.id, 'name', row.name),
+    CAP,
   );
   const boards: BoardPart[] = [];
   for (const { id } of boardIds) {
     const part = await exportBoard(database, directory, accountId, id);
     if (part) boards.push(part);
   }
-  return { id: workspace.id, name: workspace.name, people, boards };
+  return {
+    id: workspace.id,
+    name: openText('workspace', workspace.id, 'name', workspace.name),
+    people,
+    boards,
+  };
 }
 
 /** Every workspace the account owns, as `exportWorkspace` makes each: the server's part of "everything". */
@@ -265,9 +281,14 @@ export async function exportOwned(
   accountId: string,
 ): Promise<WorkspacePart[]> {
   const t = tablesOf(database);
-  const owned = await dbAll<{ id: string }>(
+  const ownedRows = await dbAll<{ id: string; name: string }>(
     database,
-    sql`SELECT w.id AS id FROM ${t.workspace} w WHERE w.id IN ${workspacesOwnedBy(database, accountId)} ORDER BY w.name, w.id LIMIT ${CAP}`,
+    sql`SELECT w.id AS id, w.name AS name FROM ${t.workspace} w WHERE w.id IN ${workspacesOwnedBy(database, accountId)} ${sql.raw(nameOrderSql('w.name', 'w.id'))} ${operatorRing() ? sql`` : sql`LIMIT ${CAP}`}`,
+  );
+  const owned = inNameOrder(
+    ownedRows,
+    (row) => openText('workspace', row.id, 'name', row.name),
+    CAP,
   );
   const out: WorkspacePart[] = [];
   for (const { id } of owned) {

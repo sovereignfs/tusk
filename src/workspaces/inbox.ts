@@ -14,6 +14,7 @@ import {
   type NoticeRow,
 } from './format';
 import { tablesOf } from './tables';
+import { openText } from './content';
 
 /**
  * The Inbox (DESIGN.md §16): what a person has been told, and what is assigned to them. **Every statement names the account and holds a notice to what the
@@ -118,7 +119,7 @@ export async function inboxOf(
       workspaceId: row.workspaceId,
       boardId: row.boardId,
       cardId: row.cardId,
-      subject: subjectOf(row.details),
+      subject: subjectOf(openText('notice', row.id, 'details', row.details)),
       createdAt: Number(row.createdAt),
     }));
   const assigned: AssignedCard[] = before
@@ -141,7 +142,11 @@ export async function inboxOf(
               ORDER BY CASE WHEN c.due_date IS NULL THEN 1 ELSE 0 END, c.due_date, c.due_time, c.created_at, c.id
               LIMIT ${NOTICE_LIMITS.assignedListed}`,
         )
-      ).map((row) => row);
+      ).map((row) => ({
+        ...row,
+        boardName: openText('board', row.boardId, 'name', row.boardName),
+        title: openText('card', row.cardId, 'title', row.title),
+      }));
   return {
     notices,
     more: rows.length > page,

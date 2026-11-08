@@ -3,6 +3,7 @@ import type { Database } from '../../db/client';
 import { dbAll, dbRun } from '../../db/exec';
 import { boardsAdministeredBy, boardsEditableBy, boardsVisibleTo } from '../can';
 import { tablesOf } from '../tables';
+import { sealText } from '../content';
 
 /**
  * The world the role matrix runs in (DESIGN.md §24 Testing): one workspace with six people in six roles, and three boards that show every way a board can
@@ -63,7 +64,7 @@ export async function seedWorld(database: Database): Promise<World> {
 
   await dbRun(
     database,
-    sql`INSERT INTO ${t.workspace} (id, name, created_by, created_at, updated_at) VALUES (${workspace}, 'Acme', ${accounts.owner}, ${now}, ${now})`,
+    sql`INSERT INTO ${t.workspace} (id, name, created_by, created_at, updated_at) VALUES (${workspace}, ${sealText('workspace', workspace, 'name', 'Acme')}, ${accounts.owner}, ${now}, ${now})`,
   );
   const people: [Role, 'owner' | 'member'][] = [
     ['owner', 'owner'],
@@ -87,7 +88,7 @@ export async function seedWorld(database: Database): Promise<World> {
     dbRun(
       database,
       sql`INSERT INTO ${t.board} (id, workspace_id, name, color, visibility, archived_at, version, created_by, created_at, updated_at)
-          VALUES (${id}, ${workspace}, ${name}, '#2563eb', ${visibility}, ${archivedAt}, 1, ${accounts.boardOwner}, ${now}, ${now})`,
+          VALUES (${id}, ${workspace}, ${sealText('board', id, 'name', name)}, '#2563eb', ${visibility}, ${archivedAt}, 1, ${accounts.boardOwner}, ${now}, ${now})`,
     );
   await board(boards.publicBoard, 'Roadmap', 'public', null);
   await board(boards.privateBoard, 'Hiring', 'private', null);
@@ -104,35 +105,35 @@ export async function seedWorld(database: Database): Promise<World> {
   for (const key of ['publicBoard', 'privateBoard', 'archivedBoard'] as const)
     await dbRun(
       database,
-      sql`INSERT INTO ${t.boardList} (id, board_id, name, position, created_at, updated_at) VALUES (${lists[key]}, ${boards[key]}, 'Backlog', 'a0', ${now}, ${now})`,
+      sql`INSERT INTO ${t.boardList} (id, board_id, name, position, created_at, updated_at) VALUES (${lists[key]}, ${boards[key]}, ${sealText('board_list', lists[key], 'name', 'Backlog')}, 'a0', ${now}, ${now})`,
     );
   await dbRun(
     database,
     sql`INSERT INTO ${t.card} (id, board_id, list_id, title, position, archived_at, created_by, created_at, updated_at)
-        VALUES (${cards.open}, ${boards.publicBoard}, ${lists.publicBoard}, 'Open one', 'a0', NULL, ${accounts.boardOwner}, ${now}, ${now})`,
+        VALUES (${cards.open}, ${boards.publicBoard}, ${lists.publicBoard}, ${sealText('card', cards.open, 'title', 'Open one')}, 'a0', NULL, ${accounts.boardOwner}, ${now}, ${now})`,
   );
   await dbRun(
     database,
     sql`INSERT INTO ${t.card} (id, board_id, list_id, title, position, archived_at, created_by, created_at, updated_at)
-        VALUES (${cards.archived}, ${boards.publicBoard}, ${lists.publicBoard}, 'Old one', 'a1', ${now}, ${accounts.boardOwner}, ${now}, ${now})`,
+        VALUES (${cards.archived}, ${boards.publicBoard}, ${lists.publicBoard}, ${sealText('card', cards.archived, 'title', 'Old one')}, 'a1', ${now}, ${accounts.boardOwner}, ${now}, ${now})`,
   );
   for (const key of ['publicBoard', 'privateBoard'] as const)
     await dbRun(
       database,
-      sql`INSERT INTO ${t.label} (id, board_id, name, color, created_at) VALUES (${labels[key]}, ${boards[key]}, ${key === 'publicBoard' ? 'Urgent' : 'Secret'}, '#dc2626', ${now})`,
+      sql`INSERT INTO ${t.label} (id, board_id, name, color, created_at) VALUES (${labels[key]}, ${boards[key]}, ${sealText('label', labels[key], 'name', key === 'publicBoard' ? 'Urgent' : 'Secret')}, '#dc2626', ${now})`,
     );
   await dbRun(
     database,
     sql`INSERT INTO ${t.checklistItem} (id, card_id, board_id, title, completed_at, position, created_at)
-        VALUES (${items.open}, ${cards.open}, ${boards.publicBoard}, 'First step', NULL, 'a0', ${now})`,
+        VALUES (${items.open}, ${cards.open}, ${boards.publicBoard}, ${sealText('checklist_item', items.open, 'title', 'First step')}, NULL, 'a0', ${now})`,
   );
   await dbRun(
     database,
-    sql`INSERT INTO ${t.comment} (id, card_id, board_id, author_id, body, created_at) VALUES (${comments.byOwner}, ${cards.open}, ${boards.publicBoard}, ${accounts.boardOwner}, 'By the owner', ${now + 5})`,
+    sql`INSERT INTO ${t.comment} (id, card_id, board_id, author_id, body, created_at) VALUES (${comments.byOwner}, ${cards.open}, ${boards.publicBoard}, ${accounts.boardOwner}, ${sealText('comment', comments.byOwner, 'body', 'By the owner')}, ${now + 5})`,
   );
   await dbRun(
     database,
-    sql`INSERT INTO ${t.comment} (id, card_id, board_id, author_id, body, created_at) VALUES (${comments.old}, ${cards.open}, ${boards.publicBoard}, ${accounts.boardMember}, 'An old comment', ${now})`,
+    sql`INSERT INTO ${t.comment} (id, card_id, board_id, author_id, body, created_at) VALUES (${comments.old}, ${cards.open}, ${boards.publicBoard}, ${accounts.boardMember}, ${sealText('comment', comments.old, 'body', 'An old comment')}, ${now})`,
   );
   return { accounts, workspace, boards, lists, cards, labels, items, comments };
 }
@@ -157,14 +158,18 @@ export async function seedBoardContents(database: Database, world: World): Promi
   const list = world.lists.publicBoard;
   const card = uuid();
   const label = uuid();
+  const item = uuid();
+  const comment = uuid();
+  const activity = uuid();
+  const notice = uuid();
   const now = 1_800_000_000_000;
   const who = world.accounts.boardOwner;
   const run = (query: ReturnType<typeof sql>) => dbRun(database, query);
   await run(
-    sql`INSERT INTO ${t.card} (id, board_id, list_id, title, position, created_by, created_at, updated_at) VALUES (${card}, ${board}, ${list}, 'First', 'a0', ${who}, ${now}, ${now})`,
+    sql`INSERT INTO ${t.card} (id, board_id, list_id, title, position, created_by, created_at, updated_at) VALUES (${card}, ${board}, ${list}, ${sealText('card', card, 'title', 'First')}, 'a0', ${who}, ${now}, ${now})`,
   );
   await run(
-    sql`INSERT INTO ${t.label} (id, board_id, name, color, created_at) VALUES (${label}, ${board}, 'Bug', '#dc2626', ${now})`,
+    sql`INSERT INTO ${t.label} (id, board_id, name, color, created_at) VALUES (${label}, ${board}, ${sealText('label', label, 'name', 'Bug')}, '#dc2626', ${now})`,
   );
   await run(
     sql`INSERT INTO ${t.cardLabel} (card_id, label_id, board_id) VALUES (${card}, ${label}, ${board})`,
@@ -173,19 +178,19 @@ export async function seedBoardContents(database: Database, world: World): Promi
     sql`INSERT INTO ${t.cardAssignee} (card_id, account_id, board_id, assigned_by, created_at) VALUES (${card}, ${who}, ${board}, ${who}, ${now})`,
   );
   await run(
-    sql`INSERT INTO ${t.checklistItem} (id, card_id, board_id, title, position, created_at) VALUES (${uuid()}, ${card}, ${board}, 'Step', 'a0', ${now})`,
+    sql`INSERT INTO ${t.checklistItem} (id, card_id, board_id, title, position, created_at) VALUES (${item}, ${card}, ${board}, ${sealText('checklist_item', item, 'title', 'Step')}, 'a0', ${now})`,
   );
   await run(
-    sql`INSERT INTO ${t.comment} (id, card_id, board_id, author_id, body, created_at) VALUES (${uuid()}, ${card}, ${board}, ${who}, 'Hello', ${now})`,
+    sql`INSERT INTO ${t.comment} (id, card_id, board_id, author_id, body, created_at) VALUES (${comment}, ${card}, ${board}, ${who}, ${sealText('comment', comment, 'body', 'Hello')}, ${now})`,
   );
   await run(
-    sql`INSERT INTO ${t.activity} (id, board_id, card_id, actor_id, kind, details, created_at) VALUES (${uuid()}, ${board}, ${card}, ${who}, 'card.created', '{}', ${now})`,
+    sql`INSERT INTO ${t.activity} (id, board_id, card_id, actor_id, kind, details, created_at) VALUES (${activity}, ${board}, ${card}, ${who}, 'card.created', ${sealText('activity', activity, 'details', '{}')}, ${now})`,
   );
   await run(
     sql`INSERT INTO ${t.publication} (board_id, token, created_by, created_at) VALUES (${board}, ${uuid()}, ${who}, ${now})`,
   );
   await run(
-    sql`INSERT INTO ${t.notice} (id, account_id, kind, actor_id, workspace_id, board_id, details, created_at) VALUES (${uuid()}, ${world.accounts.member}, 'added_to_workspace', ${who}, ${world.workspace}, ${board}, '{}', ${now})`,
+    sql`INSERT INTO ${t.notice} (id, account_id, kind, actor_id, workspace_id, board_id, details, created_at) VALUES (${notice}, ${world.accounts.member}, 'added_to_workspace', ${who}, ${world.workspace}, ${board}, ${sealText('notice', notice, 'details', '{}')}, ${now})`,
   );
 }
 

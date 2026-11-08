@@ -5,6 +5,7 @@ import { dbAll, dbGet, transaction } from '../db/exec';
 import type { BoardPart, WorkspacePart } from '../portability/format';
 import { write } from './activity';
 import { WORKSPACE_LIMITS } from './format';
+import { seal, sealText } from './content';
 import { tablesOf } from './tables';
 import { workspacesOf } from './can';
 
@@ -79,7 +80,7 @@ async function insertBoard(
   const run = (query: ReturnType<typeof sql>) => dbAll(tx, query);
   await run(
     sql`INSERT INTO ${t.board} (id, workspace_id, name, color, description, visibility, archived_at, version, created_by, created_at, updated_at)
-        VALUES (${boardId}, ${workspaceId}, ${board.name}, ${board.color}, ${board.description}, ${board.visibility}, NULL, 1, ${accountId}, ${now}, ${now}) RETURNING id`,
+        VALUES (${boardId}, ${workspaceId}, ${sealText('board', boardId, 'name', board.name)}, ${board.color}, ${seal('board', boardId, 'description', board.description)}, ${board.visibility}, NULL, 1, ${accountId}, ${now}, ${now}) RETURNING id`,
   );
   await run(
     sql`INSERT INTO ${t.boardMember} (board_id, account_id, workspace_id, role, created_at) VALUES (${boardId}, ${accountId}, ${workspaceId}, 'owner', ${now}) RETURNING account_id`,
@@ -90,21 +91,21 @@ async function insertBoard(
     const id = crypto.randomUUID();
     labelIds.set(label.id, id);
     await run(
-      sql`INSERT INTO ${t.label} (id, board_id, name, color, created_at) VALUES (${id}, ${boardId}, ${label.name}, ${label.color}, ${now}) RETURNING id`,
+      sql`INSERT INTO ${t.label} (id, board_id, name, color, created_at) VALUES (${id}, ${boardId}, ${sealText('label', id, 'name', label.name)}, ${label.color}, ${now}) RETURNING id`,
     );
   }
   const onBoard = new Set<string>([accountId]);
   for (const list of board.lists) {
     const listId = crypto.randomUUID();
     await run(
-      sql`INSERT INTO ${t.boardList} (id, board_id, name, position, created_at, updated_at) VALUES (${listId}, ${boardId}, ${list.name}, ${list.position}, ${now}, ${now}) RETURNING id`,
+      sql`INSERT INTO ${t.boardList} (id, board_id, name, position, created_at, updated_at) VALUES (${listId}, ${boardId}, ${sealText('board_list', listId, 'name', list.name)}, ${list.position}, ${now}, ${now}) RETURNING id`,
     );
     for (const card of list.cards) {
       const cardId = crypto.randomUUID();
       counts.cards += 1;
       await run(
         sql`INSERT INTO ${t.card} (id, board_id, list_id, title, description, due_date, due_time, position, archived_at, created_by, created_at, updated_at)
-            VALUES (${cardId}, ${boardId}, ${listId}, ${card.title}, ${card.description === '' ? null : card.description}, ${card.dueDate}, ${card.dueTime}, ${card.position},
+            VALUES (${cardId}, ${boardId}, ${listId}, ${sealText('card', cardId, 'title', card.title)}, ${seal('card', cardId, 'description', card.description === '' ? null : card.description)}, ${card.dueDate}, ${card.dueTime}, ${card.position},
                     ${card.archived ? now : null}, ${accountId}, ${now}, ${now}) RETURNING id`,
       );
       for (const label of card.labels) {
@@ -114,11 +115,13 @@ async function insertBoard(
             sql`INSERT INTO ${t.cardLabel} (card_id, label_id, board_id) VALUES (${cardId}, ${id}, ${boardId}) RETURNING card_id`,
           );
       }
-      for (const item of card.checklist)
+      for (const item of card.checklist) {
+        const itemId = crypto.randomUUID();
         await run(
           sql`INSERT INTO ${t.checklistItem} (id, card_id, board_id, title, completed_at, position, created_at)
-              VALUES (${crypto.randomUUID()}, ${cardId}, ${boardId}, ${item.title}, ${item.completedAt}, ${item.position}, ${now}) RETURNING id`,
+              VALUES (${itemId}, ${cardId}, ${boardId}, ${sealText('checklist_item', itemId, 'title', item.title)}, ${item.completedAt}, ${item.position}, ${now}) RETURNING id`,
         );
+      }
       const assigned = new Set<string>();
       for (const person of card.assignees) {
         const email = person.email.toLowerCase();
@@ -236,7 +239,7 @@ export async function importWorkspaces(
         const id = crypto.randomUUID();
         await dbAll(
           tx,
-          sql`INSERT INTO ${t.workspace} (id, name, created_by, created_at, updated_at) VALUES (${id}, ${workspace.name}, ${accountId}, ${now}, ${now}) RETURNING id`,
+          sql`INSERT INTO ${t.workspace} (id, name, created_by, created_at, updated_at) VALUES (${id}, ${sealText('workspace', id, 'name', workspace.name)}, ${accountId}, ${now}, ${now}) RETURNING id`,
         );
         await dbAll(
           tx,

@@ -3,6 +3,7 @@ import type { Database } from '../db/client';
 import { dbAll, dbGet } from '../db/exec';
 import { boardsAdministeredBy } from './can';
 import { type Publication, TOKEN_PATTERN, WORKSPACE_LIMITS } from './format';
+import { inNameOrder, nameOrderSql, open, openText, operatorRing } from './content';
 import { tablesOf } from './tables';
 
 /**
@@ -81,9 +82,9 @@ export async function readPublished(
       sql`SELECT cl.card_id AS "cardId", cl.label_id AS "labelId" FROM ${t.cardLabel} cl JOIN ${t.label} l ON l.id = cl.label_id
           WHERE cl.board_id = ${board.id} ORDER BY l.created_at, l.id`,
     ),
-    dbAll<{ cardId: string; title: string; done: number | boolean }>(
+    dbAll<{ id: string; cardId: string; title: string; done: number | boolean }>(
       database,
-      sql`SELECT card_id AS "cardId", title, (completed_at IS NOT NULL) AS done FROM ${t.checklistItem}
+      sql`SELECT id, card_id AS "cardId", title, (completed_at IS NOT NULL) AS done FROM ${t.checklistItem}
           WHERE board_id = ${board.id} ORDER BY position, id`,
     ),
   ]);
@@ -94,23 +95,29 @@ export async function readPublished(
   for (const row of items)
     itemsOf.set(row.cardId, [
       ...(itemsOf.get(row.cardId) ?? []),
-      { title: row.title, done: row.done === true || Number(row.done) === 1 },
+      {
+        title: openText('checklist_item', row.id, 'title', row.title),
+        done: row.done === true || Number(row.done) === 1,
+      },
     ]);
   return {
-    name: board.name,
+    name: openText('board', board.id, 'name', board.name),
     color: board.color,
-    description: board.description,
+    description: open('board', board.id, 'description', board.description),
     archived: board.archivedAt !== null,
-    labels,
+    labels: labels.map((label) => ({
+      ...label,
+      name: openText('label', label.id, 'name', label.name),
+    })),
     lists: lists.map((list) => ({
       id: list.id,
-      name: list.name,
+      name: openText('board_list', list.id, 'name', list.name),
       cards: cards
         .filter((card) => card.listId === list.id)
         .map((card) => ({
           id: card.id,
-          title: card.title,
-          description: card.description,
+          title: openText('card', card.id, 'title', card.title),
+          description: open('card', card.id, 'description', card.description),
           dueDate: card.dueDate,
           dueTime: card.dueTime,
           labels: labelsOf.get(card.id) ?? [],
@@ -145,9 +152,18 @@ export async function publicationsOf(
   accountId: string,
 ): Promise<Publication[]> {
   const t = tablesOf(database);
-  return dbAll<Publication>(
+  const rows = await dbAll<Publication>(
     database,
     sql`SELECT p.board_id AS "boardId", b.name AS "boardName", p.token AS token FROM ${t.publication} p JOIN ${t.board} b ON b.id = p.board_id
-        WHERE p.board_id IN ${boardsAdministeredBy(database, accountId)} ORDER BY b.name, b.id LIMIT ${WORKSPACE_LIMITS.boardsPerWorkspace}`,
+        WHERE p.board_id IN ${boardsAdministeredBy(database, accountId)} ${sql.raw(nameOrderSql('b.name', 'b.id'))} ${operatorRing() ? sql`` : sql`LIMIT ${WORKSPACE_LIMITS.boardsPerWorkspace}`}`,
   );
+  return inNameOrder(
+    rows.map((row) => ({
+      ...row,
+      id: row.boardId,
+      boardName: openText('board', row.boardId, 'name', row.boardName),
+    })),
+    (row) => row.boardName,
+    WORKSPACE_LIMITS.boardsPerWorkspace,
+  ).map(({ id: _id, ...row }) => row);
 }

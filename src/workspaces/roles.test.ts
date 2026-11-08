@@ -29,6 +29,7 @@ import {
   readBoard,
   workspaceOf,
 } from './reads';
+import { open, openText, sealText } from './content';
 import { tablesOf } from './tables';
 import {
   type Role,
@@ -924,6 +925,8 @@ describe(`the roles (${leg})`, () => {
       dbAll<{ id: string; name: string; position: string }>(
         database,
         sql`SELECT id, name, position FROM ${t().boardList} WHERE board_id = ${boardId} ORDER BY position, id`,
+      ).then((rows) =>
+        rows.map((row) => ({ ...row, name: openText('board_list', row.id, 'name', row.name) })),
       );
     const versionOf = async (boardId: string) =>
       Number(
@@ -1051,11 +1054,13 @@ describe(`the roles (${leg})`, () => {
           position: 'a1',
         }),
       ).toEqual({ status: 'refused', code: 'not_found' });
-      for (let i = (await listsOf(board)).length; i < WORKSPACE_LIMITS.listsPerBoard; i++)
+      for (let i = (await listsOf(board)).length; i < WORKSPACE_LIMITS.listsPerBoard; i++) {
+        const filler = id();
         await dbAll(
           database,
-          sql`INSERT INTO ${t().boardList} (id, board_id, name, position, created_at, updated_at) VALUES (${id()}, ${board}, 'l', ${`b${String(i).padStart(3, '0')}`}, ${NOW}, ${NOW}) RETURNING id`,
+          sql`INSERT INTO ${t().boardList} (id, board_id, name, position, created_at, updated_at) VALUES (${filler}, ${board}, ${sealText('board_list', filler, 'name', 'l')}, ${`b${String(i).padStart(3, '0')}`}, ${NOW}, ${NOW}) RETURNING id`,
         );
+      }
       expect(
         await apply(w, 'boardMember', {
           op: 'list.create',
@@ -1380,11 +1385,11 @@ describe(`the roles (${leg})`, () => {
       await seedBoardContents(database, w);
       const contentsCard =
         (
-          await dbAll<{ id: string }>(
+          await dbAll<{ id: string; title: string }>(
             database,
-            sql`SELECT id FROM ${t().card} WHERE board_id = ${w.boards.publicBoard} AND title = 'First'`,
+            sql`SELECT id, title FROM ${t().card} WHERE board_id = ${w.boards.publicBoard}`,
           )
-        )[0]?.id ?? '';
+        ).find((row) => openText('card', row.id, 'title', row.title) === 'First')?.id ?? '';
       // An open card is not deleted.
       expect(await apply(w, 'boardMember', { op: 'card.delete', id: contentsCard })).toEqual({
         status: 'refused',
@@ -1553,7 +1558,11 @@ describe(`the roles (${leg})`, () => {
           database,
           sql`SELECT name, color, description, archived_at AS "archivedAt", version FROM ${t().board} WHERE id = ${boardId}`,
         )
-      )[0];
+      ).map((row) => ({
+        ...row,
+        name: openText('board', boardId, 'name', row.name),
+        description: open('board', boardId, 'description', row.description),
+      }))[0];
 
     it('changes the name, colour and description together, and a blank description is none', async () => {
       const w = await seedWorld(database);
@@ -2092,6 +2101,7 @@ describe(`the roles (${leg})`, () => {
     const t = () => tablesOf(database);
     const notices = (w: World) =>
       dbAll<{
+        id: string;
         accountId: string;
         kind: string;
         actorId: string;
@@ -2101,8 +2111,13 @@ describe(`the roles (${leg})`, () => {
         details: string;
       }>(
         database,
-        sql`SELECT account_id AS "accountId", kind, actor_id AS "actorId", board_id AS "boardId", card_id AS "cardId", workspace_id AS "workspaceId", details
+        sql`SELECT id, account_id AS "accountId", kind, actor_id AS "actorId", board_id AS "boardId", card_id AS "cardId", workspace_id AS "workspaceId", details
             FROM ${t().notice} WHERE workspace_id = ${w.workspace} ORDER BY created_at, id`,
+      ).then((rows) =>
+        rows.map(({ id: rowId, ...row }) => ({
+          ...row,
+          details: openText('notice', rowId, 'details', row.details),
+        })),
       );
     const assignees = async (cardId: string) =>
       (
@@ -2228,6 +2243,11 @@ describe(`the roles (${leg})`, () => {
       dbAll<{ id: string; title: string; done: number | boolean; position: string }>(
         database,
         sql`SELECT id, title, (completed_at IS NOT NULL) AS done, position FROM ${t().checklistItem} WHERE card_id = ${cardId} ORDER BY position, id`,
+      ).then((rows) =>
+        rows.map((row) => ({
+          ...row,
+          title: openText('checklist_item', row.id, 'title', row.title),
+        })),
       );
     const progress = async (w: World, role: Role = 'member') =>
       (await readBoard(database, w.accounts[role], w.boards.publicBoard))?.cards.find(

@@ -11,6 +11,7 @@ import { importBoard, importWorkspaces } from './import';
 import { tablesOf } from './tables';
 import { type World, countAll, seedBoardContents, seedWorld } from './testing/roles';
 import { WORKSPACE_LIMITS } from './format';
+import { openText, sealText } from './content';
 
 /**
  * Importing a board and a workspace (DESIGN.md §20.2), on whichever database the leg runs, in the world of six roles: created and never merged, every id
@@ -31,10 +32,11 @@ beforeAll(async () => {
     database,
     sql`INSERT INTO ${t.cardAssignee} (card_id, account_id, board_id, assigned_by, created_at) VALUES (${world.cards.open}, ${world.accounts.outsider}, ${world.boards.publicBoard}, ${world.accounts.boardOwner}, 1)`,
   );
+  const putAway = crypto.randomUUID();
   await dbRun(
     database,
     sql`INSERT INTO ${t.card} (id, board_id, list_id, title, position, archived_at, created_by, created_at, updated_at)
-        VALUES (${crypto.randomUUID()}, ${world.boards.publicBoard}, ${world.lists.publicBoard}, 'Put away', 'a8', 5, ${world.accounts.boardOwner}, 1, 1)`,
+        VALUES (${putAway}, ${world.boards.publicBoard}, ${world.lists.publicBoard}, ${sealText('card', putAway, 'title', 'Put away')}, 'a8', 5, ${world.accounts.boardOwner}, 1, 1)`,
   );
 });
 afterAll(async () => close());
@@ -132,11 +134,14 @@ describe(`importing a board (${leg})`, () => {
     expect(made.imported.cards).toBe(source.lists.reduce((n, l) => n + l.cards.length, 0));
 
     const ids = (
-      await dbAll<{ id: string }>(
+      await dbAll<{ id: string; name: string }>(
         database,
-        sql`SELECT id FROM ${tablesOf(database).board} WHERE name = ${source.name} AND id <> ${source.id} ORDER BY created_at DESC LIMIT 1`,
+        sql`SELECT id, name FROM ${tablesOf(database).board} WHERE id <> ${source.id} ORDER BY created_at DESC, id`,
       )
-    ).map((r) => r.id);
+    )
+      .filter((r) => openText('board', r.id, 'name', r.name) === source.name)
+      .slice(0, 1)
+      .map((r) => r.id);
     const copy = await exportBoard(database, directory, world.accounts.boardMember, ids[0] ?? '');
     if (!copy) throw new Error('the copy is not there');
     const expected = bare(source);
@@ -211,11 +216,11 @@ describe(`importing a board (${leg})`, () => {
     expect(made.ok).toBe(true);
     const t = tablesOf(database);
     const row = (
-      await dbAll<{ id: string; visibility: string }>(
+      await dbAll<{ id: string; name: string; visibility: string }>(
         database,
-        sql`SELECT id, visibility FROM ${t.board} WHERE name = ${source.name} AND id <> ${source.id} ORDER BY created_at DESC LIMIT 1`,
+        sql`SELECT id, name, visibility FROM ${t.board} WHERE id <> ${source.id} ORDER BY created_at DESC, id`,
       )
-    )[0];
+    ).find((each) => openText('board', each.id, 'name', each.name) === source.name);
     expect(row?.visibility).toBe('private');
     const members = await dbAll<{ accountId: string; role: string }>(
       database,
@@ -267,11 +272,8 @@ describe(`importing a workspace (${leg})`, () => {
     expect(made.imported).toMatchObject({ workspaces: 1, boards: 1 });
     const t = tablesOf(database);
     const created = (
-      await dbAll<{ id: string }>(
-        database,
-        sql`SELECT id FROM ${t.workspace} WHERE name = 'Imported'`,
-      )
-    )[0];
+      await dbAll<{ id: string; name: string }>(database, sql`SELECT id, name FROM ${t.workspace}`)
+    ).find((row) => openText('workspace', row.id, 'name', row.name) === 'Imported');
     const people = await dbAll<{ accountId: string; role: string }>(
       database,
       sql`SELECT account_id AS "accountId", role FROM ${t.workspaceMember} WHERE workspace_id = ${created?.id ?? ''}`,
@@ -285,11 +287,13 @@ describe(`importing a workspace (${leg})`, () => {
   it('is refused whole when it would give the account more workspaces than it may make', async () => {
     const t = tablesOf(database);
     const person = world.accounts.coOwner;
-    for (let i = 0; i < WORKSPACE_LIMITS.workspacesPerAccount; i++)
+    for (let i = 0; i < WORKSPACE_LIMITS.workspacesPerAccount; i++) {
+      const filler = crypto.randomUUID();
       await dbRun(
         database,
-        sql`INSERT INTO ${t.workspace} (id, name, created_by, created_at, updated_at) VALUES (${crypto.randomUUID()}, 'filler', ${person}, 1, 1)`,
+        sql`INSERT INTO ${t.workspace} (id, name, created_by, created_at, updated_at) VALUES (${filler}, ${sealText('workspace', filler, 'name', 'filler')}, ${person}, 1, 1)`,
       );
+    }
     const before = await countAll(database);
     const one = { id: crypto.randomUUID(), name: 'One too many', people: [], boards: [] };
     expect(await importWorkspaces(database, directory, person, [one], NOW)).toEqual({

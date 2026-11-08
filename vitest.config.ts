@@ -5,6 +5,7 @@ export default defineConfig({
   // The same `@/` as tsconfig.json, so that a test can import a route or a page.
   resolve: { alias: { '@': fileURLToPath(new URL('.', import.meta.url)) } },
   test: {
+    setupFiles: ['./vitest.setup.ts'],
     include: ['src/**/*.test.{ts,tsx}', 'proxy.test.ts', 'scripts/**/*.test.ts'],
     // The design system is shipped as ESM that imports CSS Modules. Node cannot import a .css file, so Vite has to process the package, as it
     // does a source file.

@@ -28,6 +28,7 @@ import {
   type Role,
   WORKSPACE_LIMITS,
 } from './format';
+import { open, openText, seal, sealText } from './content';
 import { tablesOf } from './tables';
 
 /**
@@ -115,7 +116,7 @@ async function run(
       const made = await dbAll<{ id: string }>(
         tx,
         sql`INSERT INTO ${t.workspace} (id, name, created_by, created_at, updated_at)
-            VALUES (${request.id}, ${request.name}, ${accountId}, ${now}, ${now})
+            VALUES (${request.id}, ${sealText('workspace', request.id, 'name', request.name)}, ${accountId}, ${now}, ${now})
             ON CONFLICT (id) DO NOTHING RETURNING id`,
       );
       if (made.length === 0) throw new Refused('not_found');
@@ -141,7 +142,8 @@ async function run(
         sql`SELECT name FROM ${t.workspace} WHERE id = ${request.id} AND id IN ${workspacesOwnedBy(tx, accountId)}`,
       );
       if (!found) throw new Refused('not_found');
-      if (found.name !== request.name) throw new Refused('invalid');
+      if (openText('workspace', request.id, 'name', found.name) !== request.name)
+        throw new Refused('invalid');
       await deleteWorkspace(tx, request.id);
       return { deleted: request.id };
     }
@@ -172,7 +174,7 @@ async function run(
           kind: 'added_to_workspace',
           actor: accountId,
           workspaceId: request.workspaceId,
-          subject: named?.name ?? '',
+          subject: named ? openText('workspace', request.workspaceId, 'name', named.name) : '',
         },
         now,
       );
@@ -225,7 +227,7 @@ async function run(
       const made = await dbAll<{ id: string }>(
         tx,
         sql`INSERT INTO ${t.board} (id, workspace_id, name, color, description, visibility, archived_at, version, created_by, created_at, updated_at)
-            VALUES (${request.id}, ${request.workspaceId}, ${request.name}, ${request.color}, NULL, 'public', NULL, 1, ${accountId}, ${now}, ${now})
+            VALUES (${request.id}, ${request.workspaceId}, ${sealText('board', request.id, 'name', request.name)}, ${request.color}, NULL, 'public', NULL, 1, ${accountId}, ${now}, ${now})
             ON CONFLICT (id) DO NOTHING RETURNING id`,
       );
       if (made.length === 0) throw new Refused('not_found');
@@ -234,10 +236,11 @@ async function run(
         sql`INSERT INTO ${t.boardMember} (board_id, account_id, workspace_id, role, created_at)
             VALUES (${request.id}, ${accountId}, ${request.workspaceId}, 'owner', ${now}) RETURNING account_id`,
       );
+      const backlog = crypto.randomUUID();
       await dbAll(
         tx,
         sql`INSERT INTO ${t.boardList} (id, board_id, name, position, created_at, updated_at)
-            VALUES (${crypto.randomUUID()}, ${request.id}, 'Backlog', ${first()}, ${now}, ${now}) RETURNING id`,
+            VALUES (${backlog}, ${request.id}, ${sealText('board_list', backlog, 'name', 'Backlog')}, ${first()}, ${now}, ${now}) RETURNING id`,
       );
       return {
         board: {
@@ -266,7 +269,7 @@ async function run(
       const made = await dbAll<{ id: string }>(
         tx,
         sql`INSERT INTO ${t.boardList} (id, board_id, name, position, created_at, updated_at)
-            VALUES (${request.id}, ${request.boardId}, ${request.name}, ${request.position}, ${now}, ${now})
+            VALUES (${request.id}, ${request.boardId}, ${sealText('board_list', request.id, 'name', request.name)}, ${request.position}, ${now}, ${now})
             ON CONFLICT (id) DO NOTHING RETURNING id`,
       );
       if (made.length === 0) throw new Refused('not_found');
@@ -284,7 +287,7 @@ async function run(
       const changed = await dbAll<{ boardId: string; name: string; position: string }>(
         tx,
         request.op === 'list.rename'
-          ? sql`UPDATE ${t.boardList} SET name = ${request.name}, updated_at = ${now}
+          ? sql`UPDATE ${t.boardList} SET name = ${sealText('board_list', request.id, 'name', request.name)}, updated_at = ${now}
                 WHERE id = ${request.id} AND board_id IN ${boardsEditableBy(tx, accountId)}
                 RETURNING board_id AS "boardId", name, position`
           : sql`UPDATE ${t.boardList} SET position = ${request.position}, updated_at = ${now}
@@ -294,7 +297,12 @@ async function run(
       const row = changed[0];
       if (!row) throw new Refused('not_found');
       const version = await touchBoard(tx, row.boardId, boardsEditableBy(tx, accountId), now);
-      const list: ListRow = { id: request.id, ...row, cards: await openCards(tx, request.id) };
+      const list: ListRow = {
+        id: request.id,
+        ...row,
+        name: openText('board_list', request.id, 'name', row.name),
+        cards: await openCards(tx, request.id),
+      };
       return { list, version };
     }
     case 'list.delete': {
@@ -342,7 +350,7 @@ async function run(
         const made = await dbAll<{ id: string }>(
           tx,
           sql`INSERT INTO ${t.card} (id, board_id, list_id, title, position, created_by, created_at, updated_at)
-              VALUES (${request.id}, ${boardId}, ${request.listId}, ${request.title}, ${request.position}, ${accountId}, ${now}, ${now})
+              VALUES (${request.id}, ${boardId}, ${request.listId}, ${sealText('card', request.id, 'title', request.title)}, ${request.position}, ${accountId}, ${now}, ${now})
               ON CONFLICT (id) DO NOTHING RETURNING id`,
         );
         if (made.length === 0) throw new Refused('not_found');
@@ -394,10 +402,10 @@ async function run(
       const changed = await dbAll<{ boardId: string }>(
         tx,
         request.op === 'card.rename'
-          ? sql`UPDATE ${t.card} SET title = ${request.title}, updated_at = ${now}
+          ? sql`UPDATE ${t.card} SET title = ${sealText('card', request.id, 'title', request.title)}, updated_at = ${now}
                 WHERE id = ${request.id} AND board_id IN ${boardsEditableBy(tx, accountId)}
                 RETURNING board_id AS "boardId"`
-          : sql`UPDATE ${t.card} SET description = ${request.description.trim() === '' ? null : request.description}, updated_at = ${now}
+          : sql`UPDATE ${t.card} SET description = ${seal('card', request.id, 'description', request.description.trim() === '' ? null : request.description)}, updated_at = ${now}
                 WHERE id = ${request.id} AND board_id IN ${boardsEditableBy(tx, accountId)}
                 RETURNING board_id AS "boardId"`,
       );
@@ -415,7 +423,7 @@ async function run(
       const changed = await dbAll<{ id: string }>(
         tx,
         request.op === 'board.update'
-          ? sql`UPDATE ${t.board} SET name = ${request.name}, color = ${request.color}, description = ${description === '' ? null : request.description}, updated_at = ${now}
+          ? sql`UPDATE ${t.board} SET name = ${sealText('board', request.id, 'name', request.name)}, color = ${request.color}, description = ${seal('board', request.id, 'description', description === '' ? null : request.description)}, updated_at = ${now}
                 WHERE id = ${request.id} AND id IN ${boardsAdministeredBy(tx, accountId)} AND archived_at IS NULL RETURNING id`
           : request.op === 'board.archive'
             ? sql`UPDATE ${t.board} SET archived_at = ${now}, updated_at = ${now}
@@ -435,7 +443,8 @@ async function run(
         sql`SELECT name, workspace_id AS "workspaceId" FROM ${t.board} WHERE id = ${request.id} AND id IN ${boardsAdministeredBy(tx, accountId)}`,
       );
       if (!found) throw new Refused('not_found');
-      if (found.name !== request.name) throw new Refused('invalid');
+      if (openText('board', request.id, 'name', found.name) !== request.name)
+        throw new Refused('invalid');
       await deleteBoard(tx, request.id);
       await dbAll(
         tx,
@@ -509,7 +518,7 @@ async function run(
               actor: accountId,
               workspaceId: board.workspaceId,
               boardId: request.boardId,
-              subject: board.name,
+              subject: openText('board', request.boardId, 'name', board.name),
             },
             now,
           );
@@ -607,7 +616,7 @@ async function run(
       const made = await dbAll<{ id: string }>(
         tx,
         sql`INSERT INTO ${t.label} (id, board_id, name, color, created_at)
-            VALUES (${request.id}, ${request.boardId}, ${request.name}, ${request.color}, ${now})
+            VALUES (${request.id}, ${request.boardId}, ${sealText('label', request.id, 'name', request.name)}, ${request.color}, ${now})
             ON CONFLICT (id) DO NOTHING RETURNING id`,
       );
       if (made.length === 0) throw new Refused('not_found');
@@ -625,7 +634,7 @@ async function run(
       const changed = await dbAll<{ boardId: string }>(
         tx,
         request.op === 'label.update'
-          ? sql`UPDATE ${t.label} SET name = ${request.name}, color = ${request.color}
+          ? sql`UPDATE ${t.label} SET name = ${sealText('label', request.id, 'name', request.name)}, color = ${request.color}
                 WHERE id = ${request.id} AND board_id IN ${boardsEditableBy(tx, accountId)}
                 RETURNING board_id AS "boardId"`
           : sql`DELETE FROM ${t.label}
@@ -687,6 +696,7 @@ async function run(
       );
       const card = taken[0];
       if (!card) throw new Refused('not_found');
+      const cardTitle = openText('card', request.cardId, 'title', card.title);
       const version = await touchBoard(
         tx,
         card.boardId,
@@ -723,7 +733,7 @@ async function run(
             workspaceId: card.workspaceId,
             boardId: card.boardId,
             cardId: request.cardId,
-            subject: card.title,
+            subject: cardTitle,
           },
           now,
         );
@@ -747,7 +757,7 @@ async function run(
       const made = await dbAll<{ id: string }>(
         tx,
         sql`INSERT INTO ${t.checklistItem} (id, card_id, board_id, title, completed_at, position, created_at)
-            VALUES (${request.id}, ${request.cardId}, ${boardId}, ${request.title}, NULL, ${request.position}, ${now})
+            VALUES (${request.id}, ${request.cardId}, ${boardId}, ${sealText('checklist_item', request.id, 'title', request.title)}, NULL, ${request.position}, ${now})
             ON CONFLICT (id) DO NOTHING RETURNING id`,
       );
       if (made.length === 0) throw new Refused('not_found');
@@ -767,7 +777,7 @@ async function run(
       const changed = await dbAll<{ boardId: string; cardId: string }>(
         tx,
         request.op === 'item.rename'
-          ? sql`UPDATE ${t.checklistItem} SET title = ${request.title} WHERE ${where} RETURNING board_id AS "boardId", card_id AS "cardId"`
+          ? sql`UPDATE ${t.checklistItem} SET title = ${sealText('checklist_item', request.id, 'title', request.title)} WHERE ${where} RETURNING board_id AS "boardId", card_id AS "cardId"`
           : request.op === 'item.tick'
             ? sql`UPDATE ${t.checklistItem} SET completed_at = ${now} WHERE ${where} RETURNING board_id AS "boardId", card_id AS "cardId"`
             : request.op === 'item.untick'
@@ -814,7 +824,7 @@ async function run(
       const made = await dbAll<{ id: string }>(
         tx,
         sql`INSERT INTO ${t.comment} (id, card_id, board_id, author_id, body, created_at, edited_at)
-            VALUES (${request.id}, ${request.cardId}, ${card.boardId}, ${accountId}, ${request.body}, ${now}, NULL)
+            VALUES (${request.id}, ${request.cardId}, ${card.boardId}, ${accountId}, ${sealText('comment', request.id, 'body', request.body)}, ${now}, NULL)
             ON CONFLICT (id) DO NOTHING RETURNING id`,
       );
       if (made.length === 0) throw new Refused('not_found');
@@ -835,7 +845,7 @@ async function run(
             workspaceId: card.workspaceId,
             boardId: card.boardId,
             cardId: request.cardId,
-            subject: card.title,
+            subject: openText('card', request.cardId, 'title', card.title),
           },
           now,
         );
@@ -847,7 +857,7 @@ async function run(
       const changed = await dbAll<{ boardId: string; cardId: string }>(
         tx,
         request.op === 'comment.edit'
-          ? sql`UPDATE ${t.comment} SET body = ${request.body}, edited_at = ${now}
+          ? sql`UPDATE ${t.comment} SET body = ${sealText('comment', request.id, 'body', request.body)}, edited_at = ${now}
                 WHERE id = ${request.id} AND author_id = ${accountId} AND board_id IN ${boardsEditableBy(tx, accountId)}
                 RETURNING board_id AS "boardId", card_id AS "cardId"`
           : sql`DELETE FROM ${t.comment}
@@ -907,13 +917,19 @@ async function run(
         tx,
         sql`DELETE FROM ${t.cardLabel} WHERE card_id = ${request.id} RETURNING 1 AS one`,
       );
-      for (const label of carried) {
-        let there = (
-          await dbAll<{ id: string }>(
-            tx,
-            sql`SELECT id FROM ${t.label} WHERE board_id = ${request.boardId} AND name = ${label.name} AND color = ${label.color} ORDER BY created_at, id LIMIT 1`,
-          )
-        )[0]?.id;
+      for (const carriedLabel of carried) {
+        // Matched by name and colour: the name is compared opened, since under the operator key the database cannot compare it.
+        const label = {
+          ...carriedLabel,
+          name: openText('label', carriedLabel.id, 'name', carriedLabel.name),
+        };
+        const candidates = await dbAll<{ id: string; name: string }>(
+          tx,
+          sql`SELECT id, name FROM ${t.label} WHERE board_id = ${request.boardId} AND color = ${label.color} ORDER BY created_at, id`,
+        );
+        let there = candidates.find(
+          (each) => openText('label', each.id, 'name', each.name) === label.name,
+        )?.id;
         if (!there) {
           const have = await dbGet<{ n: number | string }>(
             tx,
@@ -923,7 +939,7 @@ async function run(
           there = crypto.randomUUID();
           await dbAll(
             tx,
-            sql`INSERT INTO ${t.label} (id, board_id, name, color, created_at) VALUES (${there}, ${request.boardId}, ${label.name}, ${label.color}, ${now}) RETURNING id`,
+            sql`INSERT INTO ${t.label} (id, board_id, name, color, created_at) VALUES (${there}, ${request.boardId}, ${sealText('label', there, 'name', label.name)}, ${label.color}, ${now}) RETURNING id`,
           );
         }
         await dbAll(
@@ -939,10 +955,14 @@ async function run(
             AND account_id NOT IN (SELECT account_id FROM ${t.boardMember} WHERE board_id = ${request.boardId}) RETURNING 1 AS one`,
       );
       // The card and everything that is its own go to the other board: its checklist, its comments and its history.
-      const before = await dbGet<{ title: string; boardName: string }>(
+      const before = await dbGet<{ title: string; boardId: string; boardName: string }>(
         tx,
-        sql`SELECT c.title AS title, b.name AS "boardName" FROM ${t.card} c JOIN ${t.board} b ON b.id = c.board_id WHERE c.id = ${request.id}`,
+        sql`SELECT c.title AS title, b.id AS "boardId", b.name AS "boardName" FROM ${t.card} c JOIN ${t.board} b ON b.id = c.board_id WHERE c.id = ${request.id}`,
       );
+      const was = before && {
+        title: openText('card', request.id, 'title', before.title),
+        boardName: openText('board', before.boardId, 'name', before.boardName),
+      };
       await dbAll(
         tx,
         sql`UPDATE ${t.card} SET board_id = ${request.boardId}, list_id = ${request.listId}, position = ${request.position}, updated_at = ${now}
@@ -958,17 +978,20 @@ async function run(
         sql`SELECT name FROM ${t.board} WHERE id = ${request.boardId}`,
       );
       // Both boards' history say so: the one it left (with no card, since the card is no longer there), and the one it came to (as part of the card's own).
+      const out = crypto.randomUUID();
+      const into = crypto.randomUUID();
+      const targetName = target ? openText('board', request.boardId, 'name', target.name) : '';
       await dbAll(
         tx,
         sql`INSERT INTO ${t.activity} (id, board_id, card_id, actor_id, kind, details, created_at)
-            VALUES (${crypto.randomUUID()}, ${source.boardId}, NULL, ${accountId}, 'card.moved_out',
-                    ${JSON.stringify({ title: before?.title ?? '', to: target?.name ?? '' })}, ${now}) RETURNING id`,
+            VALUES (${out}, ${source.boardId}, NULL, ${accountId}, 'card.moved_out',
+                    ${sealText('activity', out, 'details', JSON.stringify({ title: was?.title ?? '', to: targetName }))}, ${now}) RETURNING id`,
       );
       await dbAll(
         tx,
         sql`INSERT INTO ${t.activity} (id, board_id, card_id, actor_id, kind, details, created_at)
-            VALUES (${crypto.randomUUID()}, ${request.boardId}, ${request.id}, ${accountId}, 'card.moved_in',
-                    ${JSON.stringify({ title: before?.title ?? '', from: before?.boardName ?? '' })}, ${now}) RETURNING id`,
+            VALUES (${into}, ${request.boardId}, ${request.id}, ${accountId}, 'card.moved_in',
+                    ${sealText('activity', into, 'details', JSON.stringify({ title: was?.title ?? '', from: was?.boardName ?? '' }))}, ${now}) RETURNING id`,
       );
       return { card: await cardTile(tx, request.id), version };
     }
@@ -987,8 +1010,13 @@ async function run(
             WHERE id = ${request.id} AND board_id IN ${boardsEditableBy(tx, accountId)} AND archived_at IS NULL
             RETURNING board_id AS "boardId", list_id AS "listId", title, description, due_date AS "dueDate", due_time AS "dueTime", position`,
       );
-      const original = taken[0];
-      if (!original) throw new Refused('not_found');
+      const row = taken[0];
+      if (!row) throw new Refused('not_found');
+      const original = {
+        ...row,
+        title: openText('card', request.id, 'title', row.title),
+        description: open('card', request.id, 'description', row.description),
+      };
       const version = await touchBoard(
         tx,
         original.boardId,
@@ -1010,7 +1038,7 @@ async function run(
       const made = await dbAll<{ id: string }>(
         tx,
         sql`INSERT INTO ${t.card} (id, board_id, list_id, title, description, due_date, due_time, position, created_by, created_at, updated_at)
-            VALUES (${request.newId}, ${original.boardId}, ${original.listId}, ${original.title}, ${original.description}, ${original.dueDate},
+            VALUES (${request.newId}, ${original.boardId}, ${original.listId}, ${sealText('card', request.newId, 'title', original.title)}, ${seal('card', request.newId, 'description', original.description)}, ${original.dueDate},
                     ${original.dueTime}, ${between(original.position, next?.position ?? null)}, ${accountId}, ${now}, ${now})
             ON CONFLICT (id) DO NOTHING RETURNING id`,
       );
@@ -1026,21 +1054,24 @@ async function run(
         sql`INSERT INTO ${t.cardAssignee} (card_id, account_id, board_id, assigned_by, created_at)
             SELECT ${request.newId}, account_id, board_id, ${accountId}, ${now} FROM ${t.cardAssignee} WHERE card_id = ${request.id} RETURNING card_id`,
       );
-      const items = await dbAll<{ title: string; position: string }>(
+      const items = await dbAll<{ id: string; title: string; position: string }>(
         tx,
-        sql`SELECT title, position FROM ${t.checklistItem} WHERE card_id = ${request.id} ORDER BY position, id`,
+        sql`SELECT id, title, position FROM ${t.checklistItem} WHERE card_id = ${request.id} ORDER BY position, id`,
       );
-      for (const item of items)
+      for (const item of items) {
+        const copy = crypto.randomUUID();
         await dbAll(
           tx,
           sql`INSERT INTO ${t.checklistItem} (id, card_id, board_id, title, completed_at, position, created_at)
-              VALUES (${crypto.randomUUID()}, ${request.newId}, ${original.boardId}, ${item.title}, NULL, ${item.position}, ${now}) RETURNING id`,
+              VALUES (${copy}, ${request.newId}, ${original.boardId}, ${sealText('checklist_item', copy, 'title', openText('checklist_item', item.id, 'title', item.title))}, NULL, ${item.position}, ${now}) RETURNING id`,
         );
+      }
+      const cloned = crypto.randomUUID();
       await dbAll(
         tx,
         sql`INSERT INTO ${t.activity} (id, board_id, card_id, actor_id, kind, details, created_at)
-            VALUES (${crypto.randomUUID()}, ${original.boardId}, ${request.newId}, ${accountId}, 'card.cloned',
-                    ${JSON.stringify({ title: original.title, from: original.title })}, ${now}) RETURNING id`,
+            VALUES (${cloned}, ${original.boardId}, ${request.newId}, ${accountId}, 'card.cloned',
+                    ${sealText('activity', cloned, 'details', JSON.stringify({ title: original.title, from: original.title }))}, ${now}) RETURNING id`,
       );
       return { card: await cardTile(tx, request.newId), version };
     }
@@ -1079,7 +1110,7 @@ async function run(
       // The permission is in the statement: only an owner's workspace is a row it can reach.
       const changed = await dbAll<{ createdAt: number | string }>(
         tx,
-        sql`UPDATE ${t.workspace} SET name = ${request.name}, updated_at = ${now}
+        sql`UPDATE ${t.workspace} SET name = ${sealText('workspace', request.id, 'name', request.name)}, updated_at = ${now}
             WHERE id = ${request.id} AND id IN ${workspacesOwnedBy(tx, accountId)}
             RETURNING created_at AS "createdAt"`,
       );
@@ -1162,7 +1193,7 @@ async function itemRow(tx: Database, id: string): Promise<ChecklistItem> {
   return {
     id: row.id,
     cardId: row.cardId,
-    title: row.title,
+    title: openText('checklist_item', row.id, 'title', row.title),
     done: row.completedAt !== null,
     position: row.position,
   };
@@ -1203,6 +1234,7 @@ async function cardTile(tx: Database, id: string): Promise<CardTile> {
   );
   return {
     ...row,
+    title: openText('card', row.id, 'title', row.title),
     hasDescription: row.hasDescription === true || Number(row.hasDescription) === 1,
     labels: labels.map((each) => each.id),
     assignees: assignees.map((each) => each.id),

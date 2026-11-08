@@ -5,6 +5,7 @@ import { dbAll } from '../db/exec';
 import { boardsVisibleTo } from './can';
 import { type Details, describe } from './describe';
 import { ACTIVITY_KINDS, ACTIVITY_PAGE, type ActivityKind, type ActivityPage } from './format';
+import { openText } from './content';
 import { tablesOf } from './tables';
 
 /**
@@ -51,7 +52,7 @@ async function page(
         ORDER BY a.created_at DESC, a.id DESC LIMIT ${ACTIVITY_PAGE + 1}`,
   );
   const shown = rows.slice(0, ACTIVITY_PAGE);
-  const details = shown.map((row) => parse(row.details));
+  const details = shown.map((row) => parse(openText('activity', row.id, 'details', row.details)));
   const ids = [
     ...shown.map((row) => row.actorId),
     ...details.flatMap((each) => (each.person ? [each.person] : [])),
@@ -67,7 +68,7 @@ async function page(
         actorName: name(row.actorId),
         text: describe(row.kind as ActivityKind, name(row.actorId), details[index] ?? {}, name),
         boardId: row.boardId,
-        ...(withBoard ? { boardName: row.boardName } : {}),
+        ...(withBoard ? { boardName: openText('board', row.boardId, 'name', row.boardName) } : {}),
         cardId: row.cardId,
         createdAt: Number(row.createdAt),
       })),

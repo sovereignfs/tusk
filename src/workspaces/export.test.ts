@@ -7,6 +7,7 @@ import { makeStore } from '../sync/test-support';
 import { tablesOf } from './tables';
 import { type World, seedBoardContents, seedWorld } from './testing/roles';
 import { exportBoard, exportOwned, exportWorkspace, withoutIds } from './export';
+import { sealText } from './content';
 
 /**
  * What a board and a workspace export (DESIGN.md §20.1), on whichever database the leg runs, in the world of six roles: who may export what, what is in the
@@ -21,10 +22,11 @@ beforeAll(async () => {
   world = await seedWorld(database);
   await seedBoardContents(database, world);
   const t = tablesOf(database);
+  const assignedActivity = crypto.randomUUID();
   // An activity row that kept an id of a person among the names its sentence needs, and an archived card with a comment by someone whose account is gone.
   await dbRun(
     database,
-    sql`INSERT INTO ${t.activity} (id, board_id, card_id, actor_id, kind, details, created_at) VALUES (${crypto.randomUUID()}, ${world.boards.publicBoard}, ${world.cards.open}, ${world.accounts.boardMember}, 'card.assigned', ${JSON.stringify({ person: { id: world.accounts.member, name: 'Pat' }, accountId: world.accounts.owner, title: 'Open one' })}, ${1_800_000_000_500})`,
+    sql`INSERT INTO ${t.activity} (id, board_id, card_id, actor_id, kind, details, created_at) VALUES (${assignedActivity}, ${world.boards.publicBoard}, ${world.cards.open}, ${world.accounts.boardMember}, 'card.assigned', ${sealText('activity', assignedActivity, 'details', JSON.stringify({ person: { id: world.accounts.member, name: 'Pat' }, accountId: world.accounts.owner, title: 'Open one' }))}, ${1_800_000_000_500})`,
   );
 });
 afterAll(async () => close());
