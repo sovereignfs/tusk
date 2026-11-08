@@ -14,6 +14,7 @@ import { RateLimiter } from '../limits/rate';
 import { purge } from '../sync/purge';
 import { applyMutation } from '../sync/apply';
 import { card, check, list, openStoreBesideAuth, mutation, series } from '../sync/test-support';
+import { sealText } from '../workspaces/content';
 import type { Op } from '../workspaces/format';
 import { applyOp } from '../workspaces/apply';
 import { deletePerson } from './people';
@@ -41,6 +42,7 @@ const GOES = [
   'credential',
   'backup_connection',
   'push_subscription',
+  'reminder_slot',
   'workspace_member',
   'board_member',
   'card_assignee',
@@ -175,6 +177,10 @@ describe(`deleting a person (${leg})`, () => {
         database,
         sql`INSERT INTO ${sqliteSchema.pushSubscription} (id, account_id, endpoint, credential_id, created_at) VALUES (${`push:${who}`}, ${who}, ${`https://push.example/${who}`}, ${`push-key:${who}`}, ${NOW}) RETURNING id`,
       );
+      await dbAll(
+        database,
+        sql`INSERT INTO ${sqliteSchema.reminderSlot} (account_id, at, claimed_at) VALUES (${who}, ${NOW}, NULL) RETURNING at`,
+      );
       await new RateLimiter(database).take(`ops:${who}`, { limit: 10, windowMs: 60_000 });
     }
     await dbAll(
@@ -306,6 +312,7 @@ describe(`deleting a person (${leg})`, () => {
       ['credential', `account_id = '${ada}'`],
       ['backup_connection', `account_id = '${ada}'`],
       ['push_subscription', `account_id = '${ada}'`],
+      ['reminder_slot', `account_id = '${ada}'`],
       ['workspace_member', `account_id = '${ada}'`],
       ['board_member', `account_id = '${ada}'`],
       ['card_assignee', `account_id = '${ada}'`],
@@ -358,6 +365,7 @@ describe(`deleting a person (${leg})`, () => {
     expect(await count('rate_bucket', `"key" = 'ops:${grace}'`)).toBe(before.graceBuckets);
     expect(await count('backup_connection', `account_id = '${grace}'`)).toBe(1);
     expect(await count('push_subscription', `account_id = '${grace}'`)).toBe(1);
+    expect(await count('reminder_slot', `account_id = '${grace}'`)).toBe(1);
     expect(await authCount('user', `id = '${grace}'`)).toBe(1);
     expect(await authCount('session', `user_id = '${grace}'`)).toBeGreaterThan(0);
   });
@@ -368,7 +376,7 @@ describe(`deleting a person (${leg})`, () => {
     const m = tablesOf(database);
     await dbAll(
       database,
-      sql`INSERT INTO ${m.workspace} (id, name, created_by, created_at, updated_at) VALUES (${w}, 'Handed on', ${owner}, 1, 1) RETURNING id`,
+      sql`INSERT INTO ${m.workspace} (id, name, created_by, created_at, updated_at) VALUES (${w}, ${sealText('workspace', w, 'name', 'Handed on')}, ${owner}, 1, 1) RETURNING id`,
     );
     for (const [who, role, at] of [
       [owner, 'owner', 1],

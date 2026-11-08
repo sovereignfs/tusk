@@ -31,7 +31,8 @@ export function noticeText(kind: NoticeKind, subject: string): string {
     case 'brief':
       return subject;
     case 'reminder':
-      return `Due now: ${quoted}`;
+      // A Desk the server cannot read has no title to give (task 14.6).
+      return subject === '' ? 'You have cards due' : `Due now: ${quoted}`;
     case 'workspace_passed':
       return `The workspace ${quoted} was passed to you`;
   }
@@ -78,16 +79,17 @@ export async function deliverNotices(
     )
       continue;
     fannedOut += 1;
+    const subject = subjectOf(openText('notice', row.id, 'details', row.details));
     await fanOut(
       channels,
       {
         accountId: row.accountId,
         kind: row.kind,
-        title: noticeText(
-          row.kind as NoticeKind,
-          subjectOf(openText('notice', row.id, 'details', row.details)),
-        ),
-        path: '/inbox',
+        title: noticeText(row.kind as NoticeKind, subject),
+        // A reminder with no subject is the one made for a Desk that cannot be read (task 14.6): a device is woken to say what is due.
+        ...(row.kind === 'reminder' && subject === ''
+          ? { wake: true, path: '/desk' }
+          : { path: '/inbox' }),
         key: row.id,
       },
       options.log,

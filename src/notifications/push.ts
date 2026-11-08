@@ -43,6 +43,8 @@ export function pushChannel(deps: PushDeps): Channel {
       const devices = await deps.devicesOf(notice.accountId);
       if (devices.length === 0) return { outcome: 'no_channel' };
       const payload = JSON.stringify({
+        // A wake says nothing of what is due: the device looks for itself, and shows `title` where it cannot (task 14.6).
+        ...(notice.wake ? { kind: 'wake' } : {}),
         title: notice.title,
         ...(notice.body ? { body: notice.body } : {}),
         path: notice.path,

@@ -10,6 +10,7 @@ import {
   dueBoardCards,
   peopleToRemind,
 } from '../workspaces/due';
+import { claimSlot, dueSlots, pruneSlots } from '../reminders/slots';
 import { raiseSystem } from '../workspaces/notices';
 import { openStored } from '../sync/operator-fields';
 import { decodeFields } from '../sync/validate';
@@ -25,7 +26,8 @@ import { type LocalNow, localNow } from '../time';
  * it. A day is the account's own, so a brief at 08:00 is 08:00 where they are, either side of midnight in UTC. The time `now` is given, never read.
  *
  * What the server can count is what it can read: the mirrors of the due date and time (`due_date`, `due_time`) that it fills in for a card it can read. **A Desk sealed
- * with a key of its own has no mirrors and is not counted here**; times for it come with task 14.6.
+ * with a key of its own has no mirrors and is not counted here**; its reminders come from the times the browser uploads (`reminder_slot`, task 14.6): a slot that has come
+ * is claimed by a conditional update, and the notice written for it says only that cards are due, since nothing here can say which.
  */
 export const REMINDER_WINDOW_MINUTES = 30;
 /** The most reminders written in one tick, so that a first run after a long stop cannot write thousands at once. */
@@ -78,6 +80,8 @@ export async function tick(
     total.quiet += brief.quiet;
     total.reminders += await reminders(database, zone, local, now, cap - total.reminders);
   }
+  total.reminders += await slotReminders(database, now, cap - total.reminders);
+  await pruneSlots(database, now);
   return total;
 }
 
@@ -189,6 +193,23 @@ async function reminders(
           now,
         );
       sent += people.length;
+    });
+  }
+  return sent;
+}
+
+/**
+ * A Desk with a key of its own (task 14.6): each slot that has come, and that this process claims, is one notice that says cards are due. **Nothing of a card is known
+ * here and nothing is guessed**: the notice has no subject, so the Inbox, the bell, email and core's bell say "You have cards due", and Push wakes the device to look for
+ * itself (`wake`, `src/sw/source.ts`).
+ */
+async function slotReminders(database: Database, now: number, room: number): Promise<number> {
+  let sent = 0;
+  for (const slot of await dueSlots(database, now, room)) {
+    await transaction(database, async (tx) => {
+      if (!(await claimSlot(tx, slot.accountId, slot.at, now))) return;
+      if (await raiseSystem(tx, { recipient: slot.accountId, kind: 'reminder', subject: '' }, now))
+        sent += 1;
     });
   }
   return sent;

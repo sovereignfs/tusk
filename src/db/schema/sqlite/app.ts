@@ -267,3 +267,23 @@ export const pushSubscription = sqliteTable(
     index('push_subscription_account_idx').on(table.accountId),
   ],
 );
+
+/**
+ * The times a device says something is due (DESIGN.md §25.2, task 14.6), **for a Desk sealed with a key of the person's own**, which the server cannot read: the browser works out the
+ * next fourteen days of due times from the opened cards and sends the times and nothing else. **A row has no way back to a card:** an account, an instant (to the minute, in
+ * epoch milliseconds) and when it was claimed, so two cards due together are one row and it says neither which cards nor how many. The job claims a due row by a conditional update,
+ * the notice it writes says only that cards are due, and Push wakes the device to show what the device itself can read. A device silent for fourteen days stops being reminded: nothing
+ * replaces the rows. They go with the account (`People.deletePerson`).
+ */
+export const reminderSlot = sqliteTable(
+  'reminder_slot',
+  {
+    accountId: ref('account_id').notNull(),
+    at: epochMs('at').notNull(),
+    claimedAt: epochMs('claimed_at'),
+  },
+  (table) => [
+    primaryKey({ columns: [table.accountId, table.at] }),
+    index('reminder_slot_due_idx').on(table.at),
+  ],
+);

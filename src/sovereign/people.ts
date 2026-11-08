@@ -68,6 +68,11 @@ export async function deletePerson(deps: PeopleDeps, accountId: string): Promise
       tx,
       sql`DELETE FROM ${app.pushSubscription} WHERE account_id = ${accountId} RETURNING id`,
     );
+    // The times a device said something was due, for a Desk the server cannot read (task 14.6).
+    await dbAll(
+      tx,
+      sql`DELETE FROM ${app.reminderSlot} WHERE account_id = ${accountId} RETURNING at`,
+    );
     // Counters are keyed `kind:account`.
     await dbAll(
       tx,

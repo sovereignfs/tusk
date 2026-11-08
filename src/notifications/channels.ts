@@ -38,6 +38,11 @@ export interface Outgoing {
   readonly path: string;
   /** Names this notice, so that a channel that can drop a repeat does. */
   readonly key: string;
+  /**
+   * For a Desk the server cannot read (task 14.6): this notice only says that cards are due, and **a device that can read the Desk is woken to say which** (Web Push sends a
+   * `wake`, with this title as what to show where the device cannot). Every other channel says the title as it is.
+   */
+  readonly wake?: boolean;
 }
 
 export interface Channel {

@@ -113,6 +113,13 @@
       "when": 1794108734332,
       "tag": "0015_add_reminder_claims",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1794114493785,
+      "tag": "0016_add_reminder_slot",
+      "breakpoints": true
     }
   ]
 }

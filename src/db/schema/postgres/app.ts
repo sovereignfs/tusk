@@ -230,3 +230,17 @@ export const pushSubscription = app.table(
     index('push_subscription_account_idx').on(table.accountId),
   ],
 );
+
+/** See `schema/sqlite/app.ts`. */
+export const reminderSlot = app.table(
+  'reminder_slot',
+  {
+    accountId: ref('account_id').notNull(),
+    at: epochMs('at').notNull(),
+    claimedAt: epochMs('claimed_at'),
+  },
+  (table) => [
+    primaryKey({ columns: [table.accountId, table.at] }),
+    index('reminder_slot_due_idx').on(table.at),
+  ],
+);
