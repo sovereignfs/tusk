@@ -134,6 +134,13 @@ test('a workspace, a board, a card’s dialog and a published board are all usab
   expect(width).toBeGreaterThan(250);
   expect(width).toBeLessThanOrEqual(375);
 
+  // A column scrolls without pulling the page with it.
+  expect(
+    await page
+      .locator('section[aria-label="Backlog"] [class*="cards"]')
+      .evaluate((el) => getComputedStyle(el).overscrollBehaviorY),
+  ).toBe('none');
+
   // A column has an address: the list that stops at the left edge is written to it, and a reload comes back there.
   const review = page.locator('section[aria-label="Review"]');
   const reviewId = (await review.getAttribute('data-list')) ?? '';

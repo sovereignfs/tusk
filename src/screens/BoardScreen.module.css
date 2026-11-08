@@ -136,6 +136,8 @@
   margin: calc(var(--sv-space-1) * -1);
   padding: var(--sv-space-1);
   overflow-y: auto;
+  /* A phone's scrolling column does not pull the page with it at its ends, and a sticky header above it does not bounce away (DESIGN.md §18). */
+  overscroll-behavior-y: none;
 }
 
 .add {
