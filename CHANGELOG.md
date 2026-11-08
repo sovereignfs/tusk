@@ -6,11 +6,6 @@ All notable changes to Tusk are recorded here. The format follows [Keep a Change
 Each release's section is also its GitHub release notes: the release workflow reads this file when a release is cut. Write the notes under
 `## [Unreleased]` as you go; a release turns them into the version's section.
 
-### Changed
-
-- Text is a step smaller on a computer (the body is 14px, not 16px), so lists and cards fit more on the screen. A phone and a touch screen keep the larger size.
-- **The port is now 3002** (`sovereign.manifest.json`), in the image, the Compose setups and `pnpm dev`, so Tusk, Fjord (3001) and a Sovereign core (3000) run side by side on one machine. A Sovereign instance reads the port from the image and needs nothing. Run on your own, change `-p 127.0.0.1:3000:3000` to `-p 127.0.0.1:3002:3002` (or keep the outside port: `-p 127.0.0.1:3000:3002`), and the reverse proxy's upstream with it.
-
 ## [Unreleased]
 
 ### Added
@@ -29,6 +24,8 @@ Each release's section is also its GitHub release notes: the release workflow re
 
 ### Changed
 
+- Text is a step smaller on a computer (the body is 14px, not 16px), so lists and cards fit more on the screen. A phone and a touch screen keep the larger size.
+- **The port is now 3002** (`sovereign.manifest.json`), in the image, the Compose setups and `pnpm dev`, so Tusk, Fjord (3001) and a Sovereign core (3000) run side by side on one machine. A Sovereign instance reads the port from the image and needs nothing. Run on your own, change `-p 127.0.0.1:3000:3000` to `-p 127.0.0.1:3002:3002` (or keep the outside port: `-p 127.0.0.1:3000:3002`), and the reverse proxy's upstream with it.
 - The Inbox is now the cards assigned to you and nothing else: what you are told moved to the bell and `/notifications`, and the Inbox in the sidebar no longer carries a count (the bell has it). Opening a screen no longer marks notices read: you read one by opening it, or all by saying so.
 
 ## [0.1.0] - 2026-11-07
