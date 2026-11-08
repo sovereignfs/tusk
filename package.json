@@ -9,7 +9,7 @@
   },
   "type": "module",
   "packageManager": "pnpm@11.28.9",
-  "description": "Tasks: a private task manager that runs on its own or on a Sovereign instance.",
+  "description": "Tusk: a private task manager that runs on its own or on a Sovereign instance.",
   "engines": {
     "node": ">=24.15 <25"
   },

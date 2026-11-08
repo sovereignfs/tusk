@@ -4,7 +4,7 @@
 # The manifest (sovereign.manifest.json) is the one place the port is written, and the image's label is made from it, so build with the
 # arguments @sovereignfs/manifest prints from it:
 #
-#   eval "docker build $(pnpm exec sovereign-manifest docker-args) -t tasks ."
+#   eval "docker build $(pnpm exec sovereign-manifest docker-args) -t tusk ."
 #
 # The base is Debian ("glibc"), not Alpine: libSQL's native client, which the `file:` form of the database loads, has no build for musl
 # (DESIGN.md §22.1). The sqld and PostgreSQL forms would run on either, but one image has to run all three.
@@ -35,7 +35,7 @@ FROM node:${NODE_VERSION}-bookworm-slim AS runtime
 ARG PORT
 RUN test -n "${PORT}" || { echo 'Build with: eval "docker build $(pnpm exec sovereign-manifest docker-args) ."' >&2; exit 1; }
 
-LABEL org.opencontainers.image.title="Tasks" \
+LABEL org.opencontainers.image.title="Tusk" \
       org.opencontainers.image.description="A private task manager that runs on its own or on a Sovereign instance" \
       org.opencontainers.image.source="https://github.com/sovereignfs/tusk" \
       org.opencontainers.image.licenses="AGPL-3.0-or-later"
