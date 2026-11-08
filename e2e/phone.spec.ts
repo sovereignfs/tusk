@@ -352,12 +352,15 @@ test.describe('touch gestures on a Desk row', () => {
     // Done completes the card and closes the row.
     await row.getByRole('button', { name: 'Done' }).click();
     // Done: the card is ticked, or, where this list hides its completed cards (a setting another test may have left), it is gone from the list.
-    await expect(async () => {
-      const gone = (await link.count()) === 0;
-      const ticked =
-        !gone && (await row.getByRole('checkbox', { name: `Done: ${title}` }).isChecked());
-      expect(gone || ticked).toBe(true);
-    }).toPass();
+    // (`count` does not wait, so the check can be tried again within the time `expect.poll` allows.)
+    await expect
+      .poll(async () => {
+        if ((await link.count()) === 0) return true;
+        return (
+          (await page.getByRole('checkbox', { name: `Done: ${title}`, checked: true }).count()) > 0
+        );
+      })
+      .toBe(true);
 
     // Another card: Delete removes it and offers Undo, which brings it back.
     const other = unique('Delete me');
