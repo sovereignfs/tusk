@@ -19,8 +19,9 @@ workspaces and boards (roles, labels, assignees, comments, activity, the Inbox, 
 verification and reset, Sovereign, linking); a key of your own for the Desk; backup to GitHub (by token or by a GitHub App) and export and import; account
 deletion; the phone's foundations and an accessibility pass.
 
-**Not built:** reminders and push notifications (`TUSK_VAPID_*` are
-settings reserved for them), the Planner, Today and Review, and the phone's own screens (footer, carousels, gestures). [`ROADMAP.md`](ROADMAP.md) has
+**Phone:** a footer of five with an action that fits where you are, a carousel of the Desk's lists, touch gestures on a card, and Today and Review as swipe views. **Notifications:** an Inbox notice can also go out by email, to a Sovereign core's bell, and by Web Push (`TUSK_VAPID_*`, which also need `TUSK_ENCRYPTION_KEY`), for the kinds you choose.
+
+**Not built:** the daily brief and reminders at a due time, the Planner, and a board's columns as a carousel. [`ROADMAP.md`](ROADMAP.md) has
 each, and [`DESIGN.md`](DESIGN.md) says what they will do. Nothing has been released yet (`package.json` says `0.0.0`; see [`RELEASING.md`](RELEASING.md)).
 
 ## Run it
@@ -110,7 +111,7 @@ a test keeps the two in step.
 | `TUSK_SMTP_USER`         | The user, if the server asks                                                                                                                                                    |
 | `TUSK_SMTP_PASSWORD`     | Its password (or `TUSK_SMTP_PASSWORD_FILE`)                                                                                                                                     |
 | `TUSK_SMTP_FROM`         | The sender, `Tusk <tusk@example.com>`. Required with a host                                                                                                                     |
-| `TUSK_VAPID_PUBLIC_KEY`  | Web Push, which **is not built yet**: all three or none. `npx web-push generate-vapid-keys`                                                                                     |
+| `TUSK_VAPID_PUBLIC_KEY`  | Web Push: all three or none, and `TUSK_ENCRYPTION_KEY` too, which seals what each device gives. `npx web-push generate-vapid-keys`                                              |
 | `TUSK_VAPID_PRIVATE_KEY` | The private half                                                                                                                                                                |
 | `TUSK_VAPID_SUBJECT`     | A `mailto:` or https address that identifies you to the push services                                                                                                           |
 | `TUSK_WORKER`            | `on` (the default) runs the background jobs (backups, clean-up) in this process. When several processes share a database, set `off` on all but one                              |

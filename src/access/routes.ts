@@ -55,6 +55,11 @@ export const ROUTES: RouteRule[] = [
   { route: '/api/cards/[id]', methods: { GET: { kind: 'account' } } },
   { route: '/api/boards', methods: { GET: { kind: 'account' } } },
   { route: '/api/settings', methods: { GET: { kind: 'account' }, PATCH: { kind: 'account' } } },
+  // A device turns Web Push on or off for the signed-in account (DESIGN.md §25.2).
+  {
+    route: '/api/push/subscription',
+    methods: { POST: { kind: 'account' }, DELETE: { kind: 'account' } },
+  },
   // The repository an account backs up to (DESIGN.md §21.2): the account is the session's, and the token is in one request and no response.
   {
     route: '/api/backup/connection',

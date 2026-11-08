@@ -1,4 +1,4 @@
-import { index, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { index, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { bool, counter, epochMs, fields, hhmm, id, isoDate, position, ref } from './columns';
 
 /**
@@ -241,4 +241,25 @@ export const backupConnection = sqliteTable(
     installationId: counter('installation_id'),
   },
   (table) => [index('backup_connection_due_idx').on(table.nextBackupAt)],
+);
+
+/**
+ * A device that is to be sent Web Push (DESIGN.md §17.9, §25.2, task 8.4), one row for each, **turned on from that device**: `endpoint` is the push service's address
+ * for it, which is what a device is known by and is unique. **The keys that encrypt to it are not here:** `credential_id` names them in `credential` (`src/crypto/`,
+ * sealed under the instance key like a repository's token), so that this row can be read and listed by code that touches nothing secret. It is the person's, and
+ * goes with them (`People.deletePerson`).
+ */
+export const pushSubscription = sqliteTable(
+  'push_subscription',
+  {
+    id: id('id'),
+    accountId: ref('account_id').notNull(),
+    endpoint: text('endpoint').notNull(),
+    credentialId: ref('credential_id').notNull(),
+    createdAt: epochMs('created_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('push_subscription_endpoint_idx').on(table.endpoint),
+    index('push_subscription_account_idx').on(table.accountId),
+  ],
 );

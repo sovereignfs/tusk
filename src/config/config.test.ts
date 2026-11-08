@@ -110,6 +110,7 @@ describe('loadConfig', () => {
     const PUBLIC = 'B'.repeat(87);
     const PRIVATE = 'p'.repeat(43);
     const given = {
+      TUSK_ENCRYPTION_KEY: 'a'.repeat(64),
       TUSK_VAPID_PUBLIC_KEY: PUBLIC,
       TUSK_VAPID_PRIVATE_KEY: PRIVATE,
       TUSK_VAPID_SUBJECT: 'mailto:admin@example.com',

@@ -99,6 +99,13 @@
       "when": 1794106739528,
       "tag": "0013_add_notice_sent_at",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1794107540796,
+      "tag": "0014_add_push_subscription",
+      "breakpoints": true
     }
   ]
 }

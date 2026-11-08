@@ -5,7 +5,9 @@ import type { Database } from '../db/client';
 import { smtpMailer } from '../mail/smtp';
 import { subOfAccount } from '../sovereign/identity';
 import { readSettings } from '../settings/account-settings';
+import { devicesOf, removeDevice } from '../push/store';
 import { type Channel, coreChannel, emailChannel } from './channels';
+import { pushChannel } from './push';
 
 /**
  * The channels this server has (DESIGN.md §25.2): email where there is mail, and core's bell where the people sign in through a core. **A channel is here only
@@ -33,6 +35,17 @@ export function serverChannels(
         enabled: async (accountId) => (await readSettings(databases.app, accountId)).emailOn,
         settingsUrl: absolute('/account?section=notifications'),
         absolute,
+      }),
+    );
+  }
+  // Web Push, where the operator gave VAPID keys and the instance key that seals each device's keys.
+  const ring = config.encryption;
+  if (config.push && ring) {
+    channels.push(
+      pushChannel({
+        vapid: config.push,
+        devicesOf: (accountId) => devicesOf(databases.app, ring, accountId),
+        remove: (accountId, id) => removeDevice(databases.app, accountId, id),
       }),
     );
   }

@@ -63,6 +63,11 @@ export async function deletePerson(deps: PeopleDeps, accountId: string): Promise
       tx,
       sql`DELETE FROM ${app.backupConnection} WHERE account_id = ${accountId} RETURNING account_id`,
     );
+    // The devices that were sent Web Push; the keys sealed for them go with the credentials below.
+    await dbAll(
+      tx,
+      sql`DELETE FROM ${app.pushSubscription} WHERE account_id = ${accountId} RETURNING id`,
+    );
     // Counters are keyed `kind:account`.
     await dbAll(
       tx,

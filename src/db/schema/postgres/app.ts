@@ -1,4 +1,4 @@
-import { index, pgSchema, primaryKey, text } from 'drizzle-orm/pg-core';
+import { index, pgSchema, primaryKey, text, uniqueIndex } from 'drizzle-orm/pg-core';
 import { APP_STORE } from '../../config';
 import { bool, counter, epochMs, fields, hhmm, id, isoDate, position, ref } from './columns';
 
@@ -209,4 +209,20 @@ export const backupConnection = app.table(
     installationId: counter('installation_id'),
   },
   (table) => [index('backup_connection_due_idx').on(table.nextBackupAt)],
+);
+
+/** See `schema/sqlite/app.ts`. */
+export const pushSubscription = app.table(
+  'push_subscription',
+  {
+    id: id('id'),
+    accountId: ref('account_id').notNull(),
+    endpoint: text('endpoint').notNull(),
+    credentialId: ref('credential_id').notNull(),
+    createdAt: epochMs('created_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('push_subscription_endpoint_idx').on(table.endpoint),
+    index('push_subscription_account_idx').on(table.accountId),
+  ],
 );

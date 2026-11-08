@@ -18,7 +18,8 @@ const capabilities = (): Capabilities => {
   const config = getConfig();
   return {
     email: config.mail !== undefined,
-    push: config.push !== undefined,
+    // Push needs the VAPID keys and the instance key that seals what a device gives.
+    push: config.push !== undefined && config.encryption !== undefined,
     core: config.auth?.sovereign !== undefined,
   };
 };
@@ -55,5 +56,7 @@ export const GET = accountRoute(async ({ accountId }) => {
   return json(200, {
     ...(await readSettings(await getDatabase(), accountId)),
     can: capabilities(),
+    // The public key a device subscribes with: public by its nature, and given only where Push can work.
+    pushKey: capabilities().push ? getConfig().push?.publicKey : undefined,
   });
 });

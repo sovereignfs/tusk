@@ -68,6 +68,51 @@ self.addEventListener('sync', (event) => {
   );
 });
 
+// Web Push (DESIGN.md §25.2): the push service wakes the worker, and it shows what it was sent, which is a title, a body and where choosing it goes. Nothing is read from a
+// cache or put in one: what arrives is shown and is not kept, and a page with a person's data is never fetched here.
+function ownPath(path) {
+  // An address of this app and no other: a path, never one that begins with two slashes (which is another site's).
+  return typeof path === 'string' && /^\\/(?!\\/)[^\\s]*$/.test(path) ? path : '/';
+}
+
+self.addEventListener('push', (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch (error) {
+    data = {};
+  }
+  if (typeof data !== 'object' || data === null) data = {};
+  const title = typeof data.title === 'string' && data.title !== '' ? data.title.slice(0, 200) : 'Tusk';
+  const options = { icon: '/icons/icon-192.png', data: { path: ownPath(data.path) } };
+  if (typeof data.body === 'string') options.body = data.body.slice(0, 500);
+  // A notice shown twice (a retry) replaces itself.
+  if (typeof data.key === 'string') options.tag = data.key.slice(0, 100);
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = self.location.origin + ownPath(event.notification.data && event.notification.data.path);
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (pages) => {
+      for (const page of pages) {
+        if (new URL(page.url).origin !== self.location.origin || !('focus' in page)) continue;
+        const focused = await page.focus();
+        if (focused && 'navigate' in focused) {
+          try {
+            await focused.navigate(url);
+          } catch (error) {
+            // A window that cannot be sent there stays where it is.
+          }
+        }
+        return;
+      }
+      await self.clients.openWindow(url);
+    }),
+  );
+});
+
 self.addEventListener('fetch', (event) => {
   const request = event.request;
   if (request.method !== 'GET') return;

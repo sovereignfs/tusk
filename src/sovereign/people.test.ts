@@ -40,6 +40,7 @@ const GOES = [
   'rate_bucket',
   'credential',
   'backup_connection',
+  'push_subscription',
   'workspace_member',
   'board_member',
   'card_assignee',
@@ -169,6 +170,10 @@ describe(`deleting a person (${leg})`, () => {
       await dbAll(
         database,
         sql`INSERT INTO ${sqliteSchema.backupConnection} (account_id, kind, repository, branch, credential_id, created_at) VALUES (${who}, 'token', 'o/r', 'main', ${`backup:${who}`}, ${NOW}) RETURNING account_id`,
+      );
+      await dbAll(
+        database,
+        sql`INSERT INTO ${sqliteSchema.pushSubscription} (id, account_id, endpoint, credential_id, created_at) VALUES (${`push:${who}`}, ${who}, ${`https://push.example/${who}`}, ${`push-key:${who}`}, ${NOW}) RETURNING id`,
       );
       await new RateLimiter(database).take(`ops:${who}`, { limit: 10, windowMs: 60_000 });
     }
@@ -300,6 +305,7 @@ describe(`deleting a person (${leg})`, () => {
       ['rate_bucket', `"key" LIKE '%:${ada}'`],
       ['credential', `account_id = '${ada}'`],
       ['backup_connection', `account_id = '${ada}'`],
+      ['push_subscription', `account_id = '${ada}'`],
       ['workspace_member', `account_id = '${ada}'`],
       ['board_member', `account_id = '${ada}'`],
       ['card_assignee', `account_id = '${ada}'`],
@@ -351,6 +357,7 @@ describe(`deleting a person (${leg})`, () => {
     expect(await count('credential', `account_id = '${grace}'`)).toBe(before.graceCredential);
     expect(await count('rate_bucket', `"key" = 'ops:${grace}'`)).toBe(before.graceBuckets);
     expect(await count('backup_connection', `account_id = '${grace}'`)).toBe(1);
+    expect(await count('push_subscription', `account_id = '${grace}'`)).toBe(1);
     expect(await authCount('user', `id = '${grace}'`)).toBe(1);
     expect(await authCount('session', `user_id = '${grace}'`)).toBeGreaterThan(0);
   });

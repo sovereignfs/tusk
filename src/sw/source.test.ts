@@ -64,11 +64,32 @@ function load(version = 'v1', files: readonly string[] = FILES) {
   };
   const listeners: Record<string, Listener> = {};
   const woken: unknown[] = [];
+  const shown: { title: string; options: Record<string, unknown> }[] = [];
+  const opened: string[] = [];
+  const navigated: string[] = [];
+  /** The windows of the app that are open, which a click on a notice may use. */
+  const windows: { url: string }[] = [];
   const clients = {
-    matchAll: async () => [{ postMessage: (message: unknown) => void woken.push(message) }],
+    matchAll: async () => [
+      // A page that can be told things but not taken anywhere (no `focus`): the sync wake-up's, and a click skips it.
+      { url: `${ORIGIN}/`, postMessage: (message: unknown) => void woken.push(message) },
+      ...windows.map((w) => ({
+        url: w.url,
+        postMessage: () => undefined,
+        focus: async function (this: { navigate: (u: string) => Promise<void> }) {
+          return this;
+        },
+        navigate: async (to: string) => void navigated.push(to),
+      })),
+    ],
+    openWindow: async (to: string) => void opened.push(to),
   };
   const self = {
     location: { origin: ORIGIN },
+    registration: {
+      showNotification: async (title: string, options: Record<string, unknown>) =>
+        void shown.push({ title, options }),
+    },
     clients,
     addEventListener: (type: string, fn: Listener) => void (listeners[type] = fn),
   };
@@ -119,7 +140,20 @@ function load(version = 'v1', files: readonly string[] = FILES) {
     [...stores.entries()].flatMap(([name, store]) =>
       [...store.keys()].map((url) => `${name} ${new URL(url).pathname}`),
     );
-  return { dispatch, fetchEvent, kept, stores, state, requested, listeners, woken };
+  return {
+    dispatch,
+    fetchEvent,
+    kept,
+    stores,
+    state,
+    requested,
+    listeners,
+    woken,
+    shown,
+    opened,
+    navigated,
+    windows,
+  };
 }
 
 const allowed = (path: string) =>
@@ -295,5 +329,107 @@ describe('Background Sync', () => {
     await w.dispatch('sync', { tag: 'tusk-sync' });
     expect(w.kept()).toEqual([]);
     expect(w.requested).toEqual([]);
+  });
+});
+
+describe('Web Push (DESIGN.md §25.2)', () => {
+  const pushWith = (payload: unknown) => ({
+    data: { json: () => (typeof payload === 'string' ? JSON.parse(payload) : payload) },
+  });
+
+  it('shows what it was sent: the title, the body, a tag from the key, and where choosing it goes', async () => {
+    const w = load();
+    await w.dispatch(
+      'push',
+      pushWith({
+        title: 'You were assigned “Pay the rent”',
+        body: 'On Roadmap',
+        path: '/inbox',
+        key: 'n1',
+      }),
+    );
+    expect(w.shown).toHaveLength(1);
+    expect(w.shown[0]?.title).toBe('You were assigned “Pay the rent”');
+    expect(w.shown[0]?.options).toMatchObject({
+      body: 'On Roadmap',
+      tag: 'n1',
+      data: { path: '/inbox' },
+    });
+  });
+
+  it('keeps nothing: what it shows is not put in a cache', async () => {
+    const w = load();
+    await w.dispatch('push', pushWith({ title: 'Secret title', path: '/inbox' }));
+    expect(w.kept()).toEqual([]);
+    expect(w.requested).toEqual([]);
+  });
+
+  it('shows "Tusk" for a message with no title, or that is not JSON, or has no data, and never throws', async () => {
+    const w = load();
+    await w.dispatch('push', pushWith({ body: 'no title' }));
+    await w.dispatch('push', {
+      data: {
+        json: () => {
+          throw new SyntaxError('not json');
+        },
+      },
+    });
+    await w.dispatch('push', {});
+    await w.dispatch('push', pushWith('null'));
+    expect(w.shown.map((n) => n.title)).toEqual(['Tusk', 'Tusk', 'Tusk', 'Tusk']);
+  });
+
+  it('opens only an address of this app: a path, and never another site’s', async () => {
+    const w = load();
+    for (const bad of [
+      '//evil.example/phish',
+      'https://evil.example/',
+      'javascript:alert(1)',
+      42,
+      '/a b',
+    ])
+      await w.dispatch('push', pushWith({ title: 't', path: bad }));
+    expect(w.shown.map((n) => (n.options.data as { path: string }).path)).toEqual([
+      '/',
+      '/',
+      '/',
+      '/',
+      '/',
+    ]);
+  });
+
+  it('cuts a very long title and body', async () => {
+    const w = load();
+    await w.dispatch('push', pushWith({ title: 'T'.repeat(500), body: 'B'.repeat(2000) }));
+    expect(w.shown[0]?.title.length).toBe(200);
+    expect((w.shown[0]?.options.body as string).length).toBe(500);
+  });
+
+  it('opens the notice’s address in a window when none of the app’s is open, and closes the notification', async () => {
+    const w = load();
+    let closed = false;
+    await w.dispatch('notificationclick', {
+      notification: { close: () => void (closed = true), data: { path: '/inbox' } },
+    });
+    expect(closed).toBe(true);
+    expect(w.opened).toEqual([`${ORIGIN}/inbox`]);
+  });
+
+  it('uses a window of the app that is open, taking it to the address, rather than opening another', async () => {
+    const w = load();
+    w.windows.push({ url: `${ORIGIN}/desk` });
+    await w.dispatch('notificationclick', {
+      notification: { close: () => undefined, data: { path: '/b/abc' } },
+    });
+    expect(w.navigated).toEqual([`${ORIGIN}/b/abc`]);
+    expect(w.opened).toEqual([]);
+  });
+
+  it('opens the home address for a notification whose path is not one', async () => {
+    const w = load();
+    await w.dispatch('notificationclick', {
+      notification: { close: () => undefined, data: { path: '//evil.example' } },
+    });
+    expect(w.opened).toEqual([`${ORIGIN}/`]);
   });
 });

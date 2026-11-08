@@ -41,7 +41,7 @@ export const jobs: readonly JobDefinition[] = [
     everyMs: 30 * 1000,
     run: async ({ now }) => {
       const config = getConfig();
-      if (!config.mail && !config.auth?.sovereign) return;
+      if (!config.mail && !config.auth?.sovereign && !config.push) return;
       const database = await getDatabase();
       const channels = serverChannels(
         config,

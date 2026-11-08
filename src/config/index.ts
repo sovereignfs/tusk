@@ -234,6 +234,10 @@ export function loadConfig(env: Env, readFile?: ReadFile): LoadResult {
       problems.push(
         'TUSK_VAPID_SUBJECT is a mailto: or https: address that identifies you to the push services.',
       );
+    else if (!encryption)
+      problems.push(
+        'Web Push (TUSK_VAPID_*) needs TUSK_ENCRYPTION_KEY, which seals the keys each device gives (openssl rand -base64 32).',
+      );
     else push = { publicKey, privateKey, subject };
   }
 

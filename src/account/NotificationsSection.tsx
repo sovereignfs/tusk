@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { type PushState, disablePush, enablePush, pushState } from '../push/client';
 import { Alert, Checkbox } from '../ui';
 import { NOTICE_KINDS, type NoticeKind } from '../workspaces/format';
 import styles from './Account.module.css';
@@ -23,6 +24,7 @@ interface Loaded {
   emailOn: boolean;
   sentKinds: NoticeKind[];
   can: { email: boolean; push: boolean; core: boolean };
+  pushKey?: string;
 }
 
 /**
@@ -34,6 +36,9 @@ interface Loaded {
 export function NotificationsSection() {
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [failed, setFailed] = useState(false);
+  // Push is per device: what this browser has, not what the account has.
+  const [push, setPush] = useState<PushState | null>(null);
+  const [pushNote, setPushNote] = useState<string | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -66,6 +71,12 @@ export function NotificationsSection() {
     setLoaded(before);
     setFailed(true);
   }
+
+  // Only where the server can send Push is the device asked what it has: the question touches the service worker, which a server with no Push has no use for.
+  const pushPossible = loaded?.can.push === true;
+  useEffect(() => {
+    if (pushPossible) void pushState().then(setPush);
+  }, [pushPossible]);
 
   const off = loaded?.noticesOff ?? [];
   const sent = loaded?.sentKinds ?? [];
@@ -143,6 +154,40 @@ export function NotificationsSection() {
                 onChange={(on) => void save({ remindersOn: on })}
               />
             </li>
+            {loaded.can.push ? (
+              <li>
+                {push === 'unsupported' ? (
+                  <p className={styles.muted}>This browser cannot receive push notifications.</p>
+                ) : push === 'denied' ? (
+                  <p className={styles.muted}>
+                    Notifications are blocked for this site in the browser. Allow them there to turn
+                    Push on.
+                  </p>
+                ) : (
+                  <Checkbox
+                    label="Push on this device"
+                    checked={push === 'on'}
+                    disabled={push === null}
+                    onChange={(on) => {
+                      setPushNote(null);
+                      void (async () => {
+                        if (!on) {
+                          await disablePush();
+                          return setPush(await pushState());
+                        }
+                        const done = await enablePush(loaded.pushKey ?? '');
+                        if (done === 'limit')
+                          setPushNote('This account has as many devices as it can have.');
+                        else if (done === 'failed')
+                          setPushNote('Push could not be turned on. Try again.');
+                        setPush(await pushState());
+                      })();
+                    }}
+                  />
+                )}
+                {pushNote ? <p className={styles.muted}>{pushNote}</p> : null}
+              </li>
+            ) : null}
             <li>
               {loaded.can.email ? (
                 <Checkbox
