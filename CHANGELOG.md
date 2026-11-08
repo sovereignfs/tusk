@@ -10,6 +10,7 @@ Each release's section is also its GitHub release notes: the release workflow re
 
 ### Added
 
+- On a phone, the footer's Today (what is overdue, due today or starred) and Review (every open card, least recently reviewed first) go through cards one at a time: swipe or press Done, Cancel (with Undo, and a repeating card skips to its next), Dismiss (Today: hide until tomorrow, with Undo; Review: skip) and Star. A pass can be stopped and carried on, on any device.
 - On a phone, a card is reordered by pressing its handle and dragging, a long press chooses it, and swiping a row aside shows Done and Delete (Delete can be undone).
 - On a phone there is a footer: Desk, Boards, Planner and Inbox, with an action button in the middle that offers what fits where you are (a new card into the list you are looking at, a new list, a new board, a new workspace).
 - On a phone the Desk is a carousel of its lists: swipe between them, the address follows (a reload comes back to the same list), and a link to a list moves it. A board's lists have an address too, `?list=`, so a reload or a shared link opens on the list you were reading.
