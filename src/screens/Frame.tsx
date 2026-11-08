@@ -34,7 +34,7 @@ export function Frame({ children }: { children: ReactNode }) {
   const key = useKey();
   const onDesk = pathname.startsWith('/desk');
   // A board goes to the edges of the content, since its lists are laid on a tint of its colour that fills the page; the page pads what needs it.
-  const flush = pathname.startsWith('/b/');
+  const flush = pathname.startsWith('/b/') || pathname === '/planner';
   // The Desk's lists are a column beside the Desk and the Inbox, and nowhere else: Home, a workspace and a board have the width. Settings opens as a
   // dialog over the page it was opened from, which is still there behind it: it keeps what that page had.
   const beside = onDesk || pathname === '/inbox';

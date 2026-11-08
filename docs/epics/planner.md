@@ -2,7 +2,7 @@
 
 ## Status
 
-📋 Planned (2026-11-08): five tasks, in phase 2. 19.1 to 19.4 make the Planner usable; 19.5, start and end times, makes it a place to box time, and can follow.
+⏳ In progress (2026-11-08): five tasks, in phase 2; 19.1 is done. 19.1 to 19.4 make the Planner usable; 19.5, start and end times, makes it a place to box time, and can follow.
 
 ## Overview
 
@@ -32,7 +32,7 @@ Settled with the developer on 2026-11-08, before any task was started:
 
 ## Tasks
 
-#### 📋 19.1 — The feed
+#### ✅ 19.1 — The feed
 
 **Priority:** P1. **Goal:** `/planner` is a feed of days, before and after today, that a person can scroll through without end.
 
@@ -57,6 +57,8 @@ Settled with the developer on 2026-11-08, before any task was started:
 and an assigned board card with dates appear on their days, and a board card not assigned to the person does not; leaving a board takes its cards out at the
 next load; the route answers 401 without a session and returns another person's assigned cards to nobody (role matrix); runs of empty days fold and unfold;
 with the network off the Desk's part is there and the boards' part says so; at a phone's width nothing scrolls sideways.
+
+**Done as:** **`GET /api/planner?from=&to=`** (`src/planner/endpoint.ts`, `app/api/planner/route.ts`, in `src/access/routes.ts`): the open cards assigned to the signed-in account whose date is in the range, on boards `boardsVisibleTo` them, with the board's name and colour and the list's name (`src/workspaces/planned.ts`, titles and names opened through `content.ts`); the range is two real dates in order of at most 62 days (`src/planner/range.ts`, else 400). **`src/planner/feed.ts` is the pure part:** chunks of four weeks on a fixed grid (`chunkOf`, `chunkRange`) that the boards are read in and the window grows by; `deskEntries` and `boardEntries` make one kind of `Entry` of both halves (a Desk card whose date is ciphertext or not a date is left out, never placed on a guess); `groupByDate` and the order of a day (no time first, then by time, the Desk before a board, then by title: a total order); `layout`, which folds a run of three or more empty days into one row, never today or the day either side of it, and keeps a run open as the window makes it longer; `dayParts` and `gapLabel` for the words. **`PlannerScreen`** reads the Desk's cards and lists from the working copy (`visibleCards`, `listsOf`) and the boards' by chunk, opens on today, and **adds a chunk when the reader goes near an end by scrolling, wheel or touch, once for each move**: the chunk is read before the window grows, so what is added above arrives whole, and the reader's place is kept by the height that came. A scroll the feed made itself is recognised by its position and asks for nothing. If the boards cannot be had the Desk is still shown, with a way to try again. `/planner` is flush in `Frame` and its feed is its own scroller. Tests: the range, the six roles (the one assigned, and no other, whatever the role sees of the board), a range, an archived card, a card of a board the person left, 401 and 400 (on every database form, with `TUSK_TEST_OPERATOR` on and off), the feed's pure rules (each was seen to fail when broken), and in Chromium and WebKit a Desk card on tomorrow and an assigned board card on today with an unassigned one nowhere, the feed opening on today, a card opening where it is, a folded run opening, days arriving at both ends with the reader's place kept to the pixel, and nothing scrolling sideways at 390px. **Not as the epic said:** the epic had an `IntersectionObserver` at each end; a run of empty days is one short folded row, so the end stays in view and it asked for more for ever, which is why it is the reader's move that asks. A card in the feed is a link to where it is (a Desk card at `/desk/<list>?card=`, a board card at its own page); 19.2 makes it open over the Planner.
 
 #### 📋 19.2 — A day's block
 

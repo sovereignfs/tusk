@@ -1,0 +1,164 @@
+.scroller {
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sv-space-3);
+  max-width: 640px;
+  margin: 0 auto;
+  padding: var(--sv-space-4);
+}
+
+.days {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sv-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.day {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  gap: var(--sv-space-3);
+  align-items: start;
+  padding: var(--sv-space-2) 0;
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sv-space-1);
+  color: var(--sv-color-text-muted);
+  font-size: var(--sv-font-size-xs);
+}
+
+.weekday {
+  font-weight: var(--sv-font-weight-medium);
+}
+
+.number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: var(--sv-color-text-primary);
+  font-size: var(--sv-font-size-md);
+  font-weight: var(--sv-font-weight-semibold);
+}
+
+.today {
+  background: var(--sv-color-accent);
+  color: var(--sv-color-text-on-accent);
+}
+
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sv-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* One height for every card, until a card can have an end (DESIGN.md §25.1). The band is a list's or a board's colour, data a person chose: a band, never a background. */
+.card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-height: 56px;
+  padding: var(--sv-space-2) var(--sv-space-3);
+  border: 1px solid var(--sv-color-border);
+  border-left: 4px solid var(--band);
+  border-radius: var(--sv-radius-md);
+  background: var(--sv-color-surface-raised);
+  color: var(--sv-color-text-primary);
+  text-decoration: none;
+}
+
+.card:hover {
+  background: var(--sv-color-surface-sunken);
+}
+
+.card:focus-visible {
+  outline: 2px solid var(--sv-color-focus-ring);
+  outline-offset: 2px;
+}
+
+.title {
+  overflow: hidden;
+  font-weight: var(--sv-font-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta {
+  overflow: hidden;
+  color: var(--sv-color-text-muted);
+  font-size: var(--sv-font-size-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.done .title {
+  color: var(--sv-color-text-muted);
+  text-decoration: line-through;
+}
+
+.overdue .meta {
+  color: var(--sv-color-error-text);
+}
+
+.empty {
+  margin: 0;
+  padding: var(--sv-space-2) 0;
+  color: var(--sv-color-text-muted);
+  font-size: var(--sv-font-size-sm);
+}
+
+.gap {
+  padding: var(--sv-space-1) 0;
+}
+
+.gapButton {
+  width: 100%;
+  padding: var(--sv-space-2) var(--sv-space-3);
+  border: 1px dashed var(--sv-color-border-strong);
+  border-radius: var(--sv-radius-md);
+  background: transparent;
+  color: var(--sv-color-text-muted);
+  font: inherit;
+  font-size: var(--sv-font-size-sm);
+  cursor: pointer;
+}
+
+.gapButton:hover {
+  background: var(--sv-color-surface-sunken);
+}
+
+.gapButton:focus-visible {
+  outline: 2px solid var(--sv-color-focus-ring);
+  outline-offset: 2px;
+}
+
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sv-space-3);
+}
+
+.bone {
+  height: 56px;
+  border-radius: var(--sv-radius-md);
+  background: var(--sv-color-surface-sunken);
+}

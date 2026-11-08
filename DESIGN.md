@@ -197,6 +197,7 @@ As Fjord Web's. `app/` for routes, and `src/` for everything else, with tests be
 | `src/screens/`                                        | The signed-in screens: the shell's sidebar, the Desk, the boards index, a board, the card modal, the Inbox        |
 | `src/pwa/`, `src/sw/`                                 | The manifest's details, and the service worker's source (§17.9)                                                   |
 | `src/reminders/`                                      | Reminders for a Desk the server cannot read (§25.2)                                                               |
+| `src/planner/`                                        | The Planner (§25.1): the feed's pure rules, the range, and `GET /api/planner`                                     |
 | `src/ui/`                                             | The design system's client boundary, `AppShell`, and what every drag shares                                       |
 | `migrations/`                                         | The generated SQL: `sqlite/`, `postgres/`, `auth/`                                                                |
 | `deploy/`                                             | The Compose setups for sqld, a file and PostgreSQL, their README and `.env.example`                               |
