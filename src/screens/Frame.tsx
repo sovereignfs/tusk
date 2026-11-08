@@ -11,7 +11,6 @@ import { CardDetail } from './CardDetail';
 import { KeyOffer } from './KeyOffer';
 import { useKey } from './KeyContext';
 import { UnlockKey } from './UnlockKey';
-import { UndoProvider } from './Undo';
 
 /**
  * Below the shell's header (DESIGN.md §17.4): a sidebar of 280px, the content, and a right sidebar of 360px **that is there only while a card is
@@ -48,7 +47,7 @@ export function Frame({ children }: { children: ReactNode }) {
   const locked = key.status === 'locked' || (key.sealed && key.status === 'loading');
 
   return (
-    <UndoProvider>
+    <>
       {locked ? null : <FirstList />}
       <ThreeColumnLayout sidebarHidden={mobile || !withLists}>
         {locked || mobile || !withLists ? <div /> : <Sidebar />}
@@ -94,6 +93,6 @@ export function Frame({ children }: { children: ReactNode }) {
           {withLists ? <Sidebar /> : null}
         </Drawer>
       ) : null}
-    </UndoProvider>
+    </>
   );
 }

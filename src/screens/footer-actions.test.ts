@@ -22,6 +22,8 @@ describe('the footer’s action', () => {
       for (const action of ACTIONS[place]) expect(LABELS[action]).not.toBe('');
     }
     expect(ACTIONS.board).toEqual(['board-new-card', 'board-new-list']);
+    // The Desk has the phone's two swipe views.
+    expect(ACTIONS.desk).toEqual(expect.arrayContaining(['today', 'review']));
   });
 
   it('knows the list a Desk address names, and none for the Desk’s own', () => {

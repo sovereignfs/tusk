@@ -1,0 +1,54 @@
+.wrap {
+  display: grid;
+  gap: var(--sv-space-3);
+}
+
+.count {
+  margin: 0;
+  color: var(--sv-color-text-muted);
+  font-size: var(--sv-font-size-sm, 0.875rem);
+}
+
+.card {
+  display: grid;
+  align-content: start;
+  gap: var(--sv-space-3);
+  min-height: 200px;
+  padding: var(--sv-space-5);
+  border: var(--sv-border-width-hairline) solid var(--sv-color-border);
+  border-radius: var(--sv-radius-lg);
+  background: var(--sv-color-surface-raised);
+}
+
+/* The title opens the card; it is a button and not a link, since where it goes is the overlay's to decide. */
+.title {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--sv-color-text-primary);
+  font: inherit;
+  font-size: 1.25rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.title:focus-visible {
+  outline: 2px solid var(--sv-color-focus-ring);
+  outline-offset: 2px;
+}
+
+.detail {
+  color: var(--sv-color-text-muted);
+}
+
+.description {
+  margin: 0;
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--sv-color-text-primary);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  overflow-wrap: anywhere;
+}

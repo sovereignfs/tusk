@@ -451,3 +451,84 @@ test.describe('touch gestures on a Desk row', () => {
     await expect.poll(order).toEqual([first, third, second]);
   });
 });
+
+test('Today and Review, from the footer, go through cards one at a time by their buttons: done, dismiss with Undo, skip and carry on', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await signedIn(page);
+  await page.goto('/desk');
+  // Two cards, both starred (starred is what Today shows when nothing is due). Their titles begin with a mark that sorts before any other, so that they are the first
+  // two of Today whatever else the shared account holds, and each is the other's kind (a before b).
+  const alpha = `!a ${crypto.randomUUID().slice(0, 8)}`;
+  const beta = `!b ${crypto.randomUUID().slice(0, 8)}`;
+  for (const title of [alpha, beta]) {
+    await page.getByPlaceholder('Add a card…').first().fill(title);
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('link', { name: title })).toBeVisible();
+    await page
+      .locator('li')
+      .filter({ has: page.getByRole('link', { name: title }) })
+      .getByRole('button', { name: 'Star' })
+      .click();
+  }
+  const footer = page.getByRole('navigation', { name: 'App navigation' });
+  const apps = () => footer.getByRole('button', { name: 'Apps' }).click();
+  const what = page.getByRole('dialog', { name: 'What to add' });
+  const today = page.getByRole('dialog', { name: 'Today' });
+
+  // Today is an overlay: the Desk is under it at the same address.
+  const address = page.url();
+  await apps();
+  await what.getByRole('button', { name: 'Today' }).click();
+  await expect(today).toBeVisible();
+  for (const name of ['Done', 'Cancel', 'Dismiss', 'Star'])
+    await expect(today.getByRole('button', { name })).toBeVisible();
+  // The starred are ordered by title, and the page's own cards are the same ones (ours are among them).
+  await expect(today.getByRole('button', { name: alpha, exact: true })).toBeVisible();
+  await today.getByRole('button', { name: 'Done' }).click();
+  await expect(today.getByRole('button', { name: beta, exact: true })).toBeVisible();
+
+  // Dismiss hides it until tomorrow; closing leaves the Desk where it was, and Undo (still offered) brings it back.
+  await today.getByRole('button', { name: 'Dismiss' }).click();
+  await page.keyboard.press('Escape');
+  await expect(today).toHaveCount(0);
+  expect(page.url()).toBe(address);
+  await apps();
+  await what.getByRole('button', { name: 'Today' }).click();
+  await expect(today.getByRole('button', { name: beta, exact: true })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await apps();
+  await what.getByRole('button', { name: 'Today' }).click();
+  await expect(today.getByRole('button', { name: beta, exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  // Review: a pass can be stopped and gone on with. The card that was skipped goes to the end, and is not the first one when it is opened again.
+  const gamma = unique('Gamma');
+  await page.getByPlaceholder('Add a card…').first().fill(gamma);
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('link', { name: gamma })).toBeVisible();
+  const review = page.getByRole('dialog', { name: 'Review' });
+  await apps();
+  await what.getByRole('button', { name: 'Review' }).click();
+  await expect(review).toBeVisible();
+  const first = await review.locator('[data-card-title]').first().innerText();
+  await review.getByRole('button', { name: 'Skip' }).click();
+  await page.keyboard.press('Escape');
+  await apps();
+  await what.getByRole('button', { name: 'Review' }).click();
+  const next = await review.locator('[data-card-title]').first().innerText();
+  expect(next).not.toBe(first);
+  await page.keyboard.press('Escape');
+
+  // Tidy up what this test made on the shared account: Beta is done from Today, and Gamma ticked on the Desk.
+  await apps();
+  await what.getByRole('button', { name: 'Today' }).click();
+  await expect(today.getByRole('button', { name: beta, exact: true })).toBeVisible();
+  await today.getByRole('button', { name: 'Done' }).click();
+  await page.keyboard.press('Escape');
+  await page.getByRole('checkbox', { name: `Done: ${gamma}` }).check();
+  // The shared account is read by the next browser's run from the server: let what was just written get there before this page goes.
+  await page.waitForTimeout(2500);
+});

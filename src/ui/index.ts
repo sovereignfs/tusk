@@ -33,6 +33,8 @@ export {
   MobileFooter,
   ResponsiveSurface,
   SwipableMobileCarousel,
+  SwipeStack,
+  SwipeStackCard,
   SwipableMobileCarouselSlide,
   SwipableMobileCarouselSlideBody,
   GripIcon,

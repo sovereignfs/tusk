@@ -7,6 +7,7 @@ import { Icon, MobileAppsDrawer, MobileFooter } from '../ui';
 import { LucideIcon } from '../ui/icons';
 import { useMobileNav } from '../ui/mobile-nav';
 import { ENTRIES } from './AppSidebar';
+import { StackOverlay } from './StackOverlay';
 import { NewBoardDialog, NewCardDialog, NewListDialog, NewWorkspaceDialog } from './FooterDialogs';
 import { ACTIONS, type Action, BOARD_ACTION, LABELS, deskListOf, placeOf } from './footer-actions';
 
@@ -25,6 +26,8 @@ const ACTION_ICONS: Record<Action, ReactNode> = {
   'new-card': <Icon name="plus" aria-hidden />,
   'new-list': <Icon name="plus" aria-hidden />,
   'choose-list': <LucideIcon name="list-todo" />,
+  today: <LucideIcon name="calendar-days" />,
+  review: <Icon name="check" aria-hidden />,
   'new-board': <Icon name="plus" aria-hidden />,
   'new-workspace': <LucideIcon name="folder-kanban" />,
   'board-new-list': <Icon name="plus" aria-hidden />,
@@ -96,6 +99,13 @@ export function PhoneFooter() {
       />
       {dialog === 'new-card' ? (
         <NewCardDialog listId={deskListOf(pathname)} onClose={() => setDialog(null)} />
+      ) : null}
+      {dialog === 'today' || dialog === 'review' ? (
+        <StackOverlay
+          kind={dialog}
+          {...(deskListOf(pathname) ? { listId: deskListOf(pathname) } : {})}
+          onClose={() => setDialog(null)}
+        />
       ) : null}
       {dialog === 'new-list' ? <NewListDialog onClose={() => setDialog(null)} /> : null}
       {dialog === 'new-board' ? (

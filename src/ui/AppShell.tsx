@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { UndoProvider } from '../screens/Undo';
 import styles from './AppShell.module.css';
 
 /**
@@ -34,23 +35,26 @@ export function AppShell({
   return (
     // `sv-app-shell` is where the design system's footer publishes its height (`--sv-shell-footer-height`), so that sheets and dialogs clear it.
     <div id="sv-app-shell" className={styles.shell}>
-      <header className={styles.header}>
-        <div className={styles.lead}>
-          {toolbar}
-          {/* The wordmark is set in the design system's typeface (a page may not name another, and may not fetch one), heavy and tight; a screen reader says the name. */}
-          <a href="/" className={styles.brand} aria-label={name}>
-            <span className={styles.wordmark} aria-hidden>
-              tusk.
-            </span>
-          </a>
-        </div>
-        <div className={styles.actions}>
-          {bell}
-          {account}
-        </div>
-      </header>
-      <div className={styles.main}>{children}</div>
-      {footer ? <footer className={styles.footer}>{footer}</footer> : null}
+      {/* Every delete offers Undo (DESIGN.md §11.5): kept here, so that the footer's views have it too, and its bar stands above the footer by the height it publishes. */}
+      <UndoProvider>
+        <header className={styles.header}>
+          <div className={styles.lead}>
+            {toolbar}
+            {/* The wordmark is set in the design system's typeface (a page may not name another, and may not fetch one), heavy and tight; a screen reader says the name. */}
+            <a href="/" className={styles.brand} aria-label={name}>
+              <span className={styles.wordmark} aria-hidden>
+                tusk.
+              </span>
+            </a>
+          </div>
+          <div className={styles.actions}>
+            {bell}
+            {account}
+          </div>
+        </header>
+        <div className={styles.main}>{children}</div>
+        {footer ? <footer className={styles.footer}>{footer}</footer> : null}
+      </UndoProvider>
     </div>
   );
 }
