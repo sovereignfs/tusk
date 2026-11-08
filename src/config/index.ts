@@ -28,6 +28,15 @@ export interface Config {
   readonly githubApp: GitHubAppSettings | undefined;
   /** Where mail goes, or `undefined`: then an address is not verified, a password is not reset by mail, and no screen or route offers either (DESIGN.md §6). */
   readonly mail: MailSettings | undefined;
+  /** The keys Web Push is sent with (DESIGN.md §25.2), when the operator gave all three; then a device can be offered Push, and without them none is. */
+  readonly push: PushSettings | undefined;
+}
+
+/** VAPID: the application server key pair and the address that identifies the operator to the push services. */
+export interface PushSettings {
+  readonly publicKey: string;
+  readonly privateKey: string;
+  readonly subject: string;
 }
 
 /** One thing that is wrong, in words that name the setting and never its value. */
@@ -204,6 +213,30 @@ export function loadConfig(env: Env, readFile?: ReadFile): LoadResult {
   // Mail is optional, but a host with no sender would send nothing anyone could answer, so it stops here rather than at the first message.
   const mail = resolveMail(read, problems);
 
+  // Web Push (DESIGN.md §25.2): the three together or none (the group check says which is missing); given, each must be what a push service accepts.
+  let push: PushSettings | undefined;
+  const vapid = [
+    read('TUSK_VAPID_PUBLIC_KEY'),
+    read('TUSK_VAPID_PRIVATE_KEY'),
+    read('TUSK_VAPID_SUBJECT'),
+  ];
+  if (vapid.every((value) => value !== undefined)) {
+    const [publicKey, privateKey, subject] = vapid as [string, string, string];
+    if (!/^[A-Za-z0-9_-]{80,100}$/.test(publicKey))
+      problems.push(
+        'TUSK_VAPID_PUBLIC_KEY is the public key of a VAPID pair, in URL-safe base64 (npx web-push generate-vapid-keys).',
+      );
+    else if (!/^[A-Za-z0-9_-]{40,50}$/.test(privateKey))
+      problems.push(
+        'TUSK_VAPID_PRIVATE_KEY is the private key of a VAPID pair, in URL-safe base64 (npx web-push generate-vapid-keys).',
+      );
+    else if (!/^(mailto:[^\s@]+@[^\s@]+|https:\/\/[^\s]+)$/.test(subject))
+      problems.push(
+        'TUSK_VAPID_SUBJECT is a mailto: or https: address that identifies you to the push services.',
+      );
+    else push = { publicKey, privateKey, subject };
+  }
+
   // The database: which of the three forms, and the address it needs. A secret address may arrive as a file.
   let database: DatabaseSettings | undefined;
   try {
@@ -229,6 +262,7 @@ export function loadConfig(env: Env, readFile?: ReadFile): LoadResult {
       githubApiUrl,
       operatorEncryption: rawOperator === 'on',
       mail,
+      push,
       githubApp,
     },
   };

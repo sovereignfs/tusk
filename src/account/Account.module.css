@@ -168,3 +168,12 @@
   align-items: baseline;
   gap: var(--sv-space-3);
 }
+
+/* A setting that has a value beside its box: the time of the daily brief. */
+.inline {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sv-space-2);
+  margin-left: var(--sv-space-6);
+  color: var(--sv-color-text-muted);
+}

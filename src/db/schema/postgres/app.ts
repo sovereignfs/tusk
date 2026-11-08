@@ -1,6 +1,6 @@
 import { index, pgSchema, primaryKey, text } from 'drizzle-orm/pg-core';
 import { APP_STORE } from '../../config';
-import { counter, epochMs, fields, hhmm, id, isoDate, position, ref } from './columns';
+import { bool, counter, epochMs, fields, hhmm, id, isoDate, position, ref } from './columns';
 
 /** The app's schema; better-auth's is `tusk_auth` (DESIGN.md §22.1). */
 export const app = pgSchema(APP_STORE);
@@ -35,6 +35,16 @@ export const accountSettings = app.table('account_settings', {
   recipient: text('recipient'),
   /** When the person was offered a key and chose (made one, brought one or skipped), so that the offer is made once. Null until they have. */
   keyOfferedAt: epochMs('key_offered_at'),
+  /** The daily brief (DESIGN.md §25.2, task 8.5): sent once a day at `brief_at` in the person's zone, when it is on. */
+  briefOn: bool('brief_on').notNull().default(false),
+  /** When the brief is sent, `HH:MM` in the account's zone. */
+  briefAt: hhmm('brief_at').notNull().default('08:00'),
+  /** Reminders when a card is due, at its time (task 8.6). */
+  remindersOn: bool('reminders_on').notNull().default(false),
+  /** Whether what is sent outside the app goes by email too (task 8.3); only where the server has mail. */
+  emailOn: bool('email_on').notNull().default(false),
+  /** The kinds of Inbox notice that are also sent outside the app (§19), comma-separated; empty: none. */
+  sentKinds: text('sent_kinds').notNull().default(''),
   createdAt: epochMs('created_at').notNull(),
 });
 

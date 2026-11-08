@@ -196,7 +196,7 @@ After the MVP. The tasks with IDs are planned in their epics; the rest are outli
 | [6.3](docs/epics/views.md)         | Today                                       | 4.3, 7.3           | ✅     |
 | [6.4](docs/epics/views.md)         | Cards to swipe                              | 5.5, 6.3           | ✅     |
 | [6.5](docs/epics/views.md)         | Review                                      | 6.4, 7.3           | ✅     |
-| [8.2](docs/epics/notifications.md) | Notification settings for reminders         | 2.7, 4.1, 8.1      | 📋     |
+| [8.2](docs/epics/notifications.md) | Notification settings for reminders         | 2.7, 4.1, 8.1      | ✅     |
 | [8.3](docs/epics/notifications.md) | Channels: email and core                    | 2.3, 2.5, 8.1      | 📋     |
 | [8.4](docs/epics/notifications.md) | Web Push                                    | 1.11, 8.2, 8.3     | 📋     |
 | [8.5](docs/epics/notifications.md) | The daily brief                             | 1.6, 4.3, 8.2, 8.3 | 📋     |

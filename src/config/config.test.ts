@@ -105,6 +105,41 @@ describe('loadConfig', () => {
     });
   });
 
+  describe('Web Push', () => {
+    // The shapes of a VAPID pair (`npx web-push generate-vapid-keys`): a 65-byte public key and a 32-byte private key, in URL-safe base64.
+    const PUBLIC = 'B'.repeat(87);
+    const PRIVATE = 'p'.repeat(43);
+    const given = {
+      TUSK_VAPID_PUBLIC_KEY: PUBLIC,
+      TUSK_VAPID_PRIVATE_KEY: PRIVATE,
+      TUSK_VAPID_SUBJECT: 'mailto:admin@example.com',
+    };
+    it('is off with none, and on with all three', () => {
+      expect(loadConfig({})).toMatchObject({ config: { push: undefined } });
+      expect(loadConfig(given)).toMatchObject({
+        config: {
+          push: { publicKey: PUBLIC, privateKey: PRIVATE, subject: 'mailto:admin@example.com' },
+        },
+      });
+      expect(loadConfig({ ...given, TUSK_VAPID_SUBJECT: 'https://tusk.example.com' }).ok).toBe(
+        true,
+      );
+    });
+    it('stops, naming the setting and never its value, for a key or an address that is not what a push service takes', () => {
+      for (const [name, value] of [
+        ['TUSK_VAPID_PUBLIC_KEY', 'short'],
+        ['TUSK_VAPID_PRIVATE_KEY', 'not base64 !!'],
+        ['TUSK_VAPID_SUBJECT', 'admin@example.com'],
+        ['TUSK_VAPID_SUBJECT', 'http://tusk.example.com'],
+      ] as const) {
+        const result = loadConfig({ ...given, [name]: value });
+        const said = problems(result).join(' ');
+        expect(said, name).toContain(name);
+        expect(said).not.toContain(value);
+      }
+    });
+  });
+
   describe('TUSK_GITHUB_API_URL', () => {
     it('is GitHub itself unless it names another, and keeps the path of an Enterprise Server', () => {
       expect(loadConfig({})).toMatchObject({ config: { githubApiUrl: 'https://api.github.com' } });
