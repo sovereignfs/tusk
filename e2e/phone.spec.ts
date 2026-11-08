@@ -134,6 +134,25 @@ test('a workspace, a board, a card’s dialog and a published board are all usab
   expect(width).toBeGreaterThan(250);
   expect(width).toBeLessThanOrEqual(375);
 
+  // A column has an address: the list that stops at the left edge is written to it, and a reload comes back there.
+  const review = page.locator('section[aria-label="Review"]');
+  const reviewId = (await review.getAttribute('data-list')) ?? '';
+  expect(reviewId).toMatch(/^[0-9a-f-]{36}$/);
+  await columns.evaluate((row, id) => {
+    const target = row.querySelector(`[data-list="${id}"]`);
+    if (!target) throw new Error('no such column');
+    const left =
+      target.getBoundingClientRect().left - row.getBoundingClientRect().left + row.scrollLeft - 16;
+    row.scrollTo({ left });
+  }, reviewId);
+  await expect(page).toHaveURL(new RegExp(`/b/[0-9a-f-]{36}\\?list=${reviewId}$`));
+  await page.reload();
+  await expect(page).toHaveURL(new RegExp(`\\?list=${reviewId}$`));
+  await expect(review).toBeVisible();
+  const edge = (await review.boundingBox())?.x ?? -1;
+  expect(edge).toBeGreaterThanOrEqual(0);
+  expect(edge).toBeLessThan(40);
+
   // A card, and its dialog is the whole screen.
   const column = page.locator('section[aria-label="Backlog"]');
   await column.scrollIntoViewIfNeeded();

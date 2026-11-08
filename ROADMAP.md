@@ -189,7 +189,7 @@ After the MVP. The tasks with IDs are planned in their epics; the rest are outli
 
 | ID                                 | Task                                        | Depends on         | Status |
 | ---------------------------------- | ------------------------------------------- | ------------------ | ------ |
-| [7.2](docs/epics/interface.md)     | The Desk carousel and the boards on a phone | 7.9                | 📋     |
+| [7.2](docs/epics/interface.md)     | The Desk carousel and the boards on a phone | 7.9                | ✅     |
 | [7.3](docs/epics/interface.md)     | The footer and its action button            | 7.2                | 📋     |
 | [7.4](docs/epics/interface.md)     | Sheets and adaptive surfaces                | 7.2                | 📋     |
 | [7.5](docs/epics/interface.md)     | Touch gestures                              | 7.2                | 📋     |

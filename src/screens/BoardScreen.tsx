@@ -51,6 +51,7 @@ import { LucideIcon } from '../ui/icons';
 import { ShareDialog } from './ShareDialog';
 import { ActivityList } from './ActivityList';
 import { ListColumn } from './ListColumn';
+import { useColumnAddress } from './useColumnAddress';
 import styles from './BoardScreen.module.css';
 
 /**
@@ -95,6 +96,9 @@ export function BoardScreen({
   const [menuOpen, setMenuOpen] = useState(false);
   const [query, setQuery] = useState('');
   const search = useRef<HTMLInputElement>(null);
+  const columns = useRef<HTMLDivElement>(null);
+  // A column's address, where the lists snap one at a time (a phone): see `useColumnAddress`.
+  useColumnAddress(columns, view.lists.length);
   const [dialog, setDialog] = useState<'settings' | 'delete' | 'share' | 'activity' | null>(null);
   const [people, setPeople] = useState<BoardPeople | null>(null);
   const boardId = view.board.id;
@@ -423,6 +427,7 @@ export function BoardScreen({
               strategy={horizontalListSortingStrategy}
             >
               <div
+                ref={columns}
                 className={styles.columns}
                 // The board's colour, as a tint behind the lists: no text is set on it, since the lists and the cards are surfaces of their own (DESIGN.md §17.5).
                 style={{

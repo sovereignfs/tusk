@@ -94,6 +94,7 @@ export function ListColumn({
       style={style}
       className={`${styles.column} ${sortable.isDragging ? styles.dragging : ''}`}
       aria-label={list.name}
+      data-list={list.id}
     >
       <div className={styles.listHeader}>
         {editable ? (
