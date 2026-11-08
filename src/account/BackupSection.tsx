@@ -3,7 +3,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import { PROBLEM_MESSAGES, type ConnectProblem } from '../backup/problems';
 import { useKey } from '../screens/KeyContext';
-import { Alert, Button, ButtonLink, FormField, Input, SegmentedControl, Select } from '../ui';
+import {
+  Alert,
+  Button,
+  ButtonLink,
+  FormField,
+  Input,
+  SegmentedControl,
+  Select,
+} from '@sovereignfs/ui';
 import styles from './Account.module.css';
 
 interface Connection {

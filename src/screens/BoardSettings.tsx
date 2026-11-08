@@ -6,7 +6,7 @@ import type { BoardStore } from '../boards/store';
 import { SWATCHES } from '../lists/colors';
 import { type BoardRow, WORKSPACE_LIMITS } from '../workspaces/format';
 import { LabelsEditor } from './LabelsEditor';
-import { Alert, Button, ColorPicker, Dialog, FormField, Input, Textarea } from '../ui';
+import { Alert, Button, ColorPicker, Dialog, FormField, Input, Textarea } from '@sovereignfs/ui';
 import styles from './BoardScreen.module.css';
 
 /**

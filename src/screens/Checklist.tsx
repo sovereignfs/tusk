@@ -21,7 +21,7 @@ import {
 import type { LocalRow } from '../local/rows';
 import { checkCount, checksOf } from '../local/store';
 import { useLocal, useSync } from '../sync/react';
-import { Button, Checkbox, Input, useToast } from '../ui';
+import { Button, Checkbox, Input, useToast } from '@sovereignfs/ui';
 import { text } from './fields';
 import styles from './CardDetail.module.css';
 import {

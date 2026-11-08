@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { authClient } from '../auth/client';
 import { messageFor, oauthErrorMessage } from '../auth/messages';
-import { Alert, Button } from '../ui';
+import { Alert, Button } from '@sovereignfs/ui';
 import styles from './Account.module.css';
 
 /**

@@ -1,7 +1,7 @@
 'use client';
 
 import { type ReactNode, useState } from 'react';
-import { Icon, type IconName } from '../ui';
+import { Icon, type IconName } from '@sovereignfs/ui';
 import { type AccountSection } from './query';
 import styles from './Account.module.css';
 

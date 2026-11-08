@@ -16,7 +16,7 @@ import {
   Popover,
   SegmentedControl,
   Textarea,
-} from '../ui';
+} from '@sovereignfs/ui';
 import { CardChecklist } from './CardChecklist';
 import { ActivityList } from './ActivityList';
 import { CardComments } from './CardComments';

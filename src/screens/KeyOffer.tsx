@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { createIdentity, keyFile, parseIdentity, type Identity } from '../cipher/identity';
-import { Alert, Button, Checkbox, Textarea } from '../ui';
+import { Alert, Button, Checkbox, Textarea } from '@sovereignfs/ui';
 import { useKey } from './KeyContext';
 import styles from './KeyOffer.module.css';
 

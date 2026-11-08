@@ -3,7 +3,7 @@
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
 import { messageFor } from '../auth/messages';
 import { authClient } from '../auth/client';
-import { Alert, Button, FormField, Input } from '../ui';
+import { Alert, Button, FormField, Input } from '@sovereignfs/ui';
 import { PasskeysPanel } from './PasskeysPanel';
 import { SovereignPanel } from './SovereignPanel';
 import { TwoFactorPanel } from './TwoFactorPanel';

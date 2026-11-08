@@ -12,7 +12,7 @@ import { progressOf, showingItems, sortItems, withProgress } from '../boards/che
 import type { BoardStore } from '../boards/store';
 import { after, between, first } from '../position';
 import { VERTICAL_AUTOSCROLL, spokenDrag, useDragClickGuard, useReorderSensors } from '../ui/dnd';
-import { Button, Checkbox, Input } from '../ui';
+import { Button, Checkbox, Input } from '@sovereignfs/ui';
 import { type ChecklistItem, type Op, WORKSPACE_LIMITS } from '../workspaces/format';
 import styles from './CardChecklist.module.css';
 

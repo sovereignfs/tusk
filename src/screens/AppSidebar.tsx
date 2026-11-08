@@ -5,8 +5,7 @@ import { usePathname } from 'next/navigation';
 import { type FormEvent, useState } from 'react';
 import { failureMessage, useWorkspaces } from '../boards/workspaces';
 import { WORKSPACE_LIMITS, type WorkspaceRow } from '../workspaces/format';
-import { Alert, Button, Dialog, FormField, Icon, type IconName, Input } from '../ui';
-import { LucideIcon, type LucideName, isLucide } from '../ui/icons';
+import { Alert, Button, Dialog, FormField, Icon, type IconName, Input } from '@sovereignfs/ui';
 import { useSidebar } from '../ui/useSidebar';
 import styles from './AppSidebar.module.css';
 
@@ -17,7 +16,7 @@ import styles from './AppSidebar.module.css';
 interface Entry {
   href: string;
   label: string;
-  icon: IconName | LucideName;
+  icon: IconName;
   /** The addresses that are this entry's, for the one that is current. */
   under: readonly string[];
 }
@@ -49,11 +48,7 @@ function NavigationContent({ rail, pathname }: { rail: boolean; pathname: string
               aria-label={rail ? entry.label : undefined}
               title={rail ? entry.label : undefined}
             >
-              {isLucide(entry.icon) ? (
-                <LucideIcon name={entry.icon} />
-              ) : (
-                <Icon name={entry.icon} aria-hidden />
-              )}
+              <Icon name={entry.icon} aria-hidden />
               {rail ? null : <span className={styles.label}>{entry.label}</span>}
             </Link>
           </li>
@@ -93,7 +88,7 @@ export function AppSidebar() {
         title={rail ? 'Widen the sidebar' : 'Narrow the sidebar'}
         onClick={sidebar.toggleRail}
       >
-        <LucideIcon name={rail ? 'panel-left-open' : 'panel-left-close'} />
+        <Icon name={rail ? 'panel-left-open' : 'panel-left-close'} aria-hidden />
       </button>
     </nav>
   );
@@ -167,7 +162,7 @@ function WorkspaceRow({
         aria-label={rail ? row.name : undefined}
         title={rail ? row.name : undefined}
       >
-        <LucideIcon name="folder-kanban" />
+        <Icon name="folder-kanban" aria-hidden />
         {rail ? null : <span className={styles.label}>{row.name}</span>}
       </Link>
     </li>

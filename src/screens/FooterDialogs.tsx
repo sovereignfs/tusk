@@ -9,7 +9,7 @@ import { nowHere } from '../time';
 import { createList } from '../actions/lists';
 import { allLists, cardCount, cardsOf, listsOf } from '../local/store';
 import { useLocal, useSync } from '../sync/react';
-import { Alert, Button, Dialog, FormField, Input, Select, useToast } from '../ui';
+import { Alert, Button, Dialog, FormField, Input, Select, useToast } from '@sovereignfs/ui';
 import { CreateDialog } from './AppSidebar';
 import { CreateBoardDialog } from './WorkspaceBoards';
 import { text } from './fields';

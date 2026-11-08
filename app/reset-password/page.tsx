@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { AuthShell } from '@/src/auth/screens/AuthShell';
 import { ResetForm } from '@/src/auth/screens/ResetForm';
 import { authSettings, mailAvailable } from '@/src/auth/server';
-import { AuthLink } from '@/src/ui';
+import { AuthLink } from '@sovereignfs/ui';
 
 // Choosing a new password with the link that was sent (DESIGN.md §6). The token is in the address, is good once, and is read by the form in the browser.
 export const dynamic = 'force-dynamic';

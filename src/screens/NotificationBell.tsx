@@ -5,7 +5,7 @@ import { type MouseEvent, useEffect, useState } from 'react';
 import { ago } from '../inbox/ago';
 import { noticeHref, noticeText } from '../inbox/group';
 import { useNotifications } from '../inbox/notifications';
-import { Icon, NotificationsPanel } from '../ui';
+import { Icon, NotificationsPanel } from '@sovereignfs/ui';
 import type { NoticeKind } from '../workspaces/format';
 
 /**

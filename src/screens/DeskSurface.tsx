@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { ResponsiveSurface } from '../ui';
+import { ResponsiveSurface } from '@sovereignfs/ui';
 import { DeskCarousel } from './DeskCarousel';
 
 /**

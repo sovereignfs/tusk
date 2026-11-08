@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '../ui';
+import { Button } from '@sovereignfs/ui';
 import { KeyOffer } from '../screens/KeyOffer';
 import { useKey } from '../screens/KeyContext';
 import styles from './Account.module.css';

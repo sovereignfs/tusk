@@ -6,7 +6,7 @@ import type { CardTile, LabelRow } from '../workspaces/format';
 import { useBoardPeople } from '../boards/context';
 import { formatDue } from '../format-due';
 import { nowHere } from '../time';
-import { Avatar, Icon, Menu } from '../ui';
+import { Avatar, Icon, Menu } from '@sovereignfs/ui';
 import styles from './BoardScreen.module.css';
 
 /**

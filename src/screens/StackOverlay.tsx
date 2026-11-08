@@ -14,7 +14,7 @@ import type { Mutation } from '../sync/format';
 import { useLocal, useSync } from '../sync/react';
 import { nowHere } from '../time';
 import { type Reason, buildToday, dismissedOn } from '../today';
-import { Dialog, EmptyState, SegmentedControl } from '../ui';
+import { Dialog, EmptyState, SegmentedControl } from '@sovereignfs/ui';
 import { text } from './fields';
 import { openCard } from './address';
 import { useUndo } from './Undo';

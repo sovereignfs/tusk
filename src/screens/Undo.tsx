@@ -10,7 +10,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { Button } from '../ui';
+import { Button } from '@sovereignfs/ui';
 import styles from './Undo.module.css';
 
 /**

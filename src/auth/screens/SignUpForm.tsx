@@ -3,7 +3,7 @@
 import { type FormEvent, useState } from 'react';
 import { authClient } from '../client';
 import { messageFor } from '../messages';
-import { AuthButton, AuthError, AuthField, AuthForm, Input } from '../../ui';
+import { AuthButton, AuthError, AuthField, AuthForm, Input } from '@sovereignfs/ui';
 
 /** Name, email and password. Without email there is nothing to confirm, so the account is made and the person is signed in. */
 export function SignUpForm({ minLength, mail = false }: { minLength: number; mail?: boolean }) {

@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import { useCallback, useMemo, useSyncExternalStore } from 'react';
-import { useIsMobile } from './index';
+import { useIsMobile } from '@sovereignfs/ui';
 import {
   type PageKind,
   STORAGE_KEY,

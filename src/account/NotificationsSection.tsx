@@ -6,7 +6,7 @@ import { SETTINGS_CHANGED } from '../reminders/ReminderSync';
 import { chooseWake, wakeChosen } from '../reminders/wake';
 import { useAccountId } from '../sync/react';
 import { useKey } from '../screens/KeyContext';
-import { Alert, Checkbox } from '../ui';
+import { Alert, Checkbox } from '@sovereignfs/ui';
 import { NOTICE_KINDS, type NoticeKind } from '../workspaces/format';
 import styles from './Account.module.css';
 

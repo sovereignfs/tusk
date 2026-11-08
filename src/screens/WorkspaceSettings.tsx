@@ -3,7 +3,16 @@
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
 import { failureMessage, useWorkspaces } from '../boards/workspaces';
 import { WORKSPACE_LIMITS, type Person, type Role, type WorkspaceRow } from '../workspaces/format';
-import { Alert, Avatar, Button, ConfirmDialog, Dialog, FormField, Input, Select } from '../ui';
+import {
+  Alert,
+  Avatar,
+  Button,
+  ConfirmDialog,
+  Dialog,
+  FormField,
+  Input,
+  Select,
+} from '@sovereignfs/ui';
 import styles from './WorkspaceSettings.module.css';
 
 /**

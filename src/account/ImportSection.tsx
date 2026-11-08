@@ -15,7 +15,7 @@ import type { DeskPart, TuskExport } from '../portability/format';
 import { unsealDesk } from '../portability/unseal';
 import { useKey } from '../screens/KeyContext';
 import { useSync } from '../sync/react';
-import { Alert, Button, FormField, Select } from '../ui';
+import { Alert, Button, FormField, Select } from '@sovereignfs/ui';
 import styles from './Account.module.css';
 
 const ids = { newId: () => crypto.randomUUID() };

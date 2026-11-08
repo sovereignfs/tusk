@@ -14,7 +14,7 @@ import { createList, moveList } from '../actions/lists';
 import type { LocalRow } from '../local/rows';
 import { allLists, listsOf, openCounts } from '../local/store';
 import { useHasSynced, useLocal, useSync } from '../sync/react';
-import { Icon, useToast } from '../ui';
+import { Icon, useToast } from '@sovereignfs/ui';
 import {
   VERTICAL_AUTOSCROLL,
   spokenDrag,

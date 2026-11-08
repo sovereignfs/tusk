@@ -4,7 +4,7 @@ import { type ReactNode, createContext, useContext, useEffect, useRef, useState 
 import { AuthShell } from '../auth/screens/AuthShell';
 import { type LocalDatabase, deleteLocal, openLocal } from '../local/db';
 import { requestPersistence } from '../local/persist';
-import { AuthLink, Button, useToast } from '../ui';
+import { AuthLink, Button, useToast } from '@sovereignfs/ui';
 import { onWake, registerBackgroundSync } from './background';
 import { SyncClient } from './client';
 import { browserEnvironment, startSyncLoop } from './loop';

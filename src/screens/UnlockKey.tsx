@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Alert, Button, Textarea } from '../ui';
+import { Alert, Button, Textarea } from '@sovereignfs/ui';
 import { useKey } from './KeyContext';
 import { KEY_PROBLEMS } from './KeyOffer';
 import styles from './KeyOffer.module.css';

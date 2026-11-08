@@ -2,7 +2,7 @@
 
 import { type ReactNode, useState } from 'react';
 import type { LocalRow } from '../local/rows';
-import { type IconName, SwipeStack, SwipeStackCard } from '../ui';
+import { type IconName, SwipeStack, SwipeStackCard } from '@sovereignfs/ui';
 import { text } from '../screens/fields';
 import styles from './SwipeCards.module.css';
 

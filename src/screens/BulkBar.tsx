@@ -8,7 +8,7 @@ import type { LocalRow } from '../local/rows';
 import { allChecksOf, cardsOf, checksOf, getRow, listsOf } from '../local/store';
 import { useLocal, useSync } from '../sync/react';
 import { nowHere } from '../time';
-import { Button, Select } from '../ui';
+import { Button, Select } from '@sovereignfs/ui';
 import { text } from './fields';
 import styles from './ListScreen.module.css';
 import { useUndo } from './Undo';

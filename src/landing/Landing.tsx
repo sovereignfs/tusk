@@ -1,5 +1,5 @@
 import { authSettings, signUpAvailable } from '../auth/server';
-import { ButtonLink } from '../ui';
+import { ButtonLink } from '@sovereignfs/ui';
 import { landing } from './content';
 import styles from './Landing.module.css';
 

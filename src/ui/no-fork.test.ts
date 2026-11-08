@@ -47,10 +47,7 @@ describe('a width', () => {
     );
 
   it('is asked for only by the files that draw differently by it', () => {
-    // `src/ui/index.ts` only re-exports the design system's hook.
-    expect(
-      asking.filter((file) => file !== 'src/ui/index.ts' && !(file in RENDERING_ONLY)),
-    ).toEqual([]);
+    expect(asking.filter((file) => !(file in RENDERING_ONLY))).toEqual([]);
   });
 
   it('decides nothing in those files but what is drawn: they do not navigate, fetch or touch the working copy by it', () => {

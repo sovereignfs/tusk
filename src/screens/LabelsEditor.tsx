@@ -4,7 +4,7 @@ import { type FormEvent, useState } from 'react';
 import { SWATCHES } from '../lists/colors';
 import { readableOn } from '../ui/contrast';
 import { type LabelRow, type Op, WORKSPACE_LIMITS } from '../workspaces/format';
-import { Button, Checkbox, ColorPicker, ConfirmDialog, Input } from '../ui';
+import { Button, Checkbox, ColorPicker, ConfirmDialog, Input } from '@sovereignfs/ui';
 import styles from './LabelsEditor.module.css';
 
 /**

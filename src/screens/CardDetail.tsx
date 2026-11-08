@@ -12,7 +12,7 @@ import {
 import type { LocalRow } from '../local/rows';
 import { allChecksOf, cardsOf, checksOf, getRow, listsOf } from '../local/store';
 import { useLocal, useSync } from '../sync/react';
-import { Button, FormField, Input, SegmentedControl, Select, Textarea } from '../ui';
+import { Button, FormField, Input, SegmentedControl, Select, Textarea } from '@sovereignfs/ui';
 import { text } from './fields';
 import styles from './CardDetail.module.css';
 import { dueOf } from '../actions/due';

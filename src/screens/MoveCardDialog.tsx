@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { cardPositionFor } from '../boards/board-optimistic';
 import { useBoardPeople } from '../boards/context';
 import type { BoardStore } from '../boards/store';
-import { Alert, Button, Dialog, FormField, Select } from '../ui';
+import { Alert, Button, Dialog, FormField, Select } from '@sovereignfs/ui';
 import type { MoveTargets } from '../workspaces/format';
 import styles from './BoardScreen.module.css';
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Button } from '../ui';
+import { Button } from '@sovereignfs/ui';
 import type { ActivityPage, ActivityRow } from '../workspaces/format';
 import styles from './ActivityList.module.css';
 

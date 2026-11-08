@@ -903,7 +903,7 @@ Two things that were one. **What a person is told** (a notice) is in a **bell** 
 ### 17.1 Principles
 
 Everything comes from `@sovereignfs/ui` and its `--sv-*` tokens. What is reusable and missing is added there, in `sovereign`, not built here: in phase 1
-that is the `loader-circle` and star icons (§10.2), and whatever the card dialog needs that `Dialog` lacks. The design system comes through `src/ui`. The
+that is the `loader-circle` and star icons (§10.2), and whatever the card dialog needs that `Dialog` lacks. A page imports it directly, a Server Component too. The
 icons this design names are the package's own: `square-kanban` for Boards, `calendar` for the Planner, `inbox`, `settings` for a workspace's gear and
 `panel-left` for the sidebar's toggle.
 

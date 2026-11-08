@@ -36,7 +36,7 @@ import {
   Icon,
   Input,
   useToast,
-} from '../ui';
+} from '@sovereignfs/ui';
 import {
   type ArchivedCard,
   type BoardPeople,
@@ -47,7 +47,6 @@ import {
 } from '../workspaces/format';
 import { TileBody } from './CardTileView';
 import { BoardSettingsDialog, DeleteBoardDialog } from './BoardSettings';
-import { LucideIcon } from '../ui/icons';
 import { ShareDialog } from './ShareDialog';
 import { ActivityList } from './ActivityList';
 import { ListColumn } from './ListColumn';
@@ -281,7 +280,7 @@ export function BoardScreen({
                 aria-label={`Share board, ${people?.members.length ?? 0} people`}
                 onClick={() => setDialog('share')}
               >
-                <LucideIcon name="user-plus" /> Share
+                <Icon name="user-plus" aria-hidden /> Share
               </Button>
               {view.can.join ? (
                 <Button

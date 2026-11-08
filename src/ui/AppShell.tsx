@@ -6,8 +6,9 @@ import styles from './AppShell.module.css';
  * The frame of a signed-in page (DESIGN.md §17.2): a header row and the main area. In the header, the sidebar's button and the app's wordmark, _tusk._, on
  * the left (the elephant is for the places that have room for it: sign-in, the icons), and on the right the notification bell and the person's avatar menu. The main area is given its columns by the page (`ThreeColumnLayout`, task 7.1).
  *
- * It is made here because the design system's `Header` requires an app launcher, which an app has no use for, and its `MobileHeader` never
- * stretches past 768px. **Worth offering to `@sovereignfs/ui`** (a `Header` whose launcher is optional) once a second app wants the same.
+ * It is made here, and not with the design system's `Header` (whose launcher, bell and menu are optional since 0.92, with a `leading` slot for
+ * the sidebar's button), because that header always draws a brand badge, an initial on the accent colour, where Tusk's header has only its
+ * wordmark. **Worth offering to `@sovereignfs/ui`:** a `Header` whose brand can be the app's own mark; then this row is that `Header`.
  *
  * The bell and the account menu are given, because what they do (read notifications, open settings, sign out) is the notification store's and
  * the auth client's, which this component does not know. Either may be left out until there is one to show.

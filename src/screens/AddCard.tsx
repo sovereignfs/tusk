@@ -5,7 +5,7 @@ import { createCard } from '../actions/cards';
 import type { LocalRow } from '../local/rows';
 import { cardCount } from '../local/store';
 import { useLocal, useSync } from '../sync/react';
-import { Input, useIsMobile, useToast } from '../ui';
+import { Input, useIsMobile, useToast } from '@sovereignfs/ui';
 import styles from './ListScreen.module.css';
 
 const ids = { newId: () => crypto.randomUUID() };

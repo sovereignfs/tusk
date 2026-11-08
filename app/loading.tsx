@@ -1,4 +1,4 @@
-import { Spinner } from '@/src/ui';
+import { Spinner } from '@sovereignfs/ui';
 
 export default function Loading() {
   return (

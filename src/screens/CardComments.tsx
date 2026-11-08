@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { BoardStore } from '../boards/store';
-import { Avatar, Button, ConfirmDialog, Textarea } from '../ui';
+import { Avatar, Button, ConfirmDialog, Textarea } from '@sovereignfs/ui';
 import { type CommentPage, type CommentRow, WORKSPACE_LIMITS } from '../workspaces/format';
 import styles from './CardComments.module.css';
 

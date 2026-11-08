@@ -16,7 +16,7 @@ import type { LocalRow } from '../local/rows';
 import { allChecksOf, getRow, checksOf } from '../local/store';
 import { seriesIdOf } from '../actions/series';
 import { useSync } from '../sync/react';
-import { Button, Checkbox, GripIcon, Icon, useLongPress, useSwipeReveal } from '../ui';
+import { Button, Checkbox, GripIcon, Icon, useLongPress, useSwipeReveal } from '@sovereignfs/ui';
 import { useUndo } from './Undo';
 import { text } from './fields';
 import { InProgressMark } from './InProgressMark';

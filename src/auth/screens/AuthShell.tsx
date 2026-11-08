@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { AuthCard, AuthFooter } from '../../ui';
+import { AuthCard, AuthFooter } from '@sovereignfs/ui';
 import { TuskMark } from '../../ui/TuskMark';
 import { site } from '../../site';
 import styles from './AuthShell.module.css';

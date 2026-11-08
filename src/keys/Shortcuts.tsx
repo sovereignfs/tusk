@@ -3,7 +3,7 @@
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { closeCard } from '../screens/address';
-import { Dialog } from '../ui';
+import { Dialog } from '@sovereignfs/ui';
 import { SHORTCUT_HELP, type Shortcut, isTyping, shortcutOf } from './rules';
 import styles from './Shortcuts.module.css';
 

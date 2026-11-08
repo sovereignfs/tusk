@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { type Frequency, type Rule, WEEKDAYS, describe, formatRule, summary } from '../recurrence';
 import { addDays } from '../time';
-import { Button, Icon, Input, Popover, Select } from '../ui';
+import { Button, Icon, Input, Popover, Select } from '@sovereignfs/ui';
 import {
   type Choice,
   type Draft,

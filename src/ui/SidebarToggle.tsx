@@ -1,6 +1,6 @@
 'use client';
 
-import { Icon, useIsMobile } from './index';
+import { Icon, useIsMobile } from '@sovereignfs/ui';
 import { useMobileNav } from './mobile-nav';
 import { useSidebar } from './useSidebar';
 import styles from './AppShell.module.css';

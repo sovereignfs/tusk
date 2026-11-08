@@ -2,7 +2,7 @@
 
 import { usePathname, useSearchParams } from 'next/navigation';
 import { type ReactNode, useEffect, useState } from 'react';
-import { Drawer, ThreeColumnLayout, useIsMobile } from '../ui';
+import { Drawer, ThreeColumnLayout, useIsMobile } from '@sovereignfs/ui';
 import { useMobileNav } from '../ui/mobile-nav';
 import { DrawerNavigation } from './AppSidebar';
 import { FirstList } from './FirstList';

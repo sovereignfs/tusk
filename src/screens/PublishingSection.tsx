@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { BoardStore } from '../boards/store';
-import { Alert, Button, ConfirmDialog, Input } from '../ui';
+import { Alert, Button, ConfirmDialog, Input } from '@sovereignfs/ui';
 import type { BoardRow } from '../workspaces/format';
 import styles from './BoardScreen.module.css';
 

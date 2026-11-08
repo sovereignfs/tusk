@@ -9,7 +9,7 @@ import {
   SwipableMobileCarouselSlide,
   SwipableMobileCarouselSlideBody,
   useCarouselRouteSync,
-} from '../ui';
+} from '@sovereignfs/ui';
 import { DeskScreen } from './DeskScreen';
 import { ListScreen } from './ListScreen';
 import { useSearchQuery } from './search-query';

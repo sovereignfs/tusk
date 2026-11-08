@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, ButtonLink, EmptyState } from '@/src/ui';
+import { Button, ButtonLink, EmptyState } from '@sovereignfs/ui';
 
 /** A page that failed to render. It says so, offers to try again, and offers a way back; it never shows the error, which can name an address. */
 export default function ErrorPage({

@@ -6,7 +6,7 @@ import { forgetKey } from '../cipher/vault';
 import { forgetIdentity } from '../identity';
 import { deleteLocal } from '../local/db';
 import { useAccountId, useSync } from '../sync/react';
-import { Alert, Button, FormField, Input } from '../ui';
+import { Alert, Button, FormField, Input } from '@sovereignfs/ui';
 import styles from './Account.module.css';
 
 interface Preview {

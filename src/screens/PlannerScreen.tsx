@@ -36,7 +36,7 @@ import {
 import type { Planned, PlannedBoardCard } from '../planner/format';
 import { useLocal } from '../sync/react';
 import { localNow, browserZone, nowHere } from '../time';
-import { Alert, Button, Icon } from '../ui';
+import { Alert, Button, Icon } from '@sovereignfs/ui';
 import styles from './PlannerScreen.module.css';
 
 /**

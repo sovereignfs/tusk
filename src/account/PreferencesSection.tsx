@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { type ThemeChoice, chooseTheme, readTheme } from '../theme/preferences';
-import { SegmentedControl } from '../ui';
+import { SegmentedControl } from '@sovereignfs/ui';
 import styles from './Account.module.css';
 
 function storage(): Storage | undefined {

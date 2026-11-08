@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
 import { leaveDevice } from '../../sync/signout';
 import { useOptionalSync } from '../../sync/react';
-import { ConfirmDialog, UserMenu } from '../../ui';
+import { ConfirmDialog, UserMenu } from '@sovereignfs/ui';
 import { authClient } from '../client';
 
 /**

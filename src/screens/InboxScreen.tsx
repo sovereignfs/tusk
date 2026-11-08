@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { formatDue } from '../format-due';
 import { type LocalNow, browserZone, localNow } from '../time';
-import { Alert } from '../ui';
+import { Alert } from '@sovereignfs/ui';
 import type { AssignedCard, Inbox } from '../workspaces/format';
 import styles from './InboxScreen.module.css';
 

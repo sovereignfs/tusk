@@ -6,7 +6,7 @@ import { WorkspacesProvider } from '../boards/workspaces';
 import { rememberIdentity } from '../identity';
 import { site } from '../site';
 import { SyncProvider } from '../sync/react';
-import { ResponsiveSurface } from '../ui';
+import { ResponsiveSurface } from '@sovereignfs/ui';
 import { AppShell } from '../ui/AppShell';
 import { PhoneFooter } from './PhoneFooter';
 import { MobileNavProvider } from '../ui/mobile-nav';

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { formatDue } from '../format-due';
 import { addDays, nowHere } from '../time';
-import { Button, DatePicker, Icon, Input, Popover } from '../ui';
+import { Button, DatePicker, Icon, Input, Popover } from '@sovereignfs/ui';
 import styles from './DuePicker.module.css';
 
 /**

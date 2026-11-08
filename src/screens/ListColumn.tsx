@@ -6,7 +6,7 @@ import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { WORKSPACE_LIMITS, type CardTile, type LabelRow, type ListRow } from '../workspaces/format';
 import { CardTileView } from './CardTileView';
 import { COLUMN_ADD_CARD } from './footer-actions';
-import { Button, ConfirmDialog, Dialog, FormField, Icon, Input, Menu } from '../ui';
+import { Button, ConfirmDialog, Dialog, FormField, Icon, Input, Menu } from '@sovereignfs/ui';
 import styles from './BoardScreen.module.css';
 
 /**

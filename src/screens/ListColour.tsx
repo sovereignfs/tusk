@@ -5,7 +5,7 @@ import { setColor } from '../actions/lists';
 import { SWATCHES } from '../lists/colors';
 import type { LocalRow } from '../local/rows';
 import { useSync } from '../sync/react';
-import { ColorPicker, Popover } from '../ui';
+import { ColorPicker, Popover } from '@sovereignfs/ui';
 import { colourOf, text } from './fields';
 import styles from './ListScreen.module.css';
 

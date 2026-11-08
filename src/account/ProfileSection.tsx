@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { type FormEvent, useState } from 'react';
 import { messageFor } from '../auth/messages';
 import { authClient } from '../auth/client';
-import { Alert, Avatar, Button, FormField, Input } from '../ui';
+import { Alert, Avatar, Button, FormField, Input } from '@sovereignfs/ui';
 import styles from './Account.module.css';
 
 /** The longest a display name may be: a line, as a person writes their own. */

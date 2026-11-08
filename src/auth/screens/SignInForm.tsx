@@ -13,7 +13,7 @@ import {
   AuthLink,
   AuthLinkButton,
   Input,
-} from '../../ui';
+} from '@sovereignfs/ui';
 
 /**
  * Email and password (`local`), and/or Sovereign, which takes the person away to sign in there and back (DESIGN.md §6). No message says whether an address

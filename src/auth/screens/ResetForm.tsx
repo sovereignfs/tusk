@@ -3,7 +3,7 @@
 import { type FormEvent, useState } from 'react';
 import { authClient } from '../client';
 import { messageFor } from '../messages';
-import { AuthButton, AuthError, AuthField, AuthForm, Input } from '../../ui';
+import { AuthButton, AuthError, AuthField, AuthForm, Input } from '@sovereignfs/ui';
 
 /** Chooses a new password with the token from the link. It is good once; using it ends every other session of the account. */
 export function ResetForm({ minLength }: { minLength: number }) {

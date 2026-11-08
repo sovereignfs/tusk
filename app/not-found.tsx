@@ -1,6 +1,6 @@
 import { site } from '@/src/site';
 import { AppShell } from '@/src/ui/AppShell';
-import { ButtonLink, EmptyState } from '@/src/ui';
+import { ButtonLink, EmptyState } from '@sovereignfs/ui';
 
 export const metadata = { title: 'Not found' };
 

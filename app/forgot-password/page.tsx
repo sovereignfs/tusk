@@ -3,7 +3,7 @@ import { AuthShell } from '@/src/auth/screens/AuthShell';
 import { ForgotForm } from '@/src/auth/screens/ForgotForm';
 import { mailAvailable } from '@/src/auth/server';
 import { getSession } from '@/src/auth/session';
-import { AuthLink } from '@/src/ui';
+import { AuthLink } from '@sovereignfs/ui';
 
 // Asking for a link to choose a new password (DESIGN.md §6). Only with mail: without it there is nothing to send, and the page is not there.
 export const dynamic = 'force-dynamic';

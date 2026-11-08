@@ -6,7 +6,7 @@ import { WorkspaceBoards } from './WorkspaceBoards';
 import { WorkspaceSettings } from './WorkspaceSettings';
 import type { WorkspaceRow } from '../workspaces/format';
 import { failureMessage, useWorkspaces } from '../boards/workspaces';
-import { Alert, Button, Dialog, FormField, Icon, Input } from '../ui';
+import { Alert, Button, Dialog, FormField, Icon, Input } from '@sovereignfs/ui';
 import styles from './WorkspaceScreen.module.css';
 
 /**

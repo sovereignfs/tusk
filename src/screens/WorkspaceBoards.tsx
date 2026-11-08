@@ -7,7 +7,7 @@ import { failureMessage, useWorkspaces } from '../boards/workspaces';
 import { SWATCHES } from '../lists/colors';
 import { WORKSPACE_LIMITS, type BoardRow } from '../workspaces/format';
 import { readableOn } from '../ui/contrast';
-import { Alert, Button, ColorPicker, Dialog, FormField, Icon, Input } from '../ui';
+import { Alert, Button, ColorPicker, Dialog, FormField, Icon, Input } from '@sovereignfs/ui';
 import styles from './WorkspaceBoards.module.css';
 
 /** The colour a new board offers first: blue, among the suggestions (DESIGN.md §17.7). */

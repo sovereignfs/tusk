@@ -6,7 +6,7 @@ import { ago } from '../inbox/ago';
 import { groupByDay, noticeHref, noticeText } from '../inbox/group';
 import { useNotifications } from '../inbox/notifications';
 import { browserZone } from '../time';
-import { Alert, Button, Icon } from '../ui';
+import { Alert, Button, Icon } from '@sovereignfs/ui';
 import styles from './NotificationsScreen.module.css';
 
 /**

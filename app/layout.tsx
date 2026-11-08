@@ -5,7 +5,7 @@ import '@sovereignfs/ui/tokens.css';
 import './globals.css';
 import { site } from '@/src/site';
 import { themeScript } from '@/src/theme/script';
-import { ToastProvider } from '@/src/ui';
+import { ToastProvider } from '@sovereignfs/ui';
 
 // The typeface is Hanken Grotesk, which `@sovereignfs/ui` ships with its tokens and serves from this app's own origin: nothing is fetched from
 // another site, and no font is loaded here.

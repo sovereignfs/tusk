@@ -7,8 +7,7 @@ import { useWorkspaces } from '../boards/workspaces';
 import { deskSummary } from '../local/store';
 import { useLocal } from '../sync/react';
 import { browserZone, todayFor } from '../time';
-import { Alert, Avatar, Button, EmptyState, Icon, useToast } from '../ui';
-import { LucideIcon } from '../ui/icons';
+import { Alert, Avatar, Button, EmptyState, Icon, useToast } from '@sovereignfs/ui';
 import {
   type BoardsIndex,
   type IndexWorkspace,
@@ -130,7 +129,7 @@ export function BoardsScreen() {
           <li>
             <Link href="/desk" className={styles.desk}>
               <span className={styles.deskTitle}>
-                <LucideIcon name="list-todo" />
+                <Icon name="list-todo" aria-hidden />
                 <span className={styles.deskName}>Desk</span>
               </span>
               {desk ? (

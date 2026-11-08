@@ -3,8 +3,7 @@
 import { usePathname } from 'next/navigation';
 import { type ReactNode, useState } from 'react';
 import { useWorkspaces } from '../boards/workspaces';
-import { Icon, MobileAppsDrawer, MobileFooter } from '../ui';
-import { LucideIcon } from '../ui/icons';
+import { Icon, MobileAppsDrawer, MobileFooter } from '@sovereignfs/ui';
 import { useMobileNav } from '../ui/mobile-nav';
 import { ENTRIES } from './AppSidebar';
 import { StackOverlay } from './StackOverlay';
@@ -16,21 +15,17 @@ import { ACTIONS, type Action, BOARD_ACTION, LABELS, deskListOf, placeOf } from 
 function iconOf(href: string): ReactNode {
   const entry = ENTRIES.find((each) => each.href === href);
   if (!entry) return null;
-  return entry.icon === 'list-todo' || entry.icon === 'calendar-days' ? (
-    <LucideIcon name={entry.icon} />
-  ) : (
-    <Icon name={entry.icon as never} aria-hidden />
-  );
+  return <Icon name={entry.icon} aria-hidden />;
 }
 
 const ACTION_ICONS: Record<Action, ReactNode> = {
   'new-card': <Icon name="plus" aria-hidden />,
   'new-list': <Icon name="plus" aria-hidden />,
-  'choose-list': <LucideIcon name="list-todo" />,
-  today: <LucideIcon name="calendar-days" />,
+  'choose-list': <Icon name="list-todo" aria-hidden />,
+  today: <Icon name="calendar-days" aria-hidden />,
   review: <Icon name="check" aria-hidden />,
   'new-board': <Icon name="plus" aria-hidden />,
-  'new-workspace': <LucideIcon name="folder-kanban" />,
+  'new-workspace': <Icon name="folder-kanban" aria-hidden />,
   'board-new-list': <Icon name="plus" aria-hidden />,
   'board-new-card': <Icon name="plus" aria-hidden />,
 };

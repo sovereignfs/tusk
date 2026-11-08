@@ -30,7 +30,7 @@ import type { LocalRow } from '../local/rows';
 import { allChecksOf, cardsOf, checkCounts, getRow } from '../local/store';
 import { useHasSynced, useLocal, useSync } from '../sync/react';
 import { type LocalNow, nowHere } from '../time';
-import { Button, EmptyState, SegmentedControl, Select } from '../ui';
+import { Button, EmptyState, SegmentedControl, Select } from '@sovereignfs/ui';
 import {
   VERTICAL_AUTOSCROLL,
   useDragClickGuard,

@@ -4,7 +4,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { type FormEvent, useState } from 'react';
 import { authClient } from '../auth/client';
 import { messageFor } from '../auth/messages';
-import { Alert, Button, FormField, Input } from '../ui';
+import { Alert, Button, FormField, Input } from '@sovereignfs/ui';
 import styles from './Account.module.css';
 
 /**

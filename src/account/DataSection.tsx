@@ -10,7 +10,7 @@ import { BackupSection } from './BackupSection';
 import { DeleteAccountSection } from './DeleteAccountSection';
 import { EncryptionSection } from './EncryptionSection';
 import { ImportSection } from './ImportSection';
-import { Button } from '../ui';
+import { Button } from '@sovereignfs/ui';
 import type { Publication } from '../workspaces/format';
 import styles from './Account.module.css';
 
