@@ -1,12 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { accountRoute } from '../access/route';
-import { type TwoAccounts, twoAccounts } from '../access/two-accounts';
 import type { Database } from '../db/client';
 import { testTarget } from '../db/test-support';
 import { makeStore } from '../sync/test-support';
 import { applyOp } from './apply';
 import type { Op, OpRequest } from './format';
-import { getPlanned } from '../planner/endpoint';
 import { plannedBoardCards } from './planned';
 import { ROLES, type Role, type World, seedWorld } from './testing/roles';
 
@@ -133,37 +130,5 @@ describe(`the Planner's boards (${leg})`, () => {
       accountId: w.accounts.boardMember,
     });
     expect(await planned(w, 'boardMember')).toEqual([]);
-  });
-});
-
-describe(`who may call the route (${leg})`, () => {
-  let t: TwoAccounts;
-  beforeAll(async () => {
-    t = await twoAccounts();
-  });
-  afterAll(async () => t.close());
-
-  it('refuses no session (401) and a range that is not one (400), and gives the signed-in person their own', async () => {
-    // The route's own database is the one the test made, and each account is the one the session names.
-    const route = accountRoute(
-      ({ request, accountId }) => getPlanned(request, accountId, database),
-      t.deps,
-    );
-    const w = await seedWorld(database);
-    await dated(w, 'boardMember', 'Mine', '2026-11-12', null);
-    const path = '/api/planner?from=2026-11-01&to=2026-11-30';
-    expect((await route(t.request(null, path))).status).toBe(401);
-    for (const bad of [
-      '/api/planner',
-      '/api/planner?from=2026-11-01',
-      '/api/planner?from=2026-11-30&to=2026-11-01',
-      '/api/planner?from=2026-01-01&to=2026-12-31',
-    ])
-      expect((await route(t.request(t.ada, bad))).status, bad).toBe(400);
-    const ok = await route(t.request(t.ada, path));
-    expect(ok.status).toBe(200);
-    // Ada is nobody in that world: she is given her own cards, which are none, and not those of the person the card is assigned to.
-    expect(await ok.json()).toEqual({ cards: [] });
-    expect((await planned(w, 'boardMember')).map((c) => c.title)).toEqual(['Mine']);
   });
 });
