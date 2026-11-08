@@ -207,6 +207,9 @@ After the MVP. The tasks with IDs are planned in their epics, in the order they 
 | [19.3](docs/epics/planner.md)      | The Planner: adding from the feed           | 19.2               | ✅     |
 | [19.4](docs/epics/planner.md)      | The Planner: repeating cards as previews    | 19.2, 5.2          | ✅     |
 | [19.5](docs/epics/planner.md)      | Start and end times, and a card's length    | 19.2               | ✅     |
+| [8.7](docs/epics/notifications.md) | Read and dismissed, one notice at a time    | 8.1                | 📋     |
+| [8.8](docs/epics/notifications.md) | The bell                                    | 8.7                | 📋     |
+| [8.9](docs/epics/notifications.md) | The Notifications page, and the Inbox       | 8.7, 8.8           | 📋     |
 
 | What                                                          | Note                                        |
 | ------------------------------------------------------------- | ------------------------------------------- |

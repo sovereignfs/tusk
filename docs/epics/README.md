@@ -34,7 +34,7 @@ _Status key: ✅ Done · ⏳ In progress · 📋 Planned · 🚧 Waits on a deci
 | 5   | [Recurrence](recurrence.md)                 | Rules, series, the next occurrence, editing                                                    | 5     |
 | 6   | [Views of the Desk](views.md)               | Starred, search; Today, swipe cards and Review on the phone (phase 2)                          | 5     |
 | 7   | [Interface](interface.md)                   | The shell, the phone's foundations, keyboard, accessibility; the phone's own screens (phase 2) | 9     |
-| 8   | [Inbox and notifications](notifications.md) | The Inbox; reminders, Push and email (phase 2)                                                 | 6     |
+| 8   | [Inbox and notifications](notifications.md) | The Inbox; reminders, Push and email; the bell and the Inbox of what is assigned               | 9     |
 | 9   | [Portability](portability.md)               | Export and import of the Desk, a board, a workspace or everything; the tasks plugin's file     | 3     |
 | 10  | [Backup](backup.md)                         | Credentials at rest, the GitHub provider, connecting, manual and auto backups                  | 7     |
 | 11  | [Release](release.md)                       | Seed, documents, security review, releases, a real instance                                    | 6     |

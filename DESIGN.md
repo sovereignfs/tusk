@@ -122,7 +122,8 @@ it carries into the Desk; §5.2 says what changes.
 | **Label**              | A named colour of a board, put on its cards                                                                                                 |
 | **Assignee**           | A member of the board a card is assigned to                                                                                                 |
 | **Activity**           | The record of what was done on a board, by whom and when (§15.6)                                                                            |
-| **Inbox**              | What a person is told about: assignments, comments, being added (§16)                                                                       |
+| **Notice**             | What a person is told: an assignment, a comment, being added, a reminder (§16). Shown in the bell and on `/notifications`                   |
+| **Inbox**              | The cards assigned to a person across their boards: what is theirs to do (§16)                                                              |
 | **Publishing**         | Giving a board a public, read-only address (§14.6)                                                                                          |
 | **Due date, due time** | When a card is due, as written on a calendar, in no time zone (§11)                                                                         |
 | **Series**             | A repeating rule on the Desk, and the occurrences made from it (§12)                                                                        |
@@ -883,22 +884,19 @@ under the title it had.
 **As built (task 18.1):** a card is dragged by its whole tile (a press that does not move is a click), its position is computed against what is shown, and archived cards are behind
 _Archived cards_ in the board's header until the board's menu exists (17.2).
 
-## 16. Inbox
+## 16. Notifications and the Inbox
 
-Basic notifications for phase 1: what a person needs to know about the boards they are on, in the app. Push and email are phase 2 (§25.2).
+Two things that were one. **What a person is told** (a notice) is in a **bell** beside their avatar and on a page of its own; **what is theirs to do** is the Inbox. Push and email are §25.2.
 
-- **Notices are written when they happen,** in the operation's transaction (§7.3), one row per person told: being **assigned** a card; a **comment** on
-  a card one is assigned to or created; being **added** to a workspace or a board. Never for what a person did themselves.
-- **The Inbox** (`/inbox`) has two parts. **Notifications:** newest first, grouped by day ("Today", "Yesterday", a date), each saying who did what to
-  which card or board, and opening it. **Assigned to me:** every open card assigned to the person, across their boards, by due date, undated last.
-- **Unread is one time per person** (`account_settings.inbox_seen_at`), as the kanban plugin found enough: opening the Inbox moves it on, and the
-  sidebar's Inbox entry shows how many notices are newer, up to "99+".
-- **A notice the person can no longer see** (they left the board, it was deleted or made private to others) is not shown, and is removed with them or
-  it.
+- **Notices are written when they happen,** in the operation's transaction (§7.3), one row per person told: being **assigned** a card; a **comment** on a card one is assigned to or created; being **added** to a workspace or a board; and from the app itself the daily brief, a reminder, a backup that stopped, a workspace passed on. Never for what a person did themselves.
+- **The bell** (`NotificationBell`, the design system's `NotificationsPanel`, left of the avatar) shows the number unread, up to "99+", and opened the latest notices, each with an icon for its kind, the words (who did what to which card or board), how long ago, and a dot while unread. **Opening a notice reads it** and goes where it points; each can be dismissed; the panel has "Mark all read", "Clear all" and "View all".
+- **`/notifications`** is the whole list, newest first, grouped by day ("Today", "Yesterday", a date), with the same actions.
+- **The Inbox** (`/inbox`) is **every open card assigned to the person, across their boards, by due date, undated last.** Nothing is told there.
+- **Read is per notice.** A notice is read when the person opened it (`read_at`) or it is at or before `account_settings.inbox_seen_at`, which is what "Mark all read" moves on to now (one write, whatever the number). **Dismissed** (`dismissed_at`) is shown nowhere and counts for nothing. Opening a screen reads nothing. The state is the person's, so it is the same on every device.
+- **A notice the person can no longer see** (they left the board, it was deleted or made private to others) is not shown, and is removed with them or it.
 - **Kept** 90 days, and at most the latest 500 a person.
 
-**As built (task 8.1):** `raise` is the one way a notice is written (`src/workspaces/notices.ts`), and it honours the kinds a person has turned off (`account_settings.notices_off`). The Inbox holds every
-notice to what the person can still see in the statement that reads it. `workspace_passed` joins with 2.8.
+**As built (task 8.1):** `raise` is the one way a notice is written (`src/workspaces/notices.ts`), and it honours the kinds a person has turned off (`account_settings.notices_off`). A notice is held to what the person can still see in the statement that reads it. `workspace_passed` joins with 2.8.
 
 ## 17. Interface (the web)
 
@@ -921,12 +919,12 @@ Two rows: the header, and the main area of two columns, the sidebar and the cont
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
-│ ▣ Tusk                                                          (avatar) │  header
+│ ▣ Tusk                                                     (bell) (avatar) │  header
 ├───────────────────┬──────────────────────────────────────────────────────┤
 │ ⌂ Home            │                                                      │
 │ ☑ Desk            │                    content                           │
 │ ▤ Planner         │                                                      │
-│ ▢ Inbox        3  │                                                      │
+│ ▢ Inbox           │                                                      │
 │                   │                                                      │
 │ MY WORKSPACES     │                                                      │
 │  ● Acme           │                                                      │
@@ -938,10 +936,9 @@ Two rows: the header, and the main area of two columns, the sidebar and the cont
 └───────────────────┴──────────────────────────────────────────────────────┘
 ```
 
-- **Header:** the sidebar's toggle (`menu`) and the wordmark _tusk._ on the left, linking home (lowercase, in the design system's face at weight 800 with tight tracking: a page may not name a typeface of its own or fetch one, so a drawn wordmark waits for the design system to have one; the elephant is kept for sign-in and the icons); the avatar on the right. The avatar opens `UserMenu`: a header of the person's name and
+- **Header:** the sidebar's toggle (`menu`) and the wordmark _tusk._ on the left, linking home (lowercase, in the design system's face at weight 800 with tight tracking: a page may not name a typeface of its own or fetch one, so a drawn wordmark waits for the design system to have one; the elephant is kept for sign-in and the icons); **the bell and the avatar on the right, the bell to the left of the avatar** (§16). The avatar opens `UserMenu`: a header of the person's name and
   email, then Settings, and Sign out; and when a core is set, a way back to it.
-- **Sidebar, first block:** Home (`/`, `house`), the Desk (`/desk`, `list-todo`), the Planner (`/planner`, `calendar-days`) and the Inbox (`/inbox`, `inbox`,
-  with its unread count). **An entry is there only when its page is:** the Planner's page is blank until the Planner is built (phase 2, §25.1).
+- **Sidebar, first block:** Home (`/`, `house`), the Desk (`/desk`, `list-todo`), the Planner (`/planner`, `calendar-days`) and the Inbox (`/inbox`, `inbox`, with no count: the count is the bell's). **An entry is there only when its page is:** the Planner's page is blank until the Planner is built (phase 2, §25.1).
 - **Sidebar, second block:** the workspaces. The person's own (those they own) under _My workspaces_, and those they are a member of under _Shared with
   me_; a workspace opens to its boards (`/w/<id>`). **The way to make one, a + (_Create a workspace_), comes after the workspaces,** not before. Each has an icon,
   `folder-kanban` for now; a person choosing one, as they choose a colour, is a later feature. **As a rail** the same block is a divider, the workspaces'
@@ -1100,7 +1097,7 @@ ones the phone will use, and the shell can swap its sidebar for the footer below
   (and a new list), a new card (a dialog, with the list on screen chosen), **Today's agenda** as a swipe view, and **Review** as a swipe view (§25.3).
 - **Boards** shows the boards grouped by workspace; a board opens as a carousel of its columns. The action button offers a new board and a new workspace;
   inside a board, a new list and a new card.
-- **The action button changes with the view.** The Planner is a feed of dates with blocks; the Inbox holds the notifications and assigned cards.
+- **The action button changes with the view.** The Planner is a feed of dates with blocks; the Inbox holds the assigned cards, and the notices are the bell's.
 - **A card's detail is full-screen.** Cards are reordered in a list by a long press; **moving between lists is by a menu, never a drag** on a carousel
   that also swipes (the kanban plugin's decision). Reordering on the Desk starts from a visible handle.
 
