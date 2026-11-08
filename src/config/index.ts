@@ -174,14 +174,13 @@ export function loadConfig(env: Env, readFile?: ReadFile): LoadResult {
     problems,
   );
 
-  // The operator's own encryption (§9.5) is not built yet (task 14.7). Taking `on` and encrypting nothing would tell an operator that their data is sealed
-  // when it is not, so the server stops, and says why. The setting is read and checked here so that the day it is built, only this changes.
+  // The operator's own encryption (§9.5, task 14.7): the server seals content with the instance key, so the key is required, and there is no default.
   const rawOperator = read('TUSK_DB_ENCRYPTION');
   if (rawOperator !== undefined && rawOperator !== 'on' && rawOperator !== 'off') {
     problems.push('TUSK_DB_ENCRYPTION is on or off.');
-  } else if (rawOperator === 'on') {
+  } else if (rawOperator === 'on' && !encryption) {
     problems.push(
-      'TUSK_DB_ENCRYPTION=on is not available in this version, and nothing would be encrypted by it. Remove it or set it to off; a Desk can have a key of its own instead (Settings, Data).',
+      'TUSK_DB_ENCRYPTION=on needs TUSK_ENCRYPTION_KEY, the key content is sealed with. It is 32 random bytes, in base64, URL-safe base64 or hex (openssl rand -base64 32).',
     );
   }
 

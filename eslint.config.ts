@@ -15,6 +15,7 @@ export default defineConfig(
       '**/coverage/**',
       '**/test-results/**',
       '**/playwright-report/**',
+      'tools/**', // the operator tools, bundled for the image (scripts/build-tools.mjs)
     ],
   },
 

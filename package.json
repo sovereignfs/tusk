@@ -30,6 +30,8 @@
     "db:dev": "node scripts/dev-db.mjs",
     "boot-check": "node scripts/boot-check.mjs",
     "seed": "node scripts/seed-run.mjs",
+    "encrypt-data": "node scripts/encrypt-data-run.mjs",
+    "build:tools": "node scripts/build-tools.mjs",
     "e2e": "playwright test",
     "e2e:fast": "node scripts/e2e-shard.mjs --all"
   },

@@ -20,6 +20,13 @@ export async function start(): Promise<void> {
     process.exit(1);
   }
 
+  // The operator key (DESIGN.md §9.5): content is sealed with it from the first request, so it is set before anything can read or write.
+  if (result.config.operatorEncryption) {
+    const { operatorOf } = await import('./src/crypto/operator');
+    const { configureOperator } = await import('./src/workspaces/content');
+    configureOperator(operatorOf(result.config));
+  }
+
   try {
     const { getStores } = await import('./src/db/boot');
     const stores = await getStores(result.config.database);
@@ -28,6 +35,15 @@ export async function start(): Promise<void> {
     const { assertKeys, rotateCredentials } = await import('./src/crypto/store');
     await assertKeys(stores.app, result.config.encryption);
     if (result.config.encryption) await rotateCredentials(stores.app, result.config.encryption);
+    // The operator key (DESIGN.md §9.5): what is stored must agree with the mode and the keys, or the server stops and says where. Nothing is converted here;
+    // `tools/encrypt-data.mjs` does that, explicitly. Content sealed under the previous key is wrapped under the current one, as credentials are.
+    const { assertOperatorState, rotateContent } = await import('./src/crypto/operator-data');
+    await assertOperatorState(stores.app, {
+      operator: result.config.operatorEncryption,
+      ring: result.config.encryption,
+    });
+    if (result.config.operatorEncryption && result.config.encryption)
+      await rotateContent(stores.app, result.config.encryption, (line) => console.info(line));
   } catch (error) {
     console.error('Tusk cannot start, because its database is not usable:');
     console.error(`  - ${error instanceof Error ? error.message : String(error)}`);

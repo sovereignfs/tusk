@@ -24,6 +24,8 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store pnpm install --frozen-lockfile --ignore-scripts
 COPY . .
 RUN pnpm build
+# The operator tools (`tools/encrypt-data.mjs`, DESIGN.md §9.5) as single files: the standalone server carries no TypeScript.
+RUN node scripts/build-tools.mjs
 
 # --- What runs -----------------------------------------------------------------------------------------------
 FROM node:${NODE_VERSION}-bookworm-slim AS runtime
@@ -50,6 +52,8 @@ COPY --from=build --chown=node:node /app/.next/static ./.next/static
 COPY --from=build --chown=node:node /app/public ./public
 # The migrations are read from disk when the server starts, and Next does not trace them.
 COPY --from=build --chown=node:node /app/migrations ./migrations
+# The explicit move to and from the operator key (`node tools/encrypt-data.mjs status|seal|open`), run by an operator with the server stopped.
+COPY --from=build --chown=node:node /app/tools ./tools
 
 # Licences travel with the image: ours, and the design system's NOTICE, which carries Lucide's ISC licence and asks that it accompany copies (a
 # standalone build prunes it).
