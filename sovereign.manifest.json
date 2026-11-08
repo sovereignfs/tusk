@@ -4,7 +4,7 @@
   "name": "Tusk",
   "description": "Your own tasks, private by default and working offline, and the kanban boards you share with others",
   "icon": "/icons/icon.svg",
-  "port": 3000,
+  "port": 3002,
   "health": "/api/health",
   "launch": "/",
   "signIn": {

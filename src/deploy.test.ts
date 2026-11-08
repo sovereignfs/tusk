@@ -62,6 +62,13 @@ describe('the setups', () => {
     },
   );
 
+  it('run on the manifest’s port on a developer’s machine too, so the suite’s apps can run side by side', () => {
+    const { scripts } = JSON.parse(read('package.json')) as { scripts: Record<string, string> };
+    expect(scripts.dev).toContain(`--port ${manifest.port}`);
+    expect(scripts.start).toContain(`PORT=\${PORT:-${manifest.port}}`);
+    expect(read('.env.example')).toContain(`TUSK_URL=http://localhost:${manifest.port}`);
+  });
+
   it('reach an sqld that is pinned, at the version CI runs, and a PostgreSQL that is too', () => {
     const ci = read('.github/workflows/ci.yml');
     const sqld = /SQLD_IMAGE: (\S+)/.exec(ci)?.[1];

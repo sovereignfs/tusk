@@ -109,7 +109,7 @@ check_compose() {
 check_run() {
   echo "== run"
   docker volume rm tusk-check-run >/dev/null 2>&1 || true
-  docker run -d --name tusk-check-run -p "127.0.0.1:$port:3000" -v tusk-check-run:/data \
+  docker run -d --name tusk-check-run -p "127.0.0.1:$port:3002" -v tusk-check-run:/data \
     -e TUSK_DB_DIALECT=sqlite -e TUSK_SQLITE_URL=file:/data/tusk.db \
     -e TUSK_URL="https://tusk.example.com" -e TUSK_AUTH_LOCAL=1 -e TUSK_AUTH_SECRET="$secret" -e TUSK_ENCRYPTION_KEY="$key" \
     "$image" >/dev/null

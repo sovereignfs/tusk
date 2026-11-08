@@ -13,7 +13,7 @@ services:
       context: ..
       # The port is written in sovereign.manifest.json, which Compose cannot read; a test holds this to it.
       args:
-        PORT: '3000'
+        PORT: '3002'
     image: ${TUSK_IMAGE:-tusk}
     restart: unless-stopped
     env_file:
@@ -28,7 +28,7 @@ services:
         condition: service_healthy
     # Only the machine itself can reach this port: a reverse proxy with TLS in front of it is how people do.
     ports:
-      - '127.0.0.1:${TUSK_PORT:-3000}:3000'
+      - '127.0.0.1:${TUSK_PORT:-3002}:3002'
 
   sqld:
     # Pinned, not `latest`. 0.24.33 or later: earlier releases cannot create a namespace the way the app does.

@@ -13,7 +13,7 @@ services:
       context: ..
       # The port is written in sovereign.manifest.json, which Compose cannot read; a test holds this to it.
       args:
-        PORT: '3000'
+        PORT: '3002'
     image: ${TUSK_IMAGE:-tusk}
     restart: unless-stopped
     env_file:
@@ -25,7 +25,7 @@ services:
     volumes:
       - tusk-data:/data
     ports:
-      - '127.0.0.1:${TUSK_PORT:-3000}:3000'
+      - '127.0.0.1:${TUSK_PORT:-3002}:3002'
 
 volumes:
   tusk-data:

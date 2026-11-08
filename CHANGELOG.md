@@ -6,6 +6,10 @@ All notable changes to Tusk are recorded here. The format follows [Keep a Change
 Each release's section is also its GitHub release notes: the release workflow reads this file when a release is cut. Write the notes under
 `## [Unreleased]` as you go; a release turns them into the version's section.
 
+### Changed
+
+- **The port is now 3002** (`sovereign.manifest.json`), in the image, the Compose setups and `pnpm dev`, so Tusk, Fjord (3001) and a Sovereign core (3000) run side by side on one machine. A Sovereign instance reads the port from the image and needs nothing. Run on your own, change `-p 127.0.0.1:3000:3000` to `-p 127.0.0.1:3002:3002` (or keep the outside port: `-p 127.0.0.1:3000:3002`), and the reverse proxy's upstream with it.
+
 ## [Unreleased]
 
 ### Added

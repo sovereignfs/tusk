@@ -19,13 +19,13 @@ docker compose -f compose.file.yaml up -d --build                              #
 docker compose -f compose.yaml -f compose.postgres.yaml up -d --build          # PostgreSQL (Compose 2.24 or later)
 ```
 
-Only the machine itself can reach the port (`127.0.0.1:3000`): put a reverse proxy with TLS in front of it, and set `TUSK_URL` to the address people use.
+Only the machine itself can reach the port (`127.0.0.1:3002`): put a reverse proxy with TLS in front of it, and set `TUSK_URL` to the address people use.
 Passkeys, emailed links and the sign-in redirect are made from it, and the server refuses to start on an address that is not https (localhost aside).
 
 The smallest setup of all is one `docker run`, with no Compose:
 
 ```bash
-docker run -d -p 127.0.0.1:3000:3000 -v tusk:/data \
+docker run -d -p 127.0.0.1:3002:3002 -v tusk:/data \
   -e TUSK_DB_DIALECT=sqlite -e TUSK_SQLITE_URL=file:/data/tusk.db \
   -e TUSK_URL=https://tusk.example.com -e TUSK_AUTH_LOCAL=1 \
   -e TUSK_AUTH_SECRET="$(openssl rand -base64 48)" -e TUSK_ENCRYPTION_KEY="$(openssl rand -base64 32)" \
