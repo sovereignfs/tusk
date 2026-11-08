@@ -208,3 +208,21 @@ export function nowIndex(entries: readonly Entry[], time: string): number | null
   const after = entries.findIndex((entry) => entry.time !== null && entry.time > time);
   return after === -1 ? entries.length : after;
 }
+
+/** The least gap between two timed cards, in minutes, that shows a free slot: a card is given the hour after its time, so two hours leaves an hour. */
+export const FREE_SLOT_GAP = 120;
+
+const minutes = (time: string): number => {
+  const [h, m] = time.split(':').map(Number) as [number, number];
+  return h * 60 + m;
+};
+
+/**
+ * The time of the free slot between a timed card at `before` and the next at `after`, or null when there is not room for one: an hour after `before`, when
+ * `after` is `FREE_SLOT_GAP` minutes or more later. Cards have no length until they can have an end (task 19.5), so this is a suggestion and not a measure.
+ */
+export function slotBetween(before: string, after: string): string | null {
+  if (minutes(after) - minutes(before) < FREE_SLOT_GAP) return null;
+  const at = minutes(before) + 60;
+  return `${String(Math.floor(at / 60)).padStart(2, '0')}:${String(at % 60).padStart(2, '0')}`;
+}

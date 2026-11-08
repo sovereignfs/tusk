@@ -176,6 +176,22 @@ test('at a phone’s width the feed does not scroll sideways', async ({ page }) 
   expect(wide).toBe(false);
 });
 
+async function newList(page: Page, name: string) {
+  // A click made before the page has its handlers is lost: it is made again until the field is there.
+  await expect(async () => {
+    await page.getByRole('button', { name: 'Add a list' }).click();
+    await expect(page.getByLabel('New list name')).toBeVisible({ timeout: 1500 });
+  }).toPass();
+  await page.getByLabel('New list name').fill(name);
+  await page.getByLabel('New list name').press('Enter');
+  // Written to the working copy before the page is left: a navigation straight after would race it.
+  await expect(
+    page
+      .getByRole('navigation', { name: 'Lists' })
+      .getByRole('link', { name: new RegExp(`^${name}`) }),
+  ).toBeVisible();
+}
+
 async function deskCardToday(page: Page, list: string, title: string, time: string | null) {
   await page.goto('/desk');
   await page
@@ -200,9 +216,7 @@ test('a day reads in the order of the day, with the line for now between the car
 }) => {
   await signedIn(page);
   const list = unique('Order');
-  await page.getByRole('button', { name: 'Add a list' }).click();
-  await page.getByLabel('New list name').fill(list);
-  await page.getByLabel('New list name').press('Enter');
+  await newList(page, list);
   const [anytime, early, late] = [unique('Anytime'), unique('Early'), unique('Late')];
   // The latest first, so the order is the day's and not the order they were made in.
   await deskCardToday(page, list, late, '23:59');
@@ -268,4 +282,69 @@ test('coming back to the feed is to the place the reader left, with the runs the
   await page.goBack();
   await expect(page.locator('[aria-current="date"]')).toBeVisible();
   await expect.poll(place).toEqual(left);
+});
+
+test('a card is added from an empty day, from the end of a day and from a gap between timed cards, onto that day', async ({
+  page,
+}) => {
+  await signedIn(page);
+  await page.goto('/planner');
+  const today = page.locator('[aria-current="date"]');
+  await expect(today).toBeVisible();
+  const dayBefore = today.locator('xpath=preceding-sibling::li[1]');
+  await expect(dayBefore).toHaveAttribute('data-planner-day', /^\d{4}-\d{2}-\d{2}$/);
+
+  // From a day's own row, empty or not: the dialog says which day, and the card is on it at once.
+  const one = unique('From a day');
+  await dayBefore.locator('[data-planner-add]').first().click();
+  const dialog = page.getByRole('dialog', { name: 'New card' });
+  await expect(dialog.getByText(/^Due /)).toBeVisible();
+  await dialog.getByLabel('Title').fill(one);
+  await dialog.getByRole('button', { name: 'Add card' }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(dayBefore.getByRole('link', { name: new RegExp(one) })).toBeVisible();
+
+  // From a gap: two cards today, at least two hours apart, make a slot an hour after the first, and a card made there is at that time.
+  const list = unique('Gap list');
+  await page.goto('/desk');
+  await newList(page, list);
+  await deskCardToday(page, list, unique('Gap early'), '00:00');
+  await deskCardToday(page, list, unique('Gap late'), '23:59');
+  await page.goto('/planner');
+  const slot = page.locator('[aria-current="date"] [data-planner-slot]').first();
+  await expect(slot).toBeVisible();
+  const label = ((await slot.textContent()) ?? '')
+    .replace(/^Add at /, '')
+    .replace(/\+$/, '')
+    .trim();
+  const two = unique('From a gap');
+  await slot.click();
+  const gapDialog = page.getByRole('dialog', { name: 'New card' });
+  await expect(gapDialog.getByText(/^Due Today, /)).toBeVisible();
+  await gapDialog.getByLabel('Title').fill(two);
+  await gapDialog.getByRole('button', { name: 'Add card' }).click();
+  const card = page.locator('[aria-current="date"]').getByRole('link', { name: new RegExp(two) });
+  await expect(card).toBeVisible();
+  await expect(
+    card.getByText(new RegExp(`^${label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`)),
+  ).toBeVisible();
+  // The card is in the Desk, in the list it was added to, and the list is remembered for the next.
+  await page.goto('/planner');
+  await page.locator('[aria-current="date"] [data-planner-add]').first().click();
+  await expect(page.getByRole('dialog', { name: 'New card' }).getByLabel('List')).toHaveValue(/.+/);
+});
+
+test('on a phone the footer’s new card on the Planner is due today', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 800 });
+  await ensureAccount(page);
+  await trySignIn(page, EMAIL, PASSWORD);
+  await expect(page.getByRole('button', { name: 'User menu' })).toBeVisible();
+  await page.goto('/planner');
+  await expect(page.locator('[aria-current="date"]')).toBeVisible();
+  await page.getByRole('button', { name: 'Apps' }).click();
+  await page
+    .getByRole('dialog', { name: 'What to add' })
+    .getByRole('button', { name: 'New card' })
+    .click();
+  await expect(page.getByRole('dialog', { name: 'New card' }).getByText('Due Today')).toBeVisible();
 });

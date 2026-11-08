@@ -2,7 +2,7 @@
 
 ## Status
 
-⏳ In progress (2026-11-08): five tasks, in phase 2; 19.1 and 19.2 are done. 19.1 to 19.4 make the Planner usable; 19.5, start and end times, makes it a place to box time, and can follow.
+⏳ In progress (2026-11-08): five tasks, in phase 2; 19.1 to 19.3 are done. 19.1 to 19.4 make the Planner usable; 19.5, start and end times, makes it a place to box time, and can follow.
 
 ## Overview
 
@@ -86,7 +86,7 @@ it is the same in Chromium and WebKit, and at a phone's width.
 
 **Done as:** most of the block was in 19.1's feed already (the date at the side with today a filled circle in the accent token, no-time cards first, a band of the list's or board's colour, a done card ticked and muted, an overdue open one's line in the error colour, one fixed height). 19.2 adds **"Any time"**, named only on a day that has both kinds of card; **the line for now** (`nowIndex`, pure: before the first timed card after the time, after them all when they have gone, and nowhere on a day with no timed card), redrawn every 15 seconds in the browser's zone; **a card opens over the Planner**: a Desk card's address is `/planner?card=<id>` and a click opens it with `openCard`, the History API and no navigation, so `Frame`'s own column (a sheet-page of its own on a phone) shows `CardDetail` as it does on the Desk, and a click with a modifier goes by the address; a board card is a link to its own page (`/b/<board>/c/<card>`), since the card dialog is a page of its board; **the reader's place is kept** (`tusk.planner.at` in `sessionStorage`: the day at the top, how far down the screen it was, and the runs opened), so Back from a board card, and closing a card on a phone (where it replaces the feed), come back to the same place, and only near today (four chunks), else the feed opens on today. Cards carry `data-shortcut-card`, so the keyboard's moves between cards work in the feed. A Desk that is sealed and locked says so, with a way to unlock it on the Desk, instead of showing a feed that is missing it. Tests: the line's rule, the Desk card's address, and in Chromium and WebKit the order of a day (named "Any time", then by time, the line between the card that has gone and the one to come), a card opening over the feed that stays and closing, and the place kept across another page and Back with an opened run still open. **Not as the epic said:** the cards with no time are in order of title, not "their place in their list": positions of two lists cannot be compared, and a Desk's and a board's even less; the card dialog does not open over the Planner for a board card (said above), and a phone's close of a Desk card was not seen in the iOS Simulator.
 
-#### 📋 19.3 — Adding from the feed
+#### ✅ 19.3 — Adding from the feed
 
 **Priority:** P1. **Goal:** tap an empty place and add a card there.
 
@@ -94,7 +94,7 @@ it is the same in Chromium and WebKit, and at a phone's width.
 
 **Technical:**
 
-- **Where:** an empty day's row, the space after a day's last card, and the gap between two timed cards an hour or more apart, drawn as a dashed slot with a
+- **Where:** an empty day's row, the space after a day's last card, and the gap between two timed cards two hours or more apart (a card is given the hour after its time), drawn as a dashed slot with a
   `+` ("Add at 2 PM"), as the screenshot's suggested slot is. A slot is a button, reachable by keyboard.
 - **The quick add** is the footer's new-card form (7.3) with the date, and the time where the slot has one, filled in: a title, the list (the last list the
   person added to from the Planner, kept on the device; else the first), and Add. It writes to the working copy with the Desk's actions (`createCard`, then
@@ -104,6 +104,8 @@ it is the same in Chromium and WebKit, and at a phone's width.
 
 **Accepts when:** a card added from an empty day, from the end of a day and from a gap lands on that day (and at that time for a gap) in the chosen list, and
 is in the Desk; the list chosen last is offered next time on that device; it works on a sealed Desk; the slots are reachable and usable by keyboard alone.
+
+**Done as:** **`createDueCard`** (`src/actions/due.ts`, the one file that names a card's date and time) makes the card with its date and time in the same change as its title, so there is never a card with no date in between; the footer's new-card dialog (`NewCardDialog`) takes an optional `due` and uses it, says "Due Today, 2:00 PM", and **starts at the list last used from the Planner** (`tusk.planner.list` on the device, the first list when it is gone or cannot be read). The feed has three places to add: **an empty day** is itself a button ("Nothing planned +"), **every day with cards ends with "+ Add a card"**, and **a gap of two hours or more between two timed cards** is a dashed slot an hour after the first ("Add at 2:00 PM", `slotBetween`, pure); each is a button, reachable by keyboard, and the new card is in the feed at once, from the working copy. **The footer's action on `/planner`** is its own place (`placeOf`), offering a new card due today. Tests: `createDueCard` (date and time in one change, a time with no date is none, an empty title and a full account refused), `slotBetween`, the footer's places, and in Chromium and WebKit a card added from a day, one from a gap (at the slot's time, in the Desk) and the list remembered, and at 390px the footer's new card due today. **Not as the epic said:** a gap is two hours, not one (a card has no length until 19.5 and is given an hour); a day's end-of-day button shows on every day with cards and not only the last one the reader sees; board cards are not made here.
 
 #### 📋 19.4 — Repeating cards as previews
 

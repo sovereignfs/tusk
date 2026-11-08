@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { LocalRow } from '../local/rows';
-import { dueOf, setDue } from './due';
+import { createDueCard, dueOf, setDue } from './due';
 
 const ids = { newId: () => crypto.randomUUID() };
 /** A card whose fields are the given plain values (or `{ c }` for sealed ones), each stamped. */
@@ -97,5 +97,55 @@ describe('who writes the due fields', () => {
       .filter((file) => file.endsWith('.ts') && !file.endsWith('.test.ts') && file !== 'due.ts')
       .filter((file) => /dueDate|dueTime/.test(readFileSync(path.join(dir, file), 'utf8')));
     expect(offenders).toEqual([]);
+  });
+});
+
+describe('making a card that is due from the start', () => {
+  it('carries the date and the time in the change that makes the card, at the top of its list', () => {
+    const top = card({ title: 'Top' });
+    const result = createDueCard(
+      'L1',
+      [top],
+      { title: '  Call the plumber ', due: { date: '2026-11-09', time: '14:00' } },
+      ids,
+    );
+    expect(result).toMatchObject({ ok: true });
+    if (!result.ok) return;
+    expect(result.mutation.changes).toHaveLength(1);
+    expect(result.mutation.changes[0]).toMatchObject({
+      table: 'desk_card',
+      listId: 'L1',
+      fields: {
+        title: { v: 'Call the plumber' },
+        dueDate: { v: '2026-11-09' },
+        dueTime: { v: '14:00' },
+      },
+    });
+  });
+
+  it('is a card with a date and no time when it has none, and no time when it has no date', () => {
+    const noTime = createDueCard(
+      'L1',
+      [],
+      { title: 'x', due: { date: '2026-11-09', time: null } },
+      ids,
+    );
+    expect(noTime.ok && noTime.mutation.changes[0]).toMatchObject({
+      fields: { dueDate: { v: '2026-11-09' }, dueTime: { v: null } },
+    });
+    const noDate = createDueCard('L1', [], { title: 'x', due: { date: null, time: '09:00' } }, ids);
+    expect(noDate.ok && noDate.mutation.changes[0]).toMatchObject({
+      fields: { dueDate: { v: null }, dueTime: { v: null } },
+    });
+  });
+
+  it('refuses what a card is refused: an empty title, and a full account', () => {
+    expect(createDueCard('L1', [], { title: '  ', due: { date: null, time: null } }, ids)).toEqual({
+      ok: false,
+      reason: 'title',
+    });
+    expect(
+      createDueCard('L1', [], { title: 'x', due: { date: null, time: null } }, ids, 50_000),
+    ).toEqual({ ok: false, reason: 'limit' });
   });
 });

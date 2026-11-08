@@ -8,3 +8,9 @@
   justify-content: flex-end;
   gap: var(--sv-space-2);
 }
+
+.due {
+  margin: 0;
+  color: var(--sv-color-text-muted);
+  font-size: var(--sv-font-size-sm);
+}

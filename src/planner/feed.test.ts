@@ -15,6 +15,7 @@ import {
   groupByDate,
   layout,
   nowIndex,
+  slotBetween,
 } from './feed';
 
 const card = (id: string, fields: Record<string, unknown>, listId = 'L1'): LocalRow =>
@@ -238,5 +239,18 @@ describe('the line for now', () => {
   it('is not there when no card has a time, however late it is', () => {
     expect(nowIndex([at(null), at(null)], '12:00')).toBeNull();
     expect(nowIndex([], '12:00')).toBeNull();
+  });
+});
+
+describe('a free slot between two timed cards', () => {
+  it('is an hour after the first, where the next is two hours or more later', () => {
+    expect(slotBetween('09:00', '11:00')).toBe('10:00');
+    expect(slotBetween('09:30', '15:00')).toBe('10:30');
+    expect(slotBetween('13:00', '23:59')).toBe('14:00');
+  });
+  it('is not there when there is not an hour left over', () => {
+    expect(slotBetween('09:00', '10:59')).toBeNull();
+    expect(slotBetween('09:00', '09:00')).toBeNull();
+    expect(slotBetween('09:00', '10:00')).toBeNull();
   });
 });

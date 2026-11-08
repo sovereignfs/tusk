@@ -120,10 +120,68 @@
 }
 
 .empty {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
   margin: 0;
-  padding: var(--sv-space-2) 0;
+  padding: var(--sv-space-2) var(--sv-space-3);
+  border: 1px solid transparent;
+  border-radius: var(--sv-radius-md);
+  background: transparent;
   color: var(--sv-color-text-muted);
+  font: inherit;
   font-size: var(--sv-font-size-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.empty:hover,
+.free:hover,
+.more:hover {
+  background: var(--sv-color-surface-sunken);
+}
+
+.empty:focus-visible,
+.free:focus-visible,
+.more:focus-visible {
+  outline: 2px solid var(--sv-color-focus-ring);
+  outline-offset: 2px;
+}
+
+.plus {
+  font-size: var(--sv-font-size-lg);
+  line-height: 1;
+}
+
+/* A gap between two timed cards: a dashed slot, as the screenshot's suggested time. */
+.free {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 40px;
+  padding: var(--sv-space-1) var(--sv-space-3);
+  border: 1px dashed var(--sv-color-border-strong);
+  border-radius: var(--sv-radius-md);
+  background: transparent;
+  color: var(--sv-color-text-muted);
+  font: inherit;
+  font-size: var(--sv-font-size-sm);
+  cursor: pointer;
+}
+
+.more {
+  width: 100%;
+  padding: var(--sv-space-1) var(--sv-space-3);
+  border: 0;
+  border-radius: var(--sv-radius-md);
+  background: transparent;
+  color: var(--sv-color-text-muted);
+  font: inherit;
+  font-size: var(--sv-font-size-xs);
+  text-align: left;
+  cursor: pointer;
 }
 
 .gap {

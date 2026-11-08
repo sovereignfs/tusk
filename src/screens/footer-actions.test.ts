@@ -10,14 +10,14 @@ describe('the footer’s action', () => {
     expect(placeOf('/b/abc')).toBe('board');
     expect(placeOf('/b/abc/c/def')).toBe('board');
     expect(placeOf('/inbox')).toBe('other');
-    expect(placeOf('/planner')).toBe('other');
+    expect(placeOf('/planner')).toBe('planner');
     expect(placeOf('/account')).toBe('other');
     // A page that only starts with the same letters is not the Desk.
     expect(placeOf('/desktop')).toBe('other');
   });
 
   it('offers what fits each, and every form has a name', () => {
-    for (const place of ['desk', 'boards', 'board', 'other'] as const) {
+    for (const place of ['desk', 'boards', 'board', 'planner', 'other'] as const) {
       expect(ACTIONS[place].length).toBeGreaterThan(0);
       for (const action of ACTIONS[place]) expect(LABELS[action]).not.toBe('');
     }

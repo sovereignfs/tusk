@@ -1,5 +1,6 @@
 import type { LocalRow } from '../local/rows';
 import type { ActionResult, Ids } from './lists';
+import { createCard } from './cards';
 
 /**
  * A card's due date and time (DESIGN.md §11), on the Desk. **This is the one action that writes them, and it always writes both**: `dueDate` and
@@ -52,6 +53,34 @@ export function setDue(card: LocalRow | undefined, due: Due, ids: Ids): ActionRe
           fields: dueFields(next),
         },
       ],
+    },
+  };
+}
+
+/**
+ * A new card that is due from the first moment (the Planner, DESIGN.md §25.1): `createCard`, with the date and time carried in the same change as the title, so that
+ * there is never a card with no date in between and a device that has seen the card has seen when it is due. The pair is written by `dueFields` and nowhere else.
+ * A time with no date is no time.
+ */
+export function createDueCard(
+  listId: string,
+  cards: readonly LocalRow[],
+  input: { title: string; due: Due },
+  ids: Ids,
+  allCount = cards.length,
+  above?: string,
+): ActionResult {
+  const made = createCard(listId, cards, { title: input.title }, ids, allCount, above);
+  if (!made.ok) return made;
+  const [change] = made.mutation.changes;
+  if (!change || change.table !== 'desk_card' || !('fields' in change) || !change.fields)
+    return { ok: false, reason: 'rule' };
+  const due = input.due.date === null ? { date: null, time: null } : input.due;
+  return {
+    ok: true,
+    mutation: {
+      ...made.mutation,
+      changes: [{ ...change, fields: { ...change.fields, ...dueFields(due) } }],
     },
   };
 }

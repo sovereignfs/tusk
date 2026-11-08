@@ -8,6 +8,7 @@ import { LucideIcon } from '../ui/icons';
 import { useMobileNav } from '../ui/mobile-nav';
 import { ENTRIES } from './AppSidebar';
 import { StackOverlay } from './StackOverlay';
+import { nowHere } from '../time';
 import { NewBoardDialog, NewCardDialog, NewListDialog, NewWorkspaceDialog } from './FooterDialogs';
 import { ACTIONS, type Action, BOARD_ACTION, LABELS, deskListOf, placeOf } from './footer-actions';
 
@@ -98,7 +99,11 @@ export function PhoneFooter() {
         }))}
       />
       {dialog === 'new-card' ? (
-        <NewCardDialog listId={deskListOf(pathname)} onClose={() => setDialog(null)} />
+        <NewCardDialog
+          listId={deskListOf(pathname)}
+          {...(place === 'planner' ? { due: { date: nowHere().date, time: null } } : {})}
+          onClose={() => setDialog(null)}
+        />
       ) : null}
       {dialog === 'today' || dialog === 'review' ? (
         <StackOverlay

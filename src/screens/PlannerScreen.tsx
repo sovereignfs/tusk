@@ -11,7 +11,9 @@ import {
   useState,
 } from 'react';
 import { formatTime } from '../format-due';
+import type { Due } from '../actions/due';
 import { openCard } from './address';
+import { NewCardDialog } from './FooterDialogs';
 import { useKey } from './KeyContext';
 import { listsOf, visibleCards } from '../local/store';
 import {
@@ -26,6 +28,7 @@ import {
   groupByDate,
   layout,
   nowIndex,
+  slotBetween,
 } from '../planner/feed';
 import type { Planned, PlannedBoardCard } from '../planner/format';
 import { useLocal } from '../sync/react';
@@ -108,6 +111,8 @@ export function PlannerScreen() {
     return () => clearInterval(tick);
   }, []);
   const key = useKey();
+  /** The place being added to: a day, and a time when it is a gap between two timed cards. */
+  const [adding, setAdding] = useState<Due | null>(null);
 
   const cards = useLocal(visibleCards);
   const lists = useLocal(listsOf);
@@ -303,6 +308,7 @@ export function PlannerScreen() {
                     entries={row.entries}
                     today={today}
                     now={row.date === today ? nowTime : null}
+                    onAdd={(time) => setAdding({ date: row.date, time })}
                   />
                 ),
               )}
@@ -310,6 +316,7 @@ export function PlannerScreen() {
           </>
         )}
       </div>
+      {adding ? <NewCardDialog due={adding} onClose={() => setAdding(null)} /> : null}
     </div>
   );
 }
@@ -319,12 +326,15 @@ function Day({
   entries,
   today,
   now,
+  onAdd,
 }: {
   date: string;
   entries: readonly Entry[];
   today: string;
   /** The time now (`HH:MM`) on today, which draws the line for it; null on any other day. */
   now: string | null;
+  /** Add a card here: to the day, or at a time of it. */
+  onAdd: (time: string | null) => void;
 }) {
   const parts = dayParts(date);
   const isToday = date === today;
@@ -344,47 +354,89 @@ function Day({
         <span className={`${styles.number} ${isToday ? styles.today : ''}`}>{parts.day}</span>
       </div>
       {entries.length === 0 ? (
-        <p className={styles.empty}>Nothing planned</p>
+        <button
+          type="button"
+          className={styles.empty}
+          // The name holds the visible words, and says what pressing it does.
+          aria-label={`Nothing planned, add a card on ${parts.weekday} ${parts.month} ${parts.day}`}
+          data-planner-add={date}
+          onClick={() => onAdd(null)}
+        >
+          Nothing planned
+          <span className={styles.plus} aria-hidden>
+            +
+          </span>
+        </button>
       ) : (
         <ul className={styles.cards}>
           {named ? <li className={styles.caption}>Any time</li> : null}
-          {entries.map((entry, index) => (
-            <Fragment key={entry.key}>
-              {line === index ? <NowLine /> : null}
-              <li>
-                <Link
-                  href={entry.href}
-                  className={`${styles.card} ${entry.done ? styles.done : ''} ${
-                    date < today && !entry.done ? styles.overdue : ''
-                  }`}
-                  style={{ '--band': entry.color } as React.CSSProperties}
-                  data-planner-card={entry.key}
-                  data-shortcut-card=""
-                  onClick={(event) => {
-                    // A Desk card opens over the Planner, from the working copy and with no navigation; a click to open it in a new tab goes by its address.
-                    if (
-                      entry.source !== 'desk' ||
-                      event.metaKey ||
-                      event.ctrlKey ||
-                      event.shiftKey ||
-                      event.button !== 0
-                    )
-                      return;
-                    event.preventDefault();
-                    openCard(entry.id);
-                  }}
-                >
-                  <span className={styles.title}>{entry.title}</span>
-                  <span className={styles.meta}>
-                    {entry.time ? `${formatTime(entry.time)} · ` : ''}
-                    {entry.where}
-                    {entry.done ? ' · Done' : ''}
-                  </span>
-                </Link>
-              </li>
-            </Fragment>
-          ))}
+          {entries.map((entry, index) => {
+            const before = entries[index - 1]?.time;
+            const free = before && entry.time ? slotBetween(before, entry.time) : null;
+            return (
+              <Fragment key={entry.key}>
+                {free ? (
+                  <li>
+                    <button
+                      type="button"
+                      className={styles.free}
+                      data-planner-slot={free}
+                      onClick={() => onAdd(free)}
+                    >
+                      Add at {formatTime(free)}
+                      <span className={styles.plus} aria-hidden>
+                        +
+                      </span>
+                    </button>
+                  </li>
+                ) : null}
+                {line === index ? <NowLine /> : null}
+                <li>
+                  <Link
+                    href={entry.href}
+                    className={`${styles.card} ${entry.done ? styles.done : ''} ${
+                      date < today && !entry.done ? styles.overdue : ''
+                    }`}
+                    style={{ '--band': entry.color } as React.CSSProperties}
+                    data-planner-card={entry.key}
+                    data-shortcut-card=""
+                    onClick={(event) => {
+                      // A Desk card opens over the Planner, from the working copy and with no navigation; a click to open it in a new tab goes by its address.
+                      if (
+                        entry.source !== 'desk' ||
+                        event.metaKey ||
+                        event.ctrlKey ||
+                        event.shiftKey ||
+                        event.button !== 0
+                      )
+                        return;
+                      event.preventDefault();
+                      openCard(entry.id);
+                    }}
+                  >
+                    <span className={styles.title}>{entry.title}</span>
+                    <span className={styles.meta}>
+                      {entry.time ? `${formatTime(entry.time)} · ` : ''}
+                      {entry.where}
+                      {entry.done ? ' · Done' : ''}
+                    </span>
+                  </Link>
+                </li>
+              </Fragment>
+            );
+          })}
           {line === entries.length ? <NowLine /> : null}
+          <li>
+            <button
+              type="button"
+              className={styles.more}
+              aria-label={`Add a card on ${parts.weekday} ${parts.month} ${parts.day}`}
+              data-planner-add={date}
+              onClick={() => onAdd(null)}
+            >
+              <span aria-hidden>+</span> Add a card
+            </button>
+          </li>
         </ul>
       )}
     </li>
