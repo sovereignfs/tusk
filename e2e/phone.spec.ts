@@ -48,7 +48,7 @@ test('the Desk is a list at a time, its lists and the places are in a drawer, an
 
   // A card of this list's own.
   const title = unique('Buy oat milk');
-  await page.getByPlaceholder('Add a card…').fill(title);
+  await page.getByPlaceholder('Add a card…').first().fill(title);
   await page.keyboard.press('Enter');
   await expect(page.getByRole('link', { name: title })).toBeVisible();
 
@@ -161,4 +161,53 @@ test('a workspace, a board, a card’s dialog and a published board are all usab
   await page.goto(path);
   await expect(page.getByRole('heading', { level: 1, name: 'Roadmap' })).toBeVisible();
   await fits(page);
+});
+
+test('the Desk is a carousel of its lists on a phone: a swipe changes the address, a reload returns there, and a link to a list moves it', async ({
+  page,
+}) => {
+  await signedIn(page);
+  await page.goto('/desk');
+  // Three lists, made from the drawer as anyone makes them; the first is Backlog.
+  const names = [unique('Alpha'), unique('Beta')] as const;
+  const [alpha, beta] = names;
+  for (const name of names) {
+    await openNavigation(page);
+    await drawer(page).getByRole('button', { name: 'Add a list' }).click();
+    await drawer(page).getByLabel('New list name').fill(name);
+    await drawer(page).getByLabel('New list name').press('Enter');
+    await expect(drawer(page).getByRole('link', { name })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(drawer(page)).toHaveCount(0);
+  }
+
+  const scroller = page.getByRole('region', { name: 'Your lists' });
+  await expect(scroller).toBeVisible();
+  await fits(page);
+  const slides = page.getByRole('tab');
+  expect(await slides.count()).toBeGreaterThanOrEqual(3);
+
+  // Swiping to the next slide (the native scroll the carousel snaps) settles, and the address is that list's. No spinner is on the way.
+  // (The account is shared with other tests, so the slide is found by its name.)
+  const at = (
+    await slides.evaluateAll((els) => els.map((el) => el.getAttribute('aria-label')))
+  ).indexOf(alpha);
+  expect(at).toBeGreaterThan(0);
+  await scroller.dispatchEvent('pointerdown');
+  await scroller.evaluate((el, n) => el.scrollTo({ left: n * el.clientWidth }), at);
+  await expect(page).toHaveURL(/\/desk\/[0-9a-f-]{36}$/);
+  const reached = page.url();
+  await expect(page.getByRole('progressbar')).toHaveCount(0);
+
+  // A reload returns to the same list, still at the same address.
+  await page.reload();
+  await expect(page).toHaveURL(reached);
+  await expect(page.getByRole('tab', { selected: true })).toHaveAccessibleName(alpha);
+
+  // A link to another list (from the drawer) moves the carousel there.
+  await openNavigation(page);
+  await drawer(page).getByRole('link', { name: beta }).click();
+  await expect(page).not.toHaveURL(reached);
+  await expect(page).toHaveURL(/\/desk\/[0-9a-f-]{36}$/);
+  await expect(page.getByRole('tab', { selected: true })).toHaveAccessibleName(beta);
 });

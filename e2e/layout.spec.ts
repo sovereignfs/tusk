@@ -137,7 +137,8 @@ test.describe('at a phone’s width', () => {
     page,
   }) => {
     await signedIn(page);
-    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    // A list is a heading, and a phone's carousel keeps the neighbours of the list on screen mounted too (the account has several by now).
+    await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible();
     await expect(page.getByRole('navigation', { name: 'Lists' })).toBeHidden();
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,

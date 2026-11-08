@@ -26,7 +26,9 @@ export function AddCard({ listId, cards }: { listId: string; cards: readonly Loc
   const count = useLocal(cardCount);
 
   useEffect(() => {
-    if (!mobile) field.current?.focus();
+    // Without scrolling to it: in a carousel of lists (a phone, DESIGN.md §18) the field may be in a slide that is not the one on screen, and the browser would
+    // scroll the carousel to reveal it.
+    if (!mobile) field.current?.focus({ preventScroll: true });
   }, [listId, mobile]);
 
   function submit(event: FormEvent) {
