@@ -29,6 +29,8 @@ export {
   ColorPicker,
   DatePicker,
   ConfirmDialog,
+  MobileAppsDrawer,
+  MobileFooter,
   ResponsiveSurface,
   SwipableMobileCarousel,
   SwipableMobileCarouselSlide,

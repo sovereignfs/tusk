@@ -51,7 +51,8 @@ import { LucideIcon } from '../ui/icons';
 import { ShareDialog } from './ShareDialog';
 import { ActivityList } from './ActivityList';
 import { ListColumn } from './ListColumn';
-import { useColumnAddress } from './useColumnAddress';
+import { BOARD_ACTION, COLUMN_ADD_CARD } from './footer-actions';
+import { listOnScreen, useColumnAddress } from './useColumnAddress';
 import styles from './BoardScreen.module.css';
 
 /**
@@ -99,6 +100,21 @@ export function BoardScreen({
   const columns = useRef<HTMLDivElement>(null);
   // A column's address, where the lists snap one at a time (a phone): see `useColumnAddress`.
   useColumnAddress(columns, view.lists.length);
+  // What the phone's footer asks of the board (DESIGN.md §18): a new list opens the field that makes one, and a new card opens the field of the list on screen.
+  useEffect(() => {
+    const onAction = (event: Event) => {
+      const action = (event as CustomEvent<{ action: string }>).detail?.action;
+      if (action === 'board-new-list') {
+        setAdding(true);
+        columns.current?.scrollTo({ left: columns.current.scrollWidth, behavior: 'smooth' });
+      } else if (action === 'board-new-card') {
+        const listId = listOnScreen(columns.current);
+        if (listId) window.dispatchEvent(new CustomEvent(COLUMN_ADD_CARD, { detail: { listId } }));
+      }
+    };
+    window.addEventListener(BOARD_ACTION, onAction);
+    return () => window.removeEventListener(BOARD_ACTION, onAction);
+  }, []);
   const [dialog, setDialog] = useState<'settings' | 'delete' | 'share' | 'activity' | null>(null);
   const [people, setPeople] = useState<BoardPeople | null>(null);
   const boardId = view.board.id;

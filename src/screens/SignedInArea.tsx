@@ -6,7 +6,9 @@ import { WorkspacesProvider } from '../boards/workspaces';
 import { rememberIdentity } from '../identity';
 import { site } from '../site';
 import { SyncProvider } from '../sync/react';
+import { ResponsiveSurface } from '../ui';
 import { AppShell } from '../ui/AppShell';
+import { PhoneFooter } from './PhoneFooter';
 import { MobileNavProvider } from '../ui/mobile-nav';
 import { SidebarToggle } from '../ui/SidebarToggle';
 import { AppFrame } from './AppFrame';
@@ -47,6 +49,8 @@ export function SignedInArea({
               name={site.name}
               toolbar={<SidebarToggle />}
               account={<AccountMenu accountId={accountId} name={name} email={email} />}
+              // The footer of five, on a phone only (DESIGN.md §18): the design system's `ResponsiveSurface` draws it there and nothing beside the sidebar.
+              footer={<ResponsiveSurface web={null} mobile={<PhoneFooter />} />}
             >
               <AppFrame>
                 {/* The Desk's own columns. */}

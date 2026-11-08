@@ -5,6 +5,7 @@ import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-
 import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { WORKSPACE_LIMITS, type CardTile, type LabelRow, type ListRow } from '../workspaces/format';
 import { CardTileView } from './CardTileView';
+import { COLUMN_ADD_CARD } from './footer-actions';
 import { Button, ConfirmDialog, Dialog, FormField, Icon, Input, Menu } from '../ui';
 import styles from './BoardScreen.module.css';
 
@@ -58,6 +59,14 @@ export function ListColumn({
   const [menu, setMenu] = useState(false);
   const [dialog, setDialog] = useState<'configure' | 'position' | 'delete' | null>(null);
   const [adding, setAdding] = useState(false);
+  // The footer's "New card" names the list on screen (DESIGN.md §18): the one it names opens its own field.
+  useEffect(() => {
+    const open = (event: Event) => {
+      if ((event as CustomEvent<{ listId: string }>).detail?.listId === list.id) setAdding(true);
+    };
+    window.addEventListener(COLUMN_ADD_CARD, open);
+    return () => window.removeEventListener(COLUMN_ADD_CARD, open);
+  }, [list.id]);
   const addField = useRef<HTMLFormElement>(null);
   const [title, setTitle] = useState('');
   // The cards' area takes a card dropped on an empty list, or below the last one.

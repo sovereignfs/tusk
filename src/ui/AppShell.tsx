@@ -32,7 +32,8 @@ export function AppShell({
   children: ReactNode;
 }) {
   return (
-    <div className={styles.shell}>
+    // `sv-app-shell` is where the design system's footer publishes its height (`--sv-shell-footer-height`), so that sheets and dialogs clear it.
+    <div id="sv-app-shell" className={styles.shell}>
       <header className={styles.header}>
         <div className={styles.lead}>
           {toolbar}

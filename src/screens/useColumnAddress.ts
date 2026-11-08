@@ -79,3 +79,20 @@ const offsetOf = (row: HTMLElement, column: HTMLElement) =>
   row.getBoundingClientRect().left +
   row.scrollLeft -
   (Number.parseFloat(getComputedStyle(row).scrollPaddingLeft) || 0);
+
+/** The id of the list that is at the left edge of a snapped row, or of the first when it does not snap: the list a phone is showing. */
+export function listOnScreen(row: HTMLElement | null): string | undefined {
+  if (!row) return undefined;
+  const all = columnsOf(row);
+  if (!snaps(row)) return all[0]?.dataset.list;
+  let nearest: HTMLElement | undefined;
+  let best = Infinity;
+  for (const each of all) {
+    const gap = Math.abs(offsetOf(row, each) - row.scrollLeft);
+    if (gap < best) {
+      best = gap;
+      nearest = each;
+    }
+  }
+  return nearest?.dataset.list;
+}

@@ -153,6 +153,17 @@ test('a workspace, a board, a card’s dialog and a published board are all usab
   expect(edge).toBeGreaterThanOrEqual(0);
   expect(edge).toBeLessThan(40);
 
+  // The footer's action, inside a board: a new card goes into the list on screen (Review, which is at the edge), and a new list is offered too.
+  const footer = page.getByRole('navigation', { name: 'App navigation' });
+  await footer.getByRole('button', { name: 'Apps' }).click();
+  const what = page.getByRole('dialog', { name: 'What to add' });
+  await expect(what.getByRole('button', { name: 'New list' })).toBeVisible();
+  await what.getByRole('button', { name: 'New card' }).click();
+  const fromFooter = review.getByLabel('Title of a new card in Review');
+  await fromFooter.fill('Added from the footer');
+  await fromFooter.press('Enter');
+  await expect(review.getByLabel('Added from the footer', { exact: true })).toBeVisible();
+
   // A card, and its dialog is the whole screen.
   const column = page.locator('section[aria-label="Backlog"]');
   await column.scrollIntoViewIfNeeded();
@@ -229,4 +240,54 @@ test('the Desk is a carousel of its lists on a phone: a swipe changes the addres
   await expect(page).not.toHaveURL(reached);
   await expect(page).toHaveURL(/\/desk\/[0-9a-f-]{36}$/);
   await expect(page.getByRole('tab', { selected: true })).toHaveAccessibleName(beta);
+});
+
+test('the phone has a footer of five: the places, and an action that fits where you are', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await signedIn(page);
+  await page.goto('/desk');
+  const footer = page.getByRole('navigation', { name: 'App navigation' });
+  await expect(footer).toBeVisible();
+  for (const name of ['Desk', 'Boards', 'Planner', 'Inbox'])
+    await expect(footer.getByRole('link', { name })).toBeVisible();
+  await expect(footer.getByRole('link', { name: 'Desk' })).toHaveAttribute('aria-current', 'page');
+  await expect(footer.getByRole('button', { name: 'Apps' })).toBeVisible();
+  await fits(page);
+  // It publishes its own height, which sheets clear.
+  const published = await page.evaluate(
+    () =>
+      document.getElementById('sv-app-shell')?.style.getPropertyValue('--sv-shell-footer-height') ??
+      '',
+  );
+  const height = (await footer.boundingBox())?.height ?? 0;
+  expect(Number.parseFloat(published)).toBeGreaterThan(40);
+  expect(Math.abs(Number.parseFloat(published) - height)).toBeLessThan(2);
+
+  // On the Desk: a new card goes into the list on screen, and each form has a name.
+  const what = page.getByRole('dialog', { name: 'What to add' });
+  await footer.getByRole('button', { name: 'Apps' }).click();
+  for (const name of ['New card', 'New list', 'Go to a list'])
+    await expect(what.getByRole('button', { name })).toBeVisible();
+  await what.getByRole('button', { name: 'New card' }).click();
+  const dialog = page.getByRole('dialog', { name: 'New card' });
+  const title = unique('From the footer');
+  await dialog.getByLabel('Title').fill(title);
+  await dialog.getByRole('button', { name: 'Add card' }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole('link', { name: title }).first()).toBeVisible();
+
+  // On Boards the action is a new board and a new workspace.
+  await footer.getByRole('link', { name: 'Boards' }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await footer.getByRole('button', { name: 'Apps' }).click();
+  await expect(what.getByRole('button', { name: 'New board' })).toBeVisible();
+  await expect(what.getByRole('button', { name: 'New workspace' })).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  // The places are links: the Inbox is one.
+  await footer.getByRole('link', { name: 'Inbox' }).click();
+  await expect(page).toHaveURL(/\/inbox$/);
+  await expect(footer.getByRole('link', { name: 'Inbox' })).toHaveAttribute('aria-current', 'page');
 });
