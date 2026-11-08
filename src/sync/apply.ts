@@ -9,10 +9,14 @@ import {
   LIMITS,
   type Mutation,
   type RefusalCode,
+  type Scalar,
+  type RowFields,
   type StoredFields,
   type SyncTable,
   encodeFields,
 } from './format';
+import { type Operator, sealDeskField } from '../crypto/operator';
+import { openStored } from './operator-fields';
 import { tableOf } from './tables';
 import { decodeFields, parseStructure } from './validate';
 
@@ -37,6 +41,8 @@ export interface ApplyOptions {
   now: number;
   /** `refuse` for an account with a key of its own, which sends no plain field (DESIGN.md §9.4). */
   plain?: 'check' | 'refuse';
+  /** The instance key when `TUSK_DB_ENCRYPTION=on` (§9.5): each field is stored sealed under it, and a ciphertext field of a personal key is refused. */
+  operator?: Operator;
   /** Smaller limits for a test; the real ones are in `LIMITS`. */
   limits?: { lists: number; cards: number; checks?: number };
 }
@@ -121,7 +127,7 @@ export async function applyMutation(
       for (const change of mutation.changes) {
         await applyChange(tx, accountId, change, seq, options, touched);
       }
-      await checkStructure(tx, accountId, touched, seq);
+      await checkStructure(tx, accountId, touched, seq, options.operator);
       await checkLimits(
         tx,
         accountId,
@@ -187,6 +193,9 @@ async function applyChange(
   const table = change.table;
   const target = tableOf(tx, table);
   const plain = options.plain ?? 'check';
+  // Under the operator key the server seals what it can read, so a field a device sealed itself has no place (§9.5).
+  if (options.operator && change.fields && Object.values(change.fields).some((f) => 'c' in f))
+    throw new Refused('invalid');
 
   // The row, if this account has it: found with the owner in the statement. A row of another account is, to this account, not there.
   const existing = await dbGet<{ deletedAt: number | string | null; fields: string }>(
@@ -200,7 +209,7 @@ async function applyChange(
     if (!parseStructure(change, { creating: true, plain }).ok) {
       throw new Refused(parseStructure(change, { plain }).ok ? 'unavailable' : 'structure');
     }
-    await insertRow(tx, accountId, change, seq, options.now);
+    await insertRow(tx, accountId, change, seq, options.now, options.operator);
     touched.created[table] += 1;
   } else {
     // A list's key is set once (DESIGN.md §9.2): everything sealed under it depends on it, so a change that would put another there is refused whole, and
@@ -222,6 +231,7 @@ async function applyChange(
       },
       seq,
       options.now,
+      options.operator,
     );
   }
 
@@ -250,11 +260,14 @@ function mergeFields(
   existing: string,
   sent: Readonly<Record<string, FieldValue>>,
   seq: number,
-): StoredFields {
+  seal?: (name: string, value: Scalar) => string,
+): RowFields {
   const decoded = decodeFields(existing);
   const base = decoded.ok ? decoded.value : {};
-  const merged: Record<string, StoredFields[string]> = { ...base };
-  for (const [name, value] of Object.entries(sent)) merged[name] = { ...value, s: seq };
+  const merged: Record<string, RowFields[string]> = { ...base };
+  for (const [name, value] of Object.entries(sent)) {
+    merged[name] = seal && 'v' in value ? { o: seal(name, value.v), s: seq } : { ...value, s: seq };
+  }
   return merged;
 }
 
@@ -281,15 +294,22 @@ function mirrors(fields: StoredFields): {
   };
 }
 
+/** What seals a field of this row under the operator key, or nothing when the mode is off. */
+const sealer = (operator: Operator, change: Change) =>
+  operator
+    ? (name: string, value: Scalar) => sealDeskField(operator, change.table, change.id, name, value)
+    : undefined;
+
 async function insertRow(
   tx: Database,
   accountId: string,
   change: Change,
   seq: number,
   now: number,
+  operator: Operator,
 ): Promise<void> {
   const target = tableOf(tx, change.table);
-  const fields = mergeFields('{}', change.fields ?? {}, seq);
+  const fields = mergeFields('{}', change.fields ?? {}, seq, sealer(operator, change));
   const columns: SQL[] = [
     ident('id'),
     ident('owner_id'),
@@ -314,7 +334,7 @@ async function insertRow(
     }
   }
   if (change.table === 'desk_card') {
-    const mirror = mirrors(fields);
+    const mirror = mirrors(openStored(operator, change.table, change.id, fields));
     columns.push(ident('due_date'), ident('due_time'), ident('completed_at'));
     values.push(sql`${mirror.dueDate}`, sql`${mirror.dueTime}`, sql`${mirror.completedAt}`);
   }
@@ -334,9 +354,10 @@ async function updateRow(
   existing: Existing,
   seq: number,
   now: number,
+  operator: Operator,
 ): Promise<void> {
   const target = tableOf(tx, change.table);
-  const fields = mergeFields(existing.fields, change.fields ?? {}, seq);
+  const fields = mergeFields(existing.fields, change.fields ?? {}, seq, sealer(operator, change));
 
   // An edit of a deleted row restores it (DESIGN.md §8.4): losing someone's words is worse than a deleted card coming back. A delete of one that is
   // deleted already keeps the time it was first deleted.
@@ -349,7 +370,7 @@ async function updateRow(
     ...structureSets(change),
   ];
   if (change.table === 'desk_card') {
-    const mirror = mirrors(fields);
+    const mirror = mirrors(openStored(operator, change.table, change.id, fields));
     sets.push(
       sql`${ident('due_date')} = ${mirror.dueDate}`,
       sql`${ident('due_time')} = ${mirror.dueTime}`,
@@ -380,6 +401,7 @@ async function checkStructure(
   accountId: string,
   touched: Touched,
   seq: number,
+  operator: Operator,
 ): Promise<void> {
   const card = tableOf(tx, 'desk_card');
   const check = tableOf(tx, 'desk_check');
@@ -396,7 +418,8 @@ async function checkStructure(
 
     // A series it points at is the account's. It is a field, so only a readable one can be checked; one that is ciphertext is not.
     const decoded = decodeFields(row.fields);
-    const pointer = decoded.ok ? decoded.value.seriesId : undefined;
+    const readable = decoded.ok ? openStored(operator, 'desk_card', row.id, decoded.value) : {};
+    const pointer = readable.seriesId;
     if (pointer && 'v' in pointer && typeof pointer.v === 'string') {
       const found = await dbGet(
         tx,

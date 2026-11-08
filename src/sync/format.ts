@@ -165,13 +165,17 @@ export const LIMITS = {
 
 /**
  * What a row's `fields` column holds: each field's value and **the `seq` that last wrote it** (§23.2), which is how two devices' changes to
- * different fields both stand and the later of two to one field wins (§8.4).
+ * different fields both stand and the later of two to one field wins (§8.4). `{ o }` is a value the server sealed under the operator key (§9.5); a device is
+ * never sent one (`pull` opens it).
  */
 export type StoredField = FieldValue & { readonly s: number };
 export type StoredFields = Readonly<Record<string, StoredField>>;
+/** A column as the server stores it: a field may also be `{ o }`, sealed under the operator key (§9.5). Only the server's own code sees this form. */
+export type RowField = StoredField | ({ readonly o: string } & { readonly s: number });
+export type RowFields = Readonly<Record<string, RowField>>;
 
 /** The text of a `fields` column. Plain and ciphertext alike, and in the same form on all three databases (§23.2). */
-export function encodeFields(fields: StoredFields): string {
+export function encodeFields(fields: RowFields): string {
   return JSON.stringify(fields);
 }
 

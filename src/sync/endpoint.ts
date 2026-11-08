@@ -1,3 +1,4 @@
+import type { Operator } from '../crypto/operator';
 import type { Database } from '../db/client';
 import { uuid } from '../access/parse';
 import { type Limiter, type Rule } from '../limits/rate';
@@ -26,6 +27,8 @@ export interface SyncDeps {
   now(): number;
   /** `refuse` for an account with a key of its own (§9.4); the route reads which it is. */
   plain?: 'check' | 'refuse';
+  /** The instance key when `TUSK_DB_ENCRYPTION=on` (§9.5). */
+  operator?: Operator;
   /** Smaller limits for a test. */
   limits?: { lists: number; cards: number; checks?: number };
 }
@@ -123,6 +126,7 @@ export async function handleSync(
     const applied = await applyMutation(deps.database, accountId, parsed.value, {
       now: deps.now(),
       ...(deps.plain ? { plain: deps.plain } : {}),
+      ...(deps.operator ? { operator: deps.operator } : {}),
       ...(deps.limits ? { limits: deps.limits } : {}),
     });
     results.push(
@@ -135,7 +139,10 @@ export async function handleSync(
   const answer: SyncResponse = {
     protocol: PROTOCOL_VERSION,
     results,
-    pull: await pull(deps.database, accountId, cursor, limit === undefined ? {} : { limit }),
+    pull: await pull(deps.database, accountId, cursor, {
+      ...(limit === undefined ? {} : { limit }),
+      ...(deps.operator ? { operator: deps.operator } : {}),
+    }),
   };
   return json(200, answer);
 }

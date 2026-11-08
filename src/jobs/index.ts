@@ -7,6 +7,7 @@ import { installationTokens } from '../github-app/server';
 import { purge } from '../sync/purge';
 import { trimNotices } from '../workspaces/inbox';
 import { JobRunner, realDeps, type JobDefinition, type RunnerDeps } from './runner';
+import { operatorOf } from '../crypto/operator';
 
 /**
  * Every job the app has. Each task that has one adds it here: the purge (13.7, here), the reminders (8.5, 8.6) and the backups (10.5, here).
@@ -19,7 +20,7 @@ export const jobs: readonly JobDefinition[] = [
     everyMs: 60 * 60 * 1000,
     runAtStart: true,
     run: async ({ now }) => {
-      await purge(await getDatabase(), now.getTime());
+      await purge(await getDatabase(), now.getTime(), getConfig().operatorEncryption);
     },
   },
   {
@@ -45,6 +46,7 @@ export const jobs: readonly JobDefinition[] = [
           database: await getDatabase(),
           directory: authDirectory(await getAuthDatabase()),
           ring: config.encryption,
+          ...(operatorOf(config) ? { operator: operatorOf(config) } : {}),
           apiUrl: config.githubApiUrl,
           ...(installationTokens() ? { tokens: installationTokens() } : {}),
         },

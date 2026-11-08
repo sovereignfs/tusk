@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import type { Directory } from '../auth/directory';
 import { CryptoError } from '../crypto/envelope';
 import type { KeyRing } from '../crypto/keys';
+import type { Operator } from '../crypto/operator';
 import { readCredential } from '../crypto/store';
 import type { Database } from '../db/client';
 import { dbAll } from '../db/exec';
@@ -93,6 +94,8 @@ export interface RunDeps {
   readonly database: Database;
   readonly directory: Pick<Directory, 'profiles'>;
   readonly ring: KeyRing | undefined;
+  /** The instance key when `TUSK_DB_ENCRYPTION=on`: content is sealed in the database and a backup is made of it opened (§9.5, §21.3). */
+  readonly operator?: Operator;
   readonly apiUrl: string;
   readonly makeProvider?: (token: string) => Provider;
   /** Where an installation's token comes from, when the GitHub App is set up (§21.2). */
@@ -195,7 +198,13 @@ async function attempt(
     if (!repository.private) return { ok: false, problem: 'public' };
 
     // The rows, in a transaction that is over before the host is called again.
-    const snapshot = await takeSnapshot(deps.database, deps.directory, accountId, when);
+    const snapshot = await takeSnapshot(
+      deps.database,
+      deps.directory,
+      accountId,
+      when,
+      deps.operator,
+    );
     // An automatic backup writes only when something changed since the last one; Back up now always writes.
     if (trigger === 'auto' && snapshot.fingerprint === connection.lastFingerprint) {
       await dbAll(

@@ -1,8 +1,10 @@
 import { sql } from 'drizzle-orm';
+import type { Operator } from '../crypto/operator';
 import type { Database } from '../db/client';
 import { dbAll, dbGet } from '../db/exec';
 import * as postgresSchema from '../db/schema/postgres';
 import * as sqliteSchema from '../db/schema/sqlite';
+import { openStored } from './operator-fields';
 import {
   LIMITS,
   type Pull,
@@ -32,6 +34,8 @@ import { decodeFields } from './validate';
 export interface PullOptions {
   /** About how many rows the page carries. */
   limit?: number;
+  /** The instance key under `TUSK_DB_ENCRYPTION=on` (§9.5): fields the server sealed are opened for the device, a backup or a file. */
+  operator?: Operator;
 }
 
 const schema = (database: Database) =>
@@ -88,7 +92,7 @@ export async function pull(
 
   const rows: PulledRow[] = [];
   for (const name of TABLES) {
-    rows.push(...(await rowsOf(database, accountId, name, cursor, end)));
+    rows.push(...(await rowsOf(database, accountId, name, cursor, end, options.operator)));
   }
   rows.sort(
     (a, b) =>
@@ -123,6 +127,7 @@ async function rowsOf(
   name: SyncTable,
   cursor: number,
   end: number,
+  operator: Operator,
 ): Promise<PulledRow[]> {
   const target = tableOf(database, name);
   const columns =
@@ -141,7 +146,7 @@ async function rowsOf(
   return raw.map((row) => {
     const decoded = decodeFields(row.fields);
     // A row the server wrote is trusted, but not so far that a bad one stops a person's whole pull.
-    const fields = decoded.ok ? decoded.value : {};
+    const fields = decoded.ok ? openStored(operator, name, row.id, decoded.value) : {};
     const base = {
       id: row.id,
       deletedAt: row.deletedAt === null ? null : Number(row.deletedAt),

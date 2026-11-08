@@ -1,4 +1,5 @@
 import { sql } from 'drizzle-orm';
+import type { Operator } from '../crypto/operator';
 import type { Directory } from '../auth/directory';
 import type { Database } from '../db/client';
 import { dbGet, transaction } from '../db/exec';
@@ -30,6 +31,7 @@ export async function takeSnapshot(
   directory: Pick<Directory, 'profiles'>,
   accountId: string,
   now: Date,
+  operator?: Operator,
 ): Promise<Snapshot> {
   return transaction(database, async (tx) => {
     const settings =
@@ -42,7 +44,10 @@ export async function takeSnapshot(
 
     const rows: LocalRow[] = [];
     for (let cursor = 0; ;) {
-      const page = await pull(tx, accountId, cursor, { limit: PAGE });
+      const page = await pull(tx, accountId, cursor, {
+        limit: PAGE,
+        ...(operator ? { operator } : {}),
+      });
       rows.push(...page.rows);
       cursor = page.cursor;
       if (!page.more) break;

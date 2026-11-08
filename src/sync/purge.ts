@@ -38,7 +38,12 @@ export interface PurgeResult {
   mutationsForgotten: number;
 }
 
-export async function purge(database: Database, now: number): Promise<PurgeResult> {
+export async function purge(
+  database: Database,
+  now: number,
+  /** `TUSK_DB_ENCRYPTION=on`: a card's `seriesId` is sealed, so no card is found to name a series, and **no series is removed as one nothing points at** (§9.5). */
+  operator = false,
+): Promise<PurgeResult> {
   const result: PurgeResult = {
     purged: { desk_list: 0, desk_card: 0, desk_check: 0, desk_series: 0 },
     accounts: 0,
@@ -59,19 +64,21 @@ export async function purge(database: Database, now: number): Promise<PurgeResul
     ),
   );
   // And any account with a series that nothing points at.
-  const lonely = await dbAll<{ owner: string }>(
-    database,
-    sql`SELECT DISTINCT s.owner_id AS owner FROM ${tableOf(database, 'desk_series')} s
+  const lonely = operator
+    ? []
+    : await dbAll<{ owner: string }>(
+        database,
+        sql`SELECT DISTINCT s.owner_id AS owner FROM ${tableOf(database, 'desk_series')} s
         WHERE s.created_at < ${cutoff}
           AND NOT EXISTS (
             SELECT 1 FROM ${tableOf(database, 'desk_card')} c
             WHERE c.owner_id = s.owner_id AND c.fields LIKE '%' || s.id || '%'
           )
           AND NOT EXISTS (${sealed(database)})`,
-  );
+      );
   const owners = new Set([...due, ...lonely].map((row) => row.owner));
   for (const owner of owners) {
-    const done = await purgeAccount(database, owner, cutoff, now);
+    const done = await purgeAccount(database, owner, cutoff, now, operator);
     if (TABLES.some((name) => done[name] > 0)) result.accounts += 1;
     for (const name of TABLES) result.purged[name] += done[name];
   }
@@ -92,6 +99,7 @@ async function purgeAccount(
   owner: string,
   cutoff: number,
   now: number,
+  operator: boolean,
 ): Promise<Record<SyncTable, number>> {
   return transaction(database, async (tx) => {
     const t = schema(tx);
@@ -148,7 +156,7 @@ async function purgeAccount(
     for (const table of ['desk_check', 'desk_card', 'desk_series', 'desk_list'] as const) {
       // Once the cards that go are gone, a series nothing names goes too.
       if (table === 'desk_series') {
-        for (const id of await orphans(tx, owner, cutoff)) seriesIds.add(id);
+        if (!operator) for (const id of await orphans(tx, owner, cutoff)) seriesIds.add(id);
         removed.desk_series = [...seriesIds];
       }
       for (const id of removed[table]) {

@@ -22,7 +22,7 @@ import {
   REQUIRED_ON_CREATE,
   type Scalar,
   STRUCTURE,
-  type StoredFields,
+  type RowFields,
   type SyncTable,
   TABLES,
 } from './format';
@@ -337,7 +337,7 @@ function sizeOf(change: Change): number {
 }
 
 /** The text of a `fields` column back into what it holds, or why it cannot be: a row the server wrote is trusted, but not so far that a bad one crashes a pull. */
-export function decodeFields(textValue: string): Parsed<StoredFields> {
+export function decodeFields(textValue: string): Parsed<RowFields> {
   let parsed: unknown;
   try {
     parsed = JSON.parse(textValue);
@@ -345,14 +345,22 @@ export function decodeFields(textValue: string): Parsed<StoredFields> {
     return no('not JSON');
   }
   if (!isRecord(parsed)) return no('not a map of fields');
-  const out: Record<string, StoredFields[string]> = {};
+  const out: Record<string, RowFields[string]> = {};
   for (const [name, entry] of Object.entries(parsed)) {
-    if (!isRecord(entry) || stray(entry, ['v', 'c', 's'])) return no('a field is { v or c, s }');
+    if (!isRecord(entry) || stray(entry, ['v', 'c', 'o', 's']))
+      return no('a field is { v, c or o, s }');
     const s = entry.s;
     if (typeof s !== 'number' || !Number.isSafeInteger(s) || s < 0) {
       return no('a field has the seq that wrote it');
     }
     const hasV = Object.hasOwn(entry, 'v');
+    if (Object.hasOwn(entry, 'o')) {
+      // The operator's: sealed by the server, and the only one of the three that is.
+      if (hasV || Object.hasOwn(entry, 'c') || typeof entry.o !== 'string')
+        return no('a field is { o } alone');
+      out[name] = { o: entry.o, s };
+      continue;
+    }
     if (hasV === Object.hasOwn(entry, 'c')) return no('a field is { v } or { c }');
     if (hasV) {
       const v = entry.v;
