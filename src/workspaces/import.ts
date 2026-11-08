@@ -104,8 +104,8 @@ async function insertBoard(
       const cardId = crypto.randomUUID();
       counts.cards += 1;
       await run(
-        sql`INSERT INTO ${t.card} (id, board_id, list_id, title, description, due_date, due_time, position, archived_at, created_by, created_at, updated_at)
-            VALUES (${cardId}, ${boardId}, ${listId}, ${sealText('card', cardId, 'title', card.title)}, ${seal('card', cardId, 'description', card.description === '' ? null : card.description)}, ${card.dueDate}, ${card.dueTime}, ${card.position},
+        sql`INSERT INTO ${t.card} (id, board_id, list_id, title, description, due_date, due_time, due_end, position, archived_at, created_by, created_at, updated_at)
+            VALUES (${cardId}, ${boardId}, ${listId}, ${sealText('card', cardId, 'title', card.title)}, ${seal('card', cardId, 'description', card.description === '' ? null : card.description)}, ${card.dueDate}, ${card.dueTime}, ${card.dueEnd}, ${card.position},
                     ${card.archived ? now : null}, ${accountId}, ${now}, ${now}) RETURNING id`,
       );
       for (const label of card.labels) {

@@ -120,6 +120,13 @@
       "when": 1794114494467,
       "tag": "0016_add_reminder_slot",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1794139832785,
+      "tag": "0017_add_card_due_end",
+      "breakpoints": true
     }
   ]
 }

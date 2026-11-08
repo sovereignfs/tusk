@@ -229,6 +229,24 @@ describe('an operation', () => {
       ).toBe(false);
   });
 
+  it('takes an end only with a time and after it, and a request without one as no end (task 19.5)', () => {
+    const a = ID();
+    const parse = (extra: object) => parseOp({ opId: ID(), op: 'card.setDue', id: a, ...extra });
+    const ok = parse({ dueDate: '2026-11-07', dueTime: '09:30', dueEnd: '10:15' });
+    expect(ok.ok && ok.value).toMatchObject({ dueEnd: '10:15' });
+    const none = parse({ dueDate: '2026-11-07', dueTime: '09:30' });
+    expect(none.ok && none.value).toMatchObject({ dueEnd: null });
+    expect(parse({ dueDate: '2026-11-07', dueTime: '09:30', dueEnd: null }).ok).toBe(true);
+    for (const bad of [
+      { dueDate: '2026-11-07', dueTime: null, dueEnd: '10:15' },
+      { dueDate: '2026-11-07', dueTime: '09:30', dueEnd: '09:30' },
+      { dueDate: '2026-11-07', dueTime: '09:30', dueEnd: '09:00' },
+      { dueDate: '2026-11-07', dueTime: '09:30', dueEnd: '25:00' },
+      { dueDate: '2026-11-07', dueTime: '09:30', dueEnd: 1015 },
+    ])
+      expect(parse(bad).ok, JSON.stringify(bad)).toBe(false);
+  });
+
   it('takes the label operations, a name that may be empty, and refuses a colour that is not one or a name that is too long', () => {
     const [a, b] = [ID(), ID()];
     for (const good of [

@@ -16,7 +16,9 @@ import {
   layout,
   nowIndex,
   previewEntries,
-  slotBetween,
+  freeSlotAt,
+  lengthOf,
+  reachOf,
 } from './feed';
 
 const card = (id: string, fields: Record<string, unknown>, listId = 'L1'): LocalRow =>
@@ -56,7 +58,7 @@ describe('the Desk and the boards as one kind of entry', () => {
   it('takes the Desk cards with a readable date in the range, and leaves out the rest', () => {
     const entries = deskEntries(
       [
-        card('a', { title: 'In', dueDate: '2026-11-10', dueTime: '09:30' }),
+        card('a', { title: 'In', dueDate: '2026-11-10', dueTime: '09:30', dueEnd: '10:30' }),
         card('b', { title: 'Done', dueDate: '2026-11-10', completedAt: 5 }),
         card('c', { title: 'Before', dueDate: '2026-11-01' }),
         card('d', { title: 'After', dueDate: '2026-12-01' }),
@@ -75,6 +77,7 @@ describe('the Desk and the boards as one kind of entry', () => {
       key: 'desk:a',
       source: 'desk',
       time: '09:30',
+      end: '10:30',
       done: false,
       color: '#16a34a',
       where: 'Errands',
@@ -82,6 +85,15 @@ describe('the Desk and the boards as one kind of entry', () => {
     });
     expect(entries[1]?.done).toBe(true);
     expect(entries[2]?.time).toBeNull();
+    // A card with no end has none, and an end that is not after the time is none.
+    expect(entries[1]?.end).toBeNull();
+    const odd = deskEntries(
+      [card('o', { title: 'x', dueDate: '2026-11-10', dueTime: '09:30', dueEnd: '09:00' })],
+      lists,
+      '2026-11-02',
+      '2026-11-30',
+    );
+    expect(odd[0]?.end).toBeNull();
   });
 
   it('takes the boards’ cards as they came, linking to the card on its board', () => {
@@ -95,7 +107,8 @@ describe('the Desk and the boards as one kind of entry', () => {
           listName: 'Backlog',
           title: 'Ship',
           dueDate: '2026-11-12',
-          dueTime: null,
+          dueTime: '13:00',
+          dueEnd: '14:30',
         },
       ]),
     ).toEqual([
@@ -105,7 +118,8 @@ describe('the Desk and the boards as one kind of entry', () => {
         id: 'c1',
         title: 'Ship',
         date: '2026-11-12',
-        time: null,
+        time: '13:00',
+        end: '14:30',
         done: false,
         color: '#2563eb',
         where: 'Roadmap',
@@ -123,6 +137,7 @@ describe('a day’s order', () => {
     title: key,
     date: '2026-11-12',
     time: null,
+    end: null,
     done: false,
     color: '#000000',
     where: '',
@@ -222,6 +237,7 @@ describe('the line for now', () => {
     title: String(time),
     date: '2026-11-08',
     time,
+    end: null,
     done: false,
     color: '#000000',
     where: '',
@@ -243,16 +259,33 @@ describe('the line for now', () => {
   });
 });
 
-describe('a free slot between two timed cards', () => {
-  it('is an hour after the first, where the next is two hours or more later', () => {
-    expect(slotBetween('09:00', '11:00')).toBe('10:00');
-    expect(slotBetween('09:30', '15:00')).toBe('10:30');
-    expect(slotBetween('13:00', '23:59')).toBe('14:00');
+describe('a card’s length, and where free time is (task 19.5)', () => {
+  const at = (time: string | null, end: string | null = null) => ({ time, end });
+
+  it('is the time to the end, an hour for a card with no end, and none for a card with no time', () => {
+    expect(lengthOf(at('09:00', '11:00'))).toBe(120);
+    expect(lengthOf(at('09:00', '09:45'))).toBe(45);
+    expect(lengthOf(at('09:00'))).toBe(60);
+    expect(lengthOf(at(null))).toBe(0);
+    // Twice the length is twice the height.
+    expect(lengthOf(at('13:00', '15:00'))).toBe(2 * lengthOf(at('13:00', '14:00')));
   });
-  it('is not there when there is not an hour left over', () => {
-    expect(slotBetween('09:00', '10:59')).toBeNull();
-    expect(slotBetween('09:00', '09:00')).toBeNull();
-    expect(slotBetween('09:00', '10:00')).toBeNull();
+
+  it('is over at its end, an hour after its time with none, and never past the last minute of the day', () => {
+    expect(reachOf(at('09:00', '10:15'))).toBe('10:15');
+    expect(reachOf(at('09:30'))).toBe('10:30');
+    expect(reachOf(at('23:30'))).toBe('23:59');
+    expect(reachOf(at(null))).toBeNull();
+  });
+
+  it('is a slot at the time the cards before are over, where an hour or more is left before the next', () => {
+    expect(freeSlotAt('10:15', '11:15')).toBe('10:15');
+    expect(freeSlotAt('10:15', '14:00')).toBe('10:15');
+    expect(freeSlotAt('10:15', '11:14')).toBeNull();
+    expect(freeSlotAt('10:15', '10:15')).toBeNull();
+    // With no end, the card is taken to take an hour: two hours between two starts leave an hour.
+    expect(freeSlotAt(reachOf(at('09:00')) as string, '11:00')).toBe('10:00');
+    expect(freeSlotAt(reachOf(at('09:00')) as string, '10:59')).toBeNull();
   });
 });
 

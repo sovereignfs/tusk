@@ -62,6 +62,7 @@ export function showingBoard(view: BoardView, op: Op): BoardView {
             position: op.position,
             dueDate: null,
             dueTime: null,
+            dueEnd: null,
             hasDescription: false,
             labels: [],
             assignees: [],
@@ -177,7 +178,12 @@ export function showingBoard(view: BoardView, op: Op): BoardView {
         ...view,
         cards: view.cards.map((each) =>
           each.id === op.id
-            ? { ...each, dueDate: op.dueDate, dueTime: op.dueDate === null ? null : op.dueTime }
+            ? {
+                ...each,
+                dueDate: op.dueDate,
+                dueTime: op.dueDate === null ? null : op.dueTime,
+                dueEnd: op.dueDate === null || op.dueTime === null ? null : (op.dueEnd ?? null),
+              }
             : each,
         ),
       };

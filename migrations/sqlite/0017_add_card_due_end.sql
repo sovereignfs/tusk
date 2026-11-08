@@ -1,0 +1,1 @@
+ALTER TABLE `card` ADD `due_end` text;

@@ -1525,6 +1525,77 @@ describe(`the roles (${leg})`, () => {
       expect(tile).toMatchObject({ dueDate: '2026-11-08', dueTime: null });
     });
 
+    it('may have an end after its time: kept with them, cleared with them, refused when it is not after the start, and a request from before it has none (task 19.5)', async () => {
+      const w = await seedWorld(database);
+      expect(
+        await apply(w, 'boardMember', {
+          op: 'card.setDue',
+          id: w.cards.open,
+          dueDate: '2026-11-07',
+          dueTime: '09:30',
+          dueEnd: '10:45',
+        }),
+      ).toMatchObject({
+        status: 'applied',
+        rows: { card: { dueDate: '2026-11-07', dueTime: '09:30', dueEnd: '10:45' } },
+      });
+      expect(await cardDetail(database, w.accounts.member, w.cards.open)).toMatchObject({
+        dueTime: '09:30',
+        dueEnd: '10:45',
+      });
+      // The tile on the board carries it; a clone has it too.
+      const tile = (await readBoard(database, w.accounts.member, w.boards.publicBoard))?.cards.find(
+        (c) => c.id === w.cards.open,
+      );
+      expect(tile).toMatchObject({ dueEnd: '10:45' });
+      const copy = id();
+      await apply(w, 'boardMember', { op: 'card.clone', id: w.cards.open, newId: copy });
+      expect(await cardDetail(database, w.accounts.member, copy)).toMatchObject({
+        dueEnd: '10:45',
+      });
+      // Not kept without a time, nor with no date; and not at all from a request that does not say it.
+      await apply(w, 'boardMember', {
+        op: 'card.setDue',
+        id: w.cards.open,
+        dueDate: '2026-11-07',
+        dueTime: null,
+        dueEnd: '10:45',
+      }).catch(() => undefined);
+      await apply(w, 'boardMember', {
+        op: 'card.setDue',
+        id: w.cards.open,
+        dueDate: '2026-11-08',
+        dueTime: '08:00',
+      });
+      expect(await cardDetail(database, w.accounts.member, w.cards.open)).toMatchObject({
+        dueDate: '2026-11-08',
+        dueTime: '08:00',
+        dueEnd: null,
+      });
+      await apply(w, 'boardMember', {
+        op: 'card.setDue',
+        id: w.cards.open,
+        dueDate: null,
+        dueTime: null,
+        dueEnd: null,
+      });
+      expect(await cardDetail(database, w.accounts.member, w.cards.open)).toMatchObject({
+        dueDate: null,
+        dueTime: null,
+        dueEnd: null,
+      });
+      // Who may not set a due date may not set an end.
+      await expect(
+        apply(w, 'outsider', {
+          op: 'card.setDue',
+          id: w.cards.open,
+          dueDate: '2026-11-09',
+          dueTime: '09:00',
+          dueEnd: '10:00',
+        }),
+      ).resolves.toMatchObject({ status: 'refused' });
+    });
+
     it('reads archived cards for whoever can see the board, and for nobody else', async () => {
       const w = await seedWorld(database);
       expect(

@@ -32,6 +32,11 @@ beforeAll(async () => {
     database,
     sql`INSERT INTO ${t.cardAssignee} (card_id, account_id, board_id, assigned_by, created_at) VALUES (${world.cards.open}, ${world.accounts.outsider}, ${world.boards.publicBoard}, ${world.accounts.boardOwner}, 1)`,
   );
+  // The open card is dated and has an end, so that a round trip has one to lose (task 19.5).
+  await dbRun(
+    database,
+    sql`UPDATE ${t.card} SET due_date = '2026-12-01', due_time = '09:00', due_end = '10:30' WHERE id = ${world.cards.open}`,
+  );
   const putAway = crypto.randomUUID();
   await dbRun(
     database,
@@ -89,6 +94,7 @@ function bare(board: BoardPart) {
           description: c.description,
           dueDate: c.dueDate,
           dueTime: c.dueTime,
+          dueEnd: c.dueEnd,
           position: c.position,
           archived: c.archived,
           labels: c.labels.map((id) => labelNames.get(id)).sort(),

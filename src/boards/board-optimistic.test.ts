@@ -126,6 +126,7 @@ describe('cards on a board', () => {
     position,
     dueDate: null,
     dueTime: null,
+    dueEnd: null,
     hasDescription: false,
     labels: [],
     assignees: [],

@@ -1,0 +1,1 @@
+ALTER TABLE "tusk"."card" ADD COLUMN "due_end" text;

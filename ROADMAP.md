@@ -18,7 +18,7 @@ Five questions decide it, in this order:
 4. **What makes the Desk a daily driver?** Repeats, search, the PWA and working offline: Milestone F. It comes after the boards because the Desk already works, offline, from Milestone B.
 5. **What protects data, and makes it part of the suite and releasable?** Export, backup and encryption (G), the rest of Fjord's sign-in and hosting (H), then the phone's foundations, review and release (I).
 
-The phone's own screens, the Planner, reminders and live boards are phase 2. The GitHub App (10.7) is P3: a token connects a repository without it.
+The phone's own screens, the Planner (epic 19, done), reminders and live boards are phase 2. The GitHub App (10.7) is P3: a token connects a repository without it.
 
 ## Phase 1 — the MVP
 
@@ -206,7 +206,7 @@ After the MVP. The tasks with IDs are planned in their epics, in the order they 
 | [19.2](docs/epics/planner.md)      | The Planner: a day's block                  | 19.1               | ✅     |
 | [19.3](docs/epics/planner.md)      | The Planner: adding from the feed           | 19.2               | ✅     |
 | [19.4](docs/epics/planner.md)      | The Planner: repeating cards as previews    | 19.2, 5.2          | ✅     |
-| [19.5](docs/epics/planner.md)      | Start and end times, and a card's length    | 19.2               | 📋     |
+| [19.5](docs/epics/planner.md)      | Start and end times, and a card's length    | 19.2               | ✅     |
 
 | What                                                          | Note                                        |
 | ------------------------------------------------------------- | ------------------------------------------- |

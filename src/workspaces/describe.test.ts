@@ -23,6 +23,9 @@ suite('what happened, in words', () => {
     expect(say('card.due_set', { title: 'Fix login', date: '2026-11-07', time: '09:30' })).toBe(
       'Ana set Fix login due 2026-11-07 at 09:30',
     );
+    expect(
+      say('card.due_set', { title: 'Fix login', date: '2026-11-07', time: '09:30', end: '10:15' }),
+    ).toBe('Ana set Fix login due 2026-11-07 at 09:30 until 10:15');
     expect(say('card.due_set', { title: 'Fix login', date: '2026-11-07', time: null })).toBe(
       'Ana set Fix login due 2026-11-07',
     );

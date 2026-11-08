@@ -53,7 +53,7 @@ const ARGUMENTS: Record<OpName, readonly string[]> = {
   'boardMember.remove': ['boardId', 'accountId'],
   'board.join': ['id'],
   'board.leave': ['id'],
-  'card.setDue': ['id', 'dueDate', 'dueTime'],
+  'card.setDue': ['id', 'dueDate', 'dueTime', 'dueEnd'],
   'label.create': ['id', 'boardId', 'name', 'color'],
   'label.update': ['id', 'name', 'color'],
   'label.delete': ['id'],
@@ -394,6 +394,14 @@ export function parseOp(value: unknown): Parsed<OpRequest> {
       // There is no time without a date (DESIGN.md §11).
       if (dueDate.value === null && dueTime.value !== null)
         return no('dueTime: a time needs a date');
+      // An end is optional (a request from before it has none), needs a time, and is after it (task 19.5).
+      const dueEnd =
+        value.dueEnd === undefined
+          ? { ok: true as const, value: null }
+          : nullable(hhmm)(value.dueEnd);
+      if (!dueEnd.ok) return no('dueEnd: not a time');
+      if (dueEnd.value !== null && (dueTime.value === null || dueEnd.value <= dueTime.value))
+        return no('dueEnd: an end needs a time, and is after it');
       return {
         ok: true,
         value: {
@@ -402,6 +410,7 @@ export function parseOp(value: unknown): Parsed<OpRequest> {
           id: id.value,
           dueDate: dueDate.value,
           dueTime: dueTime.value,
+          dueEnd: dueEnd.value,
         },
       };
     }

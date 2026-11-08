@@ -317,6 +317,9 @@ function board(v: unknown, path: string): BoardPart {
           const dueTime = get(c, 'dueTime', nullable(hhmm), cat);
           if (dueDate === null && dueTime !== null)
             throw new Bad(`${cat}.dueTime: a time with no date`);
+          const dueEnd = get(c, 'dueEnd', optionalEnd, cat);
+          if (dueEnd !== null && (dueTime === null || dueEnd <= dueTime))
+            throw new Bad(`${cat}.dueEnd: an end needs a time, and is after it`);
           const carried = list(c.labels, `${cat}.labels`, WORKSPACE_LIMITS.labelsPerBoard).map(
             (each, k) => {
               const parsed = uuid(each);
@@ -333,6 +336,7 @@ function board(v: unknown, path: string): BoardPart {
             description: get(c, 'description', body(LIMITS.descriptionChars), cat),
             dueDate,
             dueTime,
+            dueEnd,
             position: get(c, 'position', position, cat),
             archived: get(c, 'archived', bool, cat),
             labels: carried,

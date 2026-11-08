@@ -621,6 +621,8 @@ One function, `todayFor(zone, now)` in `src/time.ts`, is the idea of "today" eve
 
 The due date picker offers Today, Tomorrow and Next week, then the design system's `DatePicker`, and a time once a date is set.
 
+**An end (task 19.5).** A card that has a time can also have an end: `HH:MM` on the same day, **after the time** (a span across midnight is not a thing a card has). It is never alone and never at or before the start: the Desk's `setDue` writes `dueDate`, `dueTime` and `dueEnd` in one change and clears the end with the time, the validator refuses an end with no time or not after it, and on a board `card.setDue` does the same (`dueEnd` missing in a request is none). The picker offers **Until** once there is a time; a date shows "Tomorrow, 9:30 AM – 10:15 AM". It is the start that reminders and the daily brief use. The Planner draws the card as long as it is (§25.1).
+
 **As built (task 4.2):** the Desk's `setDue` writes `dueDate` and `dueTime` in one change and no other action names them; the validator refuses a time with no date; on a board `card.setDue`
 does the same through the door.
 
@@ -792,7 +794,7 @@ In phase 1, boards are read from the server and held in memory, not on the devic
 | --------------- | -------------------------------------------------- |
 | **Title**       | The one required field, 1 to 500 characters        |
 | **Description** | Plain text, shown as written, with its line breaks |
-| **Due date**    | A date, and optionally a time (§11)                |
+| **Due date**    | A date, and optionally a time and an end (§11)     |
 | **Checklist**   | Items with a title and a tick, in order (§15.4)    |
 | **Labels**      | The board's labels it carries (§15.2)              |
 | **Assignees**   | Members of the board (§15.3)                       |
@@ -1337,7 +1339,7 @@ personal-key Desk.
 | `board`            | `id`, `workspace_id`, `name`, `color`, `description`, `visibility` (`public`, `private`), `archived_at`, `version`, `created_by`, `created_at`, `updated_at` |
 | `board_member`     | `board_id`, `account_id` (the key), `workspace_id`, `role` (`owner`, `member`), `created_at`                                                                 |
 | `board_list`       | `id`, `board_id`, `name`, `position`, `created_at`, `updated_at`                                                                                             |
-| `card`             | `id`, `board_id`, `list_id`, `title`, `description`, `due_date`, `due_time`, `position`, `archived_at`, `created_by`, `created_at`, `updated_at`             |
+| `card`             | `id`, `board_id`, `list_id`, `title`, `description`, `due_date`, `due_time`, `due_end`, `position`, `archived_at`, `created_by`, `created_at`, `updated_at`  |
 | `label`            | `id`, `board_id`, `name`, `color`, `created_at`                                                                                                              |
 | `card_label`       | `card_id`, `label_id` (the key), `board_id`                                                                                                                  |
 | `card_assignee`    | `card_id`, `account_id` (the key), `board_id`, `assigned_by`, `created_at`                                                                                   |
@@ -1435,8 +1437,9 @@ assigned to them** (only those, so it stays personal). Nothing undated. It serve
 - **Repeats** show their later occurrences as previews, computed from the rule and never stored; only the current card can be completed.
 - **The Desk's part is read from the working copy** (so a sealed Desk is in it), **the boards' part from `GET /api/planner`**, which needs the network: the
   Planner is not offline, and says so for the boards' part while still showing the Desk's.
-- **A card's length** waits for an end time (`dueEnd`, task 19.5): until then a card with only a date or a start is the fixed height; after it, a card is as
-  tall as it is long and the gaps are the real free time.
+- **A card's length** is its end (`dueEnd`, task 19.5, §11): a card with only a date or a start is one fixed height; one with an end is as tall as it is long
+  (1.2px a minute, never under the fixed height), and **the free slots are the real free time**: where an hour or more is left between when the cards
+  before are over (the latest end, or an hour after a start with none) and the next start.
 
 ### 25.2 Reminders, Push and email
 

@@ -64,8 +64,9 @@ const goodBoard = () => {
             id: card,
             title: 'Ship',
             description: '',
-            dueDate: null,
-            dueTime: null,
+            dueDate: '2026-11-06',
+            dueTime: '14:00',
+            dueEnd: '15:00',
             position: 'a0',
             archived: false,
             labels: [label],
@@ -203,6 +204,11 @@ const MALFORMED: [string, (f: Record<string, any>) => void, RegExp][] = [
     /a time with no date/,
   ],
   ['a time of 25:00', (f) => (f.desk.lists[0].cards[0].dueTime = '25:00'), /\.dueTime/],
+  [
+    'a board card’s end that is not after its time',
+    (f) => (f.workspaces[0].boards[0].lists[0].cards[0].dueEnd = '13:00'),
+    /\.dueEnd: an end needs a time, and is after it/,
+  ],
   ['an end that is not a time', (f) => (f.desk.lists[0].cards[0].dueEnd = '9'), /\.dueEnd/],
   [
     'an end that is not after the time',

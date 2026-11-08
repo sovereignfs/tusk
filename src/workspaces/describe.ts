@@ -17,6 +17,8 @@ export interface Details {
   readonly visibility?: string;
   readonly date?: string;
   readonly time?: string | null;
+  /** When it ends, the same day (task 19.5). */
+  readonly end?: string;
 }
 
 /** The names a row needs, by account id: the actor's, and any person it names. */
@@ -46,7 +48,7 @@ export function describe(
     case 'card.deleted':
       return `${actor} deleted ${card}`;
     case 'card.due_set':
-      return `${actor} set ${card} due ${details.date ?? ''}${details.time ? ` at ${details.time}` : ''}`.trimEnd();
+      return `${actor} set ${card} due ${details.date ?? ''}${details.time ? ` at ${details.time}${details.end ? ` until ${details.end}` : ''}` : ''}`.trimEnd();
     case 'card.due_cleared':
       return `${actor} cleared the due date of ${card}`;
     case 'card.label_added':

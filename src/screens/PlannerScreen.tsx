@@ -29,7 +29,9 @@ import {
   layout,
   nowIndex,
   previewEntries,
-  slotBetween,
+  freeSlotAt,
+  lengthOf,
+  reachOf,
 } from '../planner/feed';
 import type { Planned, PlannedBoardCard } from '../planner/format';
 import { useLocal } from '../sync/react';
@@ -375,8 +377,15 @@ function Day({
         <ul className={styles.cards}>
           {named ? <li className={styles.caption}>Any time</li> : null}
           {entries.map((entry, index) => {
-            const before = entries[index - 1]?.time;
-            const free = before && entry.time ? slotBetween(before, entry.time) : null;
+            // Free time is counted from when the timed cards before this one are over: the latest of their ends, or an hour after one with no end.
+            const reach = entries
+              .slice(0, index)
+              .map(reachOf)
+              .reduce<string | null>(
+                (latest, each) => (each && (!latest || each > latest) ? each : latest),
+                null,
+              );
+            const free = reach && entry.time ? freeSlotAt(reach, entry.time) : null;
             return (
               <Fragment key={entry.key}>
                 {free ? (
@@ -401,7 +410,13 @@ function Day({
                     className={`${styles.card} ${entry.done ? styles.done : ''} ${
                       date < today && !entry.done ? styles.overdue : ''
                     }`}
-                    style={{ '--band': entry.color } as React.CSSProperties}
+                    style={
+                      {
+                        '--band': entry.color,
+                        // One fixed height for a card with no end, and the card as long as it is for one with an end (never shorter than the fixed height).
+                        ...(entry.end ? { '--length': `${lengthOf(entry)}` } : {}),
+                      } as React.CSSProperties
+                    }
                     data-planner-card={entry.key}
                     data-shortcut-card=""
                     onClick={(event) => {
@@ -425,7 +440,9 @@ function Day({
                       {entry.title}
                     </span>
                     <span className={styles.meta}>
-                      {entry.time ? `${formatTime(entry.time)} · ` : ''}
+                      {entry.time
+                        ? `${formatTime(entry.time)}${entry.end ? ` – ${formatTime(entry.end)}` : ''} · `
+                        : ''}
                       {entry.where}
                       {entry.done ? ' · Done' : ''}
                       {entry.preview ? ' · Repeats' : ''}

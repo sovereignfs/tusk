@@ -201,7 +201,7 @@ export async function readBoard(
   );
   const cards = await dbAll<Omit<CardTile, 'hasDescription'> & { hasDescription: unknown }>(
     database,
-    sql`SELECT id, board_id AS "boardId", list_id AS "listId", title, position, due_date AS "dueDate", due_time AS "dueTime",
+    sql`SELECT id, board_id AS "boardId", list_id AS "listId", title, position, due_date AS "dueDate", due_time AS "dueTime", due_end AS "dueEnd",
           (description IS NOT NULL AND description <> '') AS "hasDescription"
         FROM ${t.card} WHERE board_id = ${boardId} AND archived_at IS NULL
         ORDER BY list_id, position, id LIMIT ${WORKSPACE_LIMITS.cardsPerBoard}`,
@@ -424,13 +424,14 @@ export async function cardDetail(
     description: string | null;
     dueDate: string | null;
     dueTime: string | null;
+    dueEnd: string | null;
     archivedAt: number | string | null;
     createdAt: number | string;
     updatedAt: number | string;
   }>(
     database,
     sql`SELECT c.id AS id, c.board_id AS "boardId", c.list_id AS "listId", l.name AS "listName", c.title AS title, c.position AS position,
-          c.description AS description, c.due_date AS "dueDate", c.due_time AS "dueTime", c.archived_at AS "archivedAt",
+          c.description AS description, c.due_date AS "dueDate", c.due_time AS "dueTime", c.due_end AS "dueEnd", c.archived_at AS "archivedAt",
           c.created_at AS "createdAt", c.updated_at AS "updatedAt"
         FROM ${t.card} c JOIN ${t.boardList} l ON l.id = c.list_id
         WHERE c.id = ${cardId} AND c.board_id IN ${boardsVisibleTo(database, accountId)}`,
@@ -484,6 +485,7 @@ export async function cardDetail(
     position: row.position,
     dueDate: row.dueDate,
     dueTime: row.dueTime,
+    dueEnd: row.dueEnd,
     hasDescription: row.description !== null && row.description !== '',
     description: open('card', row.id, 'description', row.description),
     archived: row.archivedAt !== null,

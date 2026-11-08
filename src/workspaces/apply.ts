@@ -591,7 +591,8 @@ async function run(
     case 'card.setDue': {
       const changed = await dbAll<{ boardId: string }>(
         tx,
-        sql`UPDATE ${t.card} SET due_date = ${request.dueDate}, due_time = ${request.dueDate === null ? null : request.dueTime}, updated_at = ${now}
+        sql`UPDATE ${t.card} SET due_date = ${request.dueDate}, due_time = ${request.dueDate === null ? null : request.dueTime},
+                due_end = ${request.dueDate === null || request.dueTime === null ? null : (request.dueEnd ?? null)}, updated_at = ${now}
             WHERE id = ${request.id} AND board_id IN ${boardsEditableBy(tx, accountId)}
             RETURNING board_id AS "boardId"`,
       );
@@ -1003,12 +1004,13 @@ async function run(
         description: string | null;
         dueDate: string | null;
         dueTime: string | null;
+        dueEnd: string | null;
         position: string;
       }>(
         tx,
         sql`UPDATE ${t.card} SET updated_at = ${now}
             WHERE id = ${request.id} AND board_id IN ${boardsEditableBy(tx, accountId)} AND archived_at IS NULL
-            RETURNING board_id AS "boardId", list_id AS "listId", title, description, due_date AS "dueDate", due_time AS "dueTime", position`,
+            RETURNING board_id AS "boardId", list_id AS "listId", title, description, due_date AS "dueDate", due_time AS "dueTime", due_end AS "dueEnd", position`,
       );
       const row = taken[0];
       if (!row) throw new Refused('not_found');
@@ -1037,9 +1039,9 @@ async function run(
       );
       const made = await dbAll<{ id: string }>(
         tx,
-        sql`INSERT INTO ${t.card} (id, board_id, list_id, title, description, due_date, due_time, position, created_by, created_at, updated_at)
+        sql`INSERT INTO ${t.card} (id, board_id, list_id, title, description, due_date, due_time, due_end, position, created_by, created_at, updated_at)
             VALUES (${request.newId}, ${original.boardId}, ${original.listId}, ${sealText('card', request.newId, 'title', original.title)}, ${seal('card', request.newId, 'description', original.description)}, ${original.dueDate},
-                    ${original.dueTime}, ${between(original.position, next?.position ?? null)}, ${accountId}, ${now}, ${now})
+                    ${original.dueTime}, ${original.dueEnd}, ${between(original.position, next?.position ?? null)}, ${accountId}, ${now}, ${now})
             ON CONFLICT (id) DO NOTHING RETURNING id`,
       );
       if (made.length === 0) throw new Refused('not_found');
@@ -1210,10 +1212,11 @@ async function cardTile(tx: Database, id: string): Promise<CardTile> {
     position: string;
     dueDate: string | null;
     dueTime: string | null;
+    dueEnd: string | null;
     hasDescription: number | boolean | string;
   }>(
     tx,
-    sql`SELECT id, board_id AS "boardId", list_id AS "listId", title, position, due_date AS "dueDate", due_time AS "dueTime",
+    sql`SELECT id, board_id AS "boardId", list_id AS "listId", title, position, due_date AS "dueDate", due_time AS "dueTime", due_end AS "dueEnd",
           (description IS NOT NULL AND description <> '') AS "hasDescription"
         FROM ${t.card} WHERE id = ${id}`,
   );

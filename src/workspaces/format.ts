@@ -156,6 +156,8 @@ export type Op =
       readonly id: string;
       readonly dueDate: string | null;
       readonly dueTime: string | null;
+      /** When a card that starts at `dueTime` ends, the same day, after it (task 19.5). No end without a time. A request from before it says none. */
+      readonly dueEnd?: string | null;
     }
   /** A label of the board: any colour, and a name that may be empty (DESIGN.md §15.2). */
   | {
@@ -393,6 +395,7 @@ export interface CardTile {
   readonly position: string;
   readonly dueDate: string | null;
   readonly dueTime: string | null;
+  readonly dueEnd: string | null;
   readonly hasDescription: boolean;
   /** The ids of the board's labels it carries, in the order the labels were made. */
   readonly labels: readonly string[];

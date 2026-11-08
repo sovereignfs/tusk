@@ -246,19 +246,24 @@ export function CardDialog({ detail: first }: { detail: CardDetail }) {
             ) : null}
             {editable ? (
               <DuePicker
-                value={{ date: tile?.dueDate ?? null, time: tile?.dueTime ?? null }}
+                value={{
+                  date: tile?.dueDate ?? null,
+                  time: tile?.dueTime ?? null,
+                  end: tile?.dueEnd ?? null,
+                }}
                 onChange={(due) =>
                   void store.perform({
                     op: 'card.setDue',
                     id: detail.id,
                     dueDate: due.date,
                     dueTime: due.date === null ? null : due.time,
+                    dueEnd: due.date === null || due.time === null ? null : (due.end ?? null),
                   })
                 }
               />
             ) : tile?.dueDate ? (
               <span className={styles.chip}>
-                Due {formatDue(tile.dueDate, tile.dueTime, nowHere()).text}
+                Due {formatDue(tile.dueDate, tile.dueTime, nowHere(), undefined, tile.dueEnd).text}
               </span>
             ) : null}
           </div>

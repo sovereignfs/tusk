@@ -108,7 +108,9 @@ export function TileBody({ card, labels }: { card: CardTile; labels: readonly La
     .map((id) => labels.find((each) => each.id === id))
     .filter((each): each is LabelRow => each !== undefined);
   // A due date is floating, shown as written; today is the browser's own (DESIGN.md §11), and overdue is the danger colour.
-  const due = card.dueDate ? formatDue(card.dueDate, card.dueTime, nowHere()) : null;
+  const due = card.dueDate
+    ? formatDue(card.dueDate, card.dueTime, nowHere(), undefined, card.dueEnd)
+    : null;
   return (
     <>
       {carried.length > 0 ? (

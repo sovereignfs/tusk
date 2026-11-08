@@ -255,6 +255,8 @@ export async function record(
               title: card.title,
               date: request.dueDate,
               time: request.dueTime,
+              // The end (task 19.5), in the words only when there is one.
+              ...(request.dueTime !== null && request.dueEnd ? { end: request.dueEnd } : {}),
             });
       return;
     case 'card.addLabel':

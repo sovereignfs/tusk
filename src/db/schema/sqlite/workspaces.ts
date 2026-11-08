@@ -98,6 +98,8 @@ export const card = sqliteTable(
     description: text('description'),
     dueDate: isoDate('due_date'),
     dueTime: hhmm('due_time'),
+    /** When a card that starts at `due_time` ends, the same day (task 19.5): `HH:MM` after it, or null. */
+    dueEnd: hhmm('due_end'),
     /** The due date and time (`YYYY-MM-DD HH:MM`) a reminder was last claimed for, as on a Desk card (task 8.6). */
     remindedFor: text('reminded_for'),
     position: position('position').notNull(),

@@ -41,7 +41,7 @@ cards you have, and the size and timing of each change. Whoever runs it can see 
   no count), and the server wakes your device at that time; email and the bell say only "You have cards due". The daily brief is not made for a Desk with a key,
   since it would have to count cards. If you choose it on a device, a reminder there can name the card: that device then gives Tusk's service worker the Desk's list
   keys (not your own key), kept until you turn it off, lock the Desk, forget the key or sign out. Without it the reminder still comes, and says only that cards are due.
-  A device you have not opened Tusk on for 14 days stops getting reminders. The Planner (when it is built) will work from times only too.
+  A device you have not opened Tusk on for 14 days stops getting reminders. The Planner reads your Desk on this device, so a Desk with a key of your own is in it once unlocked; the boards' cards come from the server as they do on a board.
 
 ## The server's own key
 

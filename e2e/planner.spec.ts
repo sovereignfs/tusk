@@ -192,7 +192,13 @@ async function newList(page: Page, name: string) {
   ).toBeVisible();
 }
 
-async function deskCardToday(page: Page, list: string, title: string, time: string | null) {
+async function deskCardToday(
+  page: Page,
+  list: string,
+  title: string,
+  time: string | null,
+  end: string | null = null,
+) {
   await page.goto('/desk');
   await page
     .getByRole('navigation', { name: 'Lists' })
@@ -207,6 +213,7 @@ async function deskCardToday(page: Page, list: string, title: string, time: stri
   await detail.getByRole('button', { name: 'Set a due date' }).click();
   await page.getByRole('button', { name: 'Today' }).click();
   if (time) await page.getByLabel('Time', { exact: true }).fill(time);
+  if (end) await page.getByLabel('Until').fill(end);
   await page.keyboard.press('Escape');
   await expect(detail.getByRole('button', { name: /^Today/ })).toBeVisible();
 }
@@ -413,4 +420,38 @@ test('a repeating card shows its next days as previews, and completing it turns 
   await expect(
     page.locator('[data-planner-card^="preview:"]').filter({ hasText: title }),
   ).toHaveCount(0);
+});
+
+test('a card with an end is as tall as it is long, and free time is what is left between them (task 19.5)', async ({
+  page,
+}) => {
+  await signedIn(page);
+  const list = unique('Length');
+  await newList(page, list);
+  const [hour, two, open] = [unique('One hour'), unique('Two hours'), unique('No end')];
+  // Times that no other test uses, so that the free time between them is theirs alone.
+  await deskCardToday(page, list, hour, '03:10', '04:10');
+  await deskCardToday(page, list, two, '05:40', '07:40');
+  await deskCardToday(page, list, open, '12:00');
+
+  await page.goto('/planner');
+  const today = page.locator('[aria-current="date"]');
+  const card = (title: string) => today.locator('[data-planner-card]').filter({ hasText: title });
+  await expect(card(two)).toBeVisible();
+  const height = async (title: string) => (await card(title).boundingBox())?.height ?? 0;
+  // One hour and two hours are 72 and 144 pixels: twice. A card with no end is the fixed height.
+  const one = await height(hour);
+  expect(one).toBeGreaterThan(56);
+  expect(Math.abs((await height(two)) - 2 * one)).toBeLessThan(3);
+  expect(await height(open)).toBeLessThan(one);
+  await expect(card(hour)).toContainText(/3:10.*–.*4:10|03:10.*–.*04:10/);
+
+  // Free time begins when the cards before are over: at 04:10, after the first, and at 07:40, after the second; a slot there makes a card there.
+  const slots = await today
+    .locator('[data-planner-slot]')
+    .evaluateAll((els) => els.map((el) => el.getAttribute('data-planner-slot')));
+  expect(slots).toContain('04:10');
+  expect(slots).toContain('07:40');
+  // Not at 03:10's hour mark, which a card with an end would have said was taken until 04:10.
+  expect(slots).not.toContain('04:00');
 });

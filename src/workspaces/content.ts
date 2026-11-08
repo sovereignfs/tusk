@@ -44,6 +44,7 @@ export const STRUCTURAL_TEXT_COLUMNS: Readonly<Record<string, readonly string[]>
     'list_id',
     'due_date',
     'due_time',
+    'due_end',
     'reminded_for',
     'position',
     'created_by',

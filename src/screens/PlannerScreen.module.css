@@ -76,7 +76,8 @@
   flex-direction: column;
   justify-content: center;
   gap: 2px;
-  min-height: 56px;
+  /* One height for a card with no end; with one (`--length`, in minutes) it is 1.2px a minute, never less, and at most twelve hours. */
+  min-height: clamp(56px, calc(var(--length, 0) * 1.2px), 864px);
   padding: var(--sv-space-2) var(--sv-space-3);
   border: 1px solid var(--sv-color-border);
   border-left: 4px solid var(--band);

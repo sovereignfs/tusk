@@ -47,6 +47,8 @@ export interface Entry {
   readonly date: string;
   /** `HH:MM`, or null for a card with a date and no time. */
   readonly time: string | null;
+  /** `HH:MM` after `time`, when the card has an end (task 19.5), else null: the card is then one fixed height. */
+  readonly end: string | null;
   readonly done: boolean;
   /** `#rrggbb`, a list's or a board's: drawn as a band. */
   readonly color: string;
@@ -57,6 +59,10 @@ export interface Entry {
   /** An occurrence of a repeating card that is not there yet: shown lighter, opening the card that is, and never done or edited itself. */
   readonly preview?: true;
 }
+
+/** An end that counts: a time that is after `time`, else none. */
+const endAfter = (time: string, end: string | null): string | null =>
+  end !== null && TIME.test(end) && end > time ? end : null;
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -79,6 +85,7 @@ export function deskEntries(
     if (typeof date !== 'string' || !DATE.test(date) || date < from || date > to) continue;
     const time = plain(card, 'dueTime');
     const list = listById.get(card.listId);
+    const due = dueOf(card);
     out.push({
       key: `desk:${card.id}`,
       source: 'desk',
@@ -86,6 +93,7 @@ export function deskEntries(
       title: text(card, 'title', 'Untitled card'),
       date,
       time: typeof time === 'string' && TIME.test(time) ? time : null,
+      end: typeof time === 'string' && TIME.test(time) ? endAfter(time, due.end) : null,
       done: typeof plain(card, 'completedAt') === 'number',
       color: colourOf(list),
       where: text(list, 'title', 'Untitled list'),
@@ -147,6 +155,8 @@ export function previewEntries(
         title: text(open.card, 'title', 'Untitled card'),
         date,
         time: typeof time === 'string' && TIME.test(time) ? time : null,
+        end:
+          typeof time === 'string' && TIME.test(time) ? endAfter(time, dueOf(open.card).end) : null,
         done: false,
         color: colourOf(list),
         where: text(list, 'title', 'Untitled list'),
@@ -167,6 +177,7 @@ export function boardEntries(cards: readonly PlannedBoardCard[]): Entry[] {
     title: card.title,
     date: card.dueDate,
     time: card.dueTime,
+    end: card.dueTime !== null ? endAfter(card.dueTime, card.dueEnd) : null,
     done: false,
     color: card.boardColor,
     where: card.boardName,
@@ -278,20 +289,34 @@ export function nowIndex(entries: readonly Entry[], time: string): number | null
   return after === -1 ? entries.length : after;
 }
 
-/** The least gap between two timed cards, in minutes, that shows a free slot: a card is given the hour after its time, so two hours leaves an hour. */
-export const FREE_SLOT_GAP = 120;
+/** The least free time, in minutes, that shows a slot between cards. */
+export const FREE_SLOT_MINUTES = 60;
+/** How long a card with no end is taken to take, in minutes, for where free time begins. */
+export const DEFAULT_MINUTES = 60;
 
 const minutes = (time: string): number => {
   const [h, m] = time.split(':').map(Number) as [number, number];
   return h * 60 + m;
 };
+const clock = (total: number): string =>
+  `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+
+/** How many minutes a card takes: from its time to its end, or `DEFAULT_MINUTES` with no end (and none for a card with no time). */
+export function lengthOf(entry: Pick<Entry, 'time' | 'end'>): number {
+  if (entry.time === null) return 0;
+  return entry.end === null ? DEFAULT_MINUTES : minutes(entry.end) - minutes(entry.time);
+}
+
+/** The time a card is over: its end, or an hour after its time when it has none; null for a card with no time. May pass midnight, and is then the last minute. */
+export function reachOf(entry: Pick<Entry, 'time' | 'end'>): string | null {
+  if (entry.time === null) return null;
+  return clock(Math.min(minutes(entry.time) + lengthOf(entry), 23 * 60 + 59));
+}
 
 /**
- * The time of the free slot between a timed card at `before` and the next at `after`, or null when there is not room for one: an hour after `before`, when
- * `after` is `FREE_SLOT_GAP` minutes or more later. Cards have no length until they can have an end (task 19.5), so this is a suggestion and not a measure.
+ * The time of the free slot after cards that are over at `reach`, before a card that starts at `next`: `reach` itself, when an hour or more is left before `next`,
+ * else null. A card with no end is taken to take an hour (`reachOf`), so this is a measure for a card with an end and a suggestion for one without.
  */
-export function slotBetween(before: string, after: string): string | null {
-  if (minutes(after) - minutes(before) < FREE_SLOT_GAP) return null;
-  const at = minutes(before) + 60;
-  return `${String(Math.floor(at / 60)).padStart(2, '0')}:${String(at % 60).padStart(2, '0')}`;
+export function freeSlotAt(reach: string, next: string): string | null {
+  return minutes(next) - minutes(reach) >= FREE_SLOT_MINUTES ? reach : null;
 }

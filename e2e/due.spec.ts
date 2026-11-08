@@ -229,7 +229,10 @@ test('a Desk card gets an end after its time, shows the span, refuses one that i
 }) => {
   await signedIn(page);
   const name = unique('Ends');
-  await page.getByRole('button', { name: 'Add a list' }).click();
+  await expect(async () => {
+    await page.getByRole('button', { name: 'Add a list' }).click();
+    await expect(page.getByLabel('New list name')).toBeVisible({ timeout: 1500 });
+  }).toPass();
   await page.getByLabel('New list name').fill(name);
   await page.getByLabel('New list name').press('Enter');
   await expect(
@@ -291,5 +294,48 @@ test('a Desk card gets an end after its time, shows the span, refuses one that i
     page
       .getByRole('region', { name: 'Card' })
       .getByRole('button', { name: 'Tomorrow, change the due date' }),
+  ).toBeVisible();
+});
+
+test('a card on a board gets an end after its time from the dialog, shows the span on its tile, and keeps it after a reload (task 19.5)', async ({
+  page,
+}) => {
+  await signedIn(page);
+  await page.goto('/');
+  const workspace = unique('Spans');
+  await page
+    .getByRole('navigation', { name: 'Tusk', exact: true })
+    .getByRole('button', { name: 'Create a workspace' })
+    .click();
+  await page.getByRole('dialog', { name: 'Create a workspace' }).getByLabel('Name').fill(workspace);
+  await page.getByRole('button', { name: 'Create workspace' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: workspace })).toBeVisible();
+  await page.getByRole('button', { name: 'Create board' }).click();
+  await page.getByRole('dialog', { name: 'Create board' }).getByLabel('Name').fill('Plan');
+  await page
+    .getByRole('dialog', { name: 'Create board' })
+    .getByRole('button', { name: 'Create board' })
+    .click();
+  await expect(page).toHaveURL(/\/b\/[0-9a-f-]{36}$/);
+  const column = page.locator('section[aria-label="Backlog"]');
+  await column.getByRole('button', { name: 'Add a card' }).click();
+  await column.getByLabel('Title of a new card in Backlog').fill('Workshop');
+  await column.getByLabel('Title of a new card in Backlog').press('Enter');
+  await column.getByLabel('Workshop', { exact: true }).click();
+
+  const dialog = page.getByRole('dialog', { name: 'Workshop' });
+  await dialog.getByRole('button', { name: 'Set a due date' }).click();
+  await page.getByRole('button', { name: 'Today' }).click();
+  await expect(page.getByLabel('Until')).toHaveCount(0);
+  await page.getByLabel('Time', { exact: true }).fill('14:00');
+  await page.getByLabel('Until').fill('15:30');
+  await page.keyboard.press('Escape');
+  await expect(column.getByText(/Today, .*2:00.* – .*3:30/)).toBeVisible();
+
+  await page.reload();
+  await expect(
+    page
+      .getByRole('dialog', { name: 'Workshop' })
+      .getByRole('button', { name: /^Today, .*2:00.* – .*3:30/ }),
   ).toBeVisible();
 });

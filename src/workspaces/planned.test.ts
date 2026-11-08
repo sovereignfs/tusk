@@ -33,7 +33,14 @@ const apply = (w: World, role: Role, op: Op) =>
 const planned = (w: World, role: Role, from = '2026-11-01', to = '2026-11-30') =>
   plannedBoardCards(database, w.accounts[role], from, to);
 
-async function dated(w: World, who: Role, title: string, date: string, time: string | null) {
+async function dated(
+  w: World,
+  who: Role,
+  title: string,
+  date: string,
+  time: string | null,
+  end: string | null = null,
+) {
   const card = id();
   await apply(w, 'boardMember', {
     op: 'card.create',
@@ -42,7 +49,13 @@ async function dated(w: World, who: Role, title: string, date: string, time: str
     title,
     position: `a${card.slice(0, 6)}`,
   });
-  await apply(w, 'boardMember', { op: 'card.setDue', id: card, dueDate: date, dueTime: time });
+  await apply(w, 'boardMember', {
+    op: 'card.setDue',
+    id: card,
+    dueDate: date,
+    dueTime: time,
+    dueEnd: end,
+  });
   await apply(w, 'boardMember', { op: 'card.assign', cardId: card, accountId: w.accounts[who] });
   return card;
 }
@@ -64,6 +77,19 @@ describe(`the Planner's boards (${leg})`, () => {
       dueDate: '2026-11-12',
       dueTime: null,
     });
+  });
+
+  it('says when a card ends, and none for a card with no time', async () => {
+    const w = await seedWorld(database);
+    await dated(w, 'boardMember', 'Long', '2026-11-12', '09:00', '11:30');
+    await dated(w, 'boardMember', 'Short', '2026-11-12', '12:00');
+    await dated(w, 'boardMember', 'All day', '2026-11-12', null, '13:00');
+    const found = await planned(w, 'boardMember');
+    expect(found.map((c) => [c.title, c.dueTime, c.dueEnd])).toEqual([
+      ['All day', null, null],
+      ['Long', '09:00', '11:30'],
+      ['Short', '12:00', null],
+    ]);
   });
 
   it('leaves out a card outside the range, an undated one, an archived one, and one assigned to somebody else', async () => {

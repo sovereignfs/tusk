@@ -106,6 +106,8 @@ export interface ExportedBoardCard {
   readonly description: string;
   readonly dueDate: string | null;
   readonly dueTime: string | null;
+  /** When it ends, the same day (task 19.5): `HH:MM` after `dueTime`, or null. A file from before it has none. */
+  readonly dueEnd: string | null;
   readonly position: string;
   readonly archived: boolean;
   /** The ids, in the file, of the labels it has. */

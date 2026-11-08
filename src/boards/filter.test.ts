@@ -11,6 +11,7 @@ const card = (id: string, title: string, extra: Partial<CardTile> = {}): CardTil
   position: id,
   dueDate: null,
   dueTime: null,
+  dueEnd: null,
   hasDescription: false,
   labels: [],
   assignees: [],

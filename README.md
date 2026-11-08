@@ -19,9 +19,9 @@ workspaces and boards (roles, labels, assignees, comments, activity, the Inbox, 
 verification and reset, Sovereign, linking); a key of your own for the Desk; backup to GitHub (by token or by a GitHub App) and export and import; account
 deletion; the phone's foundations and an accessibility pass.
 
-**Phone:** a footer of five with an action that fits where you are, a carousel of the Desk's lists, touch gestures on a card, and Today and Review as swipe views. **Notifications:** an Inbox notice can also go out by email, to a Sovereign core's bell, and by Web Push (`TUSK_VAPID_*`, which also need `TUSK_ENCRYPTION_KEY`), for the kinds you choose.
+**Planner:** a feed of days, before and after today, of the cards that have a date and are yours (your Desk's and the board cards assigned to you), with a line for now, cards as long as they are, repeats shown ahead, and a quick add from an empty day or a free slot. **Phone:** a footer of five with an action that fits where you are, a carousel of the Desk's lists, touch gestures on a card, and Today and Review as swipe views. **Notifications:** an Inbox notice can also go out by email, to a Sovereign core's bell, and by Web Push (`TUSK_VAPID_*`, which also need `TUSK_ENCRYPTION_KEY`), for the kinds you choose.
 
-**Not built:** the daily brief and reminders at a due time, the Planner, and a board's columns as a carousel. [`ROADMAP.md`](ROADMAP.md) has
+**Notifications also:** a daily brief and a reminder at a due time (for a Desk with a key of your own, from times only). **Not built:** boards that work offline and update live, and a board's columns as a carousel. [`ROADMAP.md`](ROADMAP.md) has
 each, and [`DESIGN.md`](DESIGN.md) says what they will do. Nothing has been released yet (`package.json` says `0.0.0`; see [`RELEASING.md`](RELEASING.md)).
 
 ## Run it

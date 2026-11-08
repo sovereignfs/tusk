@@ -95,11 +95,12 @@ export async function exportBoard(
     description: string | null;
     dueDate: string | null;
     dueTime: string | null;
+    dueEnd: string | null;
     position: string;
     archivedAt: number | string | null;
   }>(
     database,
-    sql`SELECT id, list_id AS "listId", title, description, due_date AS "dueDate", due_time AS "dueTime", position, archived_at AS "archivedAt"
+    sql`SELECT id, list_id AS "listId", title, description, due_date AS "dueDate", due_time AS "dueTime", due_end AS "dueEnd", position, archived_at AS "archivedAt"
         FROM ${t.card} WHERE board_id = ${boardId} ORDER BY list_id, position, id LIMIT ${CAP}`,
   );
   const labels = await dbAll<{ id: string; name: string; color: string }>(
@@ -172,6 +173,7 @@ export async function exportBoard(
     description: open('card', card.id, 'description', card.description) ?? '',
     dueDate: card.dueDate,
     dueTime: card.dueTime,
+    dueEnd: card.dueEnd,
     position: card.position,
     archived: card.archivedAt !== null,
     labels: (labelsOf.get(card.id) ?? []).map((row) => row.labelId).sort(),

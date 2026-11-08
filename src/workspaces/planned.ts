@@ -32,10 +32,11 @@ export async function plannedBoardCards(
     title: string;
     dueDate: string;
     dueTime: string | null;
+    dueEnd: string | null;
   }>(
     database,
     sql`SELECT c.id AS "cardId", c.board_id AS "boardId", b.name AS "boardName", b.color AS "boardColor",
-               c.list_id AS "listId", l.name AS "listName", c.title AS title, c.due_date AS "dueDate", c.due_time AS "dueTime"
+               c.list_id AS "listId", l.name AS "listName", c.title AS title, c.due_date AS "dueDate", c.due_time AS "dueTime", c.due_end AS "dueEnd"
         FROM ${t.cardAssignee} ca
         JOIN ${t.card} c ON c.id = ca.card_id
         JOIN ${t.board} b ON b.id = c.board_id
@@ -55,5 +56,6 @@ export async function plannedBoardCards(
     title: openText('card', row.cardId, 'title', row.title),
     dueDate: row.dueDate,
     dueTime: row.dueTime,
+    dueEnd: row.dueTime === null ? null : row.dueEnd,
   }));
 }
