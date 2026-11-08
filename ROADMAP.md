@@ -185,7 +185,7 @@ Ready for a phone, reviewed, documented, released, and on a real instance. **Don
 
 ## Phase 2
 
-After the MVP. The tasks with IDs are planned in their epics; the rest are outlined in `DESIGN.md` §25 and become tasks when phase 2 is planned.
+After the MVP. The tasks with IDs are planned in their epics, in the order they are listed (the Planner, epic 19: 19.1 to 19.3 are P1, 19.4 P2, 19.5 P3); the rest are outlined in `DESIGN.md` §25 and become tasks when phase 2 is planned.
 
 | ID                                 | Task                                        | Depends on         | Status |
 | ---------------------------------- | ------------------------------------------- | ------------------ | ------ |
@@ -202,15 +202,19 @@ After the MVP. The tasks with IDs are planned in their epics; the rest are outli
 | [8.5](docs/epics/notifications.md) | The daily brief                             | 1.6, 4.3, 8.2, 8.3 | ✅     |
 | [8.6](docs/epics/notifications.md) | Due-time reminders                          | 8.5                | ✅     |
 | [14.6](docs/epics/encryption.md)   | Reminders by times only                     | 8.4, 8.6, 14.3     | ✅     |
+| [19.1](docs/epics/planner.md)      | The Planner: the feed                       | 4.2, 7.8, 18.4     | 📋     |
+| [19.2](docs/epics/planner.md)      | The Planner: a day's block                  | 19.1               | 📋     |
+| [19.3](docs/epics/planner.md)      | The Planner: adding from the feed           | 19.2               | 📋     |
+| [19.4](docs/epics/planner.md)      | The Planner: repeating cards as previews    | 19.2, 5.2          | 📋     |
+| [19.5](docs/epics/planner.md)      | Start and end times, and a card's length    | 19.2               | 📋     |
 
-| What                                                          | Note                                                                |
-| ------------------------------------------------------------- | ------------------------------------------------------------------- |
-| The Planner                                                   | A feed of dates with blocks (§25.1); the sidebar entry waits for it |
-| Boards offline, and live                                      | Under sync, with server-sent events (§25.4)                         |
-| Invitations by email, and core's directory                    | §25.5                                                               |
-| Replies to comments                                           | §25.6                                                               |
-| The Desk as a board, and cards from boards and other services | §25.7                                                               |
-| Attachments                                                   | §25.8                                                               |
+| What                                                          | Note                                        |
+| ------------------------------------------------------------- | ------------------------------------------- |
+| Boards offline, and live                                      | Under sync, with server-sent events (§25.4) |
+| Invitations by email, and core's directory                    | §25.5                                       |
+| Replies to comments                                           | §25.6                                       |
+| The Desk as a board, and cards from boards and other services | §25.7                                       |
+| Attachments                                                   | §25.8                                       |
 
 ## Phase 3 — Candidates
 

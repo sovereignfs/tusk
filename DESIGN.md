@@ -1420,9 +1420,22 @@ After the MVP. Outlined here so phase 1 does not preclude any of it. Each gets i
 
 ### 25.1 The Planner
 
-A feed of dates, from today on, each day a block of what is due: Desk cards and board cards assigned to the person, overdue first. On a phone, the
-screenshot's look: one day after another, scrolling. It reads due dates the server can see (§23.3's mirrors), so on a personal-key Desk the Desk's part
-is computed in the browser.
+One feed of days, before and after today, holding every card with a due date that is the person's: the Desk's, from every list, and **the board cards
+assigned to them** (only those, so it stays personal). Nothing undated. It serves seeing what is coming and giving a day its shape. Planned as epic 19
+(`docs/epics/planner.md`), settled on 2026-11-08:
+
+- **A feed only,** the same on a phone and a computer (a centred column when wide). It opens on today and scrolls **both ways without end**, loading a few
+  weeks at a time as an end comes near and keeping the reader's place. **No overdue block:** a card is on its own day, an overdue one in the danger colour.
+- **A day** has its date at the side (today a filled circle), its untimed cards first ("Any time"), then its timed ones in time order, every card one fixed
+  height with a band of its list's or board's colour, and on today a line for now. **An empty day is still a row,** to add to; three or more in a row fold
+  into one that unfolds.
+- **Tapping a card opens it** over the Planner; **tapping an empty day, the end of a day or a gap between timed cards adds a Desk card** there, with the date
+  (and the time) filled in. Board cards are made on the board.
+- **Repeats** show their later occurrences as previews, computed from the rule and never stored; only the current card can be completed.
+- **The Desk's part is read from the working copy** (so a sealed Desk is in it), **the boards' part from `GET /api/planner`**, which needs the network: the
+  Planner is not offline, and says so for the boards' part while still showing the Desk's.
+- **A card's length** waits for an end time (`dueEnd`, task 19.5): until then a card with only a date or a start is the fixed height; after it, a card is as
+  tall as it is long and the gaps are the real free time.
 
 ### 25.2 Reminders, Push and email
 

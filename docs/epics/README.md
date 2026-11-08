@@ -45,3 +45,4 @@ _Status key: ✅ Done · ⏳ In progress · 📋 Planned · 🚧 Waits on a deci
 | 16  | [Workspaces](workspaces.md)                 | Operations and roles, workspaces, their people, the boards index                               | 4     |
 | 17  | [Boards](boards.md)                         | A board and its lists, settings, visibility and joining, search, publishing, activity          | 6     |
 | 18  | [Cards on a board](cards.md)                | Cards in lists, the card dialog, labels, assignees, checklist, comments, moving and cloning    | 7     |
+| 19  | [The Planner](planner.md)                   | The feed of days, a day's block, adding from it, repeats as previews, start and end times      | 5     |
