@@ -476,6 +476,16 @@ test('Today and Review, from the footer, go through cards one at a time by their
   const apps = () => footer.getByRole('button', { name: 'Apps' }).click();
   const what = page.getByRole('dialog', { name: 'What to add' });
   const today = page.getByRole('dialog', { name: 'Today' });
+  // The shared account may hold other cards that are overdue or due today, which Today shows before the starred: so a card is brought to the top by dismissing what is
+  // above it (a dismissal lasts a day and is harmless here).
+  const toTop = async (title: string) => {
+    for (let guard = 0; guard < 40; guard++) {
+      const top = await today.locator('[data-card-title]').first().innerText();
+      if (top === title) return;
+      await today.getByRole('button', { name: 'Dismiss' }).click();
+    }
+    throw new Error(`${title} never came to the top of Today`);
+  };
 
   // Today is an overlay: the Desk is under it at the same address.
   const address = page.url();
@@ -485,9 +495,9 @@ test('Today and Review, from the footer, go through cards one at a time by their
   for (const name of ['Done', 'Cancel', 'Dismiss', 'Star'])
     await expect(today.getByRole('button', { name })).toBeVisible();
   // The starred are ordered by title, and the page's own cards are the same ones (ours are among them).
-  await expect(today.getByRole('button', { name: alpha, exact: true })).toBeVisible();
+  await toTop(alpha);
   await today.getByRole('button', { name: 'Done' }).click();
-  await expect(today.getByRole('button', { name: beta, exact: true })).toBeVisible();
+  await toTop(beta);
 
   // Dismiss hides it until tomorrow; closing leaves the Desk where it was, and Undo (still offered) brings it back.
   await today.getByRole('button', { name: 'Dismiss' }).click();
@@ -501,7 +511,7 @@ test('Today and Review, from the footer, go through cards one at a time by their
   await page.getByRole('button', { name: 'Undo' }).click();
   await apps();
   await what.getByRole('button', { name: 'Today' }).click();
-  await expect(today.getByRole('button', { name: beta, exact: true })).toBeVisible();
+  await toTop(beta);
   await page.keyboard.press('Escape');
 
   // Review: a pass can be stopped and gone on with. The card that was skipped goes to the end, and is not the first one when it is opened again.
@@ -525,7 +535,7 @@ test('Today and Review, from the footer, go through cards one at a time by their
   // Tidy up what this test made on the shared account: Beta is done from Today, and Gamma ticked on the Desk.
   await apps();
   await what.getByRole('button', { name: 'Today' }).click();
-  await expect(today.getByRole('button', { name: beta, exact: true })).toBeVisible();
+  await toTop(beta);
   await today.getByRole('button', { name: 'Done' }).click();
   await page.keyboard.press('Escape');
   await page.getByRole('checkbox', { name: `Done: ${gamma}` }).check();
