@@ -1,7 +1,8 @@
 import { generateKeyPairSync } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { loadConfig, type LoadResult } from './index';
-import { readSetting, SettingFileError } from './env';
+import { ConfigError } from '@sovereignfs/config';
+import { readEnvironment, readSecret } from './env';
 
 /** The problems of a bad environment, which every test below wants to read and none expects to be empty. */
 function problems(result: LoadResult): readonly string[] {
@@ -307,44 +308,77 @@ describe('loadConfig', () => {
 
   it('turns an unreadable secret file into a problem that names the variable and not the path', () => {
     const result = problems(
-      loadConfig({ TUSK_CORE_URL_FILE: '/run/secrets/nowhere' }, () => {
+      loadConfig({ TUSK_AUTH_SECRET_FILE: '/run/secrets/nowhere' }, () => {
         throw new Error('ENOENT /run/secrets/nowhere');
       }),
     );
-    expect(result.join(' ')).toContain('TUSK_CORE_URL_FILE');
+    expect(result.join(' ')).toContain('TUSK_AUTH_SECRET_FILE');
     expect(result.join(' ')).not.toContain('/run/secrets/nowhere');
   });
 });
 
-describe('readSetting', () => {
+describe('reading the environment', () => {
+  const read = (env: Record<string, string | undefined>, name: string, readFile?: () => string) => {
+    const reading = readEnvironment(env, readFile);
+    if (!reading.ok) throw new Error(reading.problems.join(' '));
+    return reading.read(name);
+  };
+
   it('reads the plain name', () => {
-    expect(readSetting({ TUSK_URL: 'a' }, 'TUSK_URL')).toBe('a');
+    expect(read({ TUSK_URL: 'a' }, 'TUSK_URL')).toBe('a');
   });
 
   it('treats an empty value as no value', () => {
-    expect(readSetting({ TUSK_URL: '' }, 'TUSK_URL')).toBeUndefined();
-    expect(readSetting({}, 'TUSK_URL')).toBeUndefined();
+    expect(read({ TUSK_URL: '' }, 'TUSK_URL')).toBeUndefined();
+    expect(read({}, 'TUSK_URL')).toBeUndefined();
   });
 
-  it('prefers the file, and drops one trailing line break and no more', () => {
-    const value = readSetting(
-      { TUSK_X: 'plain', TUSK_X_FILE: '/f' },
-      'TUSK_X',
-      () => ' spaced \n\n',
+  it('reads a secret from its file, and drops one trailing line break and no more', () => {
+    expect(read({ TUSK_AUTH_SECRET_FILE: '/f' }, 'TUSK_AUTH_SECRET', () => ' spaced \n\n')).toBe(
+      ' spaced \n',
     );
-    expect(value).toBe(' spaced \n');
   });
 
-  it('throws an error that names the variable, never the path or the cause', () => {
-    try {
-      readSetting({ TUSK_X_FILE: '/secret/path' }, 'TUSK_X', () => {
-        throw new Error('boom /secret/path');
-      });
-      expect.unreachable();
-    } catch (error) {
-      expect(error).toBeInstanceOf(SettingFileError);
-      expect((error as Error).message).toBe('TUSK_X_FILE names a file that cannot be read.');
-    }
+  it('refuses a secret given both ways (contracts/env.md §3: the file no longer wins)', () => {
+    const reading = readEnvironment(
+      { TUSK_AUTH_SECRET: 'plain', TUSK_AUTH_SECRET_FILE: '/f' },
+      () => 'x',
+    );
+    expect(reading).toEqual({
+      ok: false,
+      problems: ['TUSK_AUTH_SECRET is set together with TUSK_AUTH_SECRET_FILE; set only one.'],
+    });
+    expect(
+      problems(loadConfig({ TUSK_AUTH_SECRET: 'plain', TUSK_AUTH_SECRET_FILE: '/f' })),
+    ).toHaveLength(1);
+  });
+
+  it('refuses a file for a setting that is not a secret, rather than ignoring it', () => {
+    expect(readEnvironment({ TUSK_CORE_URL_FILE: '/run/core' }, () => 'https://core.test')).toEqual(
+      {
+        ok: false,
+        problems: ['TUSK_CORE_URL_FILE is not read: only a secret can be given as a file.'],
+      },
+    );
+  });
+
+  it('names the variable, never the path or the cause, of a file that cannot be read', () => {
+    const reading = readEnvironment({ TUSK_AUTH_SECRET_FILE: '/secret/path' }, () => {
+      throw new Error('boom /secret/path');
+    });
+    expect(reading).toEqual({
+      ok: false,
+      problems: ['TUSK_AUTH_SECRET_FILE names a file that cannot be read.'],
+    });
+  });
+
+  it('reads one secret alone, and throws a ConfigError for a file it cannot read', () => {
+    expect(readSecret({ TUSK_POSTGRES_URL: 'p' }, 'TUSK_POSTGRES_URL')).toBe('p');
+    expect(() =>
+      readSecret({ TUSK_POSTGRES_URL_FILE: '/x' }, 'TUSK_POSTGRES_URL', () => {
+        throw new Error('no');
+      }),
+    ).toThrow(ConfigError);
   });
 
   describe('the GitHub App', () => {

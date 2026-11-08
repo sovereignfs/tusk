@@ -6,7 +6,7 @@ import { type KeyRing, parseKey, ringOf } from '../crypto/keys';
 import { DatabaseConfigError, resolveDatabaseSettings, type DatabaseSettings } from '../db/config';
 import { checkApiUrl, DEFAULT_API_URL } from '../providers/github/provider';
 import { ProviderError } from '../providers/types';
-import { readSetting, SettingFileError, type Env, type ReadFile } from './env';
+import { readEnvironment, type Env, type ReadFile } from './env';
 
 /** What the app was told, once it has been checked. It grows as the tasks that read a setting are built. */
 export interface Config {
@@ -136,18 +136,11 @@ function checkUrl(value: string): { url: string } | { problem: Problem } {
 export function loadConfig(env: Env, readFile?: ReadFile): LoadResult {
   const problems: Problem[] = [];
 
-  // A setting that is a file may fail to be read; that is a problem of its own and not a crash.
-  const read = (name: string): string | undefined => {
-    try {
-      return readSetting(env, name, readFile);
-    } catch (error) {
-      if (error instanceof SettingFileError) {
-        problems.push(error.message);
-        return undefined;
-      }
-      throw error;
-    }
-  };
+  // Every setting is read once, through @sovereignfs/config; a file that cannot be read, or a secret given both ways, is reported alone,
+  // since the settings that depend on it would only add problems of their own.
+  const reading = readEnvironment(env, readFile);
+  if (!reading.ok) return { ok: false, problems: reading.problems };
+  const read = reading.read;
 
   let url: string | undefined;
   const rawUrl = read('TUSK_URL');

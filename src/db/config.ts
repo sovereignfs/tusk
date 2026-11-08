@@ -1,4 +1,5 @@
-import { readSetting, type Env, type ReadFile } from '../config/env';
+import { ConfigError } from '@sovereignfs/config';
+import { readSecret, type Env, type ReadFile } from '../config/env';
 
 /**
  * Which database Tasks runs on, read from the settings in one place (DESIGN.md §22.1). The names are Sovereign's (`contracts/env.md`), with
@@ -150,7 +151,17 @@ function resolveFile(env: Env): FileConfig {
 }
 
 function resolvePostgres(env: Env, readFile?: ReadFile): PostgresConfig {
-  const url = (readSetting(env, 'TUSK_POSTGRES_URL', readFile) ?? '').trim();
+  let url: string;
+  try {
+    url = (readSecret(env, 'TUSK_POSTGRES_URL', readFile) ?? '').trim();
+  } catch (error) {
+    if (error instanceof ConfigError) {
+      throw new DatabaseConfigError(
+        error.problems.map((problem) => `${problem.variable} ${problem.message}.`).join(' '),
+      );
+    }
+    throw error;
+  }
   if (url === '') {
     throw new DatabaseConfigError(
       'TUSK_DB_DIALECT=postgres requires TUSK_POSTGRES_URL (or TUSK_POSTGRES_URL_FILE).',

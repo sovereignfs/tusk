@@ -120,16 +120,17 @@ describe('resolveDatabaseConfig', () => {
     expect(config).toMatchObject({ dialect: 'postgres', url: 'postgres://u:p@db:5432/tusk' });
   });
 
-  it('prefers the file when the PostgreSQL address is given both ways, as for every secret', () => {
-    const config = resolveDatabaseConfig(
-      {
-        TUSK_DB_DIALECT: 'postgres',
-        TUSK_POSTGRES_URL: 'postgres://plain/tasks',
-        TUSK_POSTGRES_URL_FILE: '/x',
-      },
-      () => 'postgres://from-file/tasks',
-    );
-    expect(config).toMatchObject({ url: 'postgres://from-file/tasks' });
+  it('refuses the PostgreSQL address given both ways, as for every secret', () => {
+    expect(() =>
+      resolveDatabaseConfig(
+        {
+          TUSK_DB_DIALECT: 'postgres',
+          TUSK_POSTGRES_URL: 'postgres://plain/tasks',
+          TUSK_POSTGRES_URL_FILE: '/x',
+        },
+        () => 'postgres://from-file/tasks',
+      ),
+    ).toThrow(/TUSK_POSTGRES_URL is set together with TUSK_POSTGRES_URL_FILE/);
   });
 
   it('requires TUSK_POSTGRES_URL for PostgreSQL, and it must be a postgres URL, without repeating it', () => {

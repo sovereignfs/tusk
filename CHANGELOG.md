@@ -24,6 +24,7 @@ Each release's section is also its GitHub release notes: the release workflow re
 
 ### Changed
 
+- **A secret given both as `NAME` and as `NAME_FILE` now stops the server** (`TUSK_AUTH_SECRET` and `TUSK_AUTH_SECRET_FILE`, say), naming the two, as Sovereign's `contracts/env.md` §3 says. Before, the file won without a word. Set only one. Settings are now read through `@sovereignfs/config` 0.1.0; every name and default is the same, and only secrets take the `_FILE` form.
 - `@sovereignfs/ui` 0.92.0. Nothing looks different: the sidebar's and the footer's icons are now the design system's own, and pages import it directly.
 - **Hosted on a Sovereign instance, sign-up is open without being set.** With a core as the only way in, `TUSK_AUTH_SIGNUP` now defaults to `open`, since the core already decides who may sign in; before, every operator had to set it, or only the first person got in. With local sign-in on, the default is still `closed`, and `TUSK_AUTH_SIGNUP=closed` keeps an instance closed.
 - Text is a step smaller on a computer (the body is 14px, not 16px), so lists and cards fit more on the screen. A phone and a touch screen keep the larger size.
