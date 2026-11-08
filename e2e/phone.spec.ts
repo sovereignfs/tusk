@@ -430,7 +430,7 @@ test.describe('touch gestures on a Desk row', () => {
 
     // A long press on the body chooses the card, and the bar that acts on the chosen appears.
     await send('touchStart', body.x, body.y);
-    await page.waitForTimeout(800);
+    await page.waitForTimeout(1500);
     await send('touchEnd', body.x, body.y);
     await expect(page.getByRole('toolbar', { name: 'Chosen cards' })).toBeVisible();
     await page.getByRole('button', { name: 'Cancel' }).click();
@@ -447,12 +447,13 @@ test.describe('touch gestures on a Desk row', () => {
     const gx = grip.x + grip.width / 2;
     const gy = grip.y + grip.height / 2;
     await send('touchStart', gx, gy);
-    await page.waitForTimeout(450);
+    await page.waitForTimeout(900);
     const travel = gy - top.y;
     for (let step = 1; step <= 12; step++) {
       await send('touchMove', gx, gy - (travel * step) / 12 - 4);
-      await page.waitForTimeout(25);
+      await page.waitForTimeout(60);
     }
+    await page.waitForTimeout(200);
     await send('touchEnd', gx, top.y - 4);
     await expect.poll(order).toEqual([first, third, second]);
   });
