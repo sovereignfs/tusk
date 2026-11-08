@@ -24,6 +24,7 @@ Each release's section is also its GitHub release notes: the release workflow re
 
 ### Changed
 
+- **Hosted on a Sovereign instance, sign-up is open without being set.** With a core as the only way in, `TUSK_AUTH_SIGNUP` now defaults to `open`, since the core already decides who may sign in; before, every operator had to set it, or only the first person got in. With local sign-in on, the default is still `closed`, and `TUSK_AUTH_SIGNUP=closed` keeps an instance closed.
 - Text is a step smaller on a computer (the body is 14px, not 16px), so lists and cards fit more on the screen. A phone and a touch screen keep the larger size.
 - **The port is now 3002** (`sovereign.manifest.json`), in the image, the Compose setups and `pnpm dev`, so Tusk, Fjord (3001) and a Sovereign core (3000) run side by side on one machine. A Sovereign instance reads the port from the image and needs nothing. Run on your own, change `-p 127.0.0.1:3000:3000` to `-p 127.0.0.1:3002:3002` (or keep the outside port: `-p 127.0.0.1:3000:3002`), and the reverse proxy's upstream with it.
 - The Inbox is now the cards assigned to you and nothing else: what you are told moved to the bell and `/notifications`, and the Inbox in the sidebar no longer carries a count (the bell has it). Opening a screen no longer marks notices read: you read one by opening it, or all by saying so.

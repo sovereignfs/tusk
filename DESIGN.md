@@ -237,7 +237,7 @@ can run either or both:
 
 - **The server refuses to start on a setting that is wrong:** a short `TUSK_AUTH_SECRET`, a non-https `TUSK_URL` (localhost aside), a partial set of
   `TUSK_CORE_*`, an SMTP host with no sender.
-- **Who may sign up** is `TUSK_AUTH_SIGNUP`: `closed` by default, where the first account is made and then sign-up is refused, by the server; or `open`.
+- **Who may sign up** is `TUSK_AUTH_SIGNUP`: `closed`, where the first account is made and then sign-up is refused, by the server; or `open`. Unset, it is `closed`, or `open` when a Sovereign core is the only way in, since the core then decides who may sign in.
   One policy for both methods, in the user-creation hook. An instance sets `open`, since there the instance decides who may sign in. With sign-up
   closed, the people a self-hoster wants in their workspaces are made by opening it for a while; invitations are phase 2 (§25.5).
 - **Email is optional.** With `TUSK_SMTP_*`, an address must be verified before first sign-in and a forgotten password is reset by a single-use link.
@@ -1395,7 +1395,7 @@ docker run -v tusk:/data -e TUSK_DB_DIALECT=sqlite -e TUSK_SQLITE_URL=file:/data
 - **The manifest,** as Fjord's: `"database": true`; the redirect `/api/auth/callback/sovereign`; `backChannel` and `accountDeleted` as in §22; scopes
   `openid profile email`; an icon and a real description; `generate` of `TUSK_AUTH_SECRET` and `TUSK_ENCRYPTION_KEY`. `src/sovereign-manifest.test.ts`
   holds it to the schema and the code.
-- **What an operator of an instance sets:** `TUSK_AUTH_SIGNUP=open`, SMTP, and the GitHub App if they want it. The README says so.
+- **What an operator of an instance sets:** SMTP, and the GitHub App if they want it. Sign-up needs nothing: with a core as the only way in it is open by default (`contracts/app-manifest.md` §4). The README says so.
 - **Releases:** a `vX.Y.Z` tag publishes the image for amd64 and arm64 to `ghcr.io`. A patch release carries no migration and no change to a setting. A
   change to the sync protocol raises its version, and devices update (§8.3).
 - **The operator's backups are the database's:** a snapshot of the sqld volume, Litestream or `.backup` for a file, `pg_dump` for PostgreSQL. A person's

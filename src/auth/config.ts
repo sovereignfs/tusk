@@ -6,8 +6,9 @@ import type { Problem } from '../config';
  *
  *   TUSK_AUTH_LOCAL                 1 or true: email and password. Off means off: `/sign-in`, `/sign-up` and `/api/auth` answer 404.
  *   TUSK_AUTH_SECRET[_FILE]         32 characters or more, to sign sessions and tokens. Required with local sign-in.
- *   TUSK_AUTH_SIGNUP                `closed` (the default): the first account is made and then sign-up is refused, by the server. `open`:
- *                                    anyone who can reach the page. A self-hoster who forgets is not an open registration.
+ *   TUSK_AUTH_SIGNUP                `closed` (the default with local sign-in): the first account is made and then sign-up is refused, by the
+ *                                    server. `open`: anyone who can reach the page. A self-hoster who forgets is not an open registration.
+ *                                    With a core as the only way in the default is `open`: the core decides who may sign in.
  *   TUSK_AUTH_PASSWORD_MIN_LENGTH   the shortest password, 10 by default.
  *   TUSK_URL                        the address people use; required with either way (links, cookies, passkeys and the redirect are made from it).
  *   TUSK_CORE_URL, TUSK_CORE_CLIENT_ID, TUSK_CORE_CLIENT_SECRET[_FILE]
@@ -79,7 +80,9 @@ export function resolveAuth(
     );
   }
 
-  const rawSignUp = (read('TUSK_AUTH_SIGNUP') ?? '').toLowerCase() || 'closed';
+  // Unset, it is closed, unless a core is the only way in: then the core already decides who may sign in, and closed would admit only the
+  // first of its people (contracts/app-manifest.md §4 in sovereignfs/sovereign).
+  const rawSignUp = (read('TUSK_AUTH_SIGNUP') ?? '').toLowerCase() || (local ? 'closed' : 'open');
   if (rawSignUp !== 'open' && rawSignUp !== 'closed') {
     problems.push('TUSK_AUTH_SIGNUP is open or closed.');
   }

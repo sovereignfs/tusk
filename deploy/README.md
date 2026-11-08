@@ -61,8 +61,8 @@ tells it where it is. What it sets is the settings above under Tusk's own names:
 `TUSK_CORE_CLIENT_SECRET` (or `_FILE`), the database (`TUSK_DB_DIALECT` and its address) and `PORT`, and it makes `TUSK_AUTH_SECRET` and `TUSK_ENCRYPTION_KEY`
 once and keeps them. With `TUSK_AUTH_LOCAL` unset, people sign in through the instance only: there is no password, sign-up or reset to find.
 
-**Set `TUSK_AUTH_SIGNUP=open`** there: the instance already decides who may sign in, and the default (`closed`: the first account only) would turn every
-other person away. Mail (`TUSK_SMTP_*`) is not used when there is no password. The instance can end a person's sessions here, and delete their account, by
+Sign-up is open there without being set: with the instance as the only way in, it already decides who may sign in, so Tusk gives an account to
+anyone it signs in (`TUSK_AUTH_SIGNUP=closed` turns that off). Mail (`TUSK_SMTP_*`) is not used when there is no password. The instance can end a person's sessions here, and delete their account, by
 signed notices to `/api/sovereign/backchannel-logout` and `/api/sovereign/account-deleted`; both are answered only when they carry a token the instance
 signed.
 

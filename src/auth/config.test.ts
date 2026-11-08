@@ -78,6 +78,14 @@ describe('sign-in settings', () => {
       ).toContain('TUSK_AUTH_PASSWORD_MIN_LENGTH');
   });
 
+  it('open sign-up by default only when a core is the only way in, and keep what the operator says either way', () => {
+    const coreOnly = { TUSK_URL: ON.TUSK_URL, TUSK_AUTH_SECRET: SECRET, ...CORE };
+    expect(authOf(loadConfig(coreOnly))?.signUp).toBe('open');
+    expect(authOf(loadConfig({ ...coreOnly, TUSK_AUTH_SIGNUP: 'closed' }))?.signUp).toBe('closed');
+    expect(authOf(loadConfig({ ...coreOnly, TUSK_AUTH_LOCAL: '1' }))?.signUp).toBe('closed');
+    expect(authOf(loadConfig(ON))?.signUp).toBe('closed');
+  });
+
   it('say about a wrong address only once: the address check already reported it', () => {
     const reported = problems(loadConfig({ ...ON, TUSK_URL: 'http://tusk.example.com' }));
     expect(reported.filter((problem) => problem.includes('TUSK_URL'))).toHaveLength(1);
@@ -88,7 +96,8 @@ describe('sign-in settings', () => {
     expect(authOf(loadConfig(only))).toEqual({
       url: 'https://tusk.example.com',
       secret: SECRET,
-      signUp: 'closed',
+      // A core alone decides who may sign in, so sign-up is open unless the operator closes it.
+      signUp: 'open',
       passwordMinLength: 10,
       local: false,
       sovereign: {

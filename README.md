@@ -61,7 +61,7 @@ a test keeps the two in step.
 | `TUSK_URL`                      | The address people use: https (http for localhost), no path. Links, cookies, passkeys and the redirect to Sovereign are made from it. Required with any way of signing in |
 | `TUSK_AUTH_LOCAL`               | `1` turns on email and password, passkeys and an authenticator app. Off, their pages and routes do not exist                                                              |
 | `TUSK_AUTH_SECRET`              | 32 characters or more, to sign sessions and tokens. `openssl rand -base64 48`. Required with any way of signing in                                                        |
-| `TUSK_AUTH_SIGNUP`              | `closed` (the default): only the first account. `open`: anyone who can reach the page. An instance that hosts Tusk sets `open`                                            |
+| `TUSK_AUTH_SIGNUP`              | `closed`: only the first account. `open`: anyone who can reach the page. The default is `closed`, or `open` when a Sovereign core is the only way in                      |
 | `TUSK_AUTH_PASSWORD_MIN_LENGTH` | The shortest password, 8 to 128. Default 10                                                                                                                               |
 | `TUSK_CORE_URL`                 | Sign in through a Sovereign instance: its address (its OIDC issuer), https. With the next two, all or none                                                                |
 | `TUSK_CORE_CLIENT_ID`           | Tusk's client at that instance                                                                                                                                            |
