@@ -82,9 +82,12 @@ test('Settings has Notifications: each kind on or off, kept with the account', a
   await page.goto('/account?section=notifications');
   const section = page.getByRole('heading', { name: 'Notifications', level: 2 });
   await expect(section).toBeVisible();
+  // (The Inbox's own kind "My daily brief…" is a different checkbox, which stays.)
   // This server has no mail, no push keys and no core: nothing is offered outside the app, and it says why.
   await expect(page.getByText('Nothing leaves Tusk on this server')).toBeVisible();
-  await expect(page.getByRole('checkbox', { name: /daily brief/i })).toHaveCount(0);
+  await expect(
+    page.getByRole('checkbox', { name: 'A daily brief of what needs attention' }),
+  ).toHaveCount(0);
   await expect(page.getByRole('checkbox', { name: /Send by email/i })).toHaveCount(0);
   const assigned = page.getByRole('checkbox', { name: 'When I am assigned a card' });
   await expect(assigned).toBeChecked();

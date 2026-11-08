@@ -108,7 +108,7 @@ describe(`a Desk sealed to a key of its own (${leg})`, () => {
     for (const secret of [
       'Hidden',
       'milk',
-      'oat',
+      'item oat',
       '2026-12-24',
       '09:30',
       'FREQ=',
