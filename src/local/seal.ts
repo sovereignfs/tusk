@@ -100,6 +100,17 @@ export class DeskCipher {
     return found;
   }
 
+  /** Every list key of the Desk that this identity opens, as browser keys: what the service worker is given for a reminder that names a card (`src/reminders/wake.ts`). */
+  async listKeys(db: LocalDatabase): Promise<CryptoKey[]> {
+    const found: CryptoKey[] = [];
+    for (const list of (await db.getAll('desk_list')) as LocalRow[]) {
+      const wrapped = keyOfRow(list);
+      const key = wrapped === undefined ? undefined : await this.keyOf(wrapped);
+      if (key) found.push(key);
+    }
+    return found;
+  }
+
   /** The list a row is in: a list is its own, a checklist item's is its card's. */
   private async listOf(db: LocalDatabase, row: LocalRow): Promise<string | undefined> {
     if (row.table === 'desk_list') return row.id;

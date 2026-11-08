@@ -161,11 +161,57 @@ test('on a device that does not have the key the Desk shows nothing of itself, a
   // Chromium stores the key itself; WebKit cannot, and seals it.
   expect(kept).toEqual([browserName === 'chromium' ? 'key' : 'sealed']);
 
+  // Reminders for a Desk the server cannot read (task 14.6). With reminders on, a card with a date and a time makes the device tell the server when it is due, and only
+  // that: the request holds instants and no word of the card.
+  const origin = `http://localhost:${PORTS.keys}`;
+  expect(
+    (
+      await page.request.patch('/api/settings', {
+        headers: { origin },
+        data: { remindersOn: true },
+      })
+    ).ok(),
+  ).toBe(true);
+  await page.goto('/desk');
+  // One account for both browsers: each makes a card of its own name.
+  const plumber = `Call the plumber (${browserName})`;
+  const slots = page.waitForRequest(
+    (request) => request.url().endsWith('/api/reminders/slots') && request.method() === 'PUT',
+    { timeout: 30_000 },
+  );
+  await page.getByLabel('Add a card').fill(plumber);
+  await page.getByLabel('Add a card').press('Enter');
+  await page.getByRole('link', { name: plumber, exact: true }).click();
+  const detail = page.getByRole('region', { name: 'Card' });
+  await detail.getByRole('button', { name: 'Set a due date' }).click();
+  await page.getByRole('button', { name: 'Tomorrow' }).click();
+  await page.getByLabel('Time', { exact: true }).fill('09:30');
+  await page.keyboard.press('Escape');
+  const sent = (await slots).postDataJSON() as { slots: number[] };
+  expect(Object.keys(sent)).toEqual(['slots']);
+  expect(sent.slots.length).toBeGreaterThanOrEqual(1);
+  for (const at of sent.slots) expect(Number.isInteger(at)).toBe(true);
+  expect((await slots).postData()).not.toContain('plumber');
+
+  // What the service worker is given to name a card is the person's choice on this device, and is gone when the key is.
+  const wakeDatabases = () =>
+    page.evaluate(async () => (await indexedDB.databases()).map((each) => each.name));
+  await page.evaluate(() => {
+    const id = Object.keys(localStorage)
+      .find((name) => name.startsWith('tusk.key.'))
+      ?.slice('tusk.key.'.length);
+    localStorage.setItem(`tusk.wake.${id}`, '1');
+    window.dispatchEvent(new Event('tusk-settings-changed'));
+  });
+  await expect.poll(wakeDatabases).toContain('tusk-wake');
+
   // Forgetting the key on this device locks the Desk again, and so does signing out.
   await page.goto('/account?section=data');
   await page.getByRole('button', { name: 'Forget the key on this device' }).click();
   // Waits for it to be forgotten, which is when Settings says so: a page left in the middle of the delete would leave the key where it was.
   await expect(page.getByText('this device does not have it')).toBeVisible();
+  // The keys the service worker was given went with it.
+  await expect.poll(wakeDatabases).not.toContain('tusk-wake');
   await page.goto('/desk');
   await expect(page.getByRole('region', { name: 'Unlock your Desk' })).toBeVisible();
   await locked.getByLabel('Key file').setInputFiles(keyFile());

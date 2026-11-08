@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { type PushState, disablePush, enablePush, pushState } from '../push/client';
+import { SETTINGS_CHANGED } from '../reminders/ReminderSync';
+import { chooseWake, wakeChosen } from '../reminders/wake';
+import { useAccountId } from '../sync/react';
+import { useKey } from '../screens/KeyContext';
 import { Alert, Checkbox } from '../ui';
 import { NOTICE_KINDS, type NoticeKind } from '../workspaces/format';
 import styles from './Account.module.css';
@@ -41,6 +45,10 @@ export function NotificationsSection() {
   // Push is per device: what this browser has, not what the account has.
   const [push, setPush] = useState<PushState | null>(null);
   const [pushNote, setPushNote] = useState<string | null>(null);
+  // A Desk sealed with a key of the person's own (§9, task 14.6): the server cannot say which cards are due, and what a reminder can say depends on this device.
+  const key = useKey();
+  const accountId = useAccountId();
+  const [naming, setNaming] = useState(() => wakeChosen(accountId));
 
   useEffect(() => {
     void (async () => {
@@ -66,7 +74,11 @@ export function NotificationsSection() {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(change),
       });
-      if (reply.ok) return;
+      if (reply.ok) {
+        // What the part of the app that plans reminders for a sealed Desk reads has changed.
+        window.dispatchEvent(new Event(SETTINGS_CHANGED));
+        return;
+      }
     } catch {
       // The same answer as a refusal.
     }
@@ -188,6 +200,40 @@ export function NotificationsSection() {
                   />
                 )}
                 {pushNote ? <p className={styles.muted}>{pushNote}</p> : null}
+              </li>
+            ) : null}
+            {key.sealed ? (
+              <li>
+                <p className={styles.muted}>
+                  Your Desk is sealed with a key of your own, so this server cannot read it: it
+                  cannot count what is due in a daily brief, and for a reminder it knows only the
+                  time. Email and the bell say “You have cards due”, and nothing more. A device that
+                  has your key can say which card: it keeps the Desk open to the notification, which
+                  Push wakes at the time. A device you have not opened Tusk on for 14 days stops
+                  getting these reminders.
+                </p>
+                {key.status === 'unlocked' ? (
+                  <Checkbox
+                    label="Name the card in a reminder on this device"
+                    checked={naming}
+                    onChange={(on) => {
+                      chooseWake(accountId, on);
+                      setNaming(on);
+                      window.dispatchEvent(new Event(SETTINGS_CHANGED));
+                    }}
+                  />
+                ) : (
+                  <p className={styles.muted}>
+                    Unlock your Desk on this device to have a reminder name the card here.
+                  </p>
+                )}
+                {key.status === 'unlocked' && naming ? (
+                  <p className={styles.muted}>
+                    This device keeps your Desk’s list keys where Tusk’s service worker can read
+                    them, so that the notification can open a card. They are removed when you sign
+                    out, lock your Desk, forget your key or turn this off.
+                  </p>
+                ) : null}
               </li>
             ) : null}
             <li>

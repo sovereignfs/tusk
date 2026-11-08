@@ -13,6 +13,7 @@ import { MobileNavProvider } from '../ui/mobile-nav';
 import { SidebarToggle } from '../ui/SidebarToggle';
 import { AppFrame } from './AppFrame';
 import { Frame } from './Frame';
+import { ReminderSync } from '../reminders/ReminderSync';
 import { KeyProvider } from './KeyContext';
 import { RegisterWorker } from './RegisterWorker';
 import { ZoneReporter } from './ZoneReporter';
@@ -42,6 +43,7 @@ export function SignedInArea({
     <SyncProvider accountId={accountId}>
       <KeyProvider accountId={accountId}>
         <ZoneReporter accountId={accountId} />
+        <ReminderSync accountId={accountId} />
         <RegisterWorker />
         <WorkspacesProvider>
           <MobileNavProvider>

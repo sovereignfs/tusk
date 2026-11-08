@@ -48,6 +48,33 @@ export function localNow(zone: string, epochMs: number): LocalNow {
   };
 }
 
+/**
+ * The instant (milliseconds since the epoch) at which it is `date` `time` in `zone`: the other way from `localNow`. A time that is not there (the hour a clock skips) is the
+ * instant just after it, and one that is there twice (the hour it repeats) is its first. Pure, with no clock.
+ */
+export function instantOf(zone: string, date: string, time: string): number {
+  const [y, m, d] = date.split('-').map(Number) as [number, number, number];
+  const [h, min] = time.split(':').map(Number) as [number, number];
+  const wanted = Date.UTC(y, m - 1, d, h, min);
+  const asUtc = (at: number): number => {
+    const there = localNow(zone, at);
+    const [ly, lm, ld] = there.date.split('-').map(Number) as [number, number, number];
+    const [lh, lmin] = there.time.split(':').map(Number) as [number, number];
+    return Date.UTC(ly, lm - 1, ld, lh, lmin);
+  };
+  // The zone's offset a half day either side of the time: one is the offset before a clock change near it and one after, or both are the same.
+  const offsets = [
+    ...new Set([
+      asUtc(wanted - 12 * 3_600_000) - (wanted - 12 * 3_600_000),
+      asUtc(wanted + 12 * 3_600_000) - (wanted + 12 * 3_600_000),
+    ]),
+  ];
+  const candidates = offsets.map((offset) => wanted - offset).sort((a, b) => a - b);
+  return (
+    candidates.find((at) => asUtc(at) === wanted) ?? (candidates[candidates.length - 1] as number)
+  );
+}
+
 /** Today's date in `zone` at `now` (milliseconds since the epoch). */
 export const todayFor = (zone: string, now: number): string => localNow(zone, now).date;
 

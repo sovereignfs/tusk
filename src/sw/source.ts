@@ -11,7 +11,15 @@
  * sent with (the headers are kept with the body, so the two agree), and which starts the Desk from the device's own copy. Anything else is answered with a
  * page the worker builds itself, saying that it needs a connection. A new version waits until the pages that use the old one are closed (no `skipWaiting`),
  * so what is in flight and the outbox are not disturbed.
+ *
+ * **A wake** (task 14.6) is the one push that is not shown as it came: for a Desk sealed with a key of the person's own the server can only say that something is due, so the
+ * worker looks for itself. It reads the Desk's working copy from IndexedDB (read-only, and never made if it is not there), opens the fields it needs with the list keys the
+ * page gave it for this (`src/reminders/wake.ts`, a place of its own, kept only if the person chose it on this device), and shows the card or how many cards are due, or that
+ * nothing is after all. Where it cannot (no keys, a Desk it cannot open, a browser without IndexedDB) it shows what the server sent: that cards are due. It stores nothing.
  */
+import { LOCAL_VERSION } from '../local/db';
+import { WAKE_DB, WAKE_KEY, WAKE_STORE, WAKE_VERSION } from '../reminders/wake';
+
 export const CACHE_PREFIX = 'tusk-shell-';
 
 export function workerSource(version: string, files: readonly string[] = []): string {
@@ -75,6 +83,156 @@ function ownPath(path) {
   return typeof path === 'string' && /^\\/(?!\\/)[^\\s]*$/.test(path) ? path : '/';
 }
 
+// Reading what a wake needs, with no library: the Desk's working copy and the record of keys, opened only if they are there (an open that would make one is aborted).
+const LOCAL_VERSION = ${LOCAL_VERSION};
+const WAKE_DB = ${JSON.stringify(WAKE_DB)};
+const WAKE_VERSION = ${WAKE_VERSION};
+const WAKE_STORE = ${JSON.stringify(WAKE_STORE)};
+const WAKE_KEY = ${JSON.stringify(WAKE_KEY)};
+/** A card was due in the last hour and a half, or it is not a reminder that is still worth showing. */
+const WAKE_LATE_MS = 90 * 60 * 1000;
+const UNREADABLE = { unreadable: true };
+
+function openExisting(name, version) {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(name, version);
+    request.onupgradeneeded = () => request.transaction.abort();
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+    request.onblocked = () => reject(new Error('blocked'));
+  });
+}
+
+function readStore(db, store, key) {
+  return new Promise((resolve, reject) => {
+    const request = key === undefined ? db.transaction(store).objectStore(store).getAll() : db.transaction(store).objectStore(store).get(key);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function bytesOf(text) {
+  const plain = text.split('-').join('+').split('_').join('/');
+  const raw = atob(plain + '='.repeat((4 - (plain.length % 4)) % 4));
+  const bytes = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+  return bytes;
+}
+
+/** A field of a card, opened: plain as it is, sealed under one of the keys, and UNREADABLE when none opens it (the same form as src/cipher/field.ts). */
+async function fieldOf(keys, card, name) {
+  const field = card.fields && card.fields[name];
+  if (!field) return null;
+  if ('v' in field) return field.v;
+  if (!('c' in field) || typeof field.c !== 'string') return UNREADABLE;
+  let bytes;
+  try {
+    bytes = bytesOf(field.c);
+  } catch (error) {
+    return UNREADABLE;
+  }
+  if (bytes[0] !== 1 || bytes.length < 29) return UNREADABLE;
+  const aad = new TextEncoder().encode(JSON.stringify(['tusk-field', 1, 'desk_card', card.id, name]));
+  for (const key of keys) {
+    try {
+      const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: bytes.slice(1, 13), additionalData: aad }, key, bytes.slice(13));
+      return JSON.parse(new TextDecoder().decode(plain));
+    } catch (error) {
+      // Not this key's: the next.
+    }
+  }
+  return UNREADABLE;
+}
+
+/** The date and time as 'YYYY-MM-DD HH:MM' in a zone, which sorts as the moments do. */
+function localKey(zone, ms) {
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: zone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).formatToParts(new Date(ms));
+  const get = (type) => (parts.find((part) => part.type === type) || { value: '' }).value;
+  return get('year').padStart(4, '0') + '-' + get('month') + '-' + get('day') + ' ' + get('hour') + ':' + get('minute');
+}
+
+/**
+ * The titles of the cards that came due just now, in the order they did: an array, empty if none did. **null when it cannot be told**: no record of keys, no copy of the Desk,
+ * or a card that is not open to it and might be one of them. It never says "none" for what it could not read.
+ */
+async function dueNow() {
+  const wake = await openExisting(WAKE_DB, WAKE_VERSION).then(async (db) => {
+    try {
+      return await readStore(db, WAKE_STORE, WAKE_KEY);
+    } finally {
+      db.close();
+    }
+  });
+  if (!wake || !wake.accountId || !wake.zone || !wake.keys || wake.keys.length === 0) return null;
+  const now = Date.now();
+  const upper = localKey(wake.zone, now);
+  const lower = localKey(wake.zone, now - WAKE_LATE_MS);
+  const db = await openExisting('tusk-desk-' + wake.accountId, LOCAL_VERSION);
+  let lists;
+  let cards;
+  try {
+    lists = await readStore(db, 'desk_list');
+    cards = await readStore(db, 'desk_card');
+  } finally {
+    db.close();
+  }
+  const live = new Set(lists.filter((list) => list.deletedAt === null).map((list) => list.id));
+  const due = [];
+  let unreadable = false;
+  for (const card of cards) {
+    if (card.deletedAt !== null || !live.has(card.listId)) continue;
+    const completed = await fieldOf(wake.keys, card, 'completedAt');
+    if (completed === UNREADABLE) {
+      unreadable = true;
+      continue;
+    }
+    if (completed) continue;
+    const date = await fieldOf(wake.keys, card, 'dueDate');
+    const time = await fieldOf(wake.keys, card, 'dueTime');
+    if (date === UNREADABLE || time === UNREADABLE) {
+      unreadable = true;
+      continue;
+    }
+    if (typeof date !== 'string' || typeof time !== 'string') continue;
+    const at = date + ' ' + time;
+    if (at > upper || at < lower) continue;
+    const title = await fieldOf(wake.keys, card, 'title');
+    due.push({ at, title: typeof title === 'string' && title !== '' ? title : 'A card' });
+  }
+  if (due.length === 0 && unreadable) return null;
+  due.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : a.title < b.title ? -1 : a.title > b.title ? 1 : 0));
+  return due.map((each) => each.title);
+}
+
+function cut(text, most) {
+  return text.length <= most ? text : text.slice(0, most - 1) + '…';
+}
+
+/** A wake: shows the card, or how many, or that none is, or (where it cannot tell) what the server said. Always shows something: a push that shows nothing is one a browser stops allowing. */
+async function wake(data) {
+  let titles = null;
+  try {
+    titles = await dueNow();
+  } catch (error) {
+    titles = null;
+  }
+  const options = { icon: '/icons/icon-192.png', data: { path: '/desk' } };
+  if (typeof data.key === 'string') options.tag = data.key.slice(0, 100);
+  let title;
+  if (titles === null) {
+    title = typeof data.title === 'string' && data.title !== '' ? cut(data.title, 200) : 'You have cards due';
+  } else if (titles.length === 0) {
+    title = 'Nothing due after all';
+  } else if (titles.length === 1) {
+    title = cut(titles[0], 200);
+    options.body = 'Due now';
+  } else {
+    title = titles.length + ' cards due';
+    options.body = cut(titles.join(', '), 500);
+  }
+  await self.registration.showNotification(title, options);
+}
+
 self.addEventListener('push', (event) => {
   let data = {};
   try {
@@ -83,6 +241,10 @@ self.addEventListener('push', (event) => {
     data = {};
   }
   if (typeof data !== 'object' || data === null) data = {};
+  if (data.kind === 'wake') {
+    event.waitUntil(wake(data));
+    return;
+  }
   const title = typeof data.title === 'string' && data.title !== '' ? data.title.slice(0, 200) : 'Tusk';
   const options = { icon: '/icons/icon-192.png', data: { path: ownPath(data.path) } };
   if (typeof data.body === 'string') options.body = data.body.slice(0, 500);

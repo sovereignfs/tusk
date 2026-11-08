@@ -1,11 +1,13 @@
 import { type DBSchema, type IDBPDatabase, deleteDB, openDB } from 'idb';
 import { canStoreX25519, newDeviceKey, openIdentity, sealIdentity } from './device';
+import { forgetWake } from '../reminders/wake';
 import { identityCryptoKey } from './identity';
 
 /**
  * Where a device keeps a person's key so that it is asked for once (DESIGN.md §9.2): IndexedDB, **one record per account, in a database of its own** (apart
  * from the working copy, so that the copy can be emptied without asking for the key again, and the key can be forgotten without emptying the copy), until
- * sign-out. **Never a place the server or a service worker can read**, and never `localStorage`. What is kept depends on the platform, as `device.ts` records:
+ * sign-out. **Never a place the server or a service worker can read**, and never `localStorage`: the person's key stays here. A service worker is given the Desk's *list keys* only when the
+ * person chose a reminder that names a card on this device, in a place of its own that this forgets with the key (`src/reminders/wake.ts`). What is kept depends on the platform, as `device.ts` records:
  * the identity as a **non-extractable** X25519 key where the browser stores one (Chromium), and otherwise the identity sealed under a non-extractable
  * AES key (WebKit), which gives up that script on the page could read it.
  */
@@ -66,7 +68,10 @@ export async function loadIdentity(accountId: string): Promise<string | CryptoKe
   }
 }
 
-/** Forgets the account's key on this device: at sign-out, and when the person asks. */
+/**
+ * Forgets the account's key on this device: at sign-out, and when the person asks. **What the service worker was given to name a card in a reminder goes with it**
+ * (`src/reminders/wake.ts`): the list keys that key opened are not kept past it.
+ */
 export async function forgetKey(accountId: string): Promise<void> {
   const db = await open();
   try {
@@ -74,6 +79,7 @@ export async function forgetKey(accountId: string): Promise<void> {
   } finally {
     db.close();
   }
+  await forgetWake();
 }
 
 /** Removes the vault itself, for a test. */
