@@ -351,7 +351,13 @@ test.describe('touch gestures on a Desk row', () => {
 
     // Done completes the card and closes the row.
     await row.getByRole('button', { name: 'Done' }).click();
-    await expect(row.getByRole('checkbox', { name: `Done: ${title}` })).toBeChecked();
+    // Done: the card is ticked, or, where this list hides its completed cards (a setting another test may have left), it is gone from the list.
+    await expect(async () => {
+      const gone = (await link.count()) === 0;
+      const ticked =
+        !gone && (await row.getByRole('checkbox', { name: `Done: ${title}` }).isChecked());
+      expect(gone || ticked).toBe(true);
+    }).toPass();
 
     // Another card: Delete removes it and offers Undo, which brings it back.
     const other = unique('Delete me');
@@ -471,6 +477,12 @@ test('Today and Review, from the footer, go through cards one at a time by their
       .filter({ has: page.getByRole('link', { name: title }) })
       .getByRole('button', { name: 'Star' })
       .click();
+    await expect(
+      page
+        .locator('li')
+        .filter({ has: page.getByRole('link', { name: title }) })
+        .getByRole('button', { name: 'Remove the star' }),
+    ).toBeVisible();
   }
   const footer = page.getByRole('navigation', { name: 'App navigation' });
   const apps = () => footer.getByRole('button', { name: 'Apps' }).click();
@@ -478,11 +490,22 @@ test('Today and Review, from the footer, go through cards one at a time by their
   const today = page.getByRole('dialog', { name: 'Today' });
   // The shared account may hold other cards that are overdue or due today, which Today shows before the starred: so a card is brought to the top by dismissing what is
   // above it (a dismissal lasts a day and is harmless here).
+  // The stack renders the card under the top one first (hidden from the accessibility tree), so the card in front is the last title in the dialog.
+  const front = () =>
+    today
+      .locator('[data-card-title]')
+      .last()
+      .textContent({ timeout: 5000 })
+      .then((text) => text ?? '')
+      .catch(() => '(none)');
   const toTop = async (title: string) => {
     for (let guard = 0; guard < 40; guard++) {
-      const top = await today.locator('[data-card-title]').first().innerText();
+      const top = await front();
       if (top === title) return;
+      if (top === '(none)') throw new Error('Today is empty');
       await today.getByRole('button', { name: 'Dismiss' }).click();
+      // The card leaves with a short transition, during which the buttons do nothing: wait for the next one to be in front.
+      await expect.poll(front).not.toBe(top);
     }
     throw new Error(`${title} never came to the top of Today`);
   };
@@ -501,6 +524,8 @@ test('Today and Review, from the footer, go through cards one at a time by their
 
   // Dismiss hides it until tomorrow; closing leaves the Desk where it was, and Undo (still offered) brings it back.
   await today.getByRole('button', { name: 'Dismiss' }).click();
+  // The Undo bar is offered once the dismissal is written: closing and looking again before then would look at the copy as it was.
+  await expect(page.getByRole('button', { name: 'Undo' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(today).toHaveCount(0);
   expect(page.url()).toBe(address);
@@ -523,12 +548,12 @@ test('Today and Review, from the footer, go through cards one at a time by their
   await apps();
   await what.getByRole('button', { name: 'Review' }).click();
   await expect(review).toBeVisible();
-  const first = await review.locator('[data-card-title]').first().innerText();
+  const first = await review.locator('[data-card-title]').last().textContent();
   await review.getByRole('button', { name: 'Skip' }).click();
   await page.keyboard.press('Escape');
   await apps();
   await what.getByRole('button', { name: 'Review' }).click();
-  const next = await review.locator('[data-card-title]').first().innerText();
+  const next = await review.locator('[data-card-title]').last().textContent();
   expect(next).not.toBe(first);
   await page.keyboard.press('Escape');
 
