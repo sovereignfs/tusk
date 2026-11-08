@@ -91,6 +91,8 @@ export const ROUTES: RouteRule[] = [
   { route: '/api/inbox', methods: { GET: { kind: 'account' } } },
   { route: '/api/inbox/seen', methods: { POST: { kind: 'account' } } },
   { route: '/api/inbox/unread', methods: { GET: { kind: 'account' } } },
+  // The boards' part of the Planner (DESIGN.md §25.1): the signed-in person's own assigned cards in a range of dates.
+  { route: '/api/planner', methods: { GET: { kind: 'account' } } },
   { route: '/api/boards/[id]', methods: { GET: { kind: 'account' } } },
   { route: '/api/boards/[id]/activity', methods: { GET: { kind: 'account' } } },
   { route: '/api/cards/[id]/activity', methods: { GET: { kind: 'account' } } },

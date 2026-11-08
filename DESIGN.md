@@ -335,8 +335,8 @@ Every write to a workspace is an **operation**, sent to `POST /api/ops`:
 - **The answer** is the changed rows as the server now holds them, or a refusal: `not_found` (which covers "not yours"), `invalid`, `limit`, `stale`
   (it points at something that is gone). The browser keeps the first, and undoes its optimistic change on the second, with a toast for anything but
   `not_found`.
-- **Reads are routes of their own,** each in `routes.ts`: the boards index, a board, a card, a board's or card's activity by page, the Inbox, a
-  workspace's members, and a published board.
+- **Reads are routes of their own,** each in `routes.ts`: the boards index, a board, a card, a board's or card's activity by page, the Inbox, the
+  Planner's assigned cards by range, a workspace's members, and a published board.
 
 ### 7.4 Limits
 
