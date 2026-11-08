@@ -907,6 +907,8 @@ that is the `loader-circle` and star icons (§10.2), and whatever the card dialo
 icons this design names are the package's own: `square-kanban` for Boards, `calendar` for the Planner, `inbox`, `settings` for a workspace's gear and
 `panel-left` for the sidebar's toggle.
 
+**The type scale** is the design system's `--sv-font-size-*`, **a step smaller where there is a mouse and room** (`app/globals.css`, from 768px with a fine pointer: the body 14px, not 16px; small 13, large 16, extra large 18, 2xl 22). The whole ramp moves together, since every size in the app and in the system's components is one of the tokens; a phone and a touch screen keep the system's 16px, which is also the least a text field may be before iOS zooms the page when it is focused.
+
 **One set of routes.** Sovereign's rule: **never fork a navigation decision by viewport; fork only what is rendered.** Addresses and data are the same at
 every width. So the home is one address for everyone: **`/`** (§17.3, §17.11).
 

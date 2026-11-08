@@ -146,3 +146,14 @@ test.describe('at a phone’s width', () => {
     expect(overflow).toBeLessThanOrEqual(0);
   });
 });
+
+test('the body is 14px where there is a mouse and room, and 16px on a phone, so that iOS does not zoom a field it focuses', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto('/sign-in');
+  const size = () => page.evaluate(() => getComputedStyle(document.body).fontSize);
+  expect(await size()).toBe('14px');
+  await page.setViewportSize({ width: 390, height: 800 });
+  expect(await size()).toBe('16px');
+});
