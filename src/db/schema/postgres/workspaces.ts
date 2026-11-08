@@ -210,6 +210,8 @@ export const notice = app.table(
     cardId: ref('card_id'),
     details: text('details').notNull(),
     createdAt: epochMs('created_at').notNull(),
+    /** When the job that sends notices outside the app claimed it (DESIGN.md §25.2), which is the one claim there is: null until a process has. */
+    sentAt: epochMs('sent_at'),
   },
   (table) => [index('notice_account_idx').on(table.accountId, table.createdAt)],
 );

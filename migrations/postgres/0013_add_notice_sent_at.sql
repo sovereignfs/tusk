@@ -1,0 +1,1 @@
+ALTER TABLE "tusk"."notice" ADD COLUMN "sent_at" bigint;

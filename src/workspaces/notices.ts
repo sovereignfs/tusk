@@ -74,3 +74,34 @@ export async function raiseSystem(
   );
   return true;
 }
+
+/** A notice a process has claimed to send outside the app. */
+export interface Claimed {
+  readonly id: string;
+  readonly accountId: string;
+  readonly kind: string;
+  /** As stored: sealed under the operator key, when that is on. */
+  readonly details: string;
+}
+
+/**
+ * **The one claim** on notices to be sent outside the app (DESIGN.md §25.2): a conditional update that stamps `sent_at` on up to `limit` of the notices not yet
+ * stamped that are newer than `since`, and answers the ones it stamped. Any number of processes may run it at once, and each notice is answered to one of them:
+ * the update only takes a row that is still unstamped when it is reached. Everything about who is sent what is the caller's, after the claim.
+ */
+export async function claimUnsent(
+  database: Database,
+  now: number,
+  since: number,
+  limit: number,
+): Promise<Claimed[]> {
+  const t = tablesOf(database);
+  return dbAll<Claimed>(
+    database,
+    sql`UPDATE ${t.notice} SET sent_at = ${now}
+        WHERE sent_at IS NULL AND id IN (
+          SELECT id FROM ${t.notice} WHERE sent_at IS NULL AND created_at >= ${since} ORDER BY created_at, id LIMIT ${limit}
+        )
+        RETURNING id, account_id AS "accountId", kind, details`,
+  );
+}

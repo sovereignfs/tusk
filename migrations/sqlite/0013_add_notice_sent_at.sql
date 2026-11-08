@@ -1,0 +1,1 @@
+ALTER TABLE `notice` ADD `sent_at` integer;

@@ -92,6 +92,13 @@
       "when": 1794106385135,
       "tag": "0012_add_reminder_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1794106739528,
+      "tag": "0013_add_notice_sent_at",
+      "breakpoints": true
     }
   ]
 }

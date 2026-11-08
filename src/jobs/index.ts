@@ -4,6 +4,8 @@ import type { Config } from '../config';
 import { getConfig } from '../config/current';
 import { getAuthDatabase, getDatabase } from '../db/boot';
 import { installationTokens } from '../github-app/server';
+import { deliverNotices } from '../notifications/deliver';
+import { serverChannels } from '../notifications/server';
 import { purge } from '../sync/purge';
 import { trimNotices } from '../workspaces/inbox';
 import { JobRunner, realDeps, type JobDefinition, type RunnerDeps } from './runner';
@@ -30,6 +32,26 @@ export const jobs: readonly JobDefinition[] = [
     runAtStart: true,
     run: async ({ now }) => {
       await trimNotices(await getDatabase(), now.getTime());
+    },
+  },
+  {
+    // Inbox notices that go outside the app too (DESIGN.md §25.2), by email and core's bell, for the kinds a person asked to have sent. Each notice is claimed by a
+    // conditional update, so any process may run this at any time and one sends each. With no channel on this server nothing is claimed.
+    name: 'send-notices',
+    everyMs: 30 * 1000,
+    run: async ({ now }) => {
+      const config = getConfig();
+      if (!config.mail && !config.auth?.sovereign) return;
+      const database = await getDatabase();
+      const channels = serverChannels(
+        config,
+        { app: database, auth: await getAuthDatabase() },
+        (line) => console.info(line),
+      );
+      if (channels.length > 0)
+        await deliverNotices(database, channels, now.getTime(), {
+          log: (line) => console.info(line),
+        });
     },
   },
   {
