@@ -1,8 +1,18 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { formatTime } from '../format-due';
+import { openCard } from './address';
+import { useKey } from './KeyContext';
 import { listsOf, visibleCards } from '../local/store';
 import {
   type Entry,
@@ -15,10 +25,11 @@ import {
   gapLabel,
   groupByDate,
   layout,
+  nowIndex,
 } from '../planner/feed';
 import type { Planned, PlannedBoardCard } from '../planner/format';
 import { useLocal } from '../sync/react';
-import { nowHere } from '../time';
+import { localNow, browserZone, nowHere } from '../time';
 import { Alert, Button } from '../ui';
 import styles from './PlannerScreen.module.css';
 
@@ -32,20 +43,71 @@ import styles from './PlannerScreen.module.css';
 /** How near an end, in pixels, the reader is when the next chunk is read. */
 const NEAR = 600;
 
+/**
+ * Where the reader was, kept for this tab (`sessionStorage`) so that coming back from a card, which on a phone replaces the feed and on a board is a page of
+ * its own, is to the same day and the same place on the screen, with the runs they had opened still open. Only a place near today is kept: coming back must not
+ * mean reading half a year. A storage that cannot be read or written leaves the feed at today.
+ */
+const KEPT = 'tusk.planner.at';
+const KEPT_CHUNKS = 4;
+interface Kept {
+  readonly date: string;
+  readonly offset: number;
+  readonly open: readonly string[];
+}
+function readKept(today: string): Kept | null {
+  try {
+    const raw = typeof window === 'undefined' ? null : window.sessionStorage.getItem(KEPT);
+    const value: unknown = raw ? JSON.parse(raw) : null;
+    if (typeof value !== 'object' || value === null) return null;
+    const { date, offset, open } = value as Record<string, unknown>;
+    if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+    if (typeof offset !== 'number' || !Number.isFinite(offset)) return null;
+    if (Math.abs(chunkOf(date) - chunkOf(today)) > KEPT_CHUNKS) return null;
+    const days = Array.isArray(open)
+      ? open.filter(
+          (each): each is string => typeof each === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(each),
+        )
+      : [];
+    return { date, offset, open: days.slice(0, 50) };
+  } catch {
+    return null;
+  }
+}
+function writeKept(kept: Kept): void {
+  try {
+    window.sessionStorage.setItem(KEPT, JSON.stringify(kept));
+  } catch {
+    // Nowhere to keep it: the feed opens on today.
+  }
+}
+
 export function PlannerScreen() {
   const [today] = useState(() => nowHere().date);
   const scroller = useRef<HTMLDivElement>(null);
   /** Where the feed itself last put the scroll: the scroll event that arrives for it is ours, and asks for nothing. */
   const ours = useRef<number | null>(null);
   const start = chunkOf(today);
-  const [first, setFirst] = useState(start - 1);
-  const [last, setLast] = useState(start + 1);
+  const [kept] = useState(() => readKept(today));
+  const reach = kept ? chunkOf(kept.date) : start;
+  const lowest = Math.min(start, reach) - 1;
+  const highest = Math.max(start, reach) + 1;
+  const [first, setFirst] = useState(lowest);
+  const [last, setLast] = useState(highest);
   const [boards, setBoards] = useState<Record<number, readonly PlannedBoardCard[] | 'failed'>>({});
   const [ready, setReady] = useState(false);
-  const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
+  const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set(kept?.open ?? []));
   const reads = useRef(new Map<number, Promise<void>>());
-  const edges = useRef({ first: start - 1, last: start + 1, busy: false });
-  const kept = useRef<{ height: number; top: number } | null>(null);
+  const edges = useRef({ first: lowest, last: highest, busy: false });
+  const held = useRef<{ height: number; top: number } | null>(null);
+
+  // The time now, on the minute, for the line on today.
+  const [nowTime, setNowTime] = useState(() => localNow(browserZone(), Date.now()).time);
+  useEffect(() => {
+    const tick = setInterval(() => setNowTime(localNow(browserZone(), Date.now()).time), 15_000);
+    return () => clearInterval(tick);
+  }, []);
+  const key = useKey();
 
   const cards = useLocal(visibleCards);
   const lists = useLocal(listsOf);
@@ -72,17 +134,25 @@ export function PlannerScreen() {
 
   // The first three chunks, then the feed is shown, at today.
   useEffect(() => {
-    void Promise.all([start - 1, start, start + 1].map(read)).then(() => setReady(true));
-  }, [read, start]);
+    const wanted = Array.from({ length: highest - lowest + 1 }, (_, n) => lowest + n);
+    void Promise.all(wanted.map(read)).then(() => setReady(true));
+  }, [read, lowest, highest]);
 
   const ground = cards !== undefined && lists !== undefined && ready;
   useLayoutEffect(() => {
     if (!ground) return;
     const root = scroller.current;
-    const here = root?.querySelector<HTMLElement>(`[data-planner-day="${today}"]`);
+    // Where the reader was if that day is there, else today at the top.
+    const day = (date: string) =>
+      root?.querySelector<HTMLElement>(`[data-planner-day="${date}"]`) ?? null;
+    const back = kept ? day(kept.date) : null;
+    const here = back ?? day(today);
     if (root && here) {
       root.scrollTop =
-        here.getBoundingClientRect().top - root.getBoundingClientRect().top + root.scrollTop;
+        here.getBoundingClientRect().top -
+        root.getBoundingClientRect().top +
+        root.scrollTop -
+        (back && kept ? kept.offset : 0);
       ours.current = root.scrollTop;
     }
     // Only the first time the feed is there.
@@ -91,11 +161,11 @@ export function PlannerScreen() {
   // Keep the reader's place when days were added above: by the height that came.
   useLayoutEffect(() => {
     const root = scroller.current;
-    const before = kept.current;
+    const before = held.current;
     if (root && before) {
       root.scrollTop = before.top + (root.scrollHeight - before.height);
       ours.current = root.scrollTop;
-      kept.current = null;
+      held.current = null;
     }
   }, [first]);
 
@@ -108,7 +178,7 @@ export function PlannerScreen() {
         if (direction === 'up') {
           await read(mine.first - 1);
           const root = scroller.current;
-          if (root) kept.current = { height: root.scrollHeight, top: root.scrollTop };
+          if (root) held.current = { height: root.scrollHeight, top: root.scrollTop };
           mine.first -= 1;
           setFirst(mine.first);
         } else {
@@ -144,6 +214,32 @@ export function PlannerScreen() {
     };
   }, [ground, extend]);
 
+  // Keep the place, a moment after the reader stops, and when a run is opened.
+  useEffect(() => {
+    const root = scroller.current;
+    if (!ground || !root) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const save = () => {
+      const top = root.getBoundingClientRect().top;
+      const day = [...root.querySelectorAll<HTMLElement>('[data-planner-day]')].find(
+        (each) => each.getBoundingClientRect().bottom > top + 1,
+      );
+      const date = day?.dataset.plannerDay;
+      if (day && date)
+        writeKept({ date, offset: day.getBoundingClientRect().top - top, open: [...open] });
+    };
+    const later = () => {
+      clearTimeout(timer);
+      timer = setTimeout(save, 150);
+    };
+    later();
+    root.addEventListener('scroll', later, { passive: true });
+    return () => {
+      clearTimeout(timer);
+      root.removeEventListener('scroll', later);
+    };
+  }, [ground, open]);
+
   const from = chunkRange(first).from;
   const to = chunkRange(last).to;
   const rows = useMemo(() => {
@@ -174,6 +270,12 @@ export function PlannerScreen() {
             </Button>
           </Alert>
         ) : null}
+        {key.status === 'locked' ? (
+          <Alert variant="info">
+            Your Desk is sealed and locked, so only the cards assigned to you on boards are shown.{' '}
+            <Link href="/desk">Unlock it on the Desk</Link>.
+          </Alert>
+        ) : null}
         {!ground ? (
           <div className={styles.skeleton} aria-label="Loading the Planner">
             {[0, 1, 2, 3].map((n) => (
@@ -195,7 +297,13 @@ export function PlannerScreen() {
                     </button>
                   </li>
                 ) : (
-                  <Day key={row.date} date={row.date} entries={row.entries} today={today} />
+                  <Day
+                    key={row.date}
+                    date={row.date}
+                    entries={row.entries}
+                    today={today}
+                    now={row.date === today ? nowTime : null}
+                  />
                 ),
               )}
             </ol>
@@ -206,9 +314,24 @@ export function PlannerScreen() {
   );
 }
 
-function Day({ date, entries, today }: { date: string; entries: readonly Entry[]; today: string }) {
+function Day({
+  date,
+  entries,
+  today,
+  now,
+}: {
+  date: string;
+  entries: readonly Entry[];
+  today: string;
+  /** The time now (`HH:MM`) on today, which draws the line for it; null on any other day. */
+  now: string | null;
+}) {
   const parts = dayParts(date);
   const isToday = date === today;
+  const line = now === null ? null : nowIndex(entries, now);
+  // "Any time" is named only where it is needed to tell the cards that have no time from those that have one.
+  const named =
+    entries.some((entry) => entry.time === null) && entries.some((entry) => entry.time !== null);
   return (
     <li
       className={styles.day}
@@ -224,27 +347,51 @@ function Day({ date, entries, today }: { date: string; entries: readonly Entry[]
         <p className={styles.empty}>Nothing planned</p>
       ) : (
         <ul className={styles.cards}>
-          {entries.map((entry) => (
-            <li key={entry.key}>
-              <Link
-                href={entry.href}
-                className={`${styles.card} ${entry.done ? styles.done : ''} ${
-                  date < today && !entry.done ? styles.overdue : ''
-                }`}
-                style={{ '--band': entry.color } as React.CSSProperties}
-                data-planner-card={entry.key}
-              >
-                <span className={styles.title}>{entry.title}</span>
-                <span className={styles.meta}>
-                  {entry.time ? `${formatTime(entry.time)} · ` : ''}
-                  {entry.where}
-                  {entry.done ? ' · Done' : ''}
-                </span>
-              </Link>
-            </li>
+          {named ? <li className={styles.caption}>Any time</li> : null}
+          {entries.map((entry, index) => (
+            <Fragment key={entry.key}>
+              {line === index ? <NowLine /> : null}
+              <li>
+                <Link
+                  href={entry.href}
+                  className={`${styles.card} ${entry.done ? styles.done : ''} ${
+                    date < today && !entry.done ? styles.overdue : ''
+                  }`}
+                  style={{ '--band': entry.color } as React.CSSProperties}
+                  data-planner-card={entry.key}
+                  data-shortcut-card=""
+                  onClick={(event) => {
+                    // A Desk card opens over the Planner, from the working copy and with no navigation; a click to open it in a new tab goes by its address.
+                    if (
+                      entry.source !== 'desk' ||
+                      event.metaKey ||
+                      event.ctrlKey ||
+                      event.shiftKey ||
+                      event.button !== 0
+                    )
+                      return;
+                    event.preventDefault();
+                    openCard(entry.id);
+                  }}
+                >
+                  <span className={styles.title}>{entry.title}</span>
+                  <span className={styles.meta}>
+                    {entry.time ? `${formatTime(entry.time)} · ` : ''}
+                    {entry.where}
+                    {entry.done ? ' · Done' : ''}
+                  </span>
+                </Link>
+              </li>
+            </Fragment>
           ))}
+          {line === entries.length ? <NowLine /> : null}
         </ul>
       )}
     </li>
   );
+}
+
+/** The line for now among today's timed cards. */
+function NowLine() {
+  return <li className={styles.now} aria-hidden data-planner-now="" />;
 }

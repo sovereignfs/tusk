@@ -14,6 +14,7 @@ import {
   gapLabel,
   groupByDate,
   layout,
+  nowIndex,
 } from './feed';
 
 const card = (id: string, fields: Record<string, unknown>, listId = 'L1'): LocalRow =>
@@ -75,7 +76,7 @@ describe('the Desk and the boards as one kind of entry', () => {
       done: false,
       color: '#16a34a',
       where: 'Errands',
-      href: '/desk/L1?card=a',
+      href: '/planner?card=a',
     });
     expect(entries[1]?.done).toBe(true);
     expect(entries[2]?.time).toBeNull();
@@ -208,5 +209,34 @@ describe('how a day and a gap read', () => {
     expect(gapLabel('2026-12-28', '2027-01-03', '2026-11-08', 'en-US')).toBe(
       'Dec 28 – Jan 3, 2027',
     );
+  });
+});
+
+describe('the line for now', () => {
+  const at = (time: string | null): Entry => ({
+    key: String(time),
+    source: 'desk',
+    id: String(time),
+    title: String(time),
+    date: '2026-11-08',
+    time,
+    done: false,
+    color: '#000000',
+    where: '',
+    href: '',
+  });
+  const day = [at(null), at('09:00'), at('13:00'), at('13:00'), at('18:30')];
+
+  it('is before the first timed card that is after the time, and after them all once they have gone', () => {
+    expect(nowIndex(day, '08:59')).toBe(1);
+    expect(nowIndex(day, '12:00')).toBe(2);
+    expect(nowIndex(day, '13:00')).toBe(4);
+    expect(nowIndex(day, '18:30')).toBe(5);
+    expect(nowIndex(day, '23:59')).toBe(5);
+  });
+
+  it('is not there when no card has a time, however late it is', () => {
+    expect(nowIndex([at(null), at(null)], '12:00')).toBeNull();
+    expect(nowIndex([], '12:00')).toBeNull();
   });
 });

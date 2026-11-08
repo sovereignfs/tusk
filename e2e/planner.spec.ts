@@ -175,3 +175,97 @@ test('at a phone’s width the feed does not scroll sideways', async ({ page }) 
   );
   expect(wide).toBe(false);
 });
+
+async function deskCardToday(page: Page, list: string, title: string, time: string | null) {
+  await page.goto('/desk');
+  await page
+    .getByRole('navigation', { name: 'Lists' })
+    .getByRole('link', { name: new RegExp(`^${list}`) })
+    .click();
+  await expect(page.getByRole('heading', { level: 1, name: list })).toBeVisible();
+  await page.getByLabel('Add a card').fill(title);
+  await page.getByLabel('Add a card').press('Enter');
+  await expect(page.getByRole('link', { name: title })).toBeVisible();
+  await page.getByRole('link', { name: title }).click();
+  const detail = page.getByRole('region', { name: 'Card' });
+  await detail.getByRole('button', { name: 'Set a due date' }).click();
+  await page.getByRole('button', { name: 'Today' }).click();
+  if (time) await page.getByLabel('Time', { exact: true }).fill(time);
+  await page.keyboard.press('Escape');
+  await expect(detail.getByRole('button', { name: /^Today/ })).toBeVisible();
+}
+
+test('a day reads in the order of the day, with the line for now between the cards that have gone and those to come, and a card opens over the feed', async ({
+  page,
+}) => {
+  await signedIn(page);
+  const list = unique('Order');
+  await page.getByRole('button', { name: 'Add a list' }).click();
+  await page.getByLabel('New list name').fill(list);
+  await page.getByLabel('New list name').press('Enter');
+  const [anytime, early, late] = [unique('Anytime'), unique('Early'), unique('Late')];
+  // The latest first, so the order is the day's and not the order they were made in.
+  await deskCardToday(page, list, late, '23:59');
+  await deskCardToday(page, list, early, '00:00');
+  await deskCardToday(page, list, anytime, null);
+
+  await page.goto('/planner');
+  const today = page.locator('[aria-current="date"]');
+  await expect(today.getByText(late)).toBeVisible();
+  const items = today.locator('ul > li');
+  const texts = await items.evaluateAll((els) =>
+    els.map((el) =>
+      el.hasAttribute('data-planner-now') ? '— now —' : (el.textContent ?? '').trim(),
+    ),
+  );
+  const at = (name: string) => texts.findIndex((text) => text.includes(name));
+  // No time first, named; then by time; the line for now between the one that has gone and the one to come.
+  expect(texts[0]).toBe('Any time');
+  expect(at(anytime)).toBeLessThan(at(early));
+  expect(at(early)).toBeLessThan(texts.indexOf('— now —'));
+  expect(texts.indexOf('— now —')).toBeLessThan(at(late));
+  expect(await page.locator('[data-planner-now]').count()).toBe(1);
+
+  // A card opens over the feed, which stays; closing it leaves the feed as it was.
+  await today.getByRole('link', { name: new RegExp(anytime) }).click();
+  await expect(page).toHaveURL(/\/planner\?card=/);
+  await expect(page.getByRole('region', { name: 'Card' })).toBeVisible();
+  await expect(today.getByText(late)).toBeVisible();
+  await page.getByRole('region', { name: 'Card' }).getByRole('button', { name: 'Close' }).click();
+  await expect(page).toHaveURL(/\/planner$/);
+  await expect(page.getByRole('region', { name: 'Card' })).toHaveCount(0);
+});
+
+test('coming back to the feed is to the place the reader left, with the runs they opened still open', async ({
+  page,
+}) => {
+  await signedIn(page);
+  await page.goto('/planner');
+  await expect(page.locator('[aria-current="date"]')).toBeVisible();
+  await page
+    .getByRole('button', { name: /nothing planned$/ })
+    .first()
+    .click();
+  const scroller = page.locator('div[aria-label="Planner"]');
+  await scroller.evaluate((el) => el.scrollTo({ top: 900 }));
+  const place = () =>
+    scroller.evaluate((el) => {
+      const top = el.getBoundingClientRect().top;
+      const day = [...el.querySelectorAll('[data-planner-day]')].find(
+        (each) => each.getBoundingClientRect().bottom > top + 1,
+      );
+      return {
+        date: day?.getAttribute('data-planner-day') ?? '',
+        offset: Math.round((day?.getBoundingClientRect().top ?? 0) - top),
+      };
+    });
+  const left = await place();
+  expect(left.date).not.toBe('');
+  // The place is kept a moment after the reader stops.
+  await page.waitForTimeout(400);
+  await page.goto('/inbox');
+  await expect(page.getByRole('heading', { level: 1, name: 'Inbox' })).toBeVisible();
+  await page.goBack();
+  await expect(page.locator('[aria-current="date"]')).toBeVisible();
+  await expect.poll(place).toEqual(left);
+});

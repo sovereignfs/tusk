@@ -84,7 +84,8 @@ export function deskEntries(
       done: typeof plain(card, 'completedAt') === 'number',
       color: colourOf(list),
       where: text(list, 'title', 'Untitled list'),
-      href: `/desk/${card.listId}?card=${card.id}`,
+      // Over the Planner (`?card=`), as the Desk opens a card: the same address with the card named, never a navigation away from the feed.
+      href: `/planner?card=${card.id}`,
     });
   }
   return out;
@@ -195,4 +196,15 @@ export function gapLabel(from: string, to: string, today: string, locale?: strin
   if (from.slice(0, 7) === to.slice(0, 7))
     return `${a.month} ${a.day} – ${b.day}${withYear(to, b)}`;
   return `${a.month} ${a.day}${withYear(from, a)} – ${b.month} ${b.day}${withYear(to, b)}`;
+}
+
+/**
+ * Where the line for "now" goes in today's entries (in the day's order): the index of the first timed card that is after `time`, or the length when every timed
+ * card is before it. **Null when today has no timed card**, since a line needs something to be between. The cards with no time are before it, and a card at
+ * exactly `time` is before the line.
+ */
+export function nowIndex(entries: readonly Entry[], time: string): number | null {
+  if (!entries.some((entry) => entry.time !== null)) return null;
+  const after = entries.findIndex((entry) => entry.time !== null && entry.time > time);
+  return after === -1 ? entries.length : after;
 }
