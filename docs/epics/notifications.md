@@ -2,7 +2,7 @@
 
 ## Status
 
-⏳ The Inbox (8.1) is done and is phase 1; reminders, Push and email (8.2 to 8.6) are phase 2 and done. 8.7 to 8.9 (2026-11-08) split the Inbox in two: a bell for what a person is told, and the Inbox for what is theirs to do.
+✅ The Inbox (8.1) is done and is phase 1; reminders, Push and email (8.2 to 8.6) are phase 2 and done. 8.7 to 8.9 (2026-11-08) split the Inbox in two: a bell for what a person is told, and the Inbox for what is theirs to do.
 
 ## Overview
 
@@ -119,7 +119,7 @@ not sent; a `429` delays and loses nothing.
 
 **Done as:** in the same job. For each zone: the open Desk cards (through the mirrors) of accounts in it with reminders on, **and the board cards assigned to such accounts**, with `due_date` today, `due_time` at or before the zone's time now **and not more than 30 minutes before it** (`REMINDER_WINDOW_MINUTES`), not yet reminded for the time they are due, capped per tick (`REMINDER_CAP`, 200, so that a first run after a stop cannot write thousands). **The claim is a conditional update on the card's `reminded_for`** (a new column on `desk_card` and on a board's `card`) set to `YYYY-MM-DD HH:MM`, in the transaction that writes the Inbox notice, so a card fires once; **a card given another time has another key and so fires again at the new one**, which is what "rescheduling clears the claim" asks without a hook in `apply`; a board card is claimed once and reminded to each person assigned who has reminders on. **Yesterday's missed reminder is not sent** (only today's date), nor one more than half an hour late, a card that is done, deleted or archived, or one for a person with reminders off. A `429` from a channel delays and loses nothing because the channels are not the job's: it writes notices and `send-notices` (8.3) sends them. Tests in `src/notifications/job.test.ts`: once at its time in the account's zone (Auckland, 20:00 UTC the day before), not again, **a changed time fires again at the new one**, yesterday, hours ago, done, and reminders-off send nothing, two runners write one, a board card goes to each person assigned with reminders on and once, and the cap holds and the rest wait for the next tick. **Left out, and said so:** the **partial index** the epic names was not added (the query is by the zone's accounts and a date, over the owner's index, and was not measured); a board card whose assignees are in different zones is reminded at the **first** zone's time (one claim for the card); and nothing was tried against a real mail server, core or push service.
 
-#### 📋 8.7 — Read and dismissed, one notice at a time
+#### ✅ 8.7 — Read and dismissed, one notice at a time
 
 **Priority:** P1. **Goal:** a person reads a notice, or dismisses it, without that touching the others.
 
@@ -142,7 +142,7 @@ not sent; a `429` delays and loses nothing.
 list and the count and is not brought back by a new page or a reload; a person cannot read or dismiss another's notice (the same ids, the wrong account: nothing changes, and the answer is the
 same as for an id that is not there); both are safe to do twice; and the counts agree with the list on every form of the database.
 
-#### 📋 8.8 — The bell
+#### ✅ 8.8 — The bell
 
 **Priority:** P1. **Goal:** a bell beside the avatar that shows how many notices are unread and, opened, the latest of them.
 
@@ -161,7 +161,7 @@ same as for an id that is not there); both are safe to do twice; and the counts 
 **Accepts when:** the count on the bell is the unread notices, up to 99+; a notice written for the person appears within a minute without a reload; opening one reads it and goes to its card;
 dismissing, "Mark all read" and "Clear all" change the list and the count at once and survive a reload; the bell is reachable and usable by keyboard, in light and dark, and at a phone's width.
 
-#### 📋 8.9 — The Notifications page, and the Inbox of what is assigned
+#### ✅ 8.9 — The Notifications page, and the Inbox of what is assigned
 
 **Priority:** P1. **Goal:** the whole list of notices has a page, and the Inbox is what is theirs to do.
 
@@ -176,3 +176,9 @@ dismissing, "Mark all read" and "Clear all" change the list and the count at onc
 
 **Accepts when:** `/notifications` lists, pages, reads and dismisses as the bell does, with the same words; `/inbox` shows only what is assigned and no notice; the sidebar's Inbox has no count and the bell has it;
 the unread and dismissed state is the same on a second device; and `README.md`, `DESIGN.md` §16 and the screens' tests say the same thing.
+
+**Done as (8.7):** `notice.read_at` and `notice.dismissed_at` (migration 0018 for both dialects; `read_at` and `dismissed_at` are numbers and so not in the list of text columns `content.ts` holds the schema to). **`src/workspaces/notifications.ts`** is what a person is told and is `inbox.ts`'s no longer: `noticesOf` (a page after a cursor, each notice with `read`, and the count on the first page), `unreadCount` (up to 100), `markRead` and `dismiss` (each `{ ids }` of at most 200, or `{ all: true }`), and `trimNotices`. A notice is read with a `read_at` **or at or before `account_settings.inbox_seen_at`**, which stays as the floor it was, so every notice from before keeps its state and **"Mark all read" is moving that time on to now: one write**; a dismissed one is in no statement of the list or the count; each change is one update that names the account, so another's ids are not touched and the answer is the same as for ids that are not there. `src/workspaces/notifications-endpoint.ts` is the handlers and `parseWhich` (a closed body); the routes are `GET /api/notifications`, `GET /api/notifications/unread`, `POST /api/notifications/read` and `POST /api/notifications/dismiss`, in `src/access/routes.ts`; the 8.1 routes for the count and for "seen" are gone and `GET /api/inbox` is the assigned cards alone (`inbox.ts`: `assignedOf`). Tests, on every form of the database and with `TUSK_TEST_OPERATOR` on and off: reading the named and no other and keeping the first time, reading all and a notice made after it unread, dismissing the named and all (not brought back by a page or by reading all, and what is assigned still there), another's ids changing nothing, what a person cannot see not counted however it was read, the parts of a body, and the routes as the wrong account (401 with no session, 403 from another site on each write, 400 for a body or a cursor that is not one, one person's ids never another's).
+
+**Done as (8.8):** **`NotificationsProvider`** (`src/inbox/notifications.tsx`) is the one copy, in the signed-in area, shared by the bell and by the page: the first page when the app opens, again every minute while the window is in view, when it comes to the front and when the network is back; what it last had stays when a read fails; a change is shown at once and sent after, **and put right by reading again if the server refuses it** (a read that began before a change does not put the old state back over it); an older page is read on request and kept when the first is read again (`merge`, pure). **`NotificationBell`** (`src/screens/NotificationBell.tsx`) is the design system's `NotificationsPanel` in the shell's `bell` slot, left of the avatar, with an icon for each kind (`ICONS`), `noticeText`'s words, `ago` ("5m ago", `src/inbox/ago.ts`, pure) and the dot, the latest 20; opening a notice reads it, and **a click on a link in the panel, which the panel makes as a plain link, is taken as a navigation of the app and the panel is made again for the new place, which closes it**. Tests: `ago`, `merge`, and in Chromium and WebKit, against a stand-in for the server that does what the routes do (this instance has one account and a notice is never for the one who did it, so it has none), the bell left of the avatar with its count and the labels, opening one reading it and going to its card without loading the page again, dismissing, "Mark all read" and "Clear all", and a read the server refuses put right by reading again.
+
+**Done as (8.9):** **`/notifications`** (`NotificationsScreen`, on the shared copy): newest first, grouped by day in the person's zone, read told from unread (a dot, and muted), each openable and dismissable, "Mark all read", "Clear all" and "Older notifications". **`/inbox`** is `Assigned to me` alone (`GET /api/inbox`), and the sidebar's Inbox has no count (`unreadLabel` and its CSS went). Tests: the page and the bell agreeing, the page at 390px with nothing scrolling sideways, and the sidebar's name for the Inbox being the word alone. **Not as the epic said, and left out:** a person who turns a kind off in Settings does not have the ones already written taken away; the bell shows the latest 20 and the page pages by 50; there is no sound or badge on the app's icon; and the service worker's cache holds none of it, as it holds nothing of a person's.

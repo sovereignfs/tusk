@@ -8,7 +8,7 @@ import { deliverNotices } from '../notifications/deliver';
 import { tick } from '../notifications/job';
 import { serverChannels } from '../notifications/server';
 import { purge } from '../sync/purge';
-import { trimNotices } from '../workspaces/inbox';
+import { trimNotices } from '../workspaces/notifications';
 import { JobRunner, realDeps, type JobDefinition, type RunnerDeps } from './runner';
 import { operatorOf } from '../crypto/operator';
 

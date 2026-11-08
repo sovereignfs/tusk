@@ -233,6 +233,10 @@ export const notice = sqliteTable(
     createdAt: epochMs('created_at').notNull(),
     /** When the job that sends notices outside the app claimed it (DESIGN.md §25.2), which is the one claim there is: null until a process has. */
     sentAt: epochMs('sent_at'),
+    /** When the person read it, or null (task 8.7). A notice is also read when it is at or before `account_settings.inbox_seen_at`, which is what "Mark all read" moves on. */
+    readAt: epochMs('read_at'),
+    /** When the person dismissed it, or null: a dismissed notice is shown nowhere and counts for nothing (task 8.7). */
+    dismissedAt: epochMs('dismissed_at'),
   },
   (table) => [index('notice_account_idx').on(table.accountId, table.createdAt)],
 );

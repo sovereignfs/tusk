@@ -151,15 +151,6 @@
   gap: var(--sv-space-2);
 }
 
-.unread {
-  margin-left: auto;
-  padding: 0 var(--sv-space-2);
-  border-radius: var(--sv-radius-md);
-  background: var(--sv-color-accent-subtle);
-  font-size: var(--sv-font-size-xs);
-  font-weight: var(--sv-font-weight-semibold);
-}
-
 /* The navigation in the phone's drawer: full width, the places and then the workspaces, with room for a thumb. */
 .drawerNav {
   display: flex;

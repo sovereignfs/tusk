@@ -89,8 +89,12 @@ export const ROUTES: RouteRule[] = [
     methods: { GET: { kind: 'account' }, POST: { kind: 'account' } },
   },
   { route: '/api/inbox', methods: { GET: { kind: 'account' } } },
-  { route: '/api/inbox/seen', methods: { POST: { kind: 'account' } } },
-  { route: '/api/inbox/unread', methods: { GET: { kind: 'account' } } },
+  // What a person is told (DESIGN.md §16, task 8.7): the notices, how many are unread, and reading and dismissing them, all the session's own.
+  { route: '/api/notifications', methods: { GET: { kind: 'account' } } },
+  { route: '/api/notifications/unread', methods: { GET: { kind: 'account' } } },
+  { route: '/api/notifications/read', methods: { POST: { kind: 'account' } } },
+  { route: '/api/notifications/dismiss', methods: { POST: { kind: 'account' } } },
+  { route: '/notifications', page: { kind: 'account' } },
   // The boards' part of the Planner (DESIGN.md §25.1): the signed-in person's own assigned cards in a range of dates.
   { route: '/api/planner', methods: { GET: { kind: 'account' } } },
   { route: '/api/boards/[id]', methods: { GET: { kind: 'account' } } },

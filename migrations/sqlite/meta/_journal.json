@@ -127,6 +127,13 @@
       "when": 1794139832101,
       "tag": "0017_add_card_due_end",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1794143676564,
+      "tag": "0018_add_notice_read_state",
+      "breakpoints": true
     }
   ]
 }

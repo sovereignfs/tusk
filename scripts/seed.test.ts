@@ -13,7 +13,8 @@ import { LIMITS } from '../src/sync/format';
 import { account, card, id, list, mutation, snapshot } from '../src/sync/test-support';
 import { parseMutation } from '../src/sync/validate';
 import { authDirectory } from '../src/auth/directory';
-import { inboxOf } from '../src/workspaces/inbox';
+import { assignedOf } from '../src/workspaces/inbox';
+import { noticesOf } from '../src/workspaces/notifications';
 import { readPublished, publicationsOf } from '../src/workspaces/published';
 import { boardsOfWorkspace, readBoard } from '../src/workspaces/reads';
 import { countAll } from '../src/workspaces/testing/roles';
@@ -271,7 +272,10 @@ describe(`the shared workspace (${leg})`, () => {
 
   it('told the member what the owner did, through the door: they were added, assigned and spoken to', async () => {
     const { two } = await twoAccounts();
-    const inbox = await inboxOf(app, authDirectory(auth.database), two);
+    const inbox = {
+      ...(await noticesOf(app, authDirectory(auth.database), two)),
+      assigned: await assignedOf(app, two),
+    };
     const kinds = new Set(inbox.notices.map((n) => n.kind));
     for (const kind of ['added_to_workspace', 'added_to_board', 'assigned', 'comment'])
       expect(kinds, kind).toContain(kind);
@@ -307,9 +311,7 @@ describe(`the shared workspace (${leg})`, () => {
         )
       ).length,
     ).toBe(0);
-    expect(await inboxOf(app, authDirectory(auth.database), two).then((i) => i.notices)).toEqual(
-      [],
-    );
+    expect((await noticesOf(app, authDirectory(auth.database), two)).notices).toEqual([]);
     const reset = await runSeed(stores(), auth.settings, { now: 1_800_000_000_000 });
     expect(reset.workspace.created).toBe(true);
     const after = await countAll(app);

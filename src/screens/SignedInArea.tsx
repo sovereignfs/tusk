@@ -15,6 +15,8 @@ import { AppFrame } from './AppFrame';
 import { Frame } from './Frame';
 import { ReminderSync } from '../reminders/ReminderSync';
 import { KeyProvider } from './KeyContext';
+import { NotificationsProvider } from '../inbox/notifications';
+import { NotificationBell } from './NotificationBell';
 import { RegisterWorker } from './RegisterWorker';
 import { ZoneReporter } from './ZoneReporter';
 
@@ -45,23 +47,26 @@ export function SignedInArea({
         <ZoneReporter accountId={accountId} />
         <ReminderSync accountId={accountId} />
         <RegisterWorker />
-        <WorkspacesProvider>
-          <MobileNavProvider>
-            <AppShell
-              name={site.name}
-              toolbar={<SidebarToggle />}
-              account={<AccountMenu accountId={accountId} name={name} email={email} />}
-              // The footer of five, on a phone only (DESIGN.md §18): the design system's `ResponsiveSurface` draws it there and nothing beside the sidebar.
-              footer={<ResponsiveSurface web={null} mobile={<PhoneFooter />} />}
-            >
-              <AppFrame>
-                {/* The Desk's own columns. */}
-                <Frame>{children}</Frame>
-              </AppFrame>
-              {modal}
-            </AppShell>
-          </MobileNavProvider>
-        </WorkspacesProvider>
+        <NotificationsProvider>
+          <WorkspacesProvider>
+            <MobileNavProvider>
+              <AppShell
+                name={site.name}
+                toolbar={<SidebarToggle />}
+                bell={<NotificationBell />}
+                account={<AccountMenu accountId={accountId} name={name} email={email} />}
+                // The footer of five, on a phone only (DESIGN.md §18): the design system's `ResponsiveSurface` draws it there and nothing beside the sidebar.
+                footer={<ResponsiveSurface web={null} mobile={<PhoneFooter />} />}
+              >
+                <AppFrame>
+                  {/* The Desk's own columns. */}
+                  <Frame>{children}</Frame>
+                </AppFrame>
+                {modal}
+              </AppShell>
+            </MobileNavProvider>
+          </WorkspacesProvider>
+        </NotificationsProvider>
       </KeyProvider>
     </SyncProvider>
   );

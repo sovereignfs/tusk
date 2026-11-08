@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { NoticeRow } from '../workspaces/format';
-import { groupByDay, noticeHref, noticeText, unreadLabel } from './group';
+import { groupByDay, noticeHref, noticeText } from './group';
 
 /** How the Inbox reads (DESIGN.md §16), with the time and the zone given: no clock is read. */
 const at = (iso: string) => Date.parse(iso);
@@ -13,6 +13,7 @@ const notice = (id: string, createdAt: number, extra: Partial<NoticeRow> = {}): 
   cardId: 'c',
   subject: 'Pay the invoice',
   createdAt,
+  read: false,
   ...extra,
 });
 
@@ -78,13 +79,5 @@ describe('what a notice says and where it goes', () => {
     expect(noticeHref({ workspaceId: 'w', boardId: 'b', cardId: null })).toBe('/b/b');
     expect(noticeHref({ workspaceId: 'w', boardId: null, cardId: null })).toBe('/w/w');
     expect(noticeHref({ workspaceId: null, boardId: null, cardId: null })).toBe('/');
-  });
-
-  it('counts unread as nothing, the number, or 99+', () => {
-    expect(unreadLabel(0)).toBeNull();
-    expect(unreadLabel(7)).toBe('7');
-    expect(unreadLabel(99)).toBe('99');
-    expect(unreadLabel(100)).toBe('99+');
-    expect(unreadLabel(250)).toBe('99+');
   });
 });

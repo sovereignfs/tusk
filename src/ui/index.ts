@@ -31,6 +31,7 @@ export {
   ConfirmDialog,
   MobileAppsDrawer,
   MobileFooter,
+  NotificationsPanel,
   ResponsiveSurface,
   SwipableMobileCarousel,
   SwipeStack,

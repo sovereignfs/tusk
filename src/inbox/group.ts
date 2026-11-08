@@ -93,9 +93,3 @@ export function noticeHref(
   if (notice.workspaceId) return `/w/${notice.workspaceId}`;
   return '/';
 }
-
-/** The count shown on the sidebar's Inbox entry: nothing for none, the number, and "99+" for a hundred or more. */
-export function unreadLabel(count: number): string | null {
-  if (count <= 0) return null;
-  return count >= 100 ? '99+' : String(count);
-}

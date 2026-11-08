@@ -7,7 +7,8 @@ import { saveSettings } from '../settings/account-settings';
 import { makeStore } from '../sync/test-support';
 import { applyOp } from './apply';
 import { type Op, type OpRequest, NOTICE_LIMITS } from './format';
-import { inboxOf, markSeen, trimNotices, unreadCount } from './inbox';
+import { assignedOf } from './inbox';
+import { dismiss, markRead, noticesOf, trimNotices, unreadCount } from './notifications';
 import { tablesOf } from './tables';
 import { type Role, type World, seedWorld } from './testing/roles';
 import { sealText } from './content';
@@ -38,7 +39,12 @@ const directory = {
 const id = () => crypto.randomUUID();
 const apply = (w: World, role: Role, op: Op, now = NOW) =>
   applyOp(database, w.accounts[role], { opId: id(), ...op } as OpRequest, { now, directory });
-const inbox = (w: World, role: Role) => inboxOf(database, directory, w.accounts[role]);
+/** What a person is told and what is assigned to them, as the two screens read them. */
+const inboxFor = async (account: string, before?: { createdAt: number; id: string }) => ({
+  ...(await noticesOf(database, directory, account, before)),
+  assigned: before ? [] : await assignedOf(database, account),
+});
+const inbox = (w: World, role: Role) => inboxFor(w.accounts[role]);
 const t = () => tablesOf(database);
 
 describe(`the Inbox (${leg})`, () => {
@@ -92,7 +98,7 @@ describe(`the Inbox (${leg})`, () => {
       workspaceId: w.workspace,
       email: 'known@example.com',
     });
-    const added = await inboxOf(database, directory, KNOWN);
+    const added = await inboxFor(KNOWN);
     expect(added.notices).toMatchObject([
       { kind: 'added_to_workspace', subject: 'Acme', boardId: null, cardId: null },
     ]);
@@ -142,9 +148,7 @@ describe(`the Inbox (${leg})`, () => {
     });
     // (The same account is added in the worlds of other tests, so it is this workspace's notices that are looked at.)
     const here = async () =>
-      (await inboxOf(database, directory, KNOWN)).notices.filter(
-        (n) => n.workspaceId === w.workspace,
-      );
+      (await inboxFor(KNOWN)).notices.filter((n) => n.workspaceId === w.workspace);
     expect((await here()).map((n) => n.kind)).toEqual(['added_to_workspace']);
     await apply(w, 'owner', { op: 'member.remove', workspaceId: w.workspace, accountId: KNOWN });
     expect(await here()).toEqual([]);
@@ -197,11 +201,11 @@ describe(`the Inbox (${leg})`, () => {
     );
     expect(await unreadCount(database, w.accounts.boardMember)).toBe(1);
     // Opening it moves the time on: nothing is unread, for this account and no other.
-    await markSeen(database, w.accounts.boardMember, NOW + 10);
+    await markRead(database, w.accounts.boardMember, { all: true }, NOW + 10);
     expect(await unreadCount(database, w.accounts.boardMember)).toBe(0);
-    await markSeen(database, other, NOW + 10);
+    await markRead(database, other, { all: true }, NOW + 10);
     // And never back.
-    await markSeen(database, w.accounts.boardMember, NOW);
+    await markRead(database, w.accounts.boardMember, { all: true }, NOW);
     expect(await unreadCount(database, w.accounts.boardMember)).toBe(0);
     await apply(
       w,
@@ -281,14 +285,12 @@ describe(`the Inbox (${leg})`, () => {
             VALUES (${noticeId}, ${w.accounts.member}, 'comment', ${w.accounts.boardOwner}, ${w.workspace}, ${w.boards.publicBoard}, ${w.cards.open}, ${sealText('notice', noticeId, 'details', JSON.stringify({ title: `n${i}` }))}, ${NOW + i}) RETURNING id`,
       );
     }
-    const first = await inboxOf(database, directory, w.accounts.member);
+    const first = await inboxFor(w.accounts.member);
     expect(first.notices).toHaveLength(NOTICE_LIMITS.page);
     expect(first.more).toBe(true);
     expect(first.notices[0]?.subject).toBe('n59');
     const edge = first.notices.at(-1);
-    const second = await inboxOf(
-      database,
-      directory,
+    const second = await inboxFor(
       w.accounts.member,
       edge && { createdAt: edge.createdAt, id: edge.id },
     );
@@ -334,5 +336,132 @@ describe(`the Inbox (${leg})`, () => {
       sql`SELECT MAX(created_at) AS at FROM ${t().notice} WHERE account_id = ${mine}`,
     );
     expect(Number(newest[0]?.at)).toBe(base - 1000 + 509);
+  });
+});
+
+describe(`reading and dismissing one notice at a time (${leg})`, () => {
+  const told = async (w: World, role: Role) => {
+    const who = w.accounts[role];
+    await apply(w, 'boardOwner', { op: 'card.assign', cardId: w.cards.open, accountId: who }, NOW);
+    await apply(
+      w,
+      'boardOwner',
+      { op: 'comment.add', id: id(), cardId: w.cards.open, body: 'a' },
+      NOW + 1,
+    );
+    await apply(
+      w,
+      'boardOwner',
+      { op: 'comment.add', id: id(), cardId: w.cards.open, body: 'b' },
+      NOW + 2,
+    );
+    return (await noticesOf(database, directory, who)).notices;
+  };
+
+  it('reads the notices named and no others, and one already read keeps the time it was read', async () => {
+    const w = await seedWorld(database);
+    const notices = await told(w, 'boardMember');
+    const [first = ''] = notices.map((n) => n.id);
+    expect(notices.map((n) => n.read)).toEqual([false, false, false]);
+    const who = w.accounts.boardMember;
+    expect(await unreadCount(database, who)).toBe(3);
+    await markRead(database, who, { ids: [first] }, NOW + 10);
+    const after = await noticesOf(database, directory, who);
+    expect(after.notices.map((n) => n.read)).toEqual([true, false, false]);
+    expect(after.unread).toBe(2);
+    // Twice does nothing more; the first time stands.
+    await markRead(database, who, { ids: [first] }, NOW + 99);
+    const rows = await dbAll<{ readAt: number | string | null }>(
+      database,
+      sql`SELECT read_at AS "readAt" FROM ${t().notice} WHERE id = ${first}`,
+    );
+    expect(Number(rows[0]?.readAt)).toBe(NOW + 10);
+    // Nothing named reads nothing.
+    await markRead(database, who, { ids: [] }, NOW + 11);
+    expect(await unreadCount(database, who)).toBe(2);
+  });
+
+  it('reads all with one write that moves a time on, and a notice made after it is unread', async () => {
+    const w = await seedWorld(database);
+    await told(w, 'boardMember');
+    const who = w.accounts.boardMember;
+    await markRead(database, who, { all: true }, NOW + 50);
+    expect(await unreadCount(database, who)).toBe(0);
+    expect((await noticesOf(database, directory, who)).notices.every((n) => n.read)).toBe(true);
+    await apply(
+      w,
+      'boardOwner',
+      { op: 'comment.add', id: id(), cardId: w.cards.open, body: 'c' },
+      NOW + 60,
+    );
+    const now = await noticesOf(database, directory, who);
+    expect(now.unread).toBe(1);
+    expect(now.notices.map((n) => n.read)).toEqual([false, true, true, true]);
+  });
+
+  it('dismisses the notices named, and all, which are shown nowhere and counted for nothing', async () => {
+    const w = await seedWorld(database);
+    const notices = await told(w, 'boardMember');
+    const [first = '', second = '', third = ''] = notices.map((n) => n.id);
+    const who = w.accounts.boardMember;
+    await dismiss(database, who, { ids: [second] }, NOW + 10);
+    const after = await noticesOf(database, directory, who);
+    expect(after.notices.map((n) => n.id)).toEqual([first, third]);
+    expect(after.unread).toBe(2);
+    // A new page does not bring it back; reading all does not either.
+    await markRead(database, who, { all: true }, NOW + 20);
+    expect((await noticesOf(database, directory, who)).notices).toHaveLength(2);
+    await dismiss(database, who, { all: true }, NOW + 30);
+    expect(await noticesOf(database, directory, who)).toMatchObject({ notices: [], unread: 0 });
+    // What is assigned is not a notice and is still there.
+    expect((await assignedOf(database, who)).length).toBe(1);
+  });
+
+  it('touches only the person’s own notices: another’s ids change nothing, and are answered as ids that are not there', async () => {
+    const w = await seedWorld(database);
+    const mine = await told(w, 'boardMember');
+    // The owner has notices of their own: a comment on the card they are assigned to, by somebody else.
+    await apply(
+      w,
+      'boardOwner',
+      { op: 'card.assign', cardId: w.cards.open, accountId: w.accounts.boardOwner },
+      NOW,
+    );
+    await apply(
+      w,
+      'boardMember',
+      { op: 'comment.add', id: id(), cardId: w.cards.open, body: 'z' },
+      NOW + 3,
+    );
+    const theirs = (await noticesOf(database, directory, w.accounts.boardOwner)).notices;
+    const [owner, member] = [w.accounts.boardOwner, w.accounts.boardMember];
+    expect(theirs.length).toBeGreaterThan(0);
+    await markRead(database, owner, { ids: mine.map((n) => n.id) }, NOW + 10);
+    await dismiss(database, owner, { ids: mine.map((n) => n.id) }, NOW + 10);
+    await markRead(database, owner, { ids: [id(), id()] }, NOW + 10);
+    const unchanged = await noticesOf(database, directory, member);
+    expect(unchanged.notices.map((n) => n.read)).toEqual([false, false, false]);
+    expect(unchanged.notices).toHaveLength(3);
+    expect(unchanged.unread).toBe(3);
+    // "All" is the asker's all.
+    await dismiss(database, owner, { all: true }, NOW + 20);
+    expect((await noticesOf(database, directory, member)).notices).toHaveLength(3);
+  });
+
+  it('keeps what a person cannot see out of the count however it was read or dismissed', async () => {
+    const w = await seedWorld(database);
+    const notices = await told(w, 'boardMember');
+    const [first = ''] = notices.map((n) => n.id);
+    const who = w.accounts.boardMember;
+    await apply(
+      w,
+      'owner',
+      { op: 'member.remove', workspaceId: w.workspace, accountId: who },
+      NOW + 5,
+    );
+    expect(await unreadCount(database, who)).toBe(0);
+    expect((await noticesOf(database, directory, who)).notices).toEqual([]);
+    await markRead(database, who, { ids: [first] }, NOW + 6);
+    expect(await unreadCount(database, who)).toBe(0);
   });
 });

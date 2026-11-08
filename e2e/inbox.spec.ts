@@ -62,10 +62,8 @@ test('the Inbox lists what is assigned to the person across their boards, and ha
   const assigned = page.getByRole('region', { name: 'Assigned to me' });
   await expect(assigned.getByRole('link', { name: card })).toBeVisible();
   await expect(assigned.getByText('Plan')).toBeVisible();
-  // Nobody told Ada of what Ada did.
-  await expect(
-    page.getByRole('region', { name: 'Notifications' }).getByText('Nothing new.'),
-  ).toBeVisible();
+  // What a person is told is the bell's and not the Inbox's: nothing of the kind is here.
+  await expect(page.getByRole('region', { name: 'Notifications' })).toHaveCount(0);
   await assigned.getByRole('link', { name: card }).click();
   await expect(page).toHaveURL(/\/b\/[0-9a-f-]{36}\/c\/[0-9a-f-]{36}$/);
 
@@ -111,7 +109,7 @@ test('Settings has Notifications: each kind on or off, kept with the account', a
     .toEqual([]);
 });
 
-test('the Inbox routes are for the signed-in, and opening it moves "unread" on and never back', async ({
+test('the Inbox and notification routes are for the signed-in, a body is closed, and reading and dismissing need this app’s own address', async ({
   page,
   playwright,
   baseURL,
@@ -119,25 +117,59 @@ test('the Inbox routes are for the signed-in, and opening it moves "unread" on a
   await signedIn(page);
   const origin = new URL(baseURL ?? 'http://localhost').origin;
   const stranger = await playwright.request.newContext({ baseURL: baseURL ?? 'http://localhost' });
-  for (const path of ['/api/inbox', '/api/inbox/unread', '/api/settings'])
+  for (const path of [
+    '/api/inbox',
+    '/api/notifications',
+    '/api/notifications/unread',
+    '/api/settings',
+  ])
     expect((await stranger.get(path)).status(), path).toBe(401);
-  expect((await stranger.post('/api/inbox/seen', { headers: { origin } })).status()).toBe(401);
+  for (const path of ['/api/notifications/read', '/api/notifications/dismiss'])
+    expect(
+      (await stranger.post(path, { headers: { origin }, data: { all: true } })).status(),
+      path,
+    ).toBe(401);
   await stranger.dispose();
 
-  // A page that is not a page, or a cursor that is half given, is a bad request; the account's own is fine.
-  expect((await page.request.get('/api/inbox?beforeAt=abc&beforeId=nope')).status()).toBe(400);
-  expect((await page.request.get('/api/inbox?beforeAt=5')).status()).toBe(400);
-  expect((await page.request.get('/api/inbox')).status()).toBe(200);
-  // Marking it read is a write: it needs this app's own address.
+  // A cursor that is half given is a bad request; the account's own is fine. The old routes of the Inbox are gone.
+  expect((await page.request.get('/api/notifications?beforeAt=abc&beforeId=nope')).status()).toBe(
+    400,
+  );
+  expect((await page.request.get('/api/notifications?beforeAt=5')).status()).toBe(400);
+  expect((await page.request.get('/api/notifications')).status()).toBe(200);
+  expect((await (await page.request.get('/api/inbox')).json()) as object).toEqual({
+    assigned: expect.any(Array),
+  });
+  expect((await page.request.get('/api/inbox/unread')).status()).toBe(404);
+  expect((await page.request.post('/api/inbox/seen', { headers: { origin } })).status()).toBe(404);
+  // A body is closed: ids or all, and nothing else.
+  for (const data of [{}, { all: false }, { ids: ['x'] }, { all: true, ids: [] }])
+    expect(
+      (await page.request.post('/api/notifications/read', { headers: { origin }, data })).status(),
+      JSON.stringify(data),
+    ).toBe(400);
+  // Reading and dismissing are writes: they need this app's own address.
+  for (const path of ['/api/notifications/read', '/api/notifications/dismiss'])
+    expect(
+      (
+        await page.request.post(path, {
+          headers: { origin: 'https://evil.example.com' },
+          data: { all: true },
+        })
+      ).status(),
+      path,
+    ).toBe(403);
   expect(
     (
-      await page.request.post('/api/inbox/seen', {
-        headers: { origin: 'https://evil.example.com' },
+      await page.request.post('/api/notifications/read', {
+        headers: { origin },
+        data: { all: true },
       })
     ).status(),
-  ).toBe(403);
-  expect((await page.request.post('/api/inbox/seen', { headers: { origin } })).status()).toBe(204);
-  const unread = (await (await page.request.get('/api/inbox/unread')).json()) as { unread: number };
+  ).toBe(204);
+  const unread = (await (await page.request.get('/api/notifications/unread')).json()) as {
+    unread: number;
+  };
   expect(unread.unread).toBe(0);
   // A kind that is not one is refused in the settings.
   expect(

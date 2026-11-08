@@ -543,6 +543,8 @@ export interface NoticeRow {
   /** What the notice is about, by name: a card's title, a board's or a workspace's name. */
   readonly subject: string;
   readonly createdAt: number;
+  /** Whether the person has read it (task 8.7): opened it, or said "Mark all read" since. */
+  readonly read: boolean;
 }
 
 /** An open card assigned to the person, for _Assigned to me_. */
@@ -555,11 +557,15 @@ export interface AssignedCard {
   readonly dueTime: string | null;
 }
 
-export interface Inbox {
+/** A page of what a person is told (DESIGN.md §16): newest first, and how many are unread (up to 100, which the bell says "99+" for). */
+export interface NotificationsPage {
   readonly notices: readonly NoticeRow[];
   readonly more: boolean;
-  /** Notices newer than the person last opened the Inbox, up to 100 (the screen says "99+"). */
   readonly unread: number;
+}
+
+/** The Inbox: the cards assigned to the person (DESIGN.md §16). */
+export interface Inbox {
   readonly assigned: readonly AssignedCard[];
 }
 

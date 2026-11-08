@@ -130,6 +130,7 @@ const SURFACES: Surface[] = [
     },
   },
   { name: 'the Inbox', go: (p) => p.goto('/inbox').then(() => undefined) },
+  { name: 'the Notifications page', go: (p) => p.goto('/notifications').then(() => undefined) },
   { name: 'the Planner', go: (p) => p.goto('/planner').then(() => undefined) },
   ...['profile', 'security', 'preferences', 'notifications', 'activity', 'data'].map((section) => ({
     name: `Settings, ${section}`,
