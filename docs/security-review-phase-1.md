@@ -75,9 +75,9 @@ A nonce for each request, no inline script, handler or `eval` in production, not
 
 **A key of your own** (the only one built): the server is checked to hold no plain Desk field for such an account after a full journey, refuses a plain field for it,
 and a server-side rule that needs content says what it does when it cannot read. §9.6's limit stands and is in the user's documentation
-([`docs/encryption.md`](encryption.md)): a key in a browser does not protect against a server that sends altered code. **The server-wide key (`TUSK_DB_ENCRYPTION=on`) is
-not built, and the server refuses to start with it**, which is the review's finding for that half: nothing was reviewed because nothing is claimed, and the refusal is a
-test. The finding of §1 above was a hole in the first, found by asking what else reaches the server about a sealed Desk.
+([`docs/encryption.md`](encryption.md)): a key in a browser does not protect against a server that sends altered code. **The server-wide key (`TUSK_DB_ENCRYPTION=on`) was not built when this
+was reviewed, and the server refused to start with it**, which was the review's finding for that half: nothing was reviewed because nothing was claimed. It has been
+built since (task 14.7, `docs/epics/encryption.md`) and is checked as its own work, not by this review. The finding of §1 above was a hole in the first, found by asking what else reaches the server about a sealed Desk.
 
 ### 10. Credentials, the backup path and the GitHub App
 

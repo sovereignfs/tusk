@@ -8,6 +8,10 @@ Each release's section is also its GitHub release notes: the release workflow re
 
 ## [Unreleased]
 
+### Added
+
+- Operator-key encryption: with `TUSK_DB_ENCRYPTION=on` and `TUSK_ENCRYPTION_KEY`, the server seals the content of every Desk and every workspace (names, titles, descriptions, checklist items, comments, label names, and what activity and notices say) before it is stored, so a copy of the database holds none of it. The operator can still read it, personal keys are not offered, and backups are plain. The server never converts silently: it stops at start-up, naming where, if the setting and the stored data disagree or content is sealed under a key it was not given, and `node tools/encrypt-data.mjs status | seal | open` (`pnpm encrypt-data` in development) moves the data in batches and can be run again. A new key is given beside the old one as `TUSK_ENCRYPTION_KEY_PREVIOUS` and the content is moved at start-up. Before this, `TUSK_DB_ENCRYPTION=on` stopped the server.
+
 ## [0.1.0] - 2026-11-07
 
 ### Added

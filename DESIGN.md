@@ -503,7 +503,7 @@ to a backup repository before this. Settings says so at the time.
 
 ### 9.5 The operator key
 
-`TUSK_DB_ENCRYPTION=on`, with `TUSK_ENCRYPTION_KEY`. **Not built yet (task 14.7): the server refuses to start with it `on`.**
+`TUSK_DB_ENCRYPTION=on`, with `TUSK_ENCRYPTION_KEY` (built, task 14.7).
 
 - **It is server-side field encryption, not the database's own,** because PostgreSQL has no built-in equivalent and it must behave the same on all three
   forms. Each content field is sealed with the same AES-GCM binding as §9.2, through `src/crypto/`, with rotation by `TUSK_ENCRYPTION_KEY_PREVIOUS`. On
@@ -511,8 +511,15 @@ to a backup repository before this. Settings says so at the time.
   and the details of activity and notices.
 - **What a query needs stays readable:** structure, positions, due dates (the Planner and reminders query them), archive and delete times, and colours.
 - **Personal keys are not offered,** and the sign-up page and docs say that the operator manages encryption and can read data.
-- **It never converts silently,** per Sovereign's rule. The server refuses to start if the setting conflicts with what is stored. Moving existing data
-  takes an explicit command shipped in the image.
+- **It never converts silently,** per Sovereign's rule. The server refuses to start if the setting conflicts with what is stored (the mode on with plain
+  content or with accounts that have a key of their own; off with sealed content; or content sealed under a key it was not given), naming where. Moving
+  existing data takes an explicit command shipped in the image, `node tools/encrypt-data.mjs status | seal | open`, which works in short batches and can be
+  run again. A new key is given beside the old one (`TUSK_ENCRYPTION_KEY_PREVIOUS`) and the server moves the content at start-up.
+- **One boundary.** On a workspace every content column is read and written through `src/workspaces/content.ts` and nowhere else, bound to its table, row and
+  column. A test asks the schema for its text columns and fails for one that is neither content nor structure, and another dumps every workspace table
+  after a run of operations and fails if anything written is in it. A sealed value is `t1.<key fingerprint>.<wrapped key>.<payload>`; the empty text and
+  `NULL` are not sealed, so that "has a description" is still a question the database can answer. A name that a statement sorted by is sorted by the server
+  after it is opened, since sealed names sort as ciphertext. On the Desk a stored field is `{ o }`, opened by pull and by the backup's read.
 - **Backup files are plain** (§21.3), since the server decrypts to make them.
 
 ### 9.6 What this does not do

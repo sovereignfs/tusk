@@ -95,9 +95,25 @@ There are three keys, and they are different things.
   in `TUSK_ENCRYPTION_KEY_PREVIOUS`, start the server once (it moves what is stored to the new key), and then remove the old one.
 - **A person's own key** is theirs: it seals their Desk in their browser, and you cannot recover it for them ([`docs/encryption.md`](../docs/encryption.md)).
 
-**Operator-key mode (`TUSK_DB_ENCRYPTION=on`, which would encrypt every Desk and every workspace with `TUSK_ENCRYPTION_KEY`) is not built.** The server refuses to
-start with it on, naming the setting, rather than say it encrypts when it does not. Until it is, whoever runs the server can read boards, and a Desk is private
-from you only if its owner sealed it with a key of their own.
+**Operator-key mode (`TUSK_DB_ENCRYPTION=on`)** makes the server seal the content of every Desk and every workspace with `TUSK_ENCRYPTION_KEY` before it is
+stored: names, titles, descriptions, checklist items, comments, label names, and what activity and notices say. A copy of the database, a stolen disk or a
+backup of the volume holds none of it. **It does not hide anything from you:** the server has the key, so whoever runs it can read boards, and personal keys are
+not offered to anyone while it is on. Structure, positions, due dates and times, and colours stay readable, because queries need them. Backups to git are made of
+the opened content, so they are plain.
+
+It never changes data silently. The server stops at start-up, naming where, if the setting and what is stored disagree (the mode on with plain content, off with
+sealed content, or content sealed under a key it was not given), or if any account has a key of its own. To move an instance that already has data, **stop the
+server**, set `TUSK_DB_ENCRYPTION=on` and `TUSK_ENCRYPTION_KEY`, and run, in the image:
+
+```bash
+docker compose exec tusk node tools/encrypt-data.mjs status   # what is plain and what is sealed; changes nothing
+docker compose exec tusk node tools/encrypt-data.mjs seal     # seal what is plain, then start the server
+docker compose exec tusk node tools/encrypt-data.mjs open     # the other way, before turning the mode off
+```
+
+It works in short batches and can be stopped and run again. To change the key, give the new one as `TUSK_ENCRYPTION_KEY` and the old one as
+`TUSK_ENCRYPTION_KEY_PREVIOUS`: the server moves the content (and the stored tokens) at start-up, in as many replicas as you run, and you drop the old key after.
+Keep the key: **without it the content cannot be read**, and nothing can recover it.
 
 ## Backups
 

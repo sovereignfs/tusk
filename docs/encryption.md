@@ -42,5 +42,5 @@ cards you have, and the size and timing of each change. Whoever runs it can see 
 ## The server's own key
 
 `TUSK_ENCRYPTION_KEY` is not yours: it seals the credentials people give Tusk (a repository's token), on the server. Encrypting **everything** with a key the
-operator holds (`TUSK_DB_ENCRYPTION=on`) is a different thing, protects against a stolen database and not against the operator, and **is not built**; the
-server refuses to start with it on. See [`deploy/README.md`](../deploy/README.md).
+operator holds (`TUSK_DB_ENCRYPTION=on`) is a different thing: it protects against a stolen database or disk and **not against the operator**, who holds the key and can read everything. Personal keys
+are not offered while it is on. See [`deploy/README.md`](../deploy/README.md) for how it is turned on, moved to and rotated.

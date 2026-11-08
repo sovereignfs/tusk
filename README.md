@@ -19,7 +19,7 @@ workspaces and boards (roles, labels, assignees, comments, activity, the Inbox, 
 verification and reset, Sovereign, linking); a key of your own for the Desk; backup to GitHub (by token or by a GitHub App) and export and import; account
 deletion; the phone's foundations and an accessibility pass.
 
-**Not built:** an operator's key for the whole server (`TUSK_DB_ENCRYPTION=on` is refused, not faked), reminders and push notifications (`TUSK_VAPID_*` are
+**Not built:** reminders and push notifications (`TUSK_VAPID_*` are
 settings reserved for them), the Planner, Today and Review, and the phone's own screens (footer, carousels, gestures). [`ROADMAP.md`](ROADMAP.md) has
 each, and [`DESIGN.md`](DESIGN.md) says what they will do. Nothing has been released yet (`package.json` says `0.0.0`; see [`RELEASING.md`](RELEASING.md)).
 
@@ -83,11 +83,11 @@ a test keeps the two in step.
 
 ### Keys
 
-| Setting                        | What                                                                                                                                                                                                                                                                            |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `TUSK_ENCRYPTION_KEY`          | 32 random bytes (base64, URL-safe base64 or hex): `openssl rand -base64 32`. It seals the credentials people give Tusk (a repository's token). Without it a token cannot be kept. Keep it apart from the database backups: a lost key means connecting those repositories again |
-| `TUSK_ENCRYPTION_KEY_PREVIOUS` | When changing the key: the old one, until the server has started once with both                                                                                                                                                                                                 |
-| `TUSK_DB_ENCRYPTION`           | `off`. `on` would encrypt everything with the key above and is **not built**: the server refuses to start with it rather than say it encrypts when it does not                                                                                                                  |
+| Setting                        | What                                                                                                                                                                                                                                                                                                                                                             |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TUSK_ENCRYPTION_KEY`          | 32 random bytes (base64, URL-safe base64 or hex): `openssl rand -base64 32`. It seals the credentials people give Tusk (a repository's token). Without it a token cannot be kept. Keep it apart from the database backups: a lost key means connecting those repositories again                                                                                  |
+| `TUSK_ENCRYPTION_KEY_PREVIOUS` | When changing the key: the old one, until the server has started once with both                                                                                                                                                                                                                                                                                  |
+| `TUSK_DB_ENCRYPTION`           | `off`. `on` seals the content of the Desk and of every workspace with the key above before it is stored, so a copy of the database holds none of it (you, the operator, can still read it). It never converts silently: the server stops if the setting and the stored data disagree, and `node tools/encrypt-data.mjs seal` moves the data (`deploy/README.md`) |
 
 ### Backup to GitHub
 
