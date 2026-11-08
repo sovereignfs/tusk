@@ -8,6 +8,8 @@ Each release's section is also its GitHub release notes: the release workflow re
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-08
+
 ### Added
 
 - A bell beside your avatar: it shows how many notices you have not read, and opened, lists the latest with an icon for each kind, how long ago, and a dot while unread. Open one to read it and go to its card, dismiss one, "Mark all read", "Clear all", or "View all" for the page at `/notifications`. Read and dismissed are kept for each notice, and the same on every device.
@@ -135,5 +137,6 @@ Each release's section is also its GitHub release notes: the release workflow re
 - What you search for on the Desk is no longer in the address as a query string, which is sent to the server and any proxy's log (even for a Desk with a key of its own): it is a fragment (`/desk#q=…`), which the browser never sends.
 - Opening the Inbox no longer fails on PostgreSQL (a column named twice in one statement was ambiguous there).
 
-[Unreleased]: https://github.com/sovereignfs/tusk/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/sovereignfs/tusk/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/sovereignfs/tusk/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/sovereignfs/tusk/releases/tag/v0.1.0
