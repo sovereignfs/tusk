@@ -362,5 +362,6 @@ test('the tasks plugin’s file is read as a Desk, says what it changed before a
   await expect(page.getByRole('link', { name: `${stem} bins`, exact: true })).toBeVisible();
   // The checklist came with the card, and the repeat is a repeat.
   await page.getByRole('link', { name: `${stem} bins`, exact: true }).click();
-  await expect(page.getByText(/Repeats/)).toBeVisible();
+  // (Not /Repeats/: other specs of the shard leave lists named "Repeats …" on this Desk, in the sidebar and the list picker.)
+  await expect(page.getByText('Repeats every week on Monday')).toBeVisible();
 });

@@ -44,11 +44,26 @@ export async function deskReady(page: Page, ready: Locator) {
 }
 
 /**
+ * Opens the sign-in page. Right after the page has signed itself out (an account deleted, say) it is already on its way to `/sign-in`, and
+ * WebKit then refuses a second navigation to the same address ("interrupted by another navigation"). That one is not a failure: the page is
+ * going where we asked, so let it arrive, and only ask again if it did not.
+ */
+async function gotoSignIn(page: Page) {
+  try {
+    await page.goto('/sign-in');
+  } catch (error) {
+    if (!/interrupted by another navigation/.test(String(error))) throw error;
+    await page.waitForLoadState('load');
+    if (new URL(page.url()).pathname !== '/sign-in') await page.goto('/sign-in');
+  }
+}
+
+/**
  * Fills the sign-in form and submits it. Sign-in is rate-limited per address (three attempts in ten seconds), and both browsers reach this instance
  * from the same one, so an attempt can be told to wait: it then does, once the window has passed, as a person would.
  */
 export async function trySignIn(page: Page, email: string, password: string) {
-  await page.goto('/sign-in');
+  await gotoSignIn(page);
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(password);
   const submit = page.getByRole('button', { name: 'Sign in' });

@@ -149,6 +149,10 @@ const SURFACES: Surface[] = [
 async function scan(page: Page): Promise<string[]> {
   // Let the page settle: skeletons gone, fonts in.
   await page.waitForLoadState('networkidle').catch(() => undefined);
+  // A dialog fades in: scanned half-way, its text has the contrast of a colour that is not there yet.
+  await page
+    .waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running'))
+    .catch(() => undefined);
   const analysed = await new AxeBuilder({ page }).withTags(TAGS).analyze();
   const result = {
     violations: analysed.violations
