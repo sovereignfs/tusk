@@ -10,5 +10,15 @@ import { DeskCarousel } from './DeskCarousel';
  * one page of the Desk to another.
  */
 export function DeskSurface({ children }: { children: ReactNode }) {
-  return <ResponsiveSurface web={children} mobile={<DeskCarousel />} />;
+  return (
+    <ResponsiveSurface
+      web={children}
+      // The rest of the height of the frame, which the carousel fills.
+      mobile={
+        <div style={{ flex: '1 1 0', minHeight: 0 }}>
+          <DeskCarousel />
+        </div>
+      }
+    />
+  );
 }

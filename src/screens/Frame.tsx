@@ -56,6 +56,10 @@ export function Frame({ children }: { children: ReactNode }) {
           style={{
             padding: flush ? 0 : mobile ? 'var(--sv-space-4)' : 'var(--sv-space-6)',
             ...(flush ? { height: '100%', minHeight: 0 } : {}),
+            // The Desk's carousel on a phone fills the screen between the header and the footer, so that a swipe works anywhere on it and not only over its cards.
+            ...(mobile && onDesk
+              ? { display: 'flex', flexDirection: 'column' as const, height: '100%', minHeight: 0 }
+              : {}),
           }}
         >
           {onDesk ? <KeyOffer /> : null}

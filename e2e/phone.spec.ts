@@ -298,3 +298,156 @@ test('the phone has a footer of five: the places, and an action that fits where 
   await expect(page).toHaveURL(/\/inbox$/);
   await expect(footer.getByRole('link', { name: 'Inbox' })).toHaveAttribute('aria-current', 'page');
 });
+
+test.describe('touch gestures on a Desk row', () => {
+  // Real touch events (the DevTools protocol's), which only Chromium can send; WebKit's touch is for the iOS Simulator, by hand.
+  test.use({ hasTouch: true, isMobile: true });
+  test.skip(
+    ({ browserName }) => browserName !== 'chromium',
+    'touch events are sent through Chromium',
+  );
+
+  type Touch = 'touchStart' | 'touchMove' | 'touchEnd';
+  async function swipeLeft(page: Page, from: { x: number; y: number }, by: number) {
+    const cdp = await page.context().newCDPSession(page);
+    const send = (type: Touch, x: number) =>
+      cdp.send('Input.dispatchTouchEvent', {
+        type,
+        touchPoints: type === 'touchEnd' ? [] : [{ x, y: from.y }],
+      });
+    await send('touchStart', from.x);
+    for (let moved = 20; moved <= by; moved += 20) {
+      await send('touchMove', from.x - moved);
+      await page.waitForTimeout(25);
+    }
+    await send('touchEnd', from.x - by);
+    await cdp.detach();
+  }
+
+  test('a swipe on a row shows Done and Delete and does not move the carousel; Done completes it and Delete offers Undo', async ({
+    page,
+  }) => {
+    await signedIn(page);
+    await page.goto('/desk');
+    const title = unique('Swipe me');
+    await page.getByPlaceholder('Add a card…').first().fill(title);
+    await page.keyboard.press('Enter');
+    const link = page.getByRole('link', { name: title });
+    await expect(link).toBeVisible();
+    const row = page.locator('li').filter({ has: link });
+    const box = await link.boundingBox();
+    if (!box) throw new Error('no row');
+    const at = { x: box.x + box.width * 0.7, y: box.y + box.height / 2 };
+
+    // A handle is drawn for a touch to reorder by, and a mouse has none.
+    await expect(row.locator('[data-handle]')).toBeVisible();
+
+    // A swipe slides the row aside: Done and Delete are there, and the list on screen is still the same one.
+    const before = page.url();
+    await swipeLeft(page, at, 160);
+    await expect(row.getByRole('button', { name: 'Delete' })).toBeVisible();
+    await expect(row.getByRole('button', { name: 'Done' })).toBeVisible();
+    expect(page.url()).toBe(before);
+
+    // Done completes the card and closes the row.
+    await row.getByRole('button', { name: 'Done' }).click();
+    await expect(row.getByRole('checkbox', { name: `Done: ${title}` })).toBeChecked();
+
+    // Another card: Delete removes it and offers Undo, which brings it back.
+    const other = unique('Delete me');
+    await page.getByPlaceholder('Add a card…').first().fill(other);
+    await page.keyboard.press('Enter');
+    const otherLink = page.getByRole('link', { name: other });
+    await expect(otherLink).toBeVisible();
+    const otherBox = await otherLink.boundingBox();
+    if (!otherBox) throw new Error('no row');
+    await swipeLeft(
+      page,
+      { x: otherBox.x + otherBox.width * 0.7, y: otherBox.y + otherBox.height / 2 },
+      160,
+    );
+    await page
+      .locator('li')
+      .filter({ has: otherLink })
+      .getByRole('button', { name: 'Delete' })
+      .click();
+    await expect(otherLink).toHaveCount(0);
+    await page.getByRole('button', { name: 'Undo' }).click();
+    await expect(page.getByRole('link', { name: other })).toBeVisible();
+  });
+
+  test('a long press on a row chooses it, and a touch reorders only from the handle, after a press', async ({
+    page,
+  }) => {
+    await signedIn(page);
+    await page.goto('/desk');
+    const names = [unique('First'), unique('Second'), unique('Third')];
+    // Added one after another: each goes to the top, so the order on the screen is Third, Second, First.
+    for (const name of names) {
+      await page.getByPlaceholder('Add a card…').first().fill(name);
+      await page.keyboard.press('Enter');
+      await expect(page.getByRole('link', { name })).toBeVisible();
+    }
+    const [first, second, third] = names as [string, string, string];
+    const order = async () =>
+      (
+        await page
+          .locator('li')
+          .filter({ has: page.getByRole('link') })
+          .allInnerTexts()
+      )
+        .map((text) => text.split('\n')[0] ?? '')
+        .filter((text) => names.includes(text));
+    await expect.poll(order).toEqual([third, second, first]);
+
+    const cdp = await page.context().newCDPSession(page);
+    const send = (type: Touch, x: number, y: number) =>
+      cdp.send('Input.dispatchTouchEvent', {
+        type,
+        touchPoints: type === 'touchEnd' ? [] : [{ x, y }],
+      });
+    const centre = async (name: string) => {
+      const box = await page.getByRole('link', { name }).boundingBox();
+      if (!box) throw new Error('no row');
+      return { x: box.x + box.width * 0.5, y: box.y + box.height / 2, box };
+    };
+
+    // A drag from the body of a row (a touch that moves after no press) is not a lift: the order is as it was.
+    const body = await centre(first);
+    await send('touchStart', body.x, body.y);
+    for (let step = 1; step <= 6; step++) {
+      await send('touchMove', body.x, body.y - step * 20);
+      await page.waitForTimeout(30);
+    }
+    await send('touchEnd', body.x, body.y - 120);
+    await expect.poll(order).toEqual([third, second, first]);
+
+    // A long press on the body chooses the card, and the bar that acts on the chosen appears.
+    await send('touchStart', body.x, body.y);
+    await page.waitForTimeout(800);
+    await send('touchEnd', body.x, body.y);
+    await expect(page.getByRole('toolbar', { name: 'Chosen cards' })).toBeVisible();
+    await page.getByRole('button', { name: 'Cancel' }).click();
+    await expect(page.getByRole('toolbar', { name: 'Chosen cards' })).toHaveCount(0);
+
+    // A press on the handle, then a move, lifts the row and puts it where it is dropped: First goes to the top.
+    const handle = page
+      .locator('li')
+      .filter({ has: page.getByRole('link', { name: first }) })
+      .locator('[data-handle]');
+    const grip = await handle.boundingBox();
+    const top = await centre(third);
+    if (!grip) throw new Error('no handle');
+    const gx = grip.x + grip.width / 2;
+    const gy = grip.y + grip.height / 2;
+    await send('touchStart', gx, gy);
+    await page.waitForTimeout(450);
+    const travel = gy - top.y;
+    for (let step = 1; step <= 12; step++) {
+      await send('touchMove', gx, gy - (travel * step) / 12 - 4);
+      await page.waitForTimeout(25);
+    }
+    await send('touchEnd', gx, top.y - 4);
+    await expect.poll(order).toEqual([first, third, second]);
+  });
+});

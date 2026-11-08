@@ -1,7 +1,8 @@
 import {
   type Announcements,
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
@@ -24,7 +25,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  */
 export function useReorderSensors() {
   return useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    // A mouse lifts after a few pixels; a touch after a press, so that a swipe is a swipe (the carousel's, or a row's) and a scroll is a scroll (DESIGN.md §18).
+    // Separate sensors, because a pointer sensor would take a finger at once and the page would not scroll.
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 300, tolerance: 8 } }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
       keyboardCodes: { start: ['Space'], cancel: ['Escape'], end: ['Space'] },

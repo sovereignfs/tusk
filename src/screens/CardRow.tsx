@@ -2,15 +2,22 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { type HTMLAttributes, useEffect, useState } from 'react';
+import {
+  type HTMLAttributes,
+  type PointerEvent as ReactPointerEvent,
+  type TouchEvent as ReactTouchEvent,
+  useEffect,
+  useState,
+} from 'react';
 import { useSortable } from '@dnd-kit/sortable';
-import { completeCard, isCompleted, statusOf } from '../actions/cards';
+import { completeCard, deleteMany, isCompleted, restoreMany, statusOf } from '../actions/cards';
 import { reopenFor } from './reopen';
 import type { LocalRow } from '../local/rows';
-import { getRow, checksOf } from '../local/store';
+import { allChecksOf, getRow, checksOf } from '../local/store';
 import { seriesIdOf } from '../actions/series';
 import { useSync } from '../sync/react';
-import { Checkbox, Icon } from '../ui';
+import { Button, Checkbox, GripIcon, Icon, useLongPress, useSwipeReveal } from '../ui';
+import { useUndo } from './Undo';
 import { text } from './fields';
 import { InProgressMark } from './InProgressMark';
 import { ProgressRing } from './ProgressRing';
@@ -23,6 +30,12 @@ import { StarButton } from './StarButton';
 import styles from './ListScreen.module.css';
 
 const ids = { newId: () => crypto.randomUUID() };
+
+/** How far a row slides to show Done and Delete, and the event by which a row that opens tells the others to close (one is open at a time). */
+const REVEAL_WIDTH = 144;
+const ROW_OPENED = 'tusk:row-opened';
+/** What a swipe, a long press or a drag must leave alone: the controls of the row, each of which keeps its own touch. */
+const OWN_TOUCH = 'button, input, label, [data-handle]';
 
 /**
  * One card: a box to tick and the title, which opens the card in the right column (`?card=`), as does a click anywhere else on the row that is not a
@@ -53,6 +66,30 @@ export function CardRow({
   const client = useSync();
   const pathname = usePathname();
   const selection = useSelection();
+  const offerUndo = useUndo();
+  // The row slides to show Done and Delete (DESIGN.md §18); only one row is open at a time.
+  const [revealed, setRevealed] = useState(false);
+  useEffect(() => {
+    const closeFor = (event: Event) => {
+      if ((event as CustomEvent<string>).detail !== card.id) setRevealed(false);
+    };
+    window.addEventListener(ROW_OPENED, closeFor);
+    return () => window.removeEventListener(ROW_OPENED, closeFor);
+  }, [card.id]);
+  const swipe = useSwipeReveal({
+    revealWidth: REVEAL_WIDTH,
+    open: revealed,
+    onOpen: () => {
+      setRevealed(true);
+      window.dispatchEvent(new CustomEvent(ROW_OPENED, { detail: card.id }));
+    },
+    onClose: () => setRevealed(false),
+  });
+  // A long press on the row's body starts choosing (a touch or a pen: a mouse has ctrl and cmd).
+  const press = useLongPress({
+    onLongPress: () => selection?.toggle(card.id),
+    disabled: !selection,
+  });
   const chosen = selection?.selected.has(card.id) ?? false;
   const done = isCompleted(card);
   const [asked, setAsked] = useState<boolean | null>(null);
@@ -84,6 +121,35 @@ export function CardRow({
     else setAsked(null);
   }
 
+  async function remove() {
+    setRevealed(false);
+    const items = await client.read((db) => allChecksOf(db, card.id));
+    const result = deleteMany([{ card, items }], ids);
+    if (!result.ok) return;
+    for (const mutation of result.mutations) await client.commit(mutation);
+    offerUndo('Card deleted.', async () => {
+      const back = await client.read(async (db) => {
+        const row = await getRow(db, 'desk_card', card.id);
+        return row ? [{ card: row, items: await allChecksOf(db, card.id) }] : [];
+      });
+      const restored = restoreMany(back, ids);
+      if (restored.ok) for (const mutation of restored.mutations) await client.commit(mutation);
+    });
+  }
+
+  /** A gesture's handlers, for a pointer that is not a mouse and did not go down on a control of the row's own. */
+  const touching =
+    <E extends ReactPointerEvent<HTMLElement>>(handler: (event: never) => void) =>
+    (event: E) => {
+      if (event.pointerType === 'mouse' || (event.target as HTMLElement).closest(OWN_TOUCH)) return;
+      handler(event as never);
+    };
+  /** The rest of a gesture, which goes only to a gesture that a touch or a pen began. */
+  const through = (handler: (event: never) => void) => (event: ReactPointerEvent<HTMLElement>) => {
+    if (event.pointerType === 'mouse') return;
+    handler(event as never);
+  };
+
   return (
     // The row's free space opens the card for a pointer, as the link does; a keyboard has the link (Enter opens it, Space lifts it), so nothing is
     // reachable only by this handler.
@@ -92,6 +158,11 @@ export function CardRow({
       {...rowProps}
       className={`${styles.row} ${checked ? styles.done : ''} ${chosen ? styles.chosen : ''}`}
       aria-current={open ? 'true' : undefined}
+      onPointerDown={touching(press.onPointerDown as never)}
+      onPointerMove={through(press.onPointerMove as never)}
+      onPointerUp={through(press.onPointerUp as never)}
+      onPointerCancel={through(press.onPointerCancel as never)}
+      onPointerLeave={through(press.onPointerLeave as never)}
       onClick={(event) => {
         const target = event.target as HTMLElement;
         // Ctrl or cmd chooses the card (a click on its box already means done), and while any are chosen a click chooses and opens nothing: the link too,
@@ -110,55 +181,94 @@ export function CardRow({
         openCard(card.id);
       }}
     >
-      <Checkbox
-        id={`tick-${card.id}`}
-        label=""
-        aria-label={`Done: ${title}`}
-        checked={checked}
-        onChange={(next) => void toggle(next)}
-      />
-      <Link
-        {...linkProps}
-        href={`${pathname}?card=${card.id}`}
-        className={styles.name}
-        data-shortcut-card=""
-        scroll={false}
-        // Choosing a card is not opening it: the link does not go where it points while ctrl or cmd is held or any card is chosen. The row's own handler
-        // does the choosing; this is what keeps the link from navigating first.
-        onClick={(event) => {
-          if (selection && (event.ctrlKey || event.metaKey || selection.active)) {
-            event.preventDefault();
-            return;
-          }
-          // A plain click opens the card by the address's query alone, which needs no page from the server; a modified click is the browser's own.
-          if (
-            !event.ctrlKey &&
-            !event.metaKey &&
-            !event.shiftKey &&
-            !event.altKey &&
-            event.button === 0
-          ) {
-            event.preventDefault();
-            openCard(card.id);
-          }
-        }}
-        // A link can be dragged by the browser too, and one dropped on the page is followed: that is a navigation in the middle of a reorder.
-        draggable={false}
+      <div
+        ref={swipe.rowRef}
+        className={styles.slider}
+        // The hook moves the row while a finger is on it and lets go on release; keeping it open is ours.
+        style={revealed ? { transform: `translateX(-${REVEAL_WIDTH}px)` } : undefined}
+        onPointerDown={touching(swipe.handlers.onPointerDown as never)}
+        onPointerMove={through(swipe.handlers.onPointerMove as never)}
+        onPointerUp={through(swipe.handlers.onPointerUp as never)}
+        onPointerCancel={through(swipe.handlers.onPointerCancel as never)}
       >
-        {title}
-      </Link>
-      {due.date ? (
-        <span className={`${styles.due} ${overdue ? styles.overdue : ''}`}>{dueText}</span>
-      ) : null}
-      {seriesIdOf(card) ? (
-        <Icon name="refresh-cw" className={styles.repeats} aria-label="Repeats" />
-      ) : null}
-      {statusOf(card) === 'in_progress' ? <InProgressMark className={styles.started} /> : null}
-      {progress && progress.total > 0 ? (
-        <ProgressRing done={progress.done} total={progress.total} />
-      ) : null}
-      <StarButton card={card} />
-      {chosen ? <span className={styles.srOnly}>Chosen</span> : null}
+        <Checkbox
+          id={`tick-${card.id}`}
+          label=""
+          aria-label={`Done: ${title}`}
+          checked={checked}
+          onChange={(next) => void toggle(next)}
+        />
+        <Link
+          {...linkProps}
+          href={`${pathname}?card=${card.id}`}
+          className={styles.name}
+          data-shortcut-card=""
+          scroll={false}
+          // Choosing a card is not opening it: the link does not go where it points while ctrl or cmd is held or any card is chosen. The row's own handler
+          // does the choosing; this is what keeps the link from navigating first.
+          onClick={(event) => {
+            if (selection && (event.ctrlKey || event.metaKey || selection.active)) {
+              event.preventDefault();
+              return;
+            }
+            // A plain click opens the card by the address's query alone, which needs no page from the server; a modified click is the browser's own.
+            if (
+              !event.ctrlKey &&
+              !event.metaKey &&
+              !event.shiftKey &&
+              !event.altKey &&
+              event.button === 0
+            ) {
+              event.preventDefault();
+              openCard(card.id);
+            }
+          }}
+          // A link can be dragged by the browser too, and one dropped on the page is followed: that is a navigation in the middle of a reorder.
+          draggable={false}
+        >
+          {title}
+        </Link>
+        {due.date ? (
+          <span className={`${styles.due} ${overdue ? styles.overdue : ''}`}>{dueText}</span>
+        ) : null}
+        {seriesIdOf(card) ? (
+          <Icon name="refresh-cw" className={styles.repeats} aria-label="Repeats" />
+        ) : null}
+        {statusOf(card) === 'in_progress' ? <InProgressMark className={styles.started} /> : null}
+        {progress && progress.total > 0 ? (
+          <ProgressRing done={progress.done} total={progress.total} />
+        ) : null}
+        <StarButton card={card} />
+        {rowProps ? (
+          // A touch reorders from here and from nowhere else (DESIGN.md §18), after a press (the sensor waits); a pointer lifts the row by any part of it.
+          <span className={styles.grip} data-handle="" aria-hidden>
+            <GripIcon />
+          </span>
+        ) : null}
+        {chosen ? <span className={styles.srOnly}>Chosen</span> : null}
+      </div>
+      {/* Done and Delete, behind the row: shown when it is slid aside (a swipe on its body, clear of the star and the handle). After the row in the document, so that what a reader or a test finds first is the title; the row is above them by `z-index`. */}
+      <div className={styles.revealed} aria-hidden={!revealed} style={{ width: REVEAL_WIDTH }}>
+        <Button
+          variant="secondary"
+          size="sm"
+          tabIndex={revealed ? 0 : -1}
+          onClick={() => {
+            setRevealed(false);
+            void toggle(!checked);
+          }}
+        >
+          {checked ? 'Reopen' : 'Done'}
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          tabIndex={revealed ? 0 : -1}
+          onClick={() => void remove()}
+        >
+          Delete
+        </Button>
+      </div>
     </li>
   );
 }
@@ -186,7 +296,14 @@ export function SortableCardRow(props: {
     id: props.card.id,
   });
   // The pointer starts a drag from the row and the keyboard from the link: one set of listeners, divided between them.
-  const { onKeyDown, ...pointer } = (listeners ?? {}) as Record<string, (event: never) => void>;
+  const { onKeyDown, onTouchStart, ...pointer } = (listeners ?? {}) as Record<
+    string,
+    (event: never) => void
+  >;
+  // A touch lifts the row only from its handle (DESIGN.md §18): a touch on the rest of it is a scroll, a swipe or a long press that chooses it.
+  const fromHandle = (event: ReactTouchEvent<HTMLLIElement>) => {
+    if ((event.target as HTMLElement).closest('[data-handle]')) onTouchStart?.(event as never);
+  };
   return (
     <CardRow
       {...props}
@@ -198,6 +315,7 @@ export function SortableCardRow(props: {
           opacity: isDragging ? 0.6 : 1,
         },
         ...(pointer as HTMLAttributes<HTMLLIElement>),
+        onTouchStart: fromHandle,
       }}
       linkProps={{
         ref: setActivatorNodeRef,

@@ -23,12 +23,69 @@
 }
 
 .row {
+  position: relative;
   display: flex;
   align-items: center;
+  min-height: 44px;
+  overflow: hidden;
+  border-bottom: var(--sv-border-width-hairline) solid var(--sv-color-border);
+  background: var(--sv-color-surface);
+  /* A long press chooses the card: the browser's own menu and magnifier for a press on a link are not wanted. */
+  -webkit-touch-callout: none;
+}
+
+/* What slides: the whole row but for what it slides over. Opaque (it takes the row's background), so that Done and Delete behind it are not seen until it has moved. A
+   horizontal drag on it is the swipe's and not the page's, and a vertical one is still the page's. */
+.slider {
+  display: flex;
+  flex: 1;
+  align-items: center;
   gap: var(--sv-space-3);
+  min-width: 0;
   min-height: 44px;
   padding: 0 var(--sv-space-2);
-  border-bottom: var(--sv-border-width-hairline) solid var(--sv-color-border);
+  background: inherit;
+  touch-action: pan-y;
+  /* Above Done and Delete, which are positioned and would otherwise be painted over it and take its clicks. */
+  position: relative;
+  z-index: 1;
+  transition: transform 150ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slider {
+    transition: none;
+  }
+}
+
+/* Done and Delete, behind the slid row at its right edge. */
+.revealed {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sv-space-2);
+}
+
+/* The handle a touch reorders by: only where the pointer is coarse (a touch screen), since a mouse lifts the row by any part of it. It takes the touch for itself, so that
+   pressing on it never scrolls the list, and is a comfortable size to press. */
+.grip {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 44px;
+  color: var(--sv-color-text-muted);
+  touch-action: none;
+}
+
+@media (pointer: coarse) {
+  .grip {
+    display: inline-flex;
+  }
 }
 
 .row[aria-current='true'] {
