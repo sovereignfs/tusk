@@ -5,6 +5,7 @@ import { dbGet, dbRun } from '../src/db/exec';
 import * as postgresSchema from '../src/db/schema/postgres';
 import * as sqliteSchema from '../src/db/schema/sqlite';
 import { applyOp } from '../src/workspaces/apply';
+import { openText } from '../src/workspaces/content';
 import type { Op, OpRequest } from '../src/workspaces/format';
 import { tablesOf } from '../src/workspaces/tables';
 import { TUSK_NAMESPACE, uuid5 } from '../src/uuid5';
@@ -357,7 +358,13 @@ export async function removeWorkspaceSeed(
     const result = await applyOp(
       app,
       people.one,
-      { opId: crypto.randomUUID(), op: 'workspace.delete', id: ids.workspace, name: found.name },
+      {
+        opId: crypto.randomUUID(),
+        op: 'workspace.delete',
+        id: ids.workspace,
+        // Typed as a person would type it: under the operator key the column holds ciphertext, and what is typed is the name.
+        name: openText('workspace', ids.workspace, 'name', found.name),
+      },
       { now },
     );
     if (result.status === 'refused')
