@@ -8,6 +8,10 @@ Each release's section is also its GitHub release notes: the release workflow re
 
 ## [Unreleased]
 
+### Changed
+
+- A board's tile no longer writes the first letter of its name on the coloured band: the band is the colour alone.
+
 ## [0.2.1] - 2026-11-08
 
 ### Added
