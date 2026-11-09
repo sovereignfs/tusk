@@ -11,6 +11,7 @@ Each release's section is also its GitHub release notes: the release workflow re
 ### Changed
 
 - A board's tile no longer writes the first letter of its name on the coloured band: the band is the colour alone.
+- The Desk's tile on Home now shows how many cards are overdue beside the open and due-today counts ("115 open · 1 due today · 3 overdue"), in the error colour while there are any. A card due today at a time that has gone counts as overdue, and none is counted twice.
 
 ## [0.2.1] - 2026-11-08
 

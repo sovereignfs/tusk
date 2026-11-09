@@ -431,24 +431,60 @@ describe('counts for the sidebar', () => {
 });
 
 describe('the Desk’s summary for the boards index', () => {
-  it('counts the open cards and those of them due today, and not a deleted or completed one', async () => {
+  const now = { date: '2026-11-06', time: '12:00' };
+  const due = (date: string, time?: string) => ({
+    title: { v: 'x' },
+    dueDate: { v: date },
+    ...(time ? { dueTime: { v: time } } : {}),
+  });
+
+  it('counts the open cards, those due today and those overdue, and not a deleted or completed one', async () => {
     const { db } = await device();
     const [a, gone] = [newList('A'), newList('Gone')];
-    const today = '2026-11-06';
-    const due = (date: string) => ({ title: { v: 'x' }, dueDate: { v: date } });
     const cards = [
-      newCard(a.id, { fields: due(today) }),
+      newCard(a.id, { fields: due(now.date) }),
       newCard(a.id, { fields: due('2026-11-07') }),
       newCard(a.id),
-      newCard(a.id, { fields: { ...due(today), completedAt: { v: 1_793_000_000_000 } } }),
+      newCard(a.id, { fields: { ...due(now.date), completedAt: { v: 1_793_000_000_000 } } }),
       newCard(a.id, { fields: { title: { c: 'YWdl' }, dueDate: { c: 'YWdl' } } }),
-      newCard(gone.id, { fields: due(today) }),
+      newCard(gone.id, { fields: due(now.date) }),
     ];
     await commitMutation(db, mutation(a, gone, ...cards), 1);
     await commitMutation(db, mutation({ table: 'desk_list', id: gone.id, deleted: true }), 2);
-    // Open: the two dated, the plain one and the sealed one (counted as open, and not as due, until the keys are in place). One is due today.
-    expect(await deskSummary(db, today)).toEqual({ open: 4, dueToday: 1 });
-    expect(await deskSummary((await device()).db, today)).toEqual({ open: 0, dueToday: 0 });
+    // Open: the two dated, the plain one and the sealed one (counted as open, and as neither due nor overdue, until the keys are in place). One is due today.
+    expect(await deskSummary(db, now)).toEqual({ open: 4, dueToday: 1, overdue: 0 });
+    expect(await deskSummary((await device()).db, now)).toEqual({
+      open: 0,
+      dueToday: 0,
+      overdue: 0,
+    });
+  });
+
+  it('counts overdue as the Desk does, before today or today at a time that has gone, and never one card as both', async () => {
+    const { db } = await device();
+    const a = newList('A');
+    const cards = [
+      // Overdue: yesterday, with or without a time, and today at a time that has gone.
+      newCard(a.id, { fields: due('2026-11-05') }),
+      newCard(a.id, { fields: due('2026-10-01', '23:59') }),
+      newCard(a.id, { fields: due(now.date, '11:59') }),
+      // Due today: no time, a time to come, and the minute it is now.
+      newCard(a.id, { fields: due(now.date) }),
+      newCard(a.id, { fields: due(now.date, '12:01') }),
+      newCard(a.id, { fields: due(now.date, '12:00') }),
+      // Neither: tomorrow, and nothing. A done card, overdue as it was, is not counted.
+      newCard(a.id, { fields: due('2026-11-07') }),
+      newCard(a.id),
+      newCard(a.id, { fields: { ...due('2026-11-01'), completedAt: { v: 1_793_000_000_000 } } }),
+    ];
+    await commitMutation(db, mutation(a, ...cards), 1);
+    expect(await deskSummary(db, now)).toEqual({ open: 8, dueToday: 3, overdue: 3 });
+    // A minute later the card due at 12:00 is overdue and the one at 12:01 is still to come.
+    expect(await deskSummary(db, { date: now.date, time: '12:01' })).toEqual({
+      open: 8,
+      dueToday: 2,
+      overdue: 4,
+    });
   });
 });
 
