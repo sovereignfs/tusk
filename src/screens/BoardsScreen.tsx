@@ -6,7 +6,7 @@ import { sections } from '../boards/sort';
 import { useWorkspaces } from '../boards/workspaces';
 import { deskSummary } from '../local/store';
 import { useLocal } from '../sync/react';
-import { browserZone, todayFor } from '../time';
+import { nowHere } from '../time';
 import { Alert, Avatar, Button, EmptyState, Icon, useToast } from '@sovereignfs/ui';
 import {
   type BoardsIndex,
@@ -43,8 +43,8 @@ export function BoardsScreen() {
   const [making, setMaking] = useState(false);
   const [settingsFor, setSettingsFor] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<WorkspaceRow | null>(null);
-  const [today] = useState(() => todayFor(browserZone(), Date.now()));
-  const desk = useLocal((db) => deskSummary(db, today), [today]);
+  const [now] = useState(() => nowHere());
+  const desk = useLocal((db) => deskSummary(db, now), [now]);
 
   const read = useCallback(async () => {
     try {
@@ -134,7 +134,10 @@ export function BoardsScreen() {
               </span>
               {desk ? (
                 <span className={styles.deskCounts}>
-                  {desk.open} open · {desk.dueToday} due today
+                  {desk.open} open · {desk.dueToday} due today ·{' '}
+                  <span className={desk.overdue > 0 ? styles.deskOverdue : undefined}>
+                    {desk.overdue} overdue
+                  </span>
                 </span>
               ) : null}
             </Link>

@@ -49,7 +49,7 @@ test('the Desk is a pinned tile with its counts, and the sidebar’s entry is Ho
   await signedIn(page);
   const desk = page.getByRole('region', { name: 'Pinned' }).getByRole('link', { name: /Desk/ });
   await expect(desk).toBeVisible();
-  await expect(desk).toContainText(/\d+ open · \d+ due today/);
+  await expect(desk).toContainText(/\d+ open · \d+ due today · \d+ overdue/);
   await expect(
     page.getByRole('navigation', { name: 'Tusk', exact: true }).getByRole('link', { name: 'Home' }),
   ).toHaveAttribute('aria-current', 'page');

@@ -187,6 +187,11 @@
   font-size: var(--sv-font-size-sm);
 }
 
+/* Overdue is the one count that asks for something: it is the error colour while there is any. */
+.deskOverdue {
+  color: var(--sv-color-error-text);
+}
+
 .create {
   display: flex;
   align-items: center;

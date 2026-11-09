@@ -8,6 +8,8 @@ import {
   type SyncTable,
   TABLES,
 } from '../sync/format';
+import { isOverdue } from '../dates/overdue';
+import type { LocalNow } from '../time';
 import type { LocalDatabase, LocalSchema, OutboxEntry } from './db';
 import { type LocalRow, applyChange, byPosition, mergePulled } from './rows';
 import { openAll } from './seal';
@@ -441,25 +443,36 @@ export async function searchable(
 }
 
 /**
- * What the boards index shows of the Desk (DESIGN.md §17.3): how many cards are open, and how many of those are due today. "Open" is the sidebar's: not
- * deleted and not completed. A due date that is ciphertext cannot be read here, so such a card counts as open and not as due (task 14.3). Read from the
- * working copy, so it is there offline. `today` is the person's own date as `YYYY-MM-DD`, given and not read, so that a test controls it.
+ * What the boards index shows of the Desk (DESIGN.md §17.3): how many cards are open, how many of those are due today and how many are overdue. "Open" is the sidebar's: not
+ * deleted and not completed. **Overdue is the Desk's own rule** (`isOverdue`): before today, or today at a time that has gone; **due today is the rest of those dated today**
+ * (a card due today at a time still to come, or with no time), so the two never count one card twice, as Today does not (§25.3). A date that is ciphertext cannot be read here,
+ * so such a card counts as open and as neither (task 14.3). Read from the working copy, so it is there offline. `now` is the person's own date and time, given and not read, so
+ * that a test controls it.
  */
 export async function deskSummary(
   db: LocalDatabase,
-  today: string,
-): Promise<{ open: number; dueToday: number }> {
+  now: LocalNow,
+): Promise<{ open: number; dueToday: number; overdue: number }> {
   let open = 0;
   let dueToday = 0;
+  let overdue = 0;
   for (const card of await visibleCards(db)) {
     if (card.table !== 'desk_card') continue;
     const done = card.fields.completedAt;
     if (done !== undefined && 'v' in done && done.v !== null) continue;
     open += 1;
-    const due = card.fields.dueDate;
-    if (due !== undefined && 'v' in due && due.v === today) dueToday += 1;
+    // A plain string only: a date or a time that is ciphertext is not read here.
+    const text = (name: string): string | null => {
+      const field = card.fields[name];
+      return field !== undefined && 'v' in field && typeof field.v === 'string' ? field.v : null;
+    };
+    const date = text('dueDate');
+    if (date === null) continue;
+    const due = { date, time: text('dueTime') };
+    if (isOverdue(due, now)) overdue += 1;
+    else if (date === now.date) dueToday += 1;
   }
-  return { open, dueToday };
+  return { open, dueToday, overdue };
 }
 
 /** Every row of the Desk's four tables, deleted ones too, opened: what an export is made from, and what a screen that needs the whole Desk reads. */

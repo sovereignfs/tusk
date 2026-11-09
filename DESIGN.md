@@ -957,7 +957,7 @@ Two rows: the header, and the main area of two columns, the sidebar and the cont
 window's title is _Home_, and the page has a heading for a screen reader and none on screen: it starts with its first group, **Pinned**, then _My workspaces_
 and _Shared with me_, each titled in small muted capitals as the sidebar's headings are. It takes the whole width of the content, which the frame pads (24px).
 
-**Pinned** holds the Desk as a tile of its own (its open count, and today's due), **the size of a board's tile** (the same grid and the same height) and not
+**Pinned** holds the Desk as a tile of its own (its open count, and how many are due today and how many are overdue, the overdue in the error colour while there are any: overdue by the Desk's own rule, so a card due today at a time that has gone is overdue and not due today, and no card is counted twice), **the size of a board's tile** (the same grid and the same height) and not
 its look: it has no band of a colour, since it is not a board. _My workspaces_ is each workspace as a section: its name with how many boards it has, then at
 the right its people's avatars and a gear for its settings, and its boards as tiles of their colour, ending with a "Create board" tile. _My workspaces_ can
 be sorted, and the options are shown as they are, one pressed, at the right of the group's title and not in a menu: **Title (A-Z), Created first, Created
