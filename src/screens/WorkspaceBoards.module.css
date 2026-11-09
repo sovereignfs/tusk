@@ -42,13 +42,9 @@
 }
 
 .tileBand {
-  display: flex;
-  align-items: center;
+  display: block;
   height: 28px;
   margin: 0 calc(var(--sv-space-3) * -1);
-  padding: 0 var(--sv-space-3);
-  font-size: var(--sv-font-size-sm);
-  font-weight: var(--sv-font-weight-semibold);
 }
 
 .tileName {
