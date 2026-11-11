@@ -8,6 +8,8 @@ Each release's section is also its GitHub release notes: the release workflow re
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-11
+
 ### Changed
 
 - A board's tile no longer writes the first letter of its name on the coloured band: the band is the colour alone.
@@ -142,6 +144,7 @@ Each release's section is also its GitHub release notes: the release workflow re
 - What you search for on the Desk is no longer in the address as a query string, which is sent to the server and any proxy's log (even for a Desk with a key of its own): it is a fragment (`/desk#q=…`), which the browser never sends.
 - Opening the Inbox no longer fails on PostgreSQL (a column named twice in one statement was ambiguous there).
 
-[Unreleased]: https://github.com/sovereignfs/tusk/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/sovereignfs/tusk/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/sovereignfs/tusk/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/sovereignfs/tusk/compare/v0.1.0...v0.2.1
 [0.1.0]: https://github.com/sovereignfs/tusk/releases/tag/v0.1.0
