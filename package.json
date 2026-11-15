@@ -64,7 +64,7 @@
     "@axe-core/playwright": "4.14.0",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "1.64.1",
-    "@sovereignfs/create": "0.13.0",
+    "@sovereignfs/create": "0.14.0",
     "@sovereignfs/manifest": "^0.1.0",
     "@types/node": "^24.19.2",
     "@types/nodemailer": "8.0.2",

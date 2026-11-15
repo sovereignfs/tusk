@@ -18,7 +18,7 @@ concurrency:
 jobs:
   promotion:
     name: Promotion
-    uses: sovereignfs/sovereign/.github/workflows/app-promotion.yml@77ce151294d3c16b543d598686f93a6806e19b0f
+    uses: sovereignfs/sovereign/.github/workflows/app-promotion.yml@137f3530974e075c0c42be2f16d3806e4732de96
     with:
       directory: '.'
       tag-prefix: ''
