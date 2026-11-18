@@ -3,10 +3,14 @@
 All notable changes to Tusk are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
-Each release's section is also its GitHub release notes: the release workflow reads this file when a release is cut. Write the notes under
-`## [Unreleased]` as you go; a release turns them into the version's section.
+Each version's section is also its GitHub release notes. It is written in the change that sets the version, dated that day, and a promotion
+titled `Release vX.Y.Z` is refused without it (RELEASING.md).
 
-## [Unreleased]
+## [0.4.0] - 2026-11-18
+
+### Added
+
+- Opened from Sovereign's launcher, or from any link to it, an installed Tusk now opens as itself on desktop Chrome and Edge and on Android Chrome, on the page the link names, rather than in a browser view. On an iPhone, an iPad and in Safari the link opens a browser view, as before.
 
 ## [0.3.0] - 2026-11-11
 
@@ -144,7 +148,6 @@ Each release's section is also its GitHub release notes: the release workflow re
 - What you search for on the Desk is no longer in the address as a query string, which is sent to the server and any proxy's log (even for a Desk with a key of its own): it is a fragment (`/desk#q=…`), which the browser never sends.
 - Opening the Inbox no longer fails on PostgreSQL (a column named twice in one statement was ambiguous there).
 
-[Unreleased]: https://github.com/sovereignfs/tusk/compare/v0.3.0...HEAD
 [0.3.0]: https://github.com/sovereignfs/tusk/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/sovereignfs/tusk/compare/v0.1.0...v0.2.1
 [0.1.0]: https://github.com/sovereignfs/tusk/releases/tag/v0.1.0
