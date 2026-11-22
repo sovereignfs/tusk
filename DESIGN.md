@@ -1048,11 +1048,15 @@ Fully installable, on desktop and phone, modelled on Sovereign core (`apps/core/
   to steal, and what people write is rendered as text, never as HTML.) The page finds who is signed in **on the device** (`src/identity.ts`, kept by every
   signed-in page and removed at sign-out), makes the same composition the server's layout makes (`SignedInArea`), and chooses the screen from the address,
   since its own tree is not the address's. The Desk's screens read the working copy, so they need nothing more.
-- **Every other address with no network** is answered with a page the worker builds itself, saying that it needs a connection, with a link back to the
-  Desk and a policy that allows no script. **Nothing else is kept:** not a board, the Inbox, Settings, an API's answer or a page with a person's data.
+- **Every other address with no network** is answered with the same shell, which says that it needs a connection, with a link back to the Desk
+  (`OfflineApp`); before a shell is kept, the suite's own offline page says so, with a policy that allows no script. **Nothing else is kept:** not a
+  board, the Inbox, Settings, an API's answer or a page with a person's data.
 - **The worker keeps the build's own files** (the allow-list is `.next/static`, listed when `/sw.js` is served) as it installs, so that the shell can start
   with nothing fetched. The cache is named for the build, a new build is a new worker, and the old cache is removed when the new one activates; it does not
-  take over the pages that are open.
+  take over the pages that are open until one asks, which the registration does when the person chooses Reload on its notice.
+- **The manifest, the worker and its registration are the suite's** (`@sovereignfs/pwa`), with Tusk's cache name, files and shell. Background Sync,
+  Web Push and the wake are added after the package's text until the package's `sync` option and the push packages take them (Sovereign tasks 20.2
+  and 19.7).
 - **It also handles** Background Sync for the Desk (§8.3), and Push in phase 2. A new version activates at the next load, keeping the outbox.
 
 ### 17.10 What the plugins paid to learn
@@ -1171,6 +1175,11 @@ One JSON file, from Settings > Data, or from a workspace's or board's menu, eith
 - **Written deterministically:** ordered by position and id, so that two exports of the same data differ only in `exportedAt`.
 - **The Desk is made and read in the browser,** from the local store and into it, so that it works the same on any encryption mode, with a warning if it
   is encrypted. **Boards and workspaces are made on the server,** since that is where they are.
+
+**Core's export of a person** (`signIn.export`, manifest 5): when the person downloads their data from Sovereign, core asks Tusk for its part at
+`/api/sovereign/export` with a signed token the SDK checks. The part is **Everything**, read on the server as a backup reads it (`takeSnapshot`): the
+Desk's lists and series and every workspace the person owns, as records of the suite's format (`src/portability/core-export.ts`). A Desk sealed with a
+key of the person's own is carried as the server holds it, in files marked end to end; Tusk's own export opens it.
 
 ### 20.2 Import
 

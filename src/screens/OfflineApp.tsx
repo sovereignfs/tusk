@@ -13,10 +13,12 @@ import styles from './ListScreen.module.css';
  * The Desk with no server document (DESIGN.md §17.9). The service worker answers a Desk address with the one page it keeps, `/shell`, which holds nothing
  * of a person and is the same for everyone; this is what that page is. It finds who is signed in on the device (`src/identity.ts`), makes the same
  * composition the server's layout makes, and **chooses the screen from the address**, since the page it came in is not the page of the address:
- * `/desk/<list>` is that list and anything else the Desk's first. The Desk's screens read the working copy and write through `commit`, so they need none of the
+ * `/desk/<list>` is that list, `/` and `/desk` the Desk's first, and any other address says it needs a connection. The Desk's screens read the working copy and write through `commit`, so they need none of the
  * server.
  */
 const LIST = /^\/desk\/([0-9a-f-]{36})$/;
+/** The addresses that are the Desk: the worker answers every address with this page when there is no network (`@sovereignfs/pwa`), so any other says it needs one. */
+const DESK = /^\/(desk(\/[0-9a-f-]{36})?)?$/;
 
 export function OfflineApp() {
   const pathname = usePathname();
@@ -37,7 +39,23 @@ export function OfflineApp() {
   const list = LIST.exec(pathname)?.[1];
   return (
     <SignedInArea accountId={who.id} name={who.name} email={who.email}>
-      {list ? <ListScreen listId={list} /> : <DeskScreen />}
+      {list ? (
+        <ListScreen listId={list} />
+      ) : DESK.test(pathname) ? (
+        <DeskScreen />
+      ) : (
+        <main style={{ padding: 'var(--sv-space-6)' }}>
+          <h1>This needs a connection</h1>
+          <p className={styles.muted}>
+            Boards, the Inbox and Settings are read from the server, so they are not here while you
+            are offline. Your Desk is: everything on it works, and goes to your other devices when
+            you are back online.
+          </p>
+          <p>
+            <Link href="/desk">Back to your Desk</Link>
+          </p>
+        </main>
+      )}
     </SignedInArea>
   );
 }

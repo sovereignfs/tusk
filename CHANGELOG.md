@@ -6,7 +6,18 @@ All notable changes to Tusk are recorded here. The format follows [Keep a Change
 Each version's section is also its GitHub release notes. It is written in the change that sets the version, dated that day, and a promotion
 titled `Release vX.Y.Z` is refused without it (RELEASING.md).
 
-## [0.4.0] - 2026-11-18
+## [0.5.0] - 2026-11-22
+
+### Added
+
+- Core's export of a person now holds their Tusk data: Sovereign's "Your data" download includes their Desk and every workspace they own, as Tusk's own "Everything" export has them. A Desk sealed with a key of the person's own stays sealed in it; Tusk's own export is the one that opens it. Needs core 0.126.0 or later, which the manifest now asks for.
+
+### Changed
+
+- The service worker, the web manifest and the worker's registration are the suite's, from `@sovereignfs/pwa`. A new version of Tusk is announced with a Reload button instead of waiting for every window to close. With no connection, every page opens the Desk's offline screens, and a page they cannot show (a board, the Inbox, Settings) says it needs a connection there; before a first visit has kept them, the suite's offline page says so. Reminders, notifications and the wake work as before. Nothing of a person is kept in a cache.
+- On the suite's current packages: `@sovereignfs/sdk` 2.11.0, `@sovereignfs/ui` 0.105.0, `@sovereignfs/manifest` 0.4.0 (manifest 5) and `@sovereignfs/create` 0.27.1, whose shared rules are now in `AGENTS.md` and `CONTRIBUTING.md`. Tusk keeps its own `Dockerfile`, `.dockerignore` and Compose setups, for its three databases.
+
+- 2026-11-18
 
 ### Added
 
@@ -148,6 +159,8 @@ titled `Release vX.Y.Z` is refused without it (RELEASING.md).
 - What you search for on the Desk is no longer in the address as a query string, which is sent to the server and any proxy's log (even for a Desk with a key of its own): it is a fragment (`/desk#q=…`), which the browser never sends.
 - Opening the Inbox no longer fails on PostgreSQL (a column named twice in one statement was ambiguous there).
 
+[0.5.0]: https://github.com/sovereignfs/tusk/compare/v0.3.0...v0.5.0
+[0.4.0]: https://github.com/sovereignfs/tusk/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/sovereignfs/tusk/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/sovereignfs/tusk/compare/v0.1.0...v0.2.1
 [0.1.0]: https://github.com/sovereignfs/tusk/releases/tag/v0.1.0

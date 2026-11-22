@@ -1,5 +1,5 @@
 {
-  "manifest": 2,
+  "manifest": 5,
   "prefix": "tusk",
   "name": "Tusk",
   "description": "Your own tasks, private by default and working offline, and the kanban boards you share with others",
@@ -11,9 +11,16 @@
     "redirect": ["/api/auth/callback/sovereign"],
     "backChannel": "/api/sovereign/backchannel-logout",
     "accountDeleted": "/api/sovereign/account-deleted",
+    "export": "/api/sovereign/export",
     "scopes": ["openid", "profile", "email"]
   },
   "database": true,
-  "generate": ["TUSK_AUTH_SECRET", { "name": "TUSK_ENCRYPTION_KEY", "bytes": 32 }],
-  "core": ">=0.57.0 <1.0.0"
+  "generate": [
+    "TUSK_AUTH_SECRET",
+    {
+      "name": "TUSK_ENCRYPTION_KEY",
+      "bytes": 32
+    }
+  ],
+  "core": ">=0.126.0 <1.0.0"
 }

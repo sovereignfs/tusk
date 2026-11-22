@@ -143,6 +143,13 @@ export const ROUTES: RouteRule[] = [
       POST: { kind: 'public', because: 'a token signed by Sovereign, checked against its keys' },
     },
   },
+  // Core asks for a person's part of their export (`signIn.export`): a signed token, checked by the SDK, a replay refused.
+  {
+    route: '/api/sovereign/export',
+    methods: {
+      POST: { kind: 'public', because: 'a token signed by Sovereign, checked against its keys' },
+    },
+  },
   // better-auth's own: it checks `Origin` and the session cookie itself, and rate-limits sign-in (src/auth/auth.ts). Absent, with a 404, when sign-in is off.
   {
     route: '/api/auth/[...all]',
