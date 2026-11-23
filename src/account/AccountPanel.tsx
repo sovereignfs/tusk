@@ -33,9 +33,12 @@ export async function AccountPanel({ query }: { query: AccountQuery }) {
             }
             email={user.email}
             result={{
-              linked: query.linked === '1',
+              linked: query.link === 'done' || query.linked === '1',
               unlinked: query.unlinked === '1',
-              error: query.error ?? null,
+              error:
+                query.link === 'taken' || query.link === 'address'
+                  ? `link_${query.link}`
+                  : (query.error ?? null),
             }}
           />
         ),

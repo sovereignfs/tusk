@@ -17,6 +17,8 @@ export interface AccountQuery {
   /** The way back from Sovereign (`linked=1`, `unlinked=1`, or an `error` code) leaves what happened in the address. */
   linked?: string | undefined;
   unlinked?: string | undefined;
+  /** What linking through the package came back with (auth.md §8.2): `done`, `taken` or `address`. */
+  link?: string | undefined;
   error?: string | undefined;
 }
 

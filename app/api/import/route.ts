@@ -2,7 +2,7 @@ import { uuid } from '@/src/access/parse';
 import { accountRoute } from '@/src/access/route';
 import { authDirectory } from '@/src/auth/directory';
 import { edgeSettings } from '@/src/config/edge';
-import { getAuthDatabase, getDatabase } from '@/src/db/boot';
+import { getAuthStore, getDatabase } from '@/src/db/boot';
 import { MAX_FILE_BYTES, validateFile } from '@/src/portability/validate';
 import { importBoard, importWorkspaces } from '@/src/workspaces/import';
 import { HSTS } from '@/src/security/csp';
@@ -56,7 +56,7 @@ export const POST = accountRoute(async ({ request, accountId }) => {
   if (!read.ok) return json(400, { error: read.error });
   const { file } = read;
   const database = await getDatabase();
-  const directory = authDirectory(await getAuthDatabase());
+  const directory = authDirectory(await getAuthStore());
   const now = Date.now();
 
   let result;

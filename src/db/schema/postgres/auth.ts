@@ -6,8 +6,10 @@ import { epochMs } from './columns';
 export const auth = pgSchema(AUTH_STORE);
 
 /**
- * better-auth's tables on PostgreSQL; the same tables as `schema/sqlite/auth.ts`, which
- * says why they have the shape they have. The schema parity test keeps the two equal.
+ * **Frozen: the auth store as 0.1.0 and 0.2.x left it** (better-auth's tables under its singular names, in `tusk_auth`), which
+ * `migrations/auth` still makes before `@sovereignfs/auth` moves the store onto its own tables at every start (ADR 0001,
+ * `src/auth/migrate.ts`). Nothing reads or writes through these any more and no migration is generated from them: they say what the
+ * move starts from, for the tests of it.
  */
 const date = (name: string) => timestamp(name, { withTimezone: true });
 

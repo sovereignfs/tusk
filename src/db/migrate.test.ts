@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { type Database, openDatabase } from './client';
 import { dbAll, dbGet } from './exec';
 import { migrationsFolder, runMigrations } from './migrate';
-import { APP_TABLES, AUTH_TABLES, freshDatabase, testTarget } from './test-support';
+import { APP_TABLES, LEGACY_AUTH_TABLES, freshDatabase, testTarget } from './test-support';
 
 const { leg } = testTarget();
 
@@ -67,11 +67,11 @@ describe(`migrations (${leg})`, () => {
     expect(await appliedCount(database)).toBe(journalLength(database));
   });
 
-  it("apply to an empty auth store and make better-auth's tables, not the app's", async () => {
+  it("apply to an empty auth store and make 0.2.x's better-auth tables, not the app's, for the package to move", async () => {
     const { database } = await freshDatabase('auth');
     open.push(database);
     await runMigrations(database);
-    expect(await tableNames(database)).toEqual([...AUTH_TABLES]);
+    expect(await tableNames(database)).toEqual([...LEGACY_AUTH_TABLES]);
     expect(await appliedCount(database)).toBe(journalLength(database));
   });
 

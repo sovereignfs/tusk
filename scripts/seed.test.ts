@@ -7,6 +7,7 @@ import { dbAll } from '../src/db/exec';
 import { runMigrations } from '../src/db/migrate';
 import * as postgresSchema from '../src/db/schema/postgres';
 import * as sqliteSchema from '../src/db/schema/sqlite';
+import { authTable } from '../src/db/tables';
 import { testTarget } from '../src/db/test-support';
 import { applyMutation } from '../src/sync/apply';
 import { LIMITS } from '../src/sync/format';
@@ -36,11 +37,11 @@ afterAll(async () => {
   await auth.close();
 });
 
-const stores = () => ({ app, auth: auth.database });
+const stores = () => ({ app, authStore: auth.store });
 const userRows = async () =>
   dbAll<{ id: string }>(
     auth.database,
-    sql`SELECT id FROM ${auth.database.dialect === 'postgres' ? postgresSchema.user : sqliteSchema.user} WHERE email = ${SEED_EMAIL}`,
+    sql`SELECT id FROM ${authTable(auth.database, 'users')} WHERE email = ${SEED_EMAIL}`,
   );
 
 describe('which databases the seed will touch', () => {
@@ -273,7 +274,7 @@ describe(`the shared workspace (${leg})`, () => {
   it('told the member what the owner did, through the door: they were added, assigned and spoken to', async () => {
     const { two } = await twoAccounts();
     const inbox = {
-      ...(await noticesOf(app, authDirectory(auth.database), two)),
+      ...(await noticesOf(app, authDirectory(auth.store), two)),
       assigned: await assignedOf(app, two),
     };
     const kinds = new Set(inbox.notices.map((n) => n.kind));
@@ -307,11 +308,11 @@ describe(`the shared workspace (${leg})`, () => {
       (
         await dbAll(
           auth.database,
-          sql`SELECT 1 FROM ${auth.database.dialect === 'postgres' ? postgresSchema.user : sqliteSchema.user} WHERE email = ${SEED2_EMAIL}`,
+          sql`SELECT 1 FROM ${authTable(auth.database, 'users')} WHERE email = ${SEED2_EMAIL}`,
         )
       ).length,
     ).toBe(0);
-    expect((await noticesOf(app, authDirectory(auth.database), two)).notices).toEqual([]);
+    expect((await noticesOf(app, authDirectory(auth.store), two)).notices).toEqual([]);
     const reset = await runSeed(stores(), auth.settings, { now: 1_800_000_000_000 });
     expect(reset.workspace.created).toBe(true);
     const after = await countAll(app);

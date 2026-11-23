@@ -251,5 +251,5 @@ test('the account is deleted from Settings with the password, says what goes fir
   await page.waitForURL((url) => url.pathname === '/');
   // The account is gone: its address and password sign in to nothing.
   await trySignIn(page, EMAIL, PASSWORD);
-  await expect(page.getByText(/do not match/)).toBeVisible();
+  await expect(page.getByText(/do not match|is incorrect/)).toBeVisible();
 });

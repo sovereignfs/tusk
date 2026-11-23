@@ -60,7 +60,7 @@ test('a forged session cookie gets the sign-in page and no data', async ({
   await ensureAccount(page);
   const url = new URL(baseURL ?? 'http://localhost');
   await context.addCookies([
-    { name: 'tusk.session_token', value: 'forged.value', domain: url.hostname, path: '/' },
+    { name: 'better-auth.session_token', value: 'forged.value', domain: url.hostname, path: '/' },
   ]);
   await page.goto('/');
   await expect(page).toHaveURL(/\/sign-in$/);

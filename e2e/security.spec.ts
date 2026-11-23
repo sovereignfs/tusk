@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { totpFor } from '../src/auth/testing/totp';
 import { EMAIL, PASSWORD, ensureAccount, signOut, trySignIn } from './helpers';
@@ -18,10 +19,10 @@ async function password(page: Page) {
   const submit = page.getByRole('button', { name: 'Sign in', exact: true });
   await submit.click();
   // Sign-in is rate-limited per address, three tries in ten seconds: when told, wait it out, as a person would.
-  const limited = page.getByText(/Too many tries/);
+  const limited = page.getByText(/Too many (tries|attempts)/);
   await expect(
     limited
-      .or(page.getByLabel('Code from your authenticator app'))
+      .or(page.getByLabel('Authenticator code'))
       .or(page.getByRole('button', { name: 'User menu' })),
   ).toBeVisible();
   if (await limited.isVisible()) {
@@ -29,6 +30,25 @@ async function password(page: Page) {
     await submit.click();
   }
 }
+/** Types a code into the second step's six digits (the design system's `AuthCodeInput`). */
+async function enterCode(page: Page, code: string) {
+  for (const [at, digit] of [...code].entries())
+    await page.getByLabel(`Digit ${at + 1}`).fill(digit);
+}
+
+/** Marks the account's address confirmed in this instance's sign-in store, as following a verification link would. */
+async function confirmAddress(email: string) {
+  const { createClient } = await import('@libsql/client');
+  const store = createClient({
+    url: `file:${join(process.env.TUSK_E2E_DIR ?? '', 'security', 'tusk_auth.db')}`,
+  });
+  await store.execute({
+    sql: 'UPDATE users SET email_verified = 1 WHERE email = ?',
+    args: [email],
+  });
+  store.close();
+}
+
 const secretOf = async (page: Page): Promise<string> =>
   (await page.getByLabel('Setup key').innerText()).trim();
 const codeFor = (secret: string): Promise<string> =>
@@ -42,7 +62,18 @@ test('an authenticator app is set up, asked for at sign-in, replaced by a backup
   await ensureAccount(page, { skipKeyOffer: false });
   await trySignIn(page, EMAIL, PASSWORD);
   await expect(page.getByRole('button', { name: 'User menu' })).toBeVisible();
+  // The second step is turned on only for a confirmed address (auth.md §4), and this instance sends no mail: Settings says so, and the
+  // address is then marked confirmed as a followed link would.
+  // (A run before this one may have confirmed it already: the instance keeps its accounts.)
   await page.goto('/account?section=security');
+  const unconfirmed = page.getByText('Turning one on needs a confirmed email address');
+  await expect(
+    unconfirmed.or(page.getByRole('button', { name: 'Set up an authenticator app' })),
+  ).toBeVisible();
+  if (await unconfirmed.isVisible()) {
+    await confirmAddress(EMAIL);
+    await page.goto('/account?section=security');
+  }
 
   // Asks for the password to begin; a wrong one does not.
   await page.getByRole('button', { name: 'Set up an authenticator app' }).click();
@@ -72,27 +103,27 @@ test('an authenticator app is set up, asked for at sign-in, replaced by a backup
   await page.goto('/');
   await signOut(page);
   await password(page);
-  await expect(page.getByLabel('Code from your authenticator app')).toBeVisible();
+  await expect(page.getByLabel('Authenticator code')).toBeVisible();
   await expect(page.getByRole('button', { name: 'User menu' })).toHaveCount(0);
-  await page.getByLabel('Code from your authenticator app').fill('111111');
-  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await enterCode(page, '111111');
+  await page.getByRole('button', { name: 'Verify' }).click();
   await expect(page.getByText('That code is not right')).toBeVisible();
   // A backup code stands in for the app, and works once.
   await page.getByRole('button', { name: 'Use a backup code' }).click();
   await page.getByLabel('Backup code').fill(backup[0] ?? '');
-  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await page.getByRole('button', { name: 'Verify' }).click();
   await expect(page.getByRole('button', { name: 'User menu' })).toBeVisible();
   await signOut(page);
   await password(page);
   await page.getByRole('button', { name: 'Use a backup code' }).click();
   await page.getByLabel('Backup code').fill(backup[0] ?? '');
-  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await page.getByRole('button', { name: 'Verify' }).click();
   await expect(page.getByText('backup code is not right')).toBeVisible();
   // The app's code signs in (a failed backup code ends that attempt, so the password is given again), and turning it off asks for the password and puts
   // sign-in back to the password alone.
   await password(page);
-  await page.getByLabel('Code from your authenticator app').fill(await codeFor(secret));
-  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await enterCode(page, await codeFor(secret));
+  await page.getByRole('button', { name: 'Verify' }).click();
   await expect(page.getByRole('button', { name: 'User menu' })).toBeVisible();
   await page.goto('/account?section=security');
   await page.getByRole('button', { name: 'Turn it off' }).click();
@@ -149,7 +180,7 @@ test('a passkey is added, named, signs in with no password, and is removed', asy
   await page.goto('/');
   await signOut(page);
   await page.goto('/sign-in');
-  await page.getByRole('button', { name: 'Use a passkey instead' }).click();
+  await page.getByRole('button', { name: 'Sign in with a passkey' }).click();
   await expect(page.getByRole('button', { name: 'User menu' })).toBeVisible();
 
   // Removed, and then there is nothing for it to sign in with.
@@ -158,6 +189,6 @@ test('a passkey is added, named, signs in with no password, and is removed', asy
   await expect(page.getByText('You have no passkeys.')).toBeVisible();
   await signOut(page);
   await page.goto('/sign-in');
-  await page.getByRole('button', { name: 'Use a passkey instead' }).click();
-  await expect(page.getByText('did not sign you in')).toBeVisible();
+  await page.getByRole('button', { name: 'Sign in with a passkey' }).click();
+  await expect(page.getByText(/That did not work/)).toBeVisible();
 });

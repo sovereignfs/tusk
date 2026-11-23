@@ -80,9 +80,11 @@ describe('the fake Sovereign agrees with it', () => {
     }
   });
 
-  it('serves each endpoint at the path the real one uses, relative to the issuer', () => {
+  // At the same path on the instance's address. The recording is from a core whose issuer was `/api/auth` on it; core's issuer is now the
+  // bare instance address, as the fake's is and as the SDK requires, and the endpoints have stayed where they were.
+  it('serves each endpoint at the path the real one uses on the instance', () => {
     const relative = (doc: Record<string, unknown>, field: string) =>
-      (doc[field] as string).slice((doc.issuer as string).length);
+      new URL(doc[field] as string).pathname;
     for (const field of [
       'authorization_endpoint',
       'token_endpoint',

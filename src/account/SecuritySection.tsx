@@ -2,7 +2,8 @@
 
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
 import { messageFor } from '../auth/messages';
-import { authClient } from '../auth/client';
+import { changePassword } from '@sovereignfs/auth/client';
+import { authClient, deriveForSignIn } from '../auth/client';
 import { Alert, Button, FormField, Input } from '@sovereignfs/ui';
 import { PasskeysPanel } from './PasskeysPanel';
 import { SovereignPanel } from './SovereignPanel';
@@ -61,8 +62,8 @@ export function SecuritySection({
     <>
       {hasPassword ? (
         <>
-          <PasswordForm minLength={passwordMinLength} />
-          <TwoFactor />
+          <PasswordForm minLength={passwordMinLength} email={email} />
+          <TwoFactor email={email} />
           <PasskeysPanel />
         </>
       ) : (
@@ -76,7 +77,7 @@ export function SecuritySection({
       )}
       {sovereign ? (
         <SovereignPanel
-          linkedAccountId={sovereign.linkedAccountId}
+          linked={sovereign.linkedAccountId !== null}
           canUnlink={hasPassword}
           email={email}
           result={result}
@@ -88,17 +89,31 @@ export function SecuritySection({
 }
 
 /** The authenticator panel, once it is known whether it is on: that is the account's own, read from the session. */
-function TwoFactor() {
+function TwoFactor({ email }: { email: string }) {
   const { data, isPending } = authClient.useSession();
   if (isPending || !data) return null;
+  const on = Boolean((data.user as { twoFactorEnabled?: boolean }).twoFactorEnabled);
+  // The second step is turned on only for an address shown to be the person's (auth.md §4): a verification link could otherwise open a
+  // session without it. Without mail there is no link, so the page says so rather than offering what the server refuses.
+  if (!on && !data.user.emailVerified)
+    return (
+      <div className={styles.group}>
+        <h2>Authenticator app</h2>
+        <p className={styles.hint}>
+          Turning one on needs a confirmed email address, and this one has not been confirmed. Ask
+          whoever runs this instance to set up email.
+        </p>
+      </div>
+    );
   return (
     <TwoFactorPanel
       enabled={Boolean((data.user as { twoFactorEnabled?: boolean }).twoFactorEnabled)}
+      email={email}
     />
   );
 }
 
-function PasswordForm({ minLength }: { minLength: number }) {
+function PasswordForm({ minLength, email }: { minLength: number; email: string }) {
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [again, setAgain] = useState('');
@@ -115,13 +130,14 @@ function PasswordForm({ minLength }: { minLength: number }) {
     setError(null);
     setSaved(false);
     try {
-      const { error: failure } = await authClient.changePassword({
-        currentPassword: current,
-        newPassword: next,
-        revokeOtherSessions: true,
+      // Both as sign-in values made with the account's address, never as passwords (auth.md §4, rule 1); every other session ends.
+      const result = await changePassword(authClient, deriveForSignIn, {
+        current,
+        next,
+        address: email,
       });
-      if (failure) {
-        setError(messageFor(failure));
+      if (!result.changed) {
+        setError(result.message);
         return;
       }
       setCurrent('');

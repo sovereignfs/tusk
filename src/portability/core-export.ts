@@ -3,7 +3,7 @@ import { authDirectory } from '../auth/directory';
 import { takeSnapshot } from '../backup/snapshot';
 import { getConfig } from '../config/current';
 import { operatorOf } from '../crypto/operator';
-import { getAuthDatabase, getDatabase } from '../db/boot';
+import { getAuthStore, getDatabase } from '../db/boot';
 import { accountOfSub } from '../sovereign/identity';
 import type { TuskExport } from './format';
 import packageJson from '../../package.json';
@@ -96,7 +96,7 @@ export async function answerCoreExport(request: Request): Promise<Response | und
     request,
     { prefix: 'tusk', version: packageJson.version },
     async ({ sub, writer }) => {
-      const authDatabase = await getAuthDatabase();
+      const authDatabase = await getAuthStore();
       const accountId = await accountOfSub(authDatabase, sub);
       if (!accountId) return;
       const operator = operatorOf(config);

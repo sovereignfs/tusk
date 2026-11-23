@@ -39,7 +39,7 @@ const SECURITY_PORT = PORTS.security;
 const SOVEREIGN_PORT = PORTS.sovereign;
 const BOTH_PORT = PORTS.both;
 const CORE = {
-  TUSK_CORE_URL: `http://localhost:${PORTS.coreAuth}/api/auth`,
+  TUSK_CORE_URL: `http://localhost:${PORTS.coreAuth}`,
   TUSK_CORE_CLIENT_ID: 'tusk-e2e-client',
   TUSK_CORE_CLIENT_SECRET: 'tusk-e2e-secret',
 };

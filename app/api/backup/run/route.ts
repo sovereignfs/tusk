@@ -2,7 +2,7 @@ import { accountRoute } from '@/src/access/route';
 import { authDirectory } from '@/src/auth/directory';
 import { runNow } from '@/src/backup/endpoint';
 import { getConfig } from '@/src/config/current';
-import { getAuthDatabase, getDatabase } from '@/src/db/boot';
+import { getAuthStore, getDatabase } from '@/src/db/boot';
 import { installationTokens } from '@/src/github-app/server';
 import { RateLimiter } from '@/src/limits/rate';
 import { operatorOf } from '@/src/crypto/operator';
@@ -15,7 +15,7 @@ export const POST = accountRoute(async ({ accountId }) => {
   const config = getConfig();
   return runNow(accountId, {
     database,
-    directory: authDirectory(await getAuthDatabase()),
+    directory: authDirectory(await getAuthStore()),
     ring: config.encryption,
     ...(operatorOf(config) ? { operator: operatorOf(config) } : {}),
     apiUrl: config.githubApiUrl,

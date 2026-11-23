@@ -88,6 +88,14 @@ export const ROUTES: RouteRule[] = [
     route: '/api/account/delete',
     methods: { GET: { kind: 'account' }, POST: { kind: 'account' } },
   },
+  // Where signing out of this session goes once the device has let go: core's sign-out for a session that came from core (auth.md §8), or
+  // none. It reads only the session's own sign-in through core.
+  { route: '/api/account/sign-out', methods: { GET: { kind: 'account' } } },
+  // Unlinking Sovereign from the session's own account, after the password (DESIGN.md §6).
+  { route: '/api/account/unlink-sovereign', methods: { POST: { kind: 'account' } } },
+  // The salt of the sign-in value and whether a password stored before the package can still move (auth.md §4, §8.1): no secret, the
+  // same for everyone. Absent, with a 404, without accounts of Tusk's own.
+  { route: '/api/sign-in-salt', methods: { GET: { kind: 'public' } } },
   { route: '/api/inbox', methods: { GET: { kind: 'account' } } },
   // What a person is told (DESIGN.md §16, task 8.7): the notices, how many are unread, and reading and dismissing them, all the session's own.
   { route: '/api/notifications', methods: { GET: { kind: 'account' } } },
@@ -150,7 +158,9 @@ export const ROUTES: RouteRule[] = [
       POST: { kind: 'public', because: 'a token signed by Sovereign, checked against its keys' },
     },
   },
-  // better-auth's own: it checks `Origin` and the session cookie itself, and rate-limits sign-in (src/auth/auth.ts). Absent, with a 404, when sign-in is off.
+  // better-auth on `@sovereignfs/auth`: it checks `Origin` and the session cookie itself, and rate-limits sign-in (src/auth/auth.ts). It holds
+  // signing in through core (/sign-in/sovereign, /callback/sovereign) and the move of a password stored before the package (/sv/move-password,
+  // which opens no session). Absent, with a 404, when sign-in is off.
   {
     route: '/api/auth/[...all]',
     methods: {

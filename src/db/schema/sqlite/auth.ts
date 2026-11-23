@@ -2,14 +2,10 @@ import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { epochMs } from './columns';
 
 /**
- * better-auth's tables, in the auth store (`tusk_auth`, DESIGN.md §22.1). Their shape is
- * better-auth's, not ours: it reads and writes through its Drizzle adapter, which looks a
- * table up by the key it is exported under, so the keys are its model names, and its dates
- * are real `Date` values (`timestamp_ms` here, `timestamp` on PostgreSQL) and not the epoch
- * milliseconds of our own tables. The tables are what better-auth 1.7 reports it needs for
- * email and password and database-backed rate limits. Two-factor and passkeys have theirs below (task 2.4).
- *
- * Changed only with a better-auth upgrade, from what it reports (see `auth.test.ts`).
+ * **Frozen: the auth store as 0.1.0 to 0.3.0 left it** (better-auth's tables under its singular names, in `tusk_auth`), which
+ * `migrations/auth` still makes before `@sovereignfs/auth` moves the store onto its own tables at every start (ADR 0001 in Shopper's
+ * repository, `src/auth/migrate.ts`). Nothing reads or writes through these any more and no migration is generated from them: they say
+ * what the move starts from, for the tests of it.
  */
 const timestamp = (name: string) => integer(name, { mode: 'timestamp_ms' });
 const boolean = (name: string) => integer(name, { mode: 'boolean' });

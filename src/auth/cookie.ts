@@ -1,9 +1,16 @@
+import { sessionCookieName } from '@sovereignfs/auth';
+
 /**
- * The name of the session cookie better-auth sets (`advanced.cookiePrefix` in `auth.ts`): `tusk.session_token`, and with `Secure` cookies, which is
- * when `TUSK_URL` is https, `__Secure-tusk.session_token`. Kept apart from `auth.ts` since the proxy reads it and **the proxy runs on the Edge**:
- * it may import no Node built-in and no database, and `auth.ts` imports both.
+ * The names the session cookie can have, as `@sovereignfs/auth` names it (ADR 0001): bare over http, `__Host-` over https on the app's own
+ * host, `__Secure-` with a shared cookie domain. All three are looked for, so this needs no settings. Kept apart from `auth.ts` since the
+ * proxy reads it and **the proxy runs on the Edge**: it may import no Node built-in and no database, and the package's root entry imports
+ * nothing.
  */
-export const SESSION_COOKIES = ['tusk.session_token', '__Secure-tusk.session_token'] as const;
+export const SESSION_COOKIES = [
+  sessionCookieName({ secure: false, domain: undefined }),
+  sessionCookieName({ secure: true, domain: undefined }),
+  sessionCookieName({ secure: true, domain: 'shared' }),
+] as const;
 
 /**
  * Whether a request carries a session cookie. **Only that it is there**: the proxy cannot check it and does not try, and a forged one gets the app's

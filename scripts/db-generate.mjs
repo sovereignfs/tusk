@@ -14,9 +14,10 @@ if (!name || !/^[a-z][a-z0-9_]*$/.test(name)) {
   process.exit(2);
 }
 
-// The app's store and the auth store are separate databases with separate migrations, so
-// each is generated on its own; one with no change writes nothing.
-const configs = ['sqlite', 'postgres', 'auth.sqlite', 'auth.postgres'];
+// The app's store, one dialect at a time; one with no change writes nothing. The auth store's tables are
+// @sovereignfs/auth's, migrated by the package: its own migrations here (`migrations/auth`) are the 0.3.0
+// shape the package moves from, and are never generated again.
+const configs = ['sqlite', 'postgres'];
 for (const config of configs) {
   const result = spawnSync(
     'pnpm',

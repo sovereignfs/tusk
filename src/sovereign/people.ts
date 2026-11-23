@@ -1,7 +1,8 @@
 import { sql } from 'drizzle-orm';
 import { deleteCredentialsOf } from '../crypto/store';
+import type { Database as AuthStore } from '@sovereignfs/auth/database';
 import type { Database } from '../db/client';
-import { dbAll, dbGet, transaction } from '../db/exec';
+import { dbAll, transaction } from '../db/exec';
 import * as postgresSchema from '../db/schema/postgres';
 import * as sqliteSchema from '../db/schema/sqlite';
 import { TABLES } from '../sync/format';
@@ -27,7 +28,7 @@ export interface PeopleDeps {
   /** The app's store. */
   readonly database: Database;
   /** The sign-in store (the same database as the app's, or another). */
-  readonly authDatabase: Database;
+  readonly authDatabase: AuthStore;
   readonly now: () => number;
 }
 
@@ -87,35 +88,24 @@ export async function deletePerson(deps: PeopleDeps, accountId: string): Promise
     sql`DELETE FROM ${app.accountSettings} WHERE account_id = ${accountId} RETURNING account_id`,
   );
 
-  // 4. The sign-in store. The address is read first, for the verifications that are named by it; the account goes last.
-  const auth = authDatabase.dialect === 'postgres' ? postgresSchema : sqliteSchema;
-  const user = await dbGet<{ email: string }>(
-    authDatabase,
-    sql`SELECT email FROM ${auth.user} WHERE id = ${accountId}`,
-  );
-  await dbAll(
-    authDatabase,
-    sql`DELETE FROM ${auth.session} WHERE user_id = ${accountId} RETURNING id`,
-  );
-  await dbAll(
-    authDatabase,
-    sql`DELETE FROM ${auth.account} WHERE user_id = ${accountId} RETURNING id`,
-  );
-  // Second factors and passkeys (2.4), before the account they belong to, by name and not by what the store cascades.
-  await dbAll(
-    authDatabase,
-    sql`DELETE FROM ${auth.twoFactor} WHERE user_id = ${accountId} RETURNING id`,
-  );
-  await dbAll(
-    authDatabase,
-    sql`DELETE FROM ${auth.passkey} WHERE user_id = ${accountId} RETURNING id`,
-  );
-  if (user)
-    await dbAll(
-      authDatabase,
-      sql`DELETE FROM ${auth.verification} WHERE LOWER(identifier) = ${user.email.toLowerCase()} RETURNING id`,
+  // 4. The sign-in store, `@sovereignfs/auth`'s tables. The address is read first, for the verifications that are named by it; the account goes
+  // last. Each table is deleted by name rather than left to a cascade, which sqld does not promise to enforce.
+  const user = (await authDatabase.run('SELECT email FROM users WHERE id = ?', [accountId]))
+    .rows[0];
+  for (const table of ['sv_key_secrets', 'sv_core_sign_ins'])
+    await authDatabase.run(
+      `DELETE FROM ${table} WHERE session_id IN (SELECT id FROM sessions WHERE user_id = ?)`,
+      [accountId],
     );
-  await dbAll(authDatabase, sql`DELETE FROM ${auth.user} WHERE id = ${accountId} RETURNING id`);
+  await authDatabase.run('DELETE FROM sessions WHERE user_id = ?', [accountId]);
+  // Sign-ins (a password, a Sovereign identity), second factors and passkeys, and a password still to move, before the account.
+  for (const table of ['accounts', 'two_factors', 'passkeys', 'sv_legacy_passwords'])
+    await authDatabase.run(`DELETE FROM ${table} WHERE user_id = ?`, [accountId]);
+  if (user)
+    await authDatabase.run('DELETE FROM verifications WHERE LOWER(identifier) = ?', [
+      String(user.email).toLowerCase(),
+    ]);
+  await authDatabase.run('DELETE FROM users WHERE id = ?', [accountId]);
 
   return {
     workspacesPassed: shared.passed,

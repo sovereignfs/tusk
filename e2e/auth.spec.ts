@@ -34,7 +34,7 @@ test('a wrong password reads the same as an address with no account, and signs n
   const messages: string[] = [];
   for (const email of [EMAIL, 'nobody@example.com']) {
     await trySignIn(page, email, 'not the password at all');
-    const alert = page.getByText(/do not match/);
+    const alert = page.getByText(/do not match|is incorrect/);
     await expect(alert).toBeVisible();
     messages.push((await alert.textContent()) ?? '');
   }
@@ -51,9 +51,10 @@ test('a second account is refused by the server, and the page does not offer one
   const origin = new URL(page.url()).origin;
   const reply = await request.post('/api/auth/sign-up/email', {
     headers: { origin },
-    data: { name: 'Mallory', email: 'mallory@example.com', password: PASSWORD },
+    // What a page would send: a sign-in value, never the password (auth.md §4, rule 1); a password sent as itself is refused first.
+    data: { name: 'Mallory', email: 'mallory@example.com', password: `svp1.${'A'.repeat(43)}` },
   });
-  expect(reply.status()).toBe(403);
+  expect(reply.status()).toBe(422);
   expect((await reply.json()).code).toBe('SIGNUP_CLOSED');
 
   await page.goto('/sign-up');

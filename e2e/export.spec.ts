@@ -1,5 +1,5 @@
 import { expect, test, type APIRequestContext } from '@playwright/test';
-import { EMAIL, PASSWORD, deskReady, ensureAccount, trySignIn } from './helpers';
+import { EMAIL, PASSWORD, deskReady, ensureAccount, trySignIn, signInValueFor } from './helpers';
 
 /**
  * Export (task 9.1, DESIGN.md §20.1): the server's part over HTTP with real sessions (who may export what), and the Desk's part in the browser from the
@@ -18,13 +18,13 @@ async function account(
   const headers = { origin };
   const made = await request.post('/api/auth/sign-up/email', {
     headers,
-    data: { name, email, password: PASSWORD },
+    data: { name, email, password: await signInValueFor(request, email, PASSWORD) },
   });
   if (made.ok()) return;
   for (let attempt = 0; attempt < 3; attempt++) {
     const reply = await request.post('/api/auth/sign-in/email', {
       headers,
-      data: { email, password: PASSWORD },
+      data: { email, password: await signInValueFor(request, email, PASSWORD) },
     });
     if (reply.ok()) return;
     expect(reply.status()).toBe(429);

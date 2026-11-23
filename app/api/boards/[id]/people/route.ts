@@ -1,7 +1,7 @@
 import { uuid } from '@/src/access/parse';
 import { accountRoute } from '@/src/access/route';
 import { authDirectory } from '@/src/auth/directory';
-import { getAuthDatabase, getDatabase } from '@/src/db/boot';
+import { getAuthStore, getDatabase } from '@/src/db/boot';
 import { boardPeople } from '@/src/workspaces/reads';
 
 // A board's people (DESIGN.md §14.3), for the avatars in its header and its Share dialog. The same 404 as the board itself for what is not theirs.
@@ -12,7 +12,7 @@ export const GET = accountRoute(async ({ accountId, params }) => {
   const people = id.ok
     ? await boardPeople(
         await getDatabase(),
-        authDirectory(await getAuthDatabase()),
+        authDirectory(await getAuthStore()),
         accountId,
         id.value,
       )

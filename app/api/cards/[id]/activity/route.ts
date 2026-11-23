@@ -2,7 +2,7 @@ import { parseCursor } from '@/src/access/cursor';
 import { uuid } from '@/src/access/parse';
 import { accountRoute } from '@/src/access/route';
 import { authDirectory } from '@/src/auth/directory';
-import { getAuthDatabase, getDatabase } from '@/src/db/boot';
+import { getAuthStore, getDatabase } from '@/src/db/boot';
 import { activityOfCard } from '@/src/workspaces/activity-reads';
 
 // A card's activity (DESIGN.md §15.6), newest first in pages of 50, for someone who can see its board. It outlives the card, so this is true of a card that
@@ -16,7 +16,7 @@ export const GET = accountRoute(async ({ request, accountId, params }) => {
   if (!cursor.ok) return new Response(null, { status: 400 });
   const page = await activityOfCard(
     await getDatabase(),
-    authDirectory(await getAuthDatabase()),
+    authDirectory(await getAuthStore()),
     accountId,
     id.value,
     cursor.before,

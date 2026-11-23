@@ -21,6 +21,7 @@ export default async function AccountPage({
         section: one(query.section),
         linked: one(query.linked),
         unlinked: one(query.unlinked),
+        link: one(query.link),
         error: one(query.error),
       }}
     />

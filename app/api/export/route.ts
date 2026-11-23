@@ -1,7 +1,7 @@
 import { uuid } from '@/src/access/parse';
 import { accountRoute } from '@/src/access/route';
 import { authDirectory } from '@/src/auth/directory';
-import { getAuthDatabase, getDatabase } from '@/src/db/boot';
+import { getAuthStore, getDatabase } from '@/src/db/boot';
 import { exportBoard, exportOwned, exportWorkspace } from '@/src/workspaces/export';
 import { envelope, fileNameOf, serialise } from '@/src/portability/format';
 
@@ -14,7 +14,7 @@ export const GET = accountRoute(async ({ request, accountId }) => {
   const url = new URL(request.url);
   const scope = url.searchParams.get('scope');
   const database = await getDatabase();
-  const directory = authDirectory(await getAuthDatabase());
+  const directory = authDirectory(await getAuthStore());
   const now = new Date();
 
   let file: ReturnType<typeof envelope> | undefined;

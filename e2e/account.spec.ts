@@ -92,7 +92,7 @@ test('a password is not changed without the right one, and the answer says so', 
   await page.getByLabel(/^New password(?! again)/).fill('another long password');
   await page.getByLabel('New password again').fill('another long password');
   await page.getByRole('button', { name: 'Change password' }).click();
-  await expect(page.getByText('That password is not right.')).toBeVisible();
+  await expect(page.getByText('Your current password is not right.')).toBeVisible();
 });
 
 test('a new password that is short, or does not match, cannot be sent', async ({ page }) => {

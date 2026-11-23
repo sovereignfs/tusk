@@ -1,59 +1,63 @@
 'use client';
 
-import { type FormEvent, useState } from 'react';
-import { authClient } from '../client';
-import { messageFor } from '../messages';
-import { AuthButton, AuthError, AuthField, AuthForm, Input } from '@sovereignfs/ui';
+import { useState } from 'react';
+import { resetPassword } from '@sovereignfs/auth/client';
+import { AuthNotice, AuthLink, ResetPasswordForm } from '@sovereignfs/ui';
+import { authClient, signInValue } from '../client';
+import { passwordPolicy } from '../policy';
 
-/** Chooses a new password with the token from the link. It is good once; using it ends every other session of the account. */
-export function ResetForm({ minLength }: { minLength: number }) {
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+/**
+ * Chooses a new password with the token from the link, on the design system's form: the new password is sent as the sign-in value made with
+ * the address the link was sent to, which the page found from the token (`src/auth/reset.ts`). The link is good once; using it ends every
+ * other session of the account.
+ */
+export function ResetForm({
+  minLength,
+  token,
+  email,
+}: {
+  minLength: number;
+  token: string;
+  /** The address the link was sent to, or nothing for a link that is not, or no longer, good. */
+  email: string | null;
+}) {
+  const [error, setError] = useState<string | undefined>();
+  const [pending, setPending] = useState(false);
+  const [expired, setExpired] = useState(email === null);
   const [done, setDone] = useState(false);
-  const token =
-    typeof window === 'undefined'
-      ? ''
-      : (new URLSearchParams(window.location.search).get('token') ?? '');
 
-  async function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setBusy(true);
-    setError(null);
-    const { error: failure } = await authClient.resetPassword({ newPassword: password, token });
-    setBusy(false);
-    if (failure) return setError(messageFor(failure));
-    setDone(true);
+  async function onSubmit(values: { password: string; confirm: string }) {
+    if (!email) return setExpired(true);
+    setPending(true);
+    setError(undefined);
+    const result = await resetPassword(authClient, signInValue, {
+      ...values,
+      address: email,
+      token,
+      policy: passwordPolicy(minLength),
+    });
+    setPending(false);
+    if (result.outcome === 'done') setDone(true);
+    else if (result.outcome === 'expired') setExpired(true);
+    else setError(result.message);
   }
 
   if (done)
     return (
-      <p role="status">
+      <AuthNotice>
         Your password is changed, and you are signed out everywhere else.{' '}
-        <a href="/sign-in">Sign in</a> with it.
-      </p>
+        <AuthLink href="/sign-in">Sign in</AuthLink>
+      </AuthNotice>
     );
   return (
-    <AuthForm onSubmit={(event) => void onSubmit(event)}>
-      <AuthField label="New password" hint={`At least ${minLength} characters.`}>
-        {(field) => (
-          <Input
-            {...field}
-            type="password"
-            name="password"
-            autoComplete="new-password"
-            required
-            minLength={minLength}
-            disabled={busy}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        )}
-      </AuthField>
-      {error ? <AuthError>{error}</AuthError> : null}
-      <AuthButton type="submit" loading={busy}>
-        Change my password
-      </AuthButton>
-    </AuthForm>
+    <ResetPasswordForm
+      passwordHint={`At least ${minLength} characters.`}
+      error={error}
+      expired={expired}
+      pending={pending}
+      onSubmit={(values) => void onSubmit(values)}
+      signInHref="/sign-in"
+      newLinkHref="/forgot-password"
+    />
   );
 }

@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { COOKIE_PREFIX } from './auth';
 import { SESSION_COOKIES, hasSessionCookie } from './cookie';
 
 const jar = (values: Record<string, string>) => ({
@@ -7,20 +6,24 @@ const jar = (values: Record<string, string>) => ({
 });
 
 describe('the session cookie', () => {
-  it('is named as better-auth names it, with and without the Secure prefix, so the proxy and the server agree', () => {
+  it('is named as @sovereignfs/auth names it, over http and over https, so the proxy and the server agree', () => {
     expect([...SESSION_COOKIES]).toEqual([
-      `${COOKIE_PREFIX}.session_token`,
-      `__Secure-${COOKIE_PREFIX}.session_token`,
+      'better-auth.session_token',
+      '__Host-better-auth.session_token',
+      '__Secure-better-auth.session_token',
     ]);
   });
 
-  it('is found when it is there with a value, either name, and only then', () => {
-    expect(hasSessionCookie(jar({ 'tusk.session_token': 'x' }))).toBe(true);
-    expect(hasSessionCookie(jar({ '__Secure-tusk.session_token': 'x' }))).toBe(true);
-    expect(hasSessionCookie(jar({ 'tusk.session_token': '' }))).toBe(false);
+  it('is found when it is there with a value, any name, and only then', () => {
+    for (const name of SESSION_COOKIES) expect(hasSessionCookie(jar({ [name]: 'x' }))).toBe(true);
+    expect(hasSessionCookie(jar({ 'better-auth.session_token': '' }))).toBe(false);
     expect(
       hasSessionCookie(
-        jar({ session_token: 'x', 'tusk.session_data': 'y', 'fjord.session_token': 'z' }),
+        jar({
+          session_token: 'x',
+          'better-auth.session_data': 'y',
+          'tusk.session_token': 'z',
+        }),
       ),
     ).toBe(false);
     expect(hasSessionCookie(jar({}))).toBe(false);

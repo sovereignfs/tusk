@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { authDirectory } from '../src/auth/directory';
+import type { Database as AuthStore } from '@sovereignfs/auth/database';
 import type { Database } from '../src/db/client';
 import { dbGet, dbRun } from '../src/db/exec';
 import * as postgresSchema from '../src/db/schema/postgres';
@@ -57,7 +58,7 @@ export interface WorkspaceResult {
 
 export async function seedWorkspace(
   app: Database,
-  auth: Database,
+  auth: AuthStore,
   people: People,
   options: { now: number },
 ): Promise<WorkspaceResult> {

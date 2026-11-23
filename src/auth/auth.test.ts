@@ -1,8 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { dbAll, dbGet } from '../db/exec';
-import * as postgresAuth from '../db/schema/postgres/auth';
-import * as sqliteAuth from '../db/schema/sqlite/auth';
+import { authTable } from '../db/tables';
 import { testTarget } from '../db/test-support';
 import { type TestAuth, type TestClient, makeAuth } from './test-support';
 
@@ -28,7 +27,12 @@ async function signUp(client: TestClient, email = newEmail(), password = PASSWOR
   };
 }
 
-const tables = (t: TestAuth) => (t.database.dialect === 'postgres' ? postgresAuth : sqliteAuth);
+/** The auth store's tables, `@sovereignfs/auth`'s since the move (ADR 0001). */
+const tables = (t: TestAuth) => ({
+  user: authTable(t.database, 'users'),
+  account: authTable(t.database, 'accounts'),
+  rateLimit: authTable(t.database, 'rate_limits'),
+});
 const userCount = async (t: TestAuth) =>
   Number(
     (
@@ -80,7 +84,7 @@ describe(`local sign-in, first account only (${leg})`, () => {
       expect(JSON.stringify(reply.body)).not.toContain('password');
     });
 
-    it('is given a session cookie that scripts cannot read, that is not sent cross-site, and is ours', async () => {
+    it('is given a session cookie that scripts cannot read and that is not sent cross-site, under the package’s name', async () => {
       const client = visitor(t);
       const reply = await client.post('/api/auth/sign-in/email', {
         email: await firstEmail(t),
@@ -88,7 +92,7 @@ describe(`local sign-in, first account only (${leg})`, () => {
       });
       expect(reply.status).toBe(200);
       const cookie = found(
-        reply.setCookies.find((c) => c.startsWith('tusk.session_token=')),
+        reply.setCookies.find((c) => c.startsWith('better-auth.session_token=')),
         'session cookie',
       );
       expect(cookie).toMatch(/HttpOnly/i);
@@ -101,9 +105,9 @@ describe(`local sign-in, first account only (${leg})`, () => {
   it('then refuses every later sign-up, says why with a code, and creates nothing', async () => {
     expect(await userCount(t)).toBe(1);
     const refused = await signUp(visitor(t));
-    expect(refused.reply.status).toBe(403);
+    // The package's answer (auth.md §5): one answer whatever the address, with the code the form reads.
+    expect(refused.reply.status).toBe(422);
     expect(refused.reply.body.code).toBe('SIGNUP_CLOSED');
-    expect(refused.reply.body.message).toBe('Sign-up is closed on this instance.');
     expect(await userCount(t)).toBe(1);
   });
 
@@ -183,7 +187,7 @@ describe(`local sign-in, first account only (${leg})`, () => {
         email: await firstEmail(t),
         password: PASSWORD,
       });
-      const token = found(client.jar.get('tusk.session_token'), 'session cookie');
+      const token = found(client.jar.get('better-auth.session_token'), 'session cookie');
       expect((await client.get('/api/auth/get-session')).body.user).toBeTruthy();
 
       await client.post('/api/auth/sign-out', {});
@@ -191,7 +195,7 @@ describe(`local sign-in, first account only (${leg})`, () => {
 
       // Replaying the old cookie does not bring it back: the session is deleted, not just forgotten.
       const replay = visitor(t);
-      replay.jar.set('tusk.session_token', token);
+      replay.jar.set('better-auth.session_token', token);
       expect((await replay.get('/api/auth/get-session')).body).toBeNull();
     });
   });
@@ -235,10 +239,17 @@ describe(`local sign-in, first account only (${leg})`, () => {
     });
   });
 
-  it('must have a password as long as the instance says', async () => {
+  // The length is the page's to check (`signUpProblem`, src/auth/screens/SignUpForm.tsx): the server only ever sees the sign-in value. What
+  // it refuses is anything that is not one, a password sent as itself above all (auth.md §4, rule 1).
+  it('takes only the sign-in value the page derives, never a password as itself', async () => {
     const before = await userCount(t);
-    const { reply } = await signUp(visitor(t), newEmail(), 'short');
-    expect([400, 403]).toContain(reply.status);
+    const reply = await visitor(t).postRaw('/api/auth/sign-up/email', {
+      name: 'Ada',
+      email: newEmail(),
+      password: 'a password sent as itself',
+    });
+    expect(reply.status).toBe(400);
+    expect(reply.body?.code).toBe('PASSWORD_NOT_DERIVED');
     expect(await userCount(t)).toBe(before);
   });
 });

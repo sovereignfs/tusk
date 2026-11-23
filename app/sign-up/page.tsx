@@ -1,7 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
 import { AuthShell } from '@/src/auth/screens/AuthShell';
 import { SignUpForm } from '@/src/auth/screens/SignUpForm';
-import { authSettings, mailAvailable, signUpAvailable } from '@/src/auth/server';
+import { authSettings, signUpAvailable } from '@/src/auth/server';
 import { getSession } from '@/src/auth/session';
 import { AuthLink } from '@sovereignfs/ui';
 
@@ -25,15 +25,8 @@ export default async function SignUpPage() {
   }
 
   return (
-    <AuthShell
-      title="Create your account"
-      footer={
-        <>
-          Already have an account? <AuthLink href="/sign-in">Sign in</AuthLink>
-        </>
-      }
-    >
-      <SignUpForm minLength={settings.passwordMinLength} mail={mailAvailable()} />
+    <AuthShell title="Create your account">
+      <SignUpForm minLength={settings.passwordMinLength} />
     </AuthShell>
   );
 }
