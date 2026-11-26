@@ -27,11 +27,11 @@ importers:
         specifier: 0.1.0
         version: 0.1.0
       '@sovereignfs/sdk':
-        specifier: 2.1.0
-        version: 2.1.0(next@16.4.5(@playwright/test@1.64.1)(@types/node@24.19.2)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))
+        specifier: 2.11.0
+        version: 2.11.0(next@16.4.5(@playwright/test@1.64.1)(@types/node@24.19.2)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))
       '@sovereignfs/ui':
-        specifier: 0.92.0
-        version: 0.92.0(@dnd-kit/core@6.3.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(@dnd-kit/sortable@10.0.0(@dnd-kit/core@6.3.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        specifier: 0.106.0
+        version: 0.106.0(@dnd-kit/core@6.3.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(@dnd-kit/sortable@10.0.0(@dnd-kit/core@6.3.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       age-encryption:
         specifier: 0.3.1
         version: 0.3.1
@@ -1279,13 +1279,17 @@ packages:
     resolution: {integrity: sha512-PEZ+pW9sMUzlmZu0K0VsUarXLhUsLnBD5TXkCrQ2gNZ52t95ddYlSB3qzZ4Moys2bDKx0a3NoSg4dYAk2ryMdg==}
     engines: {node: '>=22.3'}
 
+  '@sovereignfs/export@0.3.0':
+    resolution: {integrity: sha512-12swov5KcPD7B2ZvJKvEQQan9pTdSMmwgW6BNRqXTgtdG5k7OCy9E/AdLpKaogTvmBrm1VRue+WBkTlhd6AtdQ==}
+    engines: {node: '>=22.3'}
+
   '@sovereignfs/manifest@0.1.1':
     resolution: {integrity: sha512-r8/uFpC3qFhMCmouY+Hf1eMYPC2Tu/SvOBxModkij2zb5JkeLp3cF/8zN6WJJujpb8SCG5DjykzcQ+GWuSQ1FQ==}
     engines: {node: '>=22.3'}
     hasBin: true
 
-  '@sovereignfs/sdk@2.1.0':
-    resolution: {integrity: sha512-fZ/VejE8bh7vwo6TBFmTon1m3LszQd3UnNgKXv/xh0hZ9CaceJXMho2rWHGgJB+Cn+JtVuyFqz6rd9I08ocWqQ==}
+  '@sovereignfs/sdk@2.11.0':
+    resolution: {integrity: sha512-2ENRTZ2TwzYmghaXh5Cmke54An9Wn1p+Yr7fe8BB8Tqr1Bhz9gte04Ijp2VHyivwTR2FO0Qj6po/YHaMARok2Q==}
     engines: {node: '>=22.3'}
     peerDependencies:
       next: '>=15'
@@ -1293,17 +1297,20 @@ packages:
       next:
         optional: true
 
-  '@sovereignfs/ui@0.92.0':
-    resolution: {integrity: sha512-umMcihzirOazmcRgpEZ0J20nyfVgO0VNsSscMok4GYKSht++rEUsps131Wbj64uZGHxq7xHZpQz0otfAI6t7uQ==}
+  '@sovereignfs/ui@0.106.0':
+    resolution: {integrity: sha512-MdMAGi0M+s+s8Tv8i+XiN3vG5Yt3YNN16mNTIUbwr6sr7CaFX4Lcug/HzRaDTRGfnYjHKAhyZXC3qxkbW3G+nQ==}
     peerDependencies:
       '@dnd-kit/core': ^6.3.1
       '@dnd-kit/sortable': ^10.0.0
+      maplibre-gl: ^6.18.0
       react: ^19.0.0
       react-dom: ^19.0.0
     peerDependenciesMeta:
       '@dnd-kit/core':
         optional: true
       '@dnd-kit/sortable':
+        optional: true
+      maplibre-gl:
         optional: true
 
   '@standard-schema/spec@1.1.0':
@@ -3686,16 +3693,21 @@ snapshots:
 
   '@sovereignfs/config@0.1.0': {}
 
+  '@sovereignfs/export@0.3.0':
+    dependencies:
+      age-encryption: 0.3.1
+
   '@sovereignfs/manifest@0.1.1': {}
 
-  '@sovereignfs/sdk@2.1.0(next@16.4.5(@playwright/test@1.64.1)(@types/node@24.19.2)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))':
+  '@sovereignfs/sdk@2.11.0(next@16.4.5(@playwright/test@1.64.1)(@types/node@24.19.2)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))':
     dependencies:
+      '@sovereignfs/export': 0.3.0
       jose: 6.2.13
       openid-client: 6.8.9
     optionalDependencies:
       next: 16.4.5(@playwright/test@1.64.1)(@types/node@24.19.2)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
 
-  '@sovereignfs/ui@0.92.0(@dnd-kit/core@6.3.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(@dnd-kit/sortable@10.0.0(@dnd-kit/core@6.3.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)':
+  '@sovereignfs/ui@0.106.0(@dnd-kit/core@6.3.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(@dnd-kit/sortable@10.0.0(@dnd-kit/core@6.3.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)':
     dependencies:
       react: 19.3.1
       react-dom: 19.3.1(react@19.3.1)
