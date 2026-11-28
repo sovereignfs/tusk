@@ -144,7 +144,9 @@ jobs:
           sbom: false
           outputs: ${{ needs.check.outputs.publish == 'true' && format('type=image,name={0},push-by-digest=true,name-canonical=true,push=true', env.IMAGE) || 'type=cacheonly' }}
           cache-from: type=gha,scope=publish-${{ matrix.runner }}
-          cache-to: type=gha,mode=max,scope=publish-${{ matrix.runner }}
+          # The cache only speeds the next build, so it never fails one. Called by the release workflow, this runs for a merged pull request, whose token
+          # may read GitHub's cache but not write it ("cache write denied: token has no writable scopes"): it is not written then.
+          cache-to: ${{ github.event_name != 'pull_request' && format('type=gha,mode=max,scope=publish-{0},ignore-error=true', matrix.runner) || '' }}
 
       - name: Keep the digest
         if: needs.check.outputs.publish == 'true'
