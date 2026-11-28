@@ -3,10 +3,52 @@
 All notable changes to Tusk are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
-Each release's section is also its GitHub release notes: the release workflow reads this file when a release is cut. Write the notes under
-`## [Unreleased]` as you go; a release turns them into the version's section.
+Each version's section is also its GitHub release notes. It is written in the change that sets the version, dated that day, and a promotion
+titled `Release vX.Y.Z` is refused without it (RELEASING.md).
 
-## [Unreleased]
+## [0.6.0] - 2026-11-23
+
+**Before upgrading:** take a backup. Every session open at the upgrade ends, and each person signs in once more. The move of the sign-in's tables
+happens by itself at the first start and cannot be undone: an older Tusk cannot read them after it. `TUSK_CORE_URL` is the instance's own address
+with no path (`https://sovereign.example.com`); one ending in `/api/auth` now stops Tusk at start, naming the variable. The core it is registered
+with must let it come back to `/sign-in` after signing out (the manifest's `postLogout`).
+
+### Changed
+
+- **Sign-in is the suite's `@sovereignfs/auth`**, not better-auth configured by hand: the same rules as Sovereign itself and every app, and its
+  tables. **The password never reaches the server any more**: the page sends a value it derives from it. A password stored by an earlier Tusk
+  moves across at its next sign-in, for 90 days after the upgrade; after that, it is reset by mail, or by a link the operator makes.
+- The sign-in, sign-up and new-password pages are the design system's forms. A password's length is checked on the page.
+- **Signing in through Sovereign** follows the person's Sovereign session: an hour after it was last checked, it is checked again on the next page,
+  and ends if they have signed out there. Signing out of it goes through Sovereign, which decides whether it signs them out there too. A notice from
+  Sovereign that one of its sessions ended ends only the sessions that came from it.
+- `TUSK_AUTH_SIGNUP` is for Tusk's own accounts: whoever Sovereign signs in gets an account, closed or not.
+- Linking a Sovereign account in Settings, Security asks for the password first; the Sovereign account may have another address, as long as no
+  other account here has it. Unlinking it asks for the password too, instead of a sign-in in the last ten minutes.
+- Signing in with an address not yet confirmed no longer sends another link by itself; the sign-in page offers **Send the link again**.
+- A sign-up refused because sign-up is closed is answered with 422, the package's answer, rather than 403.
+- A passkey signs in only when the device unlocks it with a PIN or biometrics, as the suite requires: one made on a device that did not ask
+  for either no longer signs in, and the password does.
+- Turning the authenticator app on needs a confirmed address, which without mail no account has: on an instance with no mail it can no longer be
+  turned on, and Settings says why. One already on stays on.
+- Changing the password, the authenticator app's steps and deleting the account send the sign-in value made from the password, as signing in does.
+
+## [0.5.0] - 2026-11-22
+
+### Added
+
+- Core's export of a person now holds their Tusk data: Sovereign's "Your data" download includes their Desk and every workspace they own, as Tusk's own "Everything" export has them. A Desk sealed with a key of the person's own stays sealed in it; Tusk's own export is the one that opens it. Needs core 0.126.0 or later, which the manifest now asks for.
+
+### Changed
+
+- The service worker, the web manifest and the worker's registration are the suite's, from `@sovereignfs/pwa`. A new version of Tusk is announced with a Reload button instead of waiting for every window to close. With no connection, every page opens the Desk's offline screens, and a page they cannot show (a board, the Inbox, Settings) says it needs a connection there; before a first visit has kept them, the suite's offline page says so. Reminders, notifications and the wake work as before. Nothing of a person is kept in a cache.
+- On the suite's current packages: `@sovereignfs/sdk` 2.11.0, `@sovereignfs/ui` 0.105.0, `@sovereignfs/manifest` 0.4.0 (manifest 5) and `@sovereignfs/create` 0.27.1, whose shared rules are now in `AGENTS.md` and `CONTRIBUTING.md`. Tusk keeps its own `Dockerfile`, `.dockerignore` and Compose setups, for its three databases.
+
+- 2026-11-18
+
+### Added
+
+- Opened from Sovereign's launcher, or from any link to it, an installed Tusk now opens as itself on desktop Chrome and Edge and on Android Chrome, on the page the link names, rather than in a browser view. On an iPhone, an iPad and in Safari the link opens a browser view, as before.
 
 ## [0.3.0] - 2026-11-11
 
@@ -144,7 +186,8 @@ Each release's section is also its GitHub release notes: the release workflow re
 - What you search for on the Desk is no longer in the address as a query string, which is sent to the server and any proxy's log (even for a Desk with a key of its own): it is a fragment (`/desk#q=…`), which the browser never sends.
 - Opening the Inbox no longer fails on PostgreSQL (a column named twice in one statement was ambiguous there).
 
-[Unreleased]: https://github.com/sovereignfs/tusk/compare/v0.3.0...HEAD
+[0.5.0]: https://github.com/sovereignfs/tusk/compare/v0.3.0...v0.5.0
+[0.4.0]: https://github.com/sovereignfs/tusk/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/sovereignfs/tusk/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/sovereignfs/tusk/compare/v0.1.0...v0.2.1
 [0.1.0]: https://github.com/sovereignfs/tusk/releases/tag/v0.1.0

@@ -1,8 +1,14 @@
+import { createHash } from 'node:crypto';
+import type { Database as AuthStore } from '@sovereignfs/auth/database';
+import { createSovereign } from '@sovereignfs/sdk';
 import { runMigrations } from '../db/migrate';
 import { freshDatabase } from '../db/test-support';
 import type { Mailer } from '../mail/mailer';
 import { createAuth } from './auth';
-import type { AuthSettings } from './config';
+import { SOVEREIGN_SCOPES, type AuthSettings } from './config';
+import { migrateAuthStore } from './migrate';
+import { discardingTokenStore, sdkSessionStore } from './sdk-stores';
+import { openAuthStore } from './store';
 
 /**
  * Everything a test of the sign-in flows needs: a better-auth instance on a freshly migrated auth store (on whichever database the leg is running),
@@ -12,8 +18,13 @@ import type { AuthSettings } from './config';
 export interface TestAuth {
   auth: ReturnType<typeof createAuth>;
   settings: AuthSettings;
+  /** The auth store through Tusk's own handle, for a test that reads its tables. */
   database: Awaited<ReturnType<typeof freshDatabase>>['database'];
+  /** The same store as `@sovereignfs/auth` takes it. */
+  store: AuthStore;
   client(): TestClient;
+  /** Waits for every send the instance started in the background (mail), as a request never does. */
+  settled(): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -30,16 +41,49 @@ const SETTINGS: AuthSettings = {
 export type AuthOverrides = Partial<AuthSettings>;
 
 export async function makeAuth(overrides: AuthOverrides = {}, mailer?: Mailer): Promise<TestAuth> {
-  const { database } = await freshDatabase('auth');
+  const { database, config } = await freshDatabase('auth');
+  // As the server starts: 0.2.x's tables, then onto the package's (`src/auth/migrate.ts`).
   await runMigrations(database);
+  const store = await openAuthStore(config);
+  await migrateAuthStore(store);
   const settings: AuthSettings = { ...SETTINGS, ...overrides };
-  const auth = createAuth({ settings, name: 'Tusk', database, mailer });
+  const pending: Promise<unknown>[] = [];
+  // With core on, the SDK's client as the server makes it (`server.ts`), its stores in the same auth store.
+  const sovereign = settings.sovereign
+    ? createSovereign({
+        appUrl: settings.url,
+        coreUrl: settings.sovereign.issuer,
+        clientId: settings.sovereign.clientId,
+        clientSecret: settings.sovereign.clientSecret,
+        scopes: SOVEREIGN_SCOPES,
+        redirectPath: '/api/auth/callback/sovereign',
+        postLogoutPath: '/sign-in',
+        sessionStore: sdkSessionStore(() => Promise.resolve(store)),
+        tokenStore: discardingTokenStore,
+      })
+    : undefined;
+  const auth = createAuth({
+    settings,
+    name: 'Tusk',
+    database: store,
+    mailer,
+    sovereign,
+    background: (task) => void pending.push(task.catch(() => undefined)),
+  });
   return {
     auth,
     settings,
     database,
+    store,
     client: () => new TestClient(auth, settings.url),
-    close: () => database.close(),
+    settled: async () => {
+      while (pending.length > 0) await Promise.all(pending.splice(0));
+    },
+    close: async () => {
+      while (pending.length > 0) await Promise.all(pending.splice(0));
+      await store.close();
+      await database.close();
+    },
   };
 }
 
@@ -67,7 +111,16 @@ export class TestClient {
     return other;
   }
 
+  /**
+   * Posts as a page does: a password in the body (`password`, `newPassword`, `currentPassword`) is sent as the sign-in value a page derives
+   * from it (`derivedFor`), never as itself (auth.md §4, rule 1). `postRaw` sends the body as it is, for the tests that the server refuses a
+   * password and for moving a password stored before the package.
+   */
   post(path: string, body?: unknown, headers: Record<string, string> = {}): Promise<Reply> {
+    return this.request('POST', path, derivedBody(body), headers);
+  }
+
+  postRaw(path: string, body?: unknown, headers: Record<string, string> = {}): Promise<Reply> {
     return this.request('POST', path, body, headers);
   }
 
@@ -128,4 +181,25 @@ export class TestClient {
     }
     return { status: response.status, headers: response.headers, body: parsed, setCookies };
   }
+}
+
+/**
+ * What a page sends for `password`: a sign-in value of the right shape, the same for the same password. A stand-in for the page's
+ * derivation, whose Argon2id takes a second, since the server sees only the value: it checks the shape and hashes what it is given.
+ */
+export function derivedFor(password: string): string {
+  return `svp1.${createHash('sha256').update(password).digest('base64url')}`;
+}
+
+const SIGN_IN_VALUE = /^svp1\.[A-Za-z0-9_-]{43}$/;
+const PASSWORD_KEYS = ['password', 'newPassword', 'currentPassword'];
+
+function derivedBody(body: unknown): unknown {
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) return body;
+  const out: Record<string, unknown> = { ...(body as Record<string, unknown>) };
+  for (const key of PASSWORD_KEYS) {
+    const value = out[key];
+    if (typeof value === 'string' && !SIGN_IN_VALUE.test(value)) out[key] = derivedFor(value);
+  }
+  return out;
 }

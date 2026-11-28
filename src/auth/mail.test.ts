@@ -85,16 +85,25 @@ describe(`verifying an address (${leg})`, () => {
     expect(reply.status).not.toBe(200);
   });
 
-  it('sends a new link to someone who signs in unconfirmed, and says the same of an address that has no account', async () => {
+  it('sends no link when someone signs in unconfirmed, a new one when asked, and answers the same for an address with no account', async () => {
     const { client, address } = await signedUp();
+    await t.settled();
     const before = mailer.sent.length;
+    // A wrong guess at a password must not fill an inbox (auth.md §4): signing in sends nothing.
     await client.post('/api/auth/sign-in/email', { email: address, password: PASSWORD });
+    await t.settled();
+    expect(mailer.sent.length).toBe(before);
+    // Asking for a link is its own request: the sign-in page offers it.
+    const asked = await visitor().post('/api/auth/send-verification-email', { email: address });
+    await t.settled();
     expect(mailer.sent.length).toBe(before + 1);
-    const stranger = await visitor().post('/api/auth/sign-in/email', {
+    const stranger = await visitor().post('/api/auth/send-verification-email', {
       email: 'nobody@example.com',
-      password: PASSWORD,
     });
-    expect(stranger.body).toMatchObject({ code: 'INVALID_EMAIL_OR_PASSWORD' });
+    await t.settled();
+    expect(mailer.sent.length).toBe(before + 1);
+    expect(stranger.status).toBe(asked.status);
+    expect(stranger.body).toEqual(asked.body);
   });
 });
 
@@ -184,7 +193,7 @@ describe(`resetting a password (${leg})`, () => {
     expect((await second.get('/api/auth/get-session')).body).toBeNull();
   });
 
-  it('refuses a token that is not one, and a password that is too short', async () => {
+  it('refuses a token that is not one, and a password that is not a sign-in value', async () => {
     const { address } = await confirmed();
     const client = visitor();
     expect(
@@ -201,10 +210,10 @@ describe(`resetting a password (${leg})`, () => {
     });
     await new Promise((resolve) => setTimeout(resolve, 50));
     const token = await tokenOf(client, mailer.linkTo(address));
+    // A password sent as itself is refused (the page checks the length and derives the value, auth.md §4), and does not spend the link.
     expect(
-      (await client.post('/api/auth/reset-password', { newPassword: 'short', token })).status,
+      (await client.postRaw('/api/auth/reset-password', { newPassword: 'short', token })).status,
     ).toBeGreaterThanOrEqual(400);
-    // A short password did not spend the link.
     expect(
       (await client.post('/api/auth/reset-password', { newPassword: NEW_PASSWORD, token })).status,
     ).toBe(200);

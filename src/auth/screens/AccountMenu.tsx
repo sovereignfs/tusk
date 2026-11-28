@@ -32,6 +32,13 @@ export function AccountMenu({
   async function signOut() {
     setOffline(false);
     setLeaving(true);
+    // Where to go afterwards, asked while the session is still there: core's sign-out for a session that came from core, which decides
+    // whether it ends core's session too (auth.md §8).
+    const throughCore = await fetch('/api/account/sign-out', { cache: 'no-store' })
+      .then(async (reply) =>
+        reply.ok ? ((await reply.json()) as { url: string | null }).url : null,
+      )
+      .catch(() => null);
     const channel = new BroadcastChannel(`tusk-${accountId}`);
     const result = await leaveDevice({
       accountId,
@@ -51,7 +58,7 @@ export function AccountMenu({
     channel.close();
     setUnsent(null);
     setLeaving(false);
-    if (result.status === 'left') window.location.assign('/');
+    if (result.status === 'left') window.location.assign(throughCore ?? '/');
     if (result.status === 'offline') setOffline(true);
   }
 

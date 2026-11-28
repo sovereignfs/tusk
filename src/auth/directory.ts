@@ -1,8 +1,4 @@
-import { sql } from 'drizzle-orm';
-import type { Database } from '../db/client';
-import { dbAll } from '../db/exec';
-import * as postgresAuth from '../db/schema/postgres/auth';
-import * as sqliteAuth from '../db/schema/sqlite/auth';
+import type { Database as AuthStore } from '@sovereignfs/auth/database';
 
 /**
  * What the rest of the app may ask of the accounts (DESIGN.md §13.2): who has this address, and what a person is called. **It is read when it is shown, and
@@ -23,33 +19,32 @@ export interface Directory {
   profiles(ids: readonly string[]): Promise<Map<string, Profile>>;
 }
 
-const userTable = (database: Database) =>
-  database.dialect === 'postgres' ? postgresAuth.user : sqliteAuth.user;
-
-/** The directory over an auth store. */
-export function authDirectory(database: Database): Directory {
+/** The directory over an auth store, `@sovereignfs/auth`'s `users` table. */
+export function authDirectory(database: AuthStore): Directory {
   return {
     async idOfEmail(email) {
-      const rows = await dbAll<{ id: string }>(
-        database,
-        sql`SELECT id FROM ${userTable(database)} WHERE LOWER(email) = ${email.trim().toLowerCase()} LIMIT 1`,
-      );
-      return rows[0]?.id;
+      const { rows } = await database.run('SELECT id FROM users WHERE LOWER(email) = ? LIMIT 1', [
+        email.trim().toLowerCase(),
+      ]);
+      return rows[0] ? String(rows[0].id) : undefined;
     },
     async profiles(ids) {
       const found = new Map<string, Profile>();
       const wanted = [...new Set(ids)];
       if (wanted.length === 0) return found;
-      const rows = await dbAll<{ id: string; name: string; email: string; image: string | null }>(
-        database,
-        sql`SELECT id, name, email, image FROM ${userTable(database)}
-            WHERE id IN (${sql.join(
-              wanted.map((id) => sql`${id}`),
-              sql`, `,
-            )})`,
+      const { rows } = await database.run(
+        `SELECT id, name, email, image FROM users WHERE id IN (${wanted.map(() => '?').join(', ')})`,
+        wanted,
       );
-      for (const row of rows)
-        found.set(row.id, { id: row.id, name: row.name, email: row.email, image: row.image });
+      for (const row of rows) {
+        const id = String(row.id);
+        found.set(id, {
+          id,
+          name: String(row.name),
+          email: String(row.email),
+          image: row.image === null || row.image === undefined ? null : String(row.image),
+        });
+      }
       return found;
     },
   };

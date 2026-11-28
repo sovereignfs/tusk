@@ -25,7 +25,8 @@ async function nextPersonIs(page: Page, who: { sub: string; email: string; name?
  */
 async function throughSovereign(page: Page) {
   const button = page.getByRole('button', { name: 'Sign in with Sovereign' });
-  const limited = page.getByText(/Too many tries/);
+  // A limited start of the sign-in through core is the package's route answering itself, a page of its own (auth.md §8).
+  const limited = page.getByText(/Too many (tries|attempts|requests)/);
   for (let attempt = 0; attempt < 3; attempt++) {
     await button.click();
     await expect(
@@ -35,6 +36,7 @@ async function throughSovereign(page: Page) {
     ).toBeVisible();
     if (!(await limited.isVisible())) return;
     await page.waitForTimeout(10_500);
+    if (!(await button.isVisible())) await page.goBack();
   }
 }
 
@@ -74,21 +76,23 @@ test.describe('an instance that signs in through Sovereign only', () => {
     await signOut(page);
   });
 
-  test('a second person is turned back to the sign-in page and told why, and has no session', async ({
+  // `TUSK_AUTH_SIGNUP` is for Tusk's own accounts: who may sign in through core is core's to say (auth.md §5).
+  test('a second person core signs in gets an account of their own, whatever the sign-up setting', async ({
     page,
   }) => {
     await nextPersonIs(page, SECOND);
     await page.goto('/sign-in');
     await throughSovereign(page);
-    await expect(page).toHaveURL(/\/sign-in/);
-    await expect(page.getByText(/Sign-up is closed/)).toBeVisible();
-    await page.goto('/desk');
-    await expect(page).toHaveURL(/\/sign-in/);
+    await expect(page.getByRole('button', { name: 'User menu' })).toBeVisible();
+    await signOut(page);
   });
 
-  test('a person who declines at Sovereign is told so and is not signed in', async ({ page }) => {
-    await page.goto('/sign-in?error=access_denied');
-    await expect(page.getByText(/You declined to share/)).toBeVisible();
+  // A sign-in through core that did not complete, declined at Sovereign included, comes back with the package's one word for it (auth.md §8).
+  test('a person whose sign-in at Sovereign did not complete is told so and is not signed in', async ({
+    page,
+  }) => {
+    await page.goto('/sign-in?error=sovereign');
+    await expect(page.getByText(/did not complete/)).toBeVisible();
     await expect(page.getByRole('button', { name: 'User menu' })).toHaveCount(0);
   });
 
@@ -120,7 +124,7 @@ test.describe('an instance that signs in through Sovereign only', () => {
     wrong?: Wrong,
   ): Promise<string> {
     const reply = await page.request.post(`http://localhost:${PORTS.coreControl}/notice`, {
-      data: { kind, sub, sid: 'core-session-1', wrong },
+      data: { kind, sub, wrong },
     });
     expect(reply.ok()).toBe(true);
     return reply.text();
@@ -163,8 +167,8 @@ test.describe('an instance that signs in through Sovereign only', () => {
     await signInAs(page, FIRST);
     for (const wrong of ['signature', 'audience', 'expired', 'type'] as const) {
       const reply = await sendLogout(page, await noticeFrom(page, 'logout', FIRST.sub, wrong));
+      // Refused with nothing said (auth.md §8): what was wrong with it is not the sender's to learn.
       expect(reply.status(), wrong).toBe(400);
-      expect(await reply.json()).toEqual({ error: 'invalid_request' });
     }
     // A deletion token is not a logout token, nor the reverse.
     expect(
@@ -246,14 +250,22 @@ test.describe('an instance that signs in through Sovereign only', () => {
   });
 });
 
+/** Links Sovereign from Settings, Security: the password first, then to Sovereign and back (auth.md §8.2). */
+async function linkWithPassword(page: Page) {
+  await page.getByRole('button', { name: 'Link Sovereign' }).click();
+  await page.getByLabel('Your password').fill('correct horse battery');
+  await page.getByRole('button', { name: 'Continue to Sovereign' }).click();
+}
+
 /** A local account made on the instance that offers both ways, signed in. */
 async function signUpLocal(page: Page, name: string): Promise<{ email: string; name: string }> {
   const email = `local-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.com`;
   await page.goto('/sign-up');
   await page.getByLabel('Name').fill(name);
   await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill('correct horse battery');
-  const limited = page.getByText(/Too many tries/);
+  await page.getByLabel('Password', { exact: true }).fill('correct horse battery');
+  await page.getByLabel('Confirm password').fill('correct horse battery');
+  const limited = page.getByText(/Too many (tries|attempts)/);
   for (let attempt = 0; attempt < 3; attempt++) {
     await page.getByRole('button', { name: 'Create account' }).click();
     await expect(limited.or(page.getByRole('button', { name: 'User menu' }))).toBeVisible();
@@ -287,7 +299,8 @@ test.describe('an instance that offers both ways', () => {
     const email = `local-${Date.now()}@example.com`;
     await page.getByLabel('Name').fill('Local Ada');
     await page.getByLabel('Email').fill(email);
-    await page.getByLabel('Password').fill('correct horse battery');
+    await page.getByLabel('Password', { exact: true }).fill('correct horse battery');
+    await page.getByLabel('Confirm password').fill('correct horse battery');
     await page.getByRole('button', { name: 'Create account' }).click();
     await expect(page.getByRole('button', { name: 'User menu' })).toBeVisible();
     await signOut(page);
@@ -300,7 +313,8 @@ test.describe('an instance that offers both ways', () => {
     await page.goto('/sign-up');
     await page.getByLabel('Name').fill('Local Grace');
     await page.getByLabel('Email').fill(email);
-    await page.getByLabel('Password').fill('correct horse battery');
+    await page.getByLabel('Password', { exact: true }).fill('correct horse battery');
+    await page.getByLabel('Confirm password').fill('correct horse battery');
     await page.getByRole('button', { name: 'Create account' }).click();
     await expect(page.getByRole('button', { name: 'User menu' })).toBeVisible();
     await signOut(page);
@@ -324,9 +338,9 @@ test.describe('an instance that offers both ways', () => {
     });
     await page.goto('/account?section=security');
     await expect(page.getByRole('button', { name: 'Change password' })).toBeVisible();
-    await page.getByRole('button', { name: 'Link Sovereign' }).click();
+    await linkWithPassword(page);
 
-    await expect(page).toHaveURL(/\/account\?section=security&linked=1/);
+    await expect(page).toHaveURL(/\/account\?section=security&link=done/);
     await expect(page.getByText('Sovereign is linked.')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Unlink Sovereign' })).toBeEnabled();
 
@@ -342,20 +356,22 @@ test.describe('an instance that offers both ways', () => {
     await signOut(page);
   });
 
-  test('a Sovereign account with a different address is refused with the reason, and nothing is linked', async ({
+  test('a Sovereign account whose address is another account’s here is refused with the reason, and nothing is linked', async ({
     page,
   }) => {
+    const other = await signUpLocal(page, 'Local Hedy');
+    await signOut(page);
     await signUpLocal(page, 'Local Mary');
     await nextPersonIs(page, {
       sub: `e2e-other-${Date.now()}`,
-      email: `other-${Date.now()}@sovereign.test`,
+      email: other.email,
       name: 'Not The Same',
     });
     await page.goto('/account?section=security');
-    await page.getByRole('button', { name: 'Link Sovereign' }).click();
+    await linkWithPassword(page);
 
     await expect(page).toHaveURL(/\/account\?section=security/);
-    await expect(page.getByText(/different email address/)).toBeVisible();
+    await expect(page.getByText(/belongs to another account here/)).toBeVisible();
     await expect(page.getByRole('button', { name: 'Link Sovereign' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Unlink Sovereign' })).toHaveCount(0);
     await signOut(page);
@@ -368,10 +384,12 @@ test.describe('an instance that offers both ways', () => {
     const who = { sub: `e2e-undo-${Date.now()}`, email, name: 'Same Person' };
     await nextPersonIs(page, who);
     await page.goto('/account?section=security');
-    await page.getByRole('button', { name: 'Link Sovereign' }).click();
+    await linkWithPassword(page);
     await expect(page.getByText('Sovereign is linked.')).toBeVisible();
 
+    // Unlinking asks for the password again (auth.md §4, rule 3).
     await page.getByRole('button', { name: 'Unlink Sovereign' }).click();
+    await page.getByLabel('Your password').fill('correct horse battery');
     await page.getByRole('button', { name: 'Unlink', exact: true }).click();
     await expect(page.getByText('Sovereign is unlinked.')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Link Sovereign' })).toBeVisible();

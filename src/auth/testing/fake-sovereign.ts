@@ -140,14 +140,15 @@ export async function startFakeSovereign(
         res.end(JSON.stringify(body));
       };
       try {
-        if (url.pathname === `${PATH}/.well-known/openid-configuration`) {
+        // Core's issuer is the bare instance address; its endpoints are under `/api/auth` (core-app §3.6).
+        if (url.pathname === '/.well-known/openid-configuration') {
           const document: Record<string, unknown> = {
             issuer,
-            authorization_endpoint: `${issuer}/oauth2/authorize`,
-            token_endpoint: `${issuer}/oauth2/token`,
-            jwks_uri: `${issuer}/jwks`,
-            userinfo_endpoint: `${issuer}/oauth2/userinfo`,
-            end_session_endpoint: `${issuer}/oauth2/end-session`,
+            authorization_endpoint: `${issuer}${PATH}/oauth2/authorize`,
+            token_endpoint: `${issuer}${PATH}/oauth2/token`,
+            jwks_uri: `${issuer}${PATH}/jwks`,
+            userinfo_endpoint: `${issuer}${PATH}/oauth2/userinfo`,
+            end_session_endpoint: `${issuer}${PATH}/oauth2/end-session`,
             scopes_supported: ['openid', 'profile', 'email', 'offline_access'],
             response_types_supported: ['code'],
             response_modes_supported: ['query'],
@@ -273,7 +274,7 @@ export async function startFakeSovereign(
   });
 
   await new Promise<void>((resolve) => server.listen(options.port ?? 0, resolve));
-  issuer = `http://localhost:${(server.address() as AddressInfo).port}${PATH}`;
+  issuer = `http://localhost:${(server.address() as AddressInfo).port}`;
 
   return {
     issuer,

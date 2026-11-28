@@ -29,7 +29,7 @@ export interface AuthSettings {
 }
 
 export interface SovereignSettings {
-  /** Core's address, its OIDC issuer: no trailing slash. Its discovery document is at `/.well-known/openid-configuration` under it. */
+  /** Core's address, its OIDC issuer: an origin, with no path. Its discovery document is at `/.well-known/openid-configuration` under it. */
   readonly issuer: string;
   readonly clientId: string;
   readonly clientSecret: string;
@@ -135,8 +135,15 @@ function resolveSovereign(read: Read, problems: Problem[]): SovereignSettings | 
     problems.push('TUSK_CORE_URL has no user, query or fragment.');
     return undefined;
   }
+  // Core's issuer is the instance's own address (core-app §3.6), and the SDK takes no other.
+  if (parsed.pathname !== '/') {
+    problems.push(
+      'TUSK_CORE_URL is the instance’s own address, with no path: https://sovereign.example.com.',
+    );
+    return undefined;
+  }
   return {
-    issuer: `${parsed.origin}${parsed.pathname}`.replace(/\/+$/, ''),
+    issuer: parsed.origin,
     clientId,
     clientSecret,
   };

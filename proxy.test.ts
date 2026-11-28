@@ -56,7 +56,7 @@ describe('the proxy', () => {
     for (const path of ['/home', '/boards']) {
       const reply = proxy(
         new NextRequest(`https://tusk.example.com${path}`, {
-          headers: { cookie: 'tusk.session_token=x' },
+          headers: { cookie: 'better-auth.session_token=x' },
         }),
       );
       expect(reply.status, path).toBe(308);
@@ -70,7 +70,7 @@ describe('the proxy', () => {
 
   it('shows Home at the front address for a request with a session cookie, and keeps the address', () => {
     const rewrite = (response: Response) => response.headers.get('x-middleware-rewrite');
-    for (const name of ['tusk.session_token', '__Secure-tusk.session_token']) {
+    for (const name of ['better-auth.session_token', '__Secure-better-auth.session_token']) {
       const signedIn = new NextRequest('https://tusk.example.com/', {
         headers: { cookie: `${name}=anything` },
       });
@@ -83,7 +83,7 @@ describe('the proxy', () => {
       rewrite(
         proxy(
           new NextRequest('https://tusk.example.com/', {
-            headers: { cookie: 'tusk.session_token=' },
+            headers: { cookie: 'better-auth.session_token=' },
           }),
         ),
       ),
@@ -101,14 +101,14 @@ describe('the proxy', () => {
       rewrite(
         proxy(
           new NextRequest('https://tusk.example.com/sign-in', {
-            headers: { cookie: 'tusk.session_token=x' },
+            headers: { cookie: 'better-auth.session_token=x' },
           }),
         ),
       ),
     ).toBeNull();
     // A policy and a nonce are on it all the same.
     const signedIn = new NextRequest('https://tusk.example.com/', {
-      headers: { cookie: 'tusk.session_token=x' },
+      headers: { cookie: 'better-auth.session_token=x' },
     });
     expect(proxy(signedIn).headers.get('content-security-policy')).toContain('nonce-');
   });

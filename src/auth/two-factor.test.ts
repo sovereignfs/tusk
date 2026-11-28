@@ -8,6 +8,7 @@ import { type TestAuth, type TestClient, makeAuth } from './test-support';
  * are tried in one (`e2e/passkeys.spec.ts`).
  */
 const { leg } = testTarget();
+// Turning it on is refused for an address that is not verified, mail or none: `account()` verifies its own.
 const PASSWORD = 'correct horse battery';
 
 let t: TestAuth;
@@ -24,6 +25,12 @@ async function account() {
   const email = `tf${++n}@example.com`;
   const client = visitor();
   await client.post('/api/auth/sign-up/email', { name: 'Ada', email, password: PASSWORD });
+  // The package turns the second step on only for an address shown to be the person's (auth.md §4): this test's instance sends no
+  // mail, so the address is marked as a followed link would.
+  await t.store.run('UPDATE users SET email_verified = ? WHERE email = ?', [
+    t.store.family === 'postgres' ? true : 1,
+    email,
+  ]);
   return { client, email };
 }
 

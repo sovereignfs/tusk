@@ -17,7 +17,7 @@ import { ReminderSync } from '../reminders/ReminderSync';
 import { KeyProvider } from './KeyContext';
 import { NotificationsProvider } from '../inbox/notifications';
 import { NotificationBell } from './NotificationBell';
-import { RegisterWorker } from './RegisterWorker';
+import { ServiceWorkerRegistration } from '@sovereignfs/pwa/client';
 import { ZoneReporter } from './ZoneReporter';
 
 /**
@@ -46,7 +46,8 @@ export function SignedInArea({
       <KeyProvider accountId={accountId}>
         <ZoneReporter accountId={accountId} />
         <ReminderSync accountId={accountId} />
-        <RegisterWorker />
+        {/* Registers the service worker in production, and says when a new version is ready (`@sovereignfs/pwa`). */}
+        <ServiceWorkerRegistration appName="Tusk" />
         <NotificationsProvider>
           <WorkspacesProvider>
             <MobileNavProvider>

@@ -1,6 +1,7 @@
 import { createSovereign } from '@sovereignfs/sdk';
 import { authDirectory } from '../auth/directory';
 import type { Config } from '../config';
+import type { Database as AuthStore } from '@sovereignfs/auth/database';
 import type { Database } from '../db/client';
 import { smtpMailer } from '../mail/smtp';
 import { subOfAccount } from '../sovereign/identity';
@@ -16,7 +17,7 @@ import { pushChannel } from './push';
  */
 export function serverChannels(
   config: Config,
-  databases: { app: Database; auth: Database },
+  databases: { app: Database; auth: AuthStore },
   log: (line: string) => void,
 ): Channel[] {
   const url = config.url;

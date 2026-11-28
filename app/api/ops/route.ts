@@ -1,6 +1,6 @@
 import { accountRoute } from '@/src/access/route';
 import { authDirectory } from '@/src/auth/directory';
-import { getAuthDatabase, getDatabase } from '@/src/db/boot';
+import { getAuthStore, getDatabase } from '@/src/db/boot';
 import { RateLimiter } from '@/src/limits/rate';
 import { opsResponse } from '@/src/workspaces/endpoint';
 
@@ -14,6 +14,6 @@ export const POST = accountRoute(async ({ request, accountId }) => {
     database,
     limiter: new RateLimiter(database),
     now: Date.now,
-    directory: authDirectory(await getAuthDatabase()),
+    directory: authDirectory(await getAuthStore()),
   });
 });

@@ -1,3 +1,4 @@
+import type { Database as AuthStore } from '@sovereignfs/auth/database';
 import type { Directory } from '../auth/directory';
 import type { Database } from '../db/client';
 import type { Limiter, Rule } from '../limits/rate';
@@ -14,7 +15,7 @@ import { deletePerson } from './people';
  */
 export interface DeleteDeps {
   readonly database: Database;
-  readonly authDatabase: Database;
+  readonly authDatabase: AuthStore;
   readonly directory: Pick<Directory, 'profiles'>;
   readonly limiter: Limiter;
   readonly now: () => number;

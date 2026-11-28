@@ -2,17 +2,18 @@
 
 import { QRCodeSVG } from 'qrcode.react';
 import { type FormEvent, useState } from 'react';
-import { authClient } from '../auth/client';
+import { authClient, signInValue } from '../auth/client';
 import { messageFor } from '../auth/messages';
 import { Alert, Button, FormField, Input } from '@sovereignfs/ui';
 import styles from './Account.module.css';
 
 /**
- * Settings, Security, authenticator app (DESIGN.md §6, §19). **It asks for the password at every step that changes it:** to begin, to make new backup codes and to
+ * Settings, Security, authenticator app (DESIGN.md §6, §19). **It asks for the password at every step that changes it**, sent as the sign-in
+ * value made from it (auth.md §4, rule 1): to begin, to make new backup codes and to
  * turn it off. Enrolling shows a code to scan and ten backup codes, and **it is on only once a code from the app has been shown to work**, so a mistaken scan
  * cannot lock a person out of their own account. The backup codes are shown once; each works once.
  */
-export function TwoFactorPanel({ enabled: initial }: { enabled: boolean }) {
+export function TwoFactorPanel({ enabled: initial, email }: { enabled: boolean; email: string }) {
   const [enabled, setEnabled] = useState(initial);
   const [step, setStep] = useState<'idle' | 'password' | 'scan' | 'off' | 'renew' | 'codes'>(
     'idle',
@@ -37,7 +38,9 @@ export function TwoFactorPanel({ enabled: initial }: { enabled: boolean }) {
   const begin = (event: FormEvent) => {
     event.preventDefault();
     void run(async () => {
-      const { data, error: failure } = await authClient.twoFactor.enable({ password });
+      const { data, error: failure } = await authClient.twoFactor.enable({
+        password: await signInValue(password, email),
+      });
       if (failure || !data || data.method !== 'totp') return setError(messageFor(failure));
       setUri(data.totpURI);
       setCodes(data.backupCodes);
@@ -59,7 +62,9 @@ export function TwoFactorPanel({ enabled: initial }: { enabled: boolean }) {
   const turnOff = (event: FormEvent) => {
     event.preventDefault();
     void run(async () => {
-      const { error: failure } = await authClient.twoFactor.disable({ password });
+      const { error: failure } = await authClient.twoFactor.disable({
+        password: await signInValue(password, email),
+      });
       if (failure) return setError(messageFor(failure));
       setEnabled(false);
       setPassword('');
@@ -70,7 +75,9 @@ export function TwoFactorPanel({ enabled: initial }: { enabled: boolean }) {
   const renew = (event: FormEvent) => {
     event.preventDefault();
     void run(async () => {
-      const { data, error: failure } = await authClient.twoFactor.generateBackupCodes({ password });
+      const { data, error: failure } = await authClient.twoFactor.generateBackupCodes({
+        password: await signInValue(password, email),
+      });
       if (failure || !data) return setError(messageFor(failure));
       setCodes(data.backupCodes);
       setPassword('');

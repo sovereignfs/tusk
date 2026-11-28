@@ -2,7 +2,7 @@ import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
-import { EMAIL, PASSWORD, ensureAccount, trySignIn } from './helpers';
+import { EMAIL, PASSWORD, ensureAccount, trySignIn, signInValueFor } from './helpers';
 
 /**
  * Import (task 9.2, DESIGN.md §20.2): a file is read and checked before anything is written, what it holds is said and the person asked, and it always
@@ -15,13 +15,13 @@ async function signInApi(request: APIRequestContext, origin: string) {
   const headers = { origin };
   const made = await request.post('/api/auth/sign-up/email', {
     headers,
-    data: { name: 'Ada', email: EMAIL, password: PASSWORD },
+    data: { name: 'Ada', email: EMAIL, password: await signInValueFor(request, EMAIL, PASSWORD) },
   });
   if (made.ok()) return;
   for (let attempt = 0; attempt < 3; attempt++) {
     const reply = await request.post('/api/auth/sign-in/email', {
       headers,
-      data: { email: EMAIL, password: PASSWORD },
+      data: { email: EMAIL, password: await signInValueFor(request, EMAIL, PASSWORD) },
     });
     if (reply.ok()) return;
     expect(reply.status()).toBe(429);

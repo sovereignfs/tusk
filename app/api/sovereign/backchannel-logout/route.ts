@@ -1,5 +1,4 @@
-import { handleBackChannelLogout } from '@/src/sovereign/http';
-import { noticeDeps } from '@/src/sovereign/server';
+import { noticeHandlers } from '@/src/sovereign/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,7 +7,7 @@ export const dynamic = 'force-dynamic';
  * set up; any other method is refused by Next with a 405.
  */
 export async function POST(request: Request): Promise<Response> {
-  const deps = await noticeDeps();
-  if (!deps) return new Response(null, { status: 404 });
-  return handleBackChannelLogout(request, deps);
+  const notices = await noticeHandlers();
+  if (!notices) return new Response(null, { status: 404 });
+  return notices.backChannelLogout(request);
 }

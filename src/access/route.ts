@@ -1,3 +1,4 @@
+import { readSession } from '@sovereignfs/auth/server';
 import { authSettings, getAuth } from '../auth/server';
 
 /**
@@ -45,7 +46,7 @@ export const serverDeps: AccessDeps = {
   origin: () => authSettings()?.url,
   accountOf: async (headers) => {
     const auth = await getAuth();
-    const session = auth ? await auth.api.getSession({ headers }) : null;
+    const session = auth ? await readSession(auth, headers) : null;
     return session?.user.id ?? null;
   },
 };

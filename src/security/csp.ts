@@ -32,7 +32,9 @@ export function contentSecurityPolicy({ nonce, secure, development }: PolicyOpti
   const styles = development ? "'self' 'unsafe-inline'" : `'self' 'nonce-${nonce}'`;
   const directives = [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${development ? " 'unsafe-eval'" : ''}`,
+    // `'wasm-unsafe-eval'` runs the sign-in value's Argon2id, which is WebAssembly (auth.md §4, rule 1); it compiles WebAssembly and is not
+    // `eval`, which is never allowed but in development.
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'wasm-unsafe-eval'${development ? " 'unsafe-eval'" : ''}`,
     `style-src ${styles}`,
     `style-src-elem ${styles}`,
     "style-src-attr 'unsafe-inline'",

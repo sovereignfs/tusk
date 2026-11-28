@@ -2,7 +2,7 @@ import { authDirectory } from '../auth/directory';
 import { runDueBackups } from '../backup/auto';
 import type { Config } from '../config';
 import { getConfig } from '../config/current';
-import { getAuthDatabase, getDatabase } from '../db/boot';
+import { getAuthStore, getDatabase } from '../db/boot';
 import { installationTokens } from '../github-app/server';
 import { deliverNotices } from '../notifications/deliver';
 import { tick } from '../notifications/job';
@@ -55,7 +55,7 @@ export const jobs: readonly JobDefinition[] = [
       const database = await getDatabase();
       const channels = serverChannels(
         config,
-        { app: database, auth: await getAuthDatabase() },
+        { app: database, auth: await getAuthStore() },
         (line) => console.info(line),
       );
       if (channels.length > 0)
@@ -76,7 +76,7 @@ export const jobs: readonly JobDefinition[] = [
       const summary = await runDueBackups(
         {
           database: await getDatabase(),
-          directory: authDirectory(await getAuthDatabase()),
+          directory: authDirectory(await getAuthStore()),
           ring: config.encryption,
           ...(operatorOf(config) ? { operator: operatorOf(config) } : {}),
           apiUrl: config.githubApiUrl,

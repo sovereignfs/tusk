@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { authClient, signInValue } from '../auth/client';
 import { messageFor } from '../auth/messages';
 import { forgetKey } from '../cipher/vault';
 import { forgetIdentity } from '../identity';
@@ -30,6 +31,8 @@ export function DeleteAccountSection() {
   const [password, setPassword] = useState('');
   const [problem, setProblem] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
+  // The account's address, which the sign-in value is made with: the password itself is never sent (auth.md §4, rule 1).
+  const email = authClient.useSession().data?.user.email ?? '';
 
   useEffect(() => {
     if (!open) return;
@@ -51,7 +54,9 @@ export function DeleteAccountSection() {
       const reply = await fetch('/api/account/delete', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({
+          password: preview?.password && password ? await signInValue(password, email) : '',
+        }),
       });
       if (reply.status === 403) {
         const { code } = (await reply.json().catch(() => ({}))) as { code?: string };

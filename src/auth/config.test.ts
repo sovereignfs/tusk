@@ -137,15 +137,17 @@ describe('sign-in settings', () => {
     ).join(' ');
     expect(insecure).toContain('TUSK_CORE_URL must be https');
     expect(insecure).not.toContain('tusk-client-secret');
-    // Plain http is for this machine alone, and a path is kept (an issuer may have one) but not a trailing slash.
+    // Plain http is for this machine alone, and the address is the instance's own: core's issuer, with no path, which the SDK requires.
     expect(
       authOf(loadConfig({ ...ON, ...CORE, TUSK_CORE_URL: 'http://localhost:4000/' })),
     ).toMatchObject({
       sovereign: { issuer: 'http://localhost:4000' },
     });
     expect(
-      authOf(loadConfig({ ...ON, ...CORE, TUSK_CORE_URL: 'https://core.example.com/api/auth/' })),
-    ).toMatchObject({ sovereign: { issuer: 'https://core.example.com/api/auth' } });
+      problems(
+        loadConfig({ ...ON, ...CORE, TUSK_CORE_URL: 'https://core.example.com/api/auth/' }),
+      ).join(' '),
+    ).toContain('TUSK_CORE_URL is the instance’s own address, with no path');
     for (const bad of [
       'not an address',
       'https://core.example.com/?x=1',

@@ -30,7 +30,7 @@ afterAll(async () => t.close());
 
 describe(`the directory over the auth store (${leg})`, () => {
   it('finds an account by its exact address, whatever the case, and nobody else', async () => {
-    const directory = authDirectory(t.database);
+    const directory = authDirectory(t.store);
     expect(await directory.idOfEmail('ada@example.com')).toBe(idOf('Ada Lovelace'));
     expect(await directory.idOfEmail('ADA@EXAMPLE.COM')).toBe(idOf('Ada Lovelace'));
     expect(await directory.idOfEmail('  grace@example.com ')).toBe(idOf('Grace Hopper'));
@@ -41,7 +41,7 @@ describe(`the directory over the auth store (${leg})`, () => {
   });
 
   it('reads names for the ids it is given, and leaves out one that is not an account', async () => {
-    const directory = authDirectory(t.database);
+    const directory = authDirectory(t.store);
     const found = await directory.profiles([
       idOf('Ada Lovelace'),
       idOf('Grace Hopper'),

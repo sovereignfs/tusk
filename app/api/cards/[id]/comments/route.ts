@@ -1,7 +1,7 @@
 import { type Parsed, uuid } from '@/src/access/parse';
 import { accountRoute } from '@/src/access/route';
 import { authDirectory } from '@/src/auth/directory';
-import { getAuthDatabase, getDatabase } from '@/src/db/boot';
+import { getAuthStore, getDatabase } from '@/src/db/boot';
 import { commentsOf } from '@/src/workspaces/reads';
 
 // A page of a card's comments, newest first (DESIGN.md §15.5), after the comment named by `beforeAt` and `beforeId` when they are given. The same 404 as the
@@ -27,7 +27,7 @@ export const GET = accountRoute(async ({ request, accountId, params }) => {
   }
   const page = await commentsOf(
     await getDatabase(),
-    authDirectory(await getAuthDatabase()),
+    authDirectory(await getAuthStore()),
     accountId,
     id.value,
     before,

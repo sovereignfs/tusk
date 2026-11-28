@@ -1,5 +1,6 @@
 import vm from 'node:vm';
 import { describe, expect, it } from 'vitest';
+import { TAKE_OVER_MESSAGE } from '@sovereignfs/pwa';
 import { CACHE_PREFIX, workerSource } from './source';
 
 /**
@@ -25,9 +26,12 @@ interface Listener {
 function load(version = 'v1', files: readonly string[] = FILES) {
   const stores = new Map<string, Map<string, Response>>();
   const requested: string[] = [];
-  const state = { online: true };
+  const state = { online: true, tookOver: false };
   /** What the network says: a page of a person for the Desk, the shell for `/shell`, and a body for anything else. */
-  const network = async (input: Request | string): Promise<Response> => {
+  /** What a browser's fetch gives for a same-origin request: a response of type `basic`, which is the only kind the worker keeps. */
+  const network = async (input: Request | string): Promise<Response> =>
+    Object.defineProperty(await answer(input), 'type', { value: 'basic' });
+  const answer = async (input: Request | string): Promise<Response> => {
     const request = typeof input === 'string' ? new Request(`${ORIGIN}${input}`) : input;
     requested.push(new URL(request.url).pathname);
     if (!state.online) throw new TypeError('no network');
@@ -49,8 +53,9 @@ function load(version = 'v1', files: readonly string[] = FILES) {
   const cacheOf = (name: string) => {
     let store = stores.get(name);
     if (!store) stores.set(name, (store = new Map()));
+    // The worker names what it keeps by its whole address (`self.location.origin + path`) or by its request.
     const keyOf = (r: Request | string) =>
-      (typeof r === 'string' ? new Request(`${ORIGIN}${r}`) : r).url;
+      typeof r === 'string' ? new URL(r, ORIGIN).href : r.url;
     return {
       match: async (r: Request | string) => store.get(keyOf(r))?.clone(),
       put: async (r: Request | string, response: Response) => void store.set(keyOf(r), response),
@@ -83,6 +88,7 @@ function load(version = 'v1', files: readonly string[] = FILES) {
       })),
     ],
     openWindow: async (to: string) => void opened.push(to),
+    claim: async () => undefined,
   };
   const self = {
     location: { origin: ORIGIN },
@@ -91,6 +97,7 @@ function load(version = 'v1', files: readonly string[] = FILES) {
         void shown.push({ title, options }),
     },
     clients,
+    skipWaiting: () => void (state.tookOver = true),
     addEventListener: (type: string, fn: Listener) => void (listeners[type] = fn),
   };
   const context = vm.createContext({
@@ -104,7 +111,11 @@ function load(version = 'v1', files: readonly string[] = FILES) {
     clients,
     Request,
     Response,
+    Headers,
     URL,
+    AbortController,
+    setTimeout,
+    clearTimeout,
     TypeError,
     Promise,
     JSON,
@@ -263,7 +274,7 @@ describe('with no network', () => {
     }
   });
 
-  it('answers anything else with a page of its own that says it needs a connection, has no script and a policy that forbids one', async () => {
+  it('answers any other address with the shell too, which says it needs a connection (`OfflineApp`), and nothing of a person', async () => {
     const w = load();
     await w.dispatch('install');
     w.state.online = false;
@@ -276,18 +287,20 @@ describe('with no network', () => {
     ]) {
       const answer = await w.fetchEvent(path, { mode: 'navigate' });
       const body = (await answer?.text()) ?? '';
-      expect(body, path).toContain('This needs a connection');
-      expect(body, path).not.toMatch(/<script/i);
-      expect(answer?.headers.get('content-security-policy'), path).toContain("default-src 'none'");
-      expect(body, path).toContain('href="/desk"');
+      expect(body, path).toBe('<html>the shell, for everyone</html>');
+      expect(body, path).not.toContain('ada@example.com');
     }
   });
 
-  it('answers with the page that needs a connection when there is no shell yet, and lets an API fail as it would', async () => {
+  it('answers with the suite’s offline page when there is no shell yet, and lets an API fail as it would', async () => {
     const w = load();
     w.state.online = false;
     const answer = await w.fetchEvent('/desk', { mode: 'navigate' });
-    expect(await answer?.text()).toContain('This needs a connection');
+    const body = (await answer?.text()) ?? '';
+    expect(answer?.status).toBe(503);
+    expect(body).toContain('You’re offline');
+    expect(body).not.toMatch(/<script/i);
+    expect(answer?.headers.get('content-security-policy')).toContain("default-src 'none'");
     expect(await w.fetchEvent('/api/sync', {})).toBeUndefined();
   });
 });
@@ -302,10 +315,13 @@ describe('versions', () => {
     expect([...w.stores.keys()].sort()).toEqual(['someone-elses-cache', `${CACHE_PREFIX}v2`]);
   });
 
-  it('does not take over the pages that are open: a new version waits for the next load', () => {
-    const text = workerSource('v1', FILES);
-    expect(text).not.toContain('skipWaiting');
-    expect(text).not.toContain('clients.claim');
+  it('does not take over the pages that are open until one asks, which the registration does when the person chooses Reload', async () => {
+    const w = load('v2');
+    await w.dispatch('install');
+    await w.dispatch('message', { data: 'something else' });
+    expect(w.state.tookOver).toBe(false);
+    await w.dispatch('message', { data: TAKE_OVER_MESSAGE });
+    expect(w.state.tookOver).toBe(true);
   });
 
   it('puts the files of the build in as data and never as code', () => {

@@ -1,12 +1,13 @@
 import { sql } from 'drizzle-orm';
+import { confirmPassword, readSession } from '@sovereignfs/auth/server';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { derivedFor } from '../auth/test-support';
 import { accountRoute } from '../access/route';
 import { type TwoAccounts, twoAccounts } from '../access/two-accounts';
 import { authDirectory } from '../auth/directory';
 import type { Database } from '../db/client';
 import { dbAll } from '../db/exec';
-import * as postgresAuth from '../db/schema/postgres/auth';
-import * as sqliteAuth from '../db/schema/sqlite/auth';
+import { authTable } from '../db/tables';
 import { testTarget } from '../db/test-support';
 import { RateLimiter } from '../limits/rate';
 import { applyMutation } from '../sync/apply';
@@ -19,7 +20,8 @@ import { type DeleteDeps, deleteAccount, deletionPreview } from './delete-accoun
  * account's deletes nothing; the right one does, and the session ends with the account.
  */
 const { leg } = testTarget();
-const PASSWORD = 'a password long enough to be one';
+// What the page sends: the sign-in value of the account's password (auth.md §4, rule 1), never the password.
+const PASSWORD = derivedFor('a password long enough to be one');
 let t: TwoAccounts;
 let database: Database;
 let close: () => Promise<void>;
@@ -34,19 +36,15 @@ afterAll(async () => {
 
 const deps = (extra: Partial<DeleteDeps> = {}): DeleteDeps => ({
   database,
-  authDatabase: t.auth.database,
-  directory: authDirectory(t.auth.database),
+  authDatabase: t.auth.store,
+  directory: authDirectory(t.auth.store),
   limiter: { take: async () => ({ ok: true }) },
   now: () => 1_800_000_000_000,
+  // As the route checks it (`app/api/account/delete`): the sign-in value, through the package.
   verify: async (request, password) => {
-    try {
-      return (
-        (await t.auth.auth.api.verifyPassword({ body: { password }, headers: request.headers }))
-          .status === true
-      );
-    } catch {
-      return false;
-    }
+    const session = await readSession(t.auth.auth, request.headers);
+    if (!session) return false;
+    return (await confirmPassword(t.auth.store, t.auth.auth, session.user.id, password)) === 'ok';
   },
   hasPassword: async () => true,
   fresh: async () => true,
@@ -65,7 +63,7 @@ const users = async () =>
   (
     await dbAll<{ id: string }>(
       t.auth.database,
-      sql`SELECT id FROM ${t.auth.database.dialect === 'postgres' ? postgresAuth.user : sqliteAuth.user}`,
+      sql`SELECT id FROM ${authTable(t.auth.database, 'users')}`,
     )
   ).map((row) => row.id);
 
@@ -121,6 +119,9 @@ describe(`deleting the account over HTTP (${leg})`, () => {
 
   it('deletes the account of the session with the right password and no other, and the session ends with it', async () => {
     const r = routes();
+    // The wrong answers above are counted against the account by the package (auth.md §4, rule 3), apart from the route's limit: they
+    // would refuse even the right password for ten minutes.
+    await t.auth.store.run("DELETE FROM rate_limits WHERE key LIKE 'confirm-password|%'");
     const done = await r.remove(post(t.grace, { password: PASSWORD }));
     expect(done.status).toBe(204);
     expect(await users()).toEqual([t.ada.id]);

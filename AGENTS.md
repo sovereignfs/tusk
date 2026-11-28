@@ -52,33 +52,69 @@ Three layers, each with one job: this file says how to work, `ROADMAP.md` says w
 - Sovereign's task skills (`sv-task-start`, `sv-verify`, `sv-create-pr`, …) are not installed here. Do by hand what they do: read the
   task's epic, branch, build it, verify it, update the row and the epic, open a draft PR.
 
-## Working conventions
+<!-- sovereign:shared:begin -->
 
-- **One task, one branch, one draft PR.** Branch from an up-to-date `main` (`git switch main && git pull`), named by the kind of change:
-  `feat/<slug>`, `fix/<slug>`, `docs/<slug>`, `chore/<slug>`. Do not start a second task on a branch whose PR is not merged.
-- **Nothing goes to `main` directly:** not a typo, not a docs fix, not a release. The one standing exception is the owner's bypass, which
-  is theirs to use and not something to reach for. The bootstrap commits were made that way, on the owner's instruction.
-- **Never commit or push without being asked.** Prepare changes in the working tree and stop.
-- **Commits explain why, not just what.** `type(scope): summary` (`feat`, `fix`, `docs`, `chore`), subject under 72 characters, body
-  wrapped at 100, a `Verified:` line naming what was run, one logical change per commit (never a rename mixed with a behaviour change).
-  Every commit an agent makes ends with `Co-Authored-By: Claude Code <noreply@anthropic.com>`: model-agnostic, never a specific model
-  name, even if your harness suggests one.
-- **PRs target `main`, are opened as drafts** (`gh pr create --draft --base main`), and are marked ready only on instruction. The body
-  says what changed and why, cites the `DESIGN.md` section, carries no task numbers, and ends with
-  `🤖 Generated with [Claude Code](https://claude.com/claude-code)`. CI is skipped while a PR is a draft or carries `skip-ci`.
-- **Merge with rebase and merge**, never squash and never a merge commit, so each reviewed commit lands verbatim. Fix commit messages
-  before merging; never rewrite `main`. **Never merge a PR automatically.**
-- **Verify before claiming done.** Run the commands under Commands and show the output. A regression test is trusted only after it has
-  been seen to fail against the code it guards.
-- **Docs are part of the change.** A statement in `README.md`, `DESIGN.md`, `ROADMAP.md` or an epic that a change makes false is fixed in
-  the same PR. A change to behaviour adds a line under `## [Unreleased]` in `CHANGELOG.md` (Keep a Changelog; it is also the release
-  notes).
-- **Releases are their own PR**, as Fjord's are: version bumps do not ride in feature PRs. Changes accumulate under `[Unreleased]`; a
-  release PR promotes them, bumps `package.json`'s `version`, and after it merges the merged commit is tagged `vX.Y.Z`, which is what
-  `.github/workflows/publish.yml` builds (the tag must equal the version). Semver by change type: `fix/` patch, `feat/` minor, breaking
-  major with a note in the changelog. `RELEASING.md` says how: `scripts/release.sh` (`check`, `prepare`, `propose`, `tag`, `verify`).
-- **Flag Docker-config impact immediately.** A new or renamed environment variable, port, on-disk path, native dependency, or anything
-  that changes `next build`'s standalone output updates the `Dockerfile` and `.dockerignore` in the same change.
+## Working conventions (shared by every app of the suite)
+
+- **Two branches.** Work lands on `develop`, committed directly or through a feature branch (`feat/`, `fix/`, `docs/`, `chore/` and a
+  slug) cut from an up-to-date `develop` and merged into it by draft pull request with rebase and merge. `main` is what is released: it
+  is protected and changes only by a promotion pull request from `develop`, merged with a merge commit (`CONTRIBUTING.md`).
+- **Never commit or push without being asked.** Prepare changes in the working tree and stop. **Never merge a pull request
+  automatically.**
+- **Commits explain why, not just what:** `type(scope): summary` (`feat`, `fix`, `docs`, `chore`) under 72 characters, a body wrapped at
+  100, a `Verified:` line naming what was run, one logical change each. An agent's commits end with its own model-agnostic trailer:
+  `Co-Authored-By: Claude Code <noreply@anthropic.com>` or `Co-Authored-By: Codex <noreply@openai.com>`, never one naming a model (the
+  promotion check refuses it).
+- **Pull requests into `develop` are drafts,** marked ready only on instruction; the body says what changed and why and ends with the
+  agent's footer.
+- **A version is set with its changelog section,** in the same change: `version` in `package.json` (or, in a repository of several
+  components, the file `sovereign.json` names for it) and `## [X.Y.Z] - date` in its changelog, in plain words for someone upgrading. A
+  promotion titled `Release` with that version's tag publishes it on merge (`RELEASING.md`).
+- **The version follows the change, by semver:** a `fix/` is a patch, a `feat/` a minor, a breaking change a major with a note for whoever
+  upgrades; `chore/` and `docs/` change no version unless they change what the app offers. Its tag is `vX.Y.Z`, with the `tagPrefix`
+  `package.json` names in front, made on the promotion's merge commit, never by hand.
+- **One task, one branch, one pull request,** reviewed before the next begins. `develop` and `main` are never rewritten: fix a commit
+  message before it reaches `develop`.
+- **CI runs only for `main`:** on pull requests into it that are not drafts, before a release and by hand; never for `develop` or a
+  feature branch, which the pre-push hook (`pnpm run verify`) checks locally.
+- **Verify before claiming done,** and show the output. A regression test is trusted only after it has been seen to fail against the code
+  it guards.
+- **Docs are part of the change:** a statement a change makes false is fixed in the same change.
+- **Flag Docker-config impact immediately:** a new or renamed environment variable, port, on-disk path or native dependency may need the
+  `Dockerfile`, `.dockerignore` or `compose.yml` changed. Those are shared files, the same in every app: change them in the template, or
+  list the one this app must keep as its own under `sovereign.unmanaged` and change it here, in the same change.
+- **Shared files are written, not edited:** the files `npm create @sovereignfs app sync` writes (this section among them) are changed
+  in the template, in sovereignfs/sovereign, and taken with the next sync; a file this app keeps as its own is listed in `package.json`
+  under `sovereign.unmanaged`.
+- **Commands are this app's package manager's:** `pnpm install`, `pnpm run dev`, `pnpm run build`, `pnpm run verify`. Never add a second
+  lockfile.
+
+## Rules every app of the suite keeps
+
+- **Naming:** user-facing text says "app"; "client" is the protocol term, for code and the settings that register one. Every environment
+  variable carries the app's prefix (`TUSK_`), and every one the code reads is declared in `.env.example`, a secret also as
+  `NAME_FILE`.
+- **No secret has a default:** a required setting the app cannot start without stops it at start-up, saying which; it is never filled in.
+- **Every server action and route decides for itself:** it asks who is calling (the session) before it reads or changes anything, and
+  one that changes something checks the request came from the app's own origin. A page's guard protects nothing, since a `'use server'`
+  function is a public endpoint.
+- **A person's data is theirs alone:** every statement that reads, changes or deletes it names the owner, from the session, never from
+  the request; their data and files are deleted with the notice that they deleted their account.
+- **People's files go only through `@sovereignfs/storage`,** in the app's own folder; a type is judged by the bytes, and only an image is
+  shown inline.
+- **Tokens and keys are compared in constant time,** never logged, and the refresh token is the SDK's to send; nothing from a request is
+  put into a shell command.
+- **Every outbound `fetch` has a timeout,** and a server render never waits on another service without one.
+- **The data layer is async and migrations only move forward:** a migration in `migrations/` is applied once, in name order, at start;
+  one that has been released is never edited, and a change is a new file.
+- **Configuration is read at run time:** never `NEXT_PUBLIC_*` for a value that differs between instances, since it is fixed at build;
+  the image bakes in no environment and no `.env` file.
+- **The interface is `@sovereignfs/ui`'s:** its components, and its semantic `--sv-*` tokens for colour; no hard-coded colour, no
+  Tailwind, no CSS-in-JS. The content security policy is a nonce, never `'unsafe-inline'` for scripts.
+- **Read the Next.js docs that come with the installed version** (`node_modules/next/dist/docs/`) before writing Next.js code; it
+  changes faster than anything remembered.
+
+<!-- sovereign:shared:end -->
 
 ## Rules of an app
 
@@ -154,7 +190,6 @@ pnpm boot-check                  # after pnpm build: a fresh instance boots on t
 pnpm e2e                         # after pnpm build: browser tests (pnpm exec playwright install chromium webkit once)
 pnpm e2e:fast                    # after pnpm build: the same, in shards at once, each on instances of its own (scripts/e2e-shard.mjs; CI's `browser` job runs the same shards)
 scripts/deploy-check.sh          # every setup of deploy/, from nothing (needs the image: see deploy/README.md)
-scripts/test-release.sh          # the release script, against throwaway repositories (RELEASING.md)
 pnpm test                        # Vitest
 pnpm test:converge               # 2000 random runs of devices converging (src/sync/simulate.test.ts); TUSK_SIM_SEEDS sets how many
 pnpm manifest:check              # sovereign.manifest.json is a valid manifest
@@ -208,7 +243,7 @@ once they exist, this list is where they are written, and `verify` means all of 
 | `instrumentation.ts`, `instrumentation-node.ts`                     | Run once at start-up: check the settings, bring the database up, and stop on either being wrong. The first only hands over to the second, which Next must not compile for the Edge                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | `e2e/`, `playwright.config.ts`                                      | Browser tests: the built app in Chromium and WebKit, on the database form the environment names (`pnpm build && pnpm e2e`). Touch is checked by hand in the iOS Simulator                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `migrations/`                                                       | The generated SQL, `sqlite/`, `postgres/` and `auth/` (better-auth's, per dialect), committed and reviewed. Never written by hand                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| `scripts/`                                                          | The CI classifier and its tests, `db-generate.mjs`, `dev-db.mjs`, `boot-check.mjs`, `serve-standalone.mjs` (the built server as the image runs it), `e2e-shard.mjs` (the browser tests in shards that run at once, on ports `e2e/ports.ts` shifts), `deploy-check.sh` (every setup, from nothing, and an instance hosting it), and the release: `release.sh`, `lib/release.sh`, `release/tusk.sh` and their tests, `test-release.sh`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `scripts/`                                                          | The CI classifier and its tests, `db-generate.mjs`, `dev-db.mjs`, `boot-check.mjs`, `serve-standalone.mjs` (the built server as the image runs it), `e2e-shard.mjs` (the browser tests in shards that run at once, on ports `e2e/ports.ts` shifts), and `deploy-check.sh` (every setup, from nothing, and an instance hosting it). There is no release script: a promotion titled `Release vX.Y.Z` releases (`RELEASING.md`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `sovereign.manifest.json`                                           | What an instance reads to host the app, held to its schema and to the code it names by `src/sovereign-manifest.test.ts`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `Dockerfile`, `deploy/`                                             | One image on Debian (libSQL has no musl build), not root, on the manifest's port; the Compose setups for sqld, a file and PostgreSQL, their README and `.env.example`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `.github/workflows/`                                                | `ci.yml` and `publish.yml` (a `vX.Y.Z` tag publishes the image to `ghcr.io`, with provenance)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |

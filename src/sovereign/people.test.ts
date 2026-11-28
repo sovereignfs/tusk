@@ -9,7 +9,7 @@ import { putCredential } from '../crypto/store';
 import type { Database } from '../db/client';
 import { dbAll } from '../db/exec';
 import * as sqliteSchema from '../db/schema/sqlite';
-import { testTarget } from '../db/test-support';
+import { AUTH_TABLES, LEGACY_AUTH_TABLES, testTarget } from '../db/test-support';
 import { RateLimiter } from '../limits/rate';
 import { purge } from '../sync/purge';
 import { applyMutation } from '../sync/apply';
@@ -47,12 +47,6 @@ const GOES = [
   'board_member',
   'card_assignee',
   'notice',
-  'user',
-  'two_factor',
-  'passkey',
-  'session',
-  'account',
-  'verification',
 ];
 /** Tables of shared work: their rows stay when the person goes (they name who made them by an id that no longer answers to a name), unless the whole workspace goes. */
 const STAYS = [
@@ -68,7 +62,33 @@ const STAYS = [
   'publication',
 ];
 /** Tables that are about something else than a person. */
-const NOT_A_PERSON = ['rate_limit'];
+const NOT_A_PERSON: string[] = [];
+
+/** The auth store's tables, `@sovereignfs/auth`'s since the move, and what deleting a person does to each. */
+const DECIDED_AUTH: Record<string, string> = {
+  users: 'deleted',
+  sessions: 'deleted',
+  accounts: 'deleted',
+  verifications: 'deleted, found by the address',
+  two_factors: 'deleted',
+  passkeys: 'deleted',
+  sv_key_secrets: 'a session’s, deleted with the account’s sessions',
+  sv_core_sign_ins: 'a session’s, deleted with the account’s sessions',
+  sv_legacy_passwords: 'deleted',
+  rate_limits:
+    'keyed by address or by a hash of it, not by person, and swept when its window is over: not an account’s',
+  sv_core_notices: 'core’s notices by their jti, kept until they expire: no person’s',
+  sv_sessions: 'sign-ins through core still pending, which run out: no account’s yet',
+  sv_key_apps: 'the instance’s vault id, the salt of the sign-in value: no person’s',
+  sv_key_settings: 'the vault’s settings: no person’s',
+  sv_key_accounts: 'the SDK vault’s records of a person’s keys, which Tusk never writes: empty',
+  sv_key_wraps: 'the SDK vault’s wrapped keys of a person, which Tusk never writes: empty',
+  sv_auth_adoption: 'the record of the move: no person’s',
+  sv_auth_migrations: 'a migration history: no person’s',
+  sv_core_sign_in_migrations: 'a migration history: no person’s',
+  tusk_sdk_store_migrations: 'a migration history: no person’s',
+  sv_key_migrations: 'a migration history: no person’s',
+};
 
 let t: TwoAccounts;
 let database: Database;
@@ -84,7 +104,7 @@ afterAll(async () => {
 
 const NOW = 1_800_000_000_000;
 const id = () => crypto.randomUUID();
-const directory = () => authDirectory(t.auth.database);
+const directory = () => authDirectory(t.auth.store);
 
 async function run(accountId: string, op: Op) {
   const result = await applyOp(database, accountId, { opId: id(), ...op } as never, {
@@ -120,11 +140,20 @@ const authCount = async (table: string, where: string): Promise<number> =>
 const authTime = (ms: number): Date | number =>
   t.auth.database.dialect === 'postgres' ? new Date(ms) : ms;
 
+describe(`the auth store's tables (${leg})`, () => {
+  it('are each decided', () => {
+    expect([...AUTH_TABLES].sort()).toEqual(Object.keys(DECIDED_AUTH).sort());
+  });
+});
+
 describe(`the tables (${leg})`, () => {
   it('are each decided: they go with the person, they stay as shared work, or they are not about a person', () => {
+    // The app store's; the frozen auth schema in it is the store before the move, whose tables the package's replaced.
+    const legacy = new Set(LEGACY_AUTH_TABLES);
     const names = Object.values(sqliteSchema)
       .filter((each) => is(each, SQLiteTable))
-      .map((each) => getTableConfig(each as SQLiteTable).name);
+      .map((each) => getTableConfig(each as SQLiteTable).name)
+      .filter((name) => !legacy.has(name));
     expect(names.length).toBeGreaterThan(20);
     const decided = new Set([...GOES, ...STAYS, ...NOT_A_PERSON]);
     expect(
@@ -185,7 +214,7 @@ describe(`deleting a person (${leg})`, () => {
     }
     await dbAll(
       t.auth.database,
-      sql`INSERT INTO ${sql.raw(authTable('verification'))} (id, identifier, value, expires_at, created_at, updated_at) VALUES (${id()}, ${t.ada.email}, 'x', ${authTime(NOW)}, ${authTime(NOW)}, ${authTime(NOW)}) RETURNING id`,
+      sql`INSERT INTO ${sql.raw(authTable('verifications'))} (id, identifier, value, expires_at, created_at, updated_at) VALUES (${id()}, ${t.ada.email}, 'x', ${authTime(NOW)}, ${authTime(NOW)}, ${authTime(NOW)}) RETURNING id`,
     );
 
     for (const [table, columns, values] of [
@@ -199,7 +228,7 @@ describe(`deleting a person (${leg})`, () => {
       await dbAll(
         t.auth.database,
         sql.raw(
-          `INSERT INTO ${authTable(table === 'passkey' ? 'passkey' : 'two_factor')} (${columns}) VALUES (${values}) RETURNING id`,
+          `INSERT INTO ${authTable(table === 'passkey' ? 'passkeys' : 'two_factors')} (${columns}) VALUES (${values}) RETURNING id`,
         ),
       );
 
@@ -289,7 +318,7 @@ describe(`deleting a person (${leg})`, () => {
       ['Only Ada', null],
     ]);
 
-    const deps = { database, authDatabase: t.auth.database, now: () => NOW + 31 * 86_400_000 };
+    const deps = { database, authDatabase: t.auth.store, now: () => NOW + 31 * 86_400_000 };
     const done = await deletePerson(deps, ada);
     expect(done).toMatchObject({ workspacesPassed: 1, workspacesDeleted: 1 });
     // Run again: nothing is left to do, and nothing goes wrong.
@@ -320,12 +349,12 @@ describe(`deleting a person (${leg})`, () => {
     ] as const)
       expect(await count(table, where), table).toBe(0);
     for (const [table, where] of [
-      ['user', `id = '${ada}'`],
-      ['session', `user_id = '${ada}'`],
-      ['account', `user_id = '${ada}'`],
-      ['verification', `identifier = '${t.ada.email}'`],
-      ['two_factor', `user_id = '${ada}'`],
-      ['passkey', `user_id = '${ada}'`],
+      ['users', `id = '${ada}'`],
+      ['sessions', `user_id = '${ada}'`],
+      ['accounts', `user_id = '${ada}'`],
+      ['verifications', `identifier = '${t.ada.email}'`],
+      ['two_factors', `user_id = '${ada}'`],
+      ['passkeys', `user_id = '${ada}'`],
     ] as const)
       expect(await authCount(table, where), table).toBe(0);
 
@@ -357,7 +386,7 @@ describe(`deleting a person (${leg})`, () => {
         `workspace_id = '${w3}' AND account_id = '${grace}' AND role = 'owner'`,
       ),
     ).toBe(1);
-    expect((await authDirectory(t.auth.database).profiles([ada])).size).toBe(0);
+    expect((await authDirectory(t.auth.store).profiles([ada])).size).toBe(0);
 
     // Grace is whole.
     expect(await count('desk_list', `owner_id = '${grace}'`)).toBe(before.graceDesk);
@@ -366,8 +395,8 @@ describe(`deleting a person (${leg})`, () => {
     expect(await count('backup_connection', `account_id = '${grace}'`)).toBe(1);
     expect(await count('push_subscription', `account_id = '${grace}'`)).toBe(1);
     expect(await count('reminder_slot', `account_id = '${grace}'`)).toBe(1);
-    expect(await authCount('user', `id = '${grace}'`)).toBe(1);
-    expect(await authCount('session', `user_id = '${grace}'`)).toBeGreaterThan(0);
+    expect(await authCount('users', `id = '${grace}'`)).toBe(1);
+    expect(await authCount('sessions', `user_id = '${grace}'`)).toBeGreaterThan(0);
   });
 
   it('hands a workspace to the member who has been in it longest, and tells only them', async () => {

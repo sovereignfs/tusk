@@ -13,7 +13,8 @@ export async function ensureAccount(page: Page, options: { skipKeyOffer?: boolea
   if (!(await create.isVisible())) return;
   await page.getByLabel('Name').fill('Ada');
   await page.getByLabel('Email').fill(EMAIL);
-  await page.getByLabel('Password').fill(PASSWORD);
+  await page.getByLabel('Password', { exact: true }).fill(PASSWORD);
+  await page.getByLabel('Confirm password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Create account' }).click();
   await expect(page.getByRole('button', { name: 'User menu' })).toBeVisible();
   // The Desk offers a key of its own once (DESIGN.md §9.1). The tests that share this account keep the Desk plain, as most people will, by pressing Skip.
@@ -66,11 +67,11 @@ export async function trySignIn(page: Page, email: string, password: string) {
   await gotoSignIn(page);
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(password);
-  const submit = page.getByRole('button', { name: 'Sign in' });
+  const submit = page.getByRole('button', { name: 'Sign in', exact: true });
   await submit.click();
-  const limited = page.getByText(/Too many tries/);
+  const limited = page.getByText(/Too many (tries|attempts)/);
   const outcome = page
-    .getByText(/do not match/)
+    .getByText(/do not match|is incorrect/)
     .or(page.getByRole('button', { name: 'User menu' }));
   await expect(limited.or(outcome)).toBeVisible();
   if (await limited.isVisible()) {
@@ -83,4 +84,26 @@ export async function signOut(page: Page) {
   await page.getByRole('button', { name: 'User menu' }).click();
   await page.getByRole('menuitem', { name: 'Sign out' }).click();
   await expect(page.getByRole('button', { name: 'User menu' })).toHaveCount(0);
+}
+
+/**
+ * What a page sends for a password (auth.md §4, rule 1): the sign-in value derived from it, the address and the instance's vault id, which
+ * `/api/sign-in-salt` serves. For the tests that sign in over the API, with no page: the server never takes a password as itself.
+ */
+export async function signInValueFor(
+  request: { get(url: string): Promise<{ json(): Promise<unknown> }> },
+  email: string,
+  password: string,
+): Promise<string> {
+  const { vaultId } = (await (await request.get('/api/sign-in-salt')).json()) as {
+    vaultId: string;
+  };
+  const { localVault } = await import('@sovereignfs/sdk/local-vault');
+  const none = {
+    get: async () => undefined,
+    set: async () => undefined,
+    delete: async () => undefined,
+  };
+  const vault = localVault({ clientId: 'tusk', vaultId, backend: none });
+  return (await vault.derive(password, email.trim().toLowerCase())).signIn;
 }

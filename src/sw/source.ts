@@ -7,64 +7,28 @@
  * manifest, and **the one shell page, `/shell`**, which holds nothing of a person: who is signed in is read from the device by the page itself. Every other
  * request, every API answer, every board, the Inbox, Settings and every page with a person's data goes to the network and is never stored.
  *
- * **With no network,** a Desk address (`/`, `/desk`, `/desk/<list>`) is answered with the kept shell page, which carries the policy and the nonce it was
- * sent with (the headers are kept with the body, so the two agree), and which starts the Desk from the device's own copy. Anything else is answered with a
- * page the worker builds itself, saying that it needs a connection. A new version waits until the pages that use the old one are closed (no `skipWaiting`),
- * so what is in flight and the outbox are not disturbed.
+ * The worker is the suite's, from `@sovereignfs/pwa`, with Tusk's version, cache name, built files and shell; what the package has no way to say yet
+ * (Background Sync, Web Push and the wake) is added after its text, and goes to the package with Sovereign tasks 20.2 (`sync`) and 19.7 (push).
+ *
+ * **With no network,** or none in time, every address is answered with the kept shell page, which carries the policy and the nonce it was sent with (the
+ * headers are kept with the body, so the two agree), and which starts the Desk from the device's own copy, or says that any other address needs a
+ * connection (`OfflineApp`). Before a shell is kept, the package's own page says the app is offline. A new version waits until a page asks it to take
+ * over, which the registration does when the person chooses Reload.
  *
  * **A wake** (task 14.6) is the one push that is not shown as it came: for a Desk sealed with a key of the person's own the server can only say that something is due, so the
  * worker looks for itself. It reads the Desk's working copy from IndexedDB (read-only, and never made if it is not there), opens the fields it needs with the list keys the
  * page gave it for this (`src/reminders/wake.ts`, a place of its own, kept only if the person chose it on this device), and shows the card or how many cards are due, or that
  * nothing is after all. Where it cannot (no keys, a Desk it cannot open, a browser without IndexedDB) it shows what the server sent: that cards are due. It stores nothing.
  */
+import { serviceWorkerSource } from '@sovereignfs/pwa';
 import { LOCAL_VERSION } from '../local/db';
 import { WAKE_DB, WAKE_KEY, WAKE_STORE, WAKE_VERSION } from '../reminders/wake';
 
 export const CACHE_PREFIX = 'tusk-shell-';
 
-export function workerSource(version: string, files: readonly string[] = []): string {
-  return `'use strict';
-const CACHE = ${JSON.stringify(CACHE_PREFIX + version)};
-const PREFIX = ${JSON.stringify(CACHE_PREFIX)};
-/** The build's own files, which are kept when the worker installs: the allow-list of what a shell needs to start with no network. */
-const FILES_OF_THE_BUILD = ${JSON.stringify(files)};
-const DESK = /^\\/desk(\\/[0-9a-f-]{36})?$/;
-const BUILT = /^\\/_next\\/static\\//;
-const FILES = /^\\/(icon\\.svg|favicon\\.ico|manifest\\.webmanifest|icons\\/[a-z0-9._-]+)$/;
-
-const OFFLINE_PAGE = ${JSON.stringify(offlineHtml())};
-
-function offline() {
-  return new Response(OFFLINE_PAGE, {
-    status: 200,
-    headers: {
-      'content-type': 'text/html; charset=utf-8',
-      'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
-      'cache-control': 'no-store',
-    },
-  });
-}
-
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE).then(async (cache) => {
-      await cache.add(new Request(self.location.origin + '/shell'));
-      // The rest in a few at a time, none of it from a person's session: the same files for everyone.
-      for (let i = 0; i < FILES_OF_THE_BUILD.length; i += 8) {
-        await Promise.all(FILES_OF_THE_BUILD.slice(i, i + 8).map((file) => cache.add(new Request(self.location.origin + file)).catch(() => undefined)));
-      }
-    }),
-  );
-});
-
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((names) =>
-      Promise.all(names.filter((name) => name.startsWith(PREFIX) && name !== CACHE).map((name) => caches.delete(name))),
-    ),
-  );
-});
-
+/** Tusk's additions to the package's worker: Background Sync, Web Push and the wake. */
+function tuskAdditions(): string {
+  return `
 // Background Sync: the browser wakes the worker when a connection is back after a write made without one. The worker has none of the working copy's code,
 // so it wakes the pages that are open, which sync through their own loop; with none open the changes wait for the next time Tusk is opened.
 self.addEventListener('sync', (event) => {
@@ -275,51 +239,20 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
-self.addEventListener('fetch', (event) => {
-  const request = event.request;
-  if (request.method !== 'GET') return;
-  const url = new URL(request.url);
-  if (url.origin !== self.location.origin) return;
-
-  if (request.mode === 'navigate') {
-    event.respondWith(navigate(request, url));
-    return;
-  }
-  if (BUILT.test(url.pathname) || FILES.test(url.pathname)) {
-    event.respondWith(kept(event, request));
-  }
-  // Anything else is not the worker's: it goes to the network as it would without one, and is never stored.
-});
-
-/** A built file or an icon: from the cache if it is there, else from the network and kept. They are the same for everyone. */
-async function kept(event, request) {
-  const cache = await caches.open(CACHE);
-  const found = await cache.match(request);
-  if (found) return found;
-  const response = await fetch(request);
-  if (response.ok && response.type !== 'opaque') event.waitUntil(cache.put(request, response.clone()));
-  return response;
-}
-
-async function navigate(request, url) {
-  try {
-    return await fetch(request);
-  } catch (error) {
-    if (url.pathname === '/' || DESK.test(url.pathname)) {
-      const cache = await caches.open(CACHE);
-      const shell = await cache.match(new Request(url.origin + '/shell'));
-      if (shell) return shell;
-    }
-    return offline();
-  }
-}
-
 `;
 }
 
-/** The page the worker builds for an address it cannot answer without a connection: plain, with no script, and a way back to the Desk. */
-function offlineHtml(): string {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Needs a connection · Tusk</title><style>body{font-family:system-ui,sans-serif;margin:0;display:grid;min-height:100vh;place-items:center;background:#fff;color:#111}main{max-width:28rem;padding:1.5rem}a{color:inherit}@media (prefers-color-scheme:dark){body{background:#111;color:#eee}}</style></head><body><main><h1>This needs a connection</h1><p>Boards, the Inbox and Settings are read from the server, so they are not here while you are offline. Your Desk is: everything on it works, and goes to your other devices when you are back online.</p><p><a href="/desk">Back to your Desk</a></p></main></body></html>`;
+export function workerSource(version: string, files: readonly string[] = []): string {
+  return (
+    serviceWorkerSource({
+      version,
+      cachePrefix: CACHE_PREFIX,
+      precache: files,
+      shell: '/shell',
+      // The design system's grey 900 and white, as the manifest's colours are.
+      offlineColors: { light: ['#ffffff', '#18181b'], dark: ['#18181b', '#fafafa'] },
+    }) + tuskAdditions()
+  );
 }
 
 /**

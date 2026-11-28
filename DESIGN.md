@@ -227,26 +227,33 @@ What was built as Tasks becomes the Desk, and the app is renamed. The roadmap's 
 **Identical to Fjord Web's §6, and read that for the detail.** The flows, the rules and the tests are the same; this section records what it means here,
 with `TUSK_` for `FJORD_`.
 
-Built on **better-auth 1.7**, in a store of its own (§23), with its own migrations. Which methods are offered is set by the environment, so an instance
-can run either or both:
+Built on **the suite's `@sovereignfs/auth`** (since 0.6.0; `sovereign`'s auth.md): better-auth on the package's preset, in a store of its own (§23),
+opened again in the package's shape (`src/auth/store.ts`) and moved onto the package's tables at every start (`src/auth/migrate.ts`). Which methods are
+offered is set by the environment, so an instance can run either or both:
 
-| Method        | Enabled by                                                                     | What                                                                                                                                                                                                                                 |
-| ------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Local**     | `TUSK_AUTH_LOCAL=1`                                                            | Email and password, passkeys, and an authenticator app with ten backup codes. Off means off: `/sign-in`, `/sign-up` and `/api/auth` answer 404                                                                                       |
-| **Sovereign** | `TUSK_CORE_URL`, `TUSK_CORE_CLIENT_ID`, `TUSK_CORE_CLIENT_SECRET`, all or none | OIDC against a core, through `genericOAuth`: authorization code with PKCE S256, the ID token verified against the keys discovery points to. Redirect address `<TUSK_URL>/api/auth/callback/sovereign`; scopes `openid profile email` |
+| Method        | Enabled by                                                                     | What                                                                                                                                                                                                                                                             |
+| ------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Local**     | `TUSK_AUTH_LOCAL=1`                                                            | Email and password, passkeys, and an authenticator app with ten backup codes. Off means off: `/sign-in`, `/sign-up` and the package's routes for them answer 404                                                                                                 |
+| **Sovereign** | `TUSK_CORE_URL`, `TUSK_CORE_CLIENT_ID`, `TUSK_CORE_CLIENT_SECRET`, all or none | OIDC against a core, through the package's `./core` on the SDK's steps: authorization code with PKCE S256. `TUSK_CORE_URL` is the instance's own address, with no path. Redirect address `<TUSK_URL>/api/auth/callback/sovereign`; scopes `openid profile email` |
 
+- **The server never receives a password.** The page derives a sign-in value from it, the address and the instance's vault id (`/api/sign-in-salt`), and
+  checks the length itself; changing it, the authenticator app's steps, linking, unlinking and deleting the account send sign-in values too. A password
+  stored before 0.6.0 (a hash of the password itself) moves at its next sign-in, for 90 days.
 - **The server refuses to start on a setting that is wrong:** a short `TUSK_AUTH_SECRET`, a non-https `TUSK_URL` (localhost aside), a partial set of
   `TUSK_CORE_*`, an SMTP host with no sender.
-- **Who may sign up** is `TUSK_AUTH_SIGNUP`: `closed`, where the first account is made and then sign-up is refused, by the server; or `open`. Unset, it is `closed`, or `open` when a Sovereign core is the only way in, since the core then decides who may sign in.
+- **Who may sign up** is `TUSK_AUTH_SIGNUP`: `closed`, where the first account is made and then sign-up is refused, by the server; or `open`. Unset, it is `closed`, or `open` when a Sovereign core is the only way in. It is for Tusk's own accounts: whoever core signs in gets one, since the core decides who may sign in.
   One policy for both methods, in the user-creation hook. An instance sets `open`, since there the instance decides who may sign in. With sign-up
   closed, the people a self-hoster wants in their workspaces are made by opening it for a while; invitations are phase 2 (§25.5).
 - **Email is optional.** With `TUSK_SMTP_*`, an address must be verified before first sign-in and a forgotten password is reset by a single-use link.
   Without it, sign-up is immediate and no screen offers a reset.
 - **A Sovereign account is identity, not authorization.** Identity is its `sub`, stored as the better-auth account id. `email` and `name` are copied
   when the account is made and not overwritten after.
-- **No implicit linking.** A Sovereign login whose email is a local account's is refused, until the person links the two from a signed-in session, and
-  only when the addresses match. Unlinking can never remove an account's last way to sign in.
-- **Signing out is local.** Ending a Tusk session does not end the Sovereign one.
+- **No implicit linking.** A Sovereign login whose email is a local account's is refused, until the person links the two from a signed-in session,
+  after the password, and only when the Sovereign account's address is no other account's here. Unlinking asks for the password too
+  (`/api/account/unlink-sovereign`), and can never remove an account's last way to sign in.
+- **A session through core follows core's.** It is checked against core every hour, and signing out of it goes through core, which decides whether it
+  ends core's session too. A notice that names one core session ends only the sessions that came from it.
+- **The second step needs a confirmed address**, which an instance without mail cannot confirm: there, Settings says so instead of offering it.
 - **Two-factor is the password's.** A person with Tusk two-factor who links Sovereign is not asked for the Tusk code when signing in through it.
 - **Tested the same way:** auth flows over real requests through `auth.handler` on all three databases, a strict fake Sovereign, a recording of a real
   instance's discovery document, and every security behaviour seen to fail with it switched off.
@@ -1048,11 +1055,15 @@ Fully installable, on desktop and phone, modelled on Sovereign core (`apps/core/
   to steal, and what people write is rendered as text, never as HTML.) The page finds who is signed in **on the device** (`src/identity.ts`, kept by every
   signed-in page and removed at sign-out), makes the same composition the server's layout makes (`SignedInArea`), and chooses the screen from the address,
   since its own tree is not the address's. The Desk's screens read the working copy, so they need nothing more.
-- **Every other address with no network** is answered with a page the worker builds itself, saying that it needs a connection, with a link back to the
-  Desk and a policy that allows no script. **Nothing else is kept:** not a board, the Inbox, Settings, an API's answer or a page with a person's data.
+- **Every other address with no network** is answered with the same shell, which says that it needs a connection, with a link back to the Desk
+  (`OfflineApp`); before a shell is kept, the suite's own offline page says so, with a policy that allows no script. **Nothing else is kept:** not a
+  board, the Inbox, Settings, an API's answer or a page with a person's data.
 - **The worker keeps the build's own files** (the allow-list is `.next/static`, listed when `/sw.js` is served) as it installs, so that the shell can start
   with nothing fetched. The cache is named for the build, a new build is a new worker, and the old cache is removed when the new one activates; it does not
-  take over the pages that are open.
+  take over the pages that are open until one asks, which the registration does when the person chooses Reload on its notice.
+- **The manifest, the worker and its registration are the suite's** (`@sovereignfs/pwa`), with Tusk's cache name, files and shell. Background Sync,
+  Web Push and the wake are added after the package's text until the package's `sync` option and the push packages take them (Sovereign tasks 20.2
+  and 19.7).
 - **It also handles** Background Sync for the Desk (§8.3), and Push in phase 2. A new version activates at the next load, keeping the outbox.
 
 ### 17.10 What the plugins paid to learn
@@ -1171,6 +1182,11 @@ One JSON file, from Settings > Data, or from a workspace's or board's menu, eith
 - **Written deterministically:** ordered by position and id, so that two exports of the same data differ only in `exportedAt`.
 - **The Desk is made and read in the browser,** from the local store and into it, so that it works the same on any encryption mode, with a warning if it
   is encrypted. **Boards and workspaces are made on the server,** since that is where they are.
+
+**Core's export of a person** (`signIn.export`, manifest 5): when the person downloads their data from Sovereign, core asks Tusk for its part at
+`/api/sovereign/export` with a signed token the SDK checks. The part is **Everything**, read on the server as a backup reads it (`takeSnapshot`): the
+Desk's lists and series and every workspace the person owns, as records of the suite's format (`src/portability/core-export.ts`). A Desk sealed with a
+key of the person's own is carried as the server holds it, in files marked end to end; Tusk's own export opens it.
 
 ### 20.2 Import
 

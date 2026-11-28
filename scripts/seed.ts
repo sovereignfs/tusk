@@ -1,3 +1,5 @@
+import type { Database as AuthStore } from '@sovereignfs/auth/database';
+import { AppVault } from '@sovereignfs/sdk/vault';
 import { sql } from 'drizzle-orm';
 import { createAuth } from '../src/auth/auth';
 import type { AuthSettings } from '../src/auth/config';
@@ -6,7 +8,7 @@ import { processEnv } from '../src/config/env';
 import { type Database } from '../src/db/client';
 import { type DatabaseConfig } from '../src/db/config';
 import { getStores } from '../src/db/boot';
-import { dbAll, dbGet, dbRun } from '../src/db/exec';
+import { dbAll, dbRun } from '../src/db/exec';
 import * as postgresSchema from '../src/db/schema/postgres';
 import * as sqliteSchema from '../src/db/schema/sqlite';
 import { many } from '../src/position';
@@ -208,15 +210,14 @@ export interface SeedResult {
 }
 
 /** The account's id, if it exists. */
-async function findUser(auth: Database, email = SEED_EMAIL): Promise<string | undefined> {
-  const user = schema(auth).user;
-  return (await dbGet<{ id: string }>(auth, sql`SELECT id FROM ${user} WHERE email = ${email}`))
-    ?.id;
+async function findUser(auth: AuthStore, email = SEED_EMAIL): Promise<string | undefined> {
+  const { rows } = await auth.run('SELECT id FROM users WHERE email = ?', [email]);
+  return rows[0] ? String(rows[0].id) : undefined;
 }
 
 /** Makes the account through better-auth, with sign-up open for this one call whatever the instance says: it is making a development account. */
 async function makeUser(
-  auth: Database,
+  auth: AuthStore,
   settings: AuthSettings,
   email = SEED_EMAIL,
   name = SEED_NAME,
@@ -227,30 +228,56 @@ async function makeUser(
     database: auth,
   });
   const made = await instance.api.signUpEmail({
-    body: { name, email, password: SEED_PASSWORD },
+    body: { name, email, password: await signInValue(auth, email) },
   });
   return made.user.id;
 }
 
+/**
+ * What the sign-in page sends for `SEED_PASSWORD` (auth.md §4, rule 1): the value the page derives from it with this instance's vault id
+ * (`/api/sign-in-salt`), so that the account signs in by hand with the password.
+ */
+async function signInValue(auth: AuthStore, email: string): Promise<string> {
+  const { localVault } = await import('@sovereignfs/sdk/local-vault');
+  const none = {
+    get: async () => undefined,
+    set: async () => undefined,
+    delete: async () => undefined,
+  };
+  const vault = localVault({
+    clientId: 'tusk',
+    vaultId: await new AppVault(auth).vaultId(),
+    backend: none,
+  });
+  return (await vault.derive(SEED_PASSWORD, email.trim().toLowerCase())).signIn;
+}
+
 /** Takes an account away: its settings row, its sessions and the account itself. */
 async function removeUser(
-  stores: { app: Database; auth: Database },
+  stores: { app: Database; authStore: AuthStore },
   accountId: string,
 ): Promise<void> {
-  const a = schema(stores.auth);
   await dbRun(
     stores.app,
     sql`DELETE FROM ${schema(stores.app).accountSettings} WHERE account_id = ${accountId}`,
   );
-  await dbRun(stores.auth, sql`DELETE FROM ${a.session} WHERE user_id = ${accountId}`);
-  await dbRun(stores.auth, sql`DELETE FROM ${a.account} WHERE user_id = ${accountId}`);
-  await dbRun(stores.auth, sql`DELETE FROM ${a.user} WHERE id = ${accountId}`);
+  await removeSignIn(stores.authStore, accountId);
+}
+
+/** The account's rows in the sign-in store, `@sovereignfs/auth`'s tables: its sessions, its sign-ins and the account itself. */
+async function removeSignIn(auth: AuthStore, accountId: string): Promise<void> {
+  await auth.run('DELETE FROM sessions WHERE user_id = ?', [accountId]);
+  await auth.run('DELETE FROM accounts WHERE user_id = ?', [accountId]);
+  await auth.run('DELETE FROM users WHERE id = ?', [accountId]);
 }
 
 /** Deletes what the seed made, and the account, and nothing else. */
-export async function removeSeed(stores: { app: Database; auth: Database }): Promise<boolean> {
-  const accountId = await findUser(stores.auth);
-  const second = await findUser(stores.auth, SEED2_EMAIL);
+export async function removeSeed(stores: {
+  app: Database;
+  authStore: AuthStore;
+}): Promise<boolean> {
+  const accountId = await findUser(stores.authStore);
+  const second = await findUser(stores.authStore, SEED2_EMAIL);
   // The shared workspace first, by deleting it through the door, so that what is below it goes with it and nothing is left pointing at the accounts.
   if (accountId)
     await removeWorkspaceSeed(
@@ -260,7 +287,7 @@ export async function removeSeed(stores: { app: Database; auth: Database }): Pro
     );
   if (second) await removeUser(stores, second);
   if (!accountId) return second !== undefined;
-  const { app, auth } = stores;
+  const { app } = stores;
   const plan = planSeed(accountId);
   const tables = schema(app);
   const mutationIds = plan.mutations.map((m) => m.mutationId);
@@ -279,26 +306,23 @@ export async function removeSeed(stores: { app: Database; auth: Database }): Pro
     );
   }
   await dbRun(app, sql`DELETE FROM ${tables.accountSettings} WHERE account_id = ${accountId}`);
-  const a = schema(auth);
-  await dbRun(auth, sql`DELETE FROM ${a.session} WHERE user_id = ${accountId}`);
-  await dbRun(auth, sql`DELETE FROM ${a.account} WHERE user_id = ${accountId}`);
-  await dbRun(auth, sql`DELETE FROM ${a.user} WHERE id = ${accountId}`);
+  await removeSignIn(stores.authStore, accountId);
   return true;
 }
 
 export async function runSeed(
-  stores: { app: Database; auth: Database },
+  stores: { app: Database; authStore: AuthStore },
   settings: AuthSettings,
   options: { now?: number } = {},
 ): Promise<SeedResult> {
-  let accountId = await findUser(stores.auth);
+  let accountId = await findUser(stores.authStore);
   const created = accountId === undefined;
-  accountId ??= await makeUser(stores.auth, settings);
+  accountId ??= await makeUser(stores.authStore, settings);
 
   const now = options.now ?? Date.now();
   const secondAccountId =
-    (await findUser(stores.auth, SEED2_EMAIL)) ??
-    (await makeUser(stores.auth, settings, SEED2_EMAIL, SEED2_NAME));
+    (await findUser(stores.authStore, SEED2_EMAIL)) ??
+    (await makeUser(stores.authStore, settings, SEED2_EMAIL, SEED2_NAME));
   for (const mutation of planSeed(accountId).mutations) {
     const result = await applyMutation(stores.app, accountId, mutation, { now });
     if (result.status === 'refused')
@@ -306,7 +330,7 @@ export async function runSeed(
   }
   const workspace = await seedWorkspace(
     stores.app,
-    stores.auth,
+    stores.authStore,
     { one: accountId, two: secondAccountId },
     { now },
   );
